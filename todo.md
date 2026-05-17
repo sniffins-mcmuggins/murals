@@ -5,7 +5,7 @@
 - [x] Artist profile & platform experience — `docs/superpowers/specs/2026-05-17-artist-profile-design.md`
 - [x] Public app — `docs/superpowers/specs/2026-05-17-public-app-design.md`
 - [x] Community boards — `docs/superpowers/specs/2026-05-17-community-boards-design.md`
-- [ ] Magazine & editorial tooling
+- [x] Magazine & editorial tooling — `docs/superpowers/specs/2026-05-17-magazine-editorial-design.md`
 - [ ] Enterprise tier
 
 ## Product & Concept
