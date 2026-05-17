@@ -176,8 +176,8 @@ Once the festival's end date passes:
 
 ---
 
-## Open Questions
+## Decided
 
-- **Waitlist promotion:** when a spot opens up (dropout), should the platform suggest the next-ranked waitlisted artist, or leave it entirely manual? Leaning manual with a visible prompt.
-- **Team role granularity:** admin and manager may be sufficient for launch; a read-only "observer" role (for funders, board members) could be added later.
-- **Clone form behaviour:** when cloning from a previous year, does the clone include custom per-invite question sets, or just the main form? Likely just the main form at launch.
+- **Waitlist promotion:** when a dropout creates an open slot, the platform shows a nudge to the organiser ("Rosa Vane is next on your waitlist — assign her?") based on their drag-ranked waitlist order. The organiser still makes the assignment manually — nothing is automatic.
+- **Team roles:** admin and manager are sufficient for launch. A read-only observer role (for funders, board members) can be added later.
+- **Clone scope:** cloning for next year carries forward the main application form only — not custom per-invite question sets.
