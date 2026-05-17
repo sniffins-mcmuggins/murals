@@ -125,13 +125,11 @@ Saves record the artist, not the individual image. Saves are a personal collecti
 
 ## 7. Community Tab
 
-Contains the **editorial blog feed** only.
+For **public users**, the Community tab contains the **editorial blog feed** only — weekly featured artist posts, editorially written and curated by the platform team. Tapping a post opens the full piece, which links through to the featured artist's profile.
 
-Weekly featured artist posts from the platform's editorial team. Each post features one artist — longform, image-led, editorially written. Being featured is an accolade, not a self-submission.
+For **artists signed in with an artist account**, the Community tab also surfaces **community boards** — the platform-wide forum for artists (public channels, private festival channels they've been invited to, and direct messages). See `2026-05-17-community-boards-design.md` for full detail.
 
-Tapping a post opens the full piece. Each post links through to the featured artist's profile.
-
-Community boards (artist-to-artist discussion) are not part of the public app. They are accessible only through the browser platform and restricted to artists.
+Community boards are never visible to public users under any circumstances.
 
 ---
 
@@ -141,7 +139,7 @@ Community boards (artist-to-artist discussion) are not part of the public app. T
 - The Random mode must never be weighted by any engagement signal — it is random, full stop
 - The Home feed is editorially curated by the team — no algorithmic ordering
 - QR scanning uses the device's native camera — no in-app scanner
-- Community tab shows editorial blog content only — community boards are not visible to the public
+- Community tab shows editorial blog content to public users — community boards are visible only to signed-in artists, never to the public
 - Festival detection is a soft prompt — the app never hard-redirects without user confirmation
 - Account creation is never required to use the app — it is always optional
 - The "Support this artist" link opens externally — the platform takes no commission

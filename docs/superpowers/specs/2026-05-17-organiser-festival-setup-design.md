@@ -123,12 +123,11 @@ This information is visible to accepted artists in their festival dashboard. It 
 
 ## 8. Communications
 
-**Festival chat** (via embedded infrastructure — Stream / Sendbird / Pusher):
-- A group channel is created automatically when the festival goes live
-- Organiser can message all accepted artists; artists can reply and see each other's questions
-- Direct messages: organiser to individual artist for private conversations
+Festival communication happens through **community boards** (see `2026-05-17-community-boards-design.md`) — there is no separate festival chat system.
 
-**Announcement blast:** before go-live, the organiser can send a message to all accepted/invited artists notifying them the festival is about to go live.
+The organiser creates a **private festival channel** within community boards and manually invites accepted artists via a GUI with an Add All option. All festival-specific communication — announcements, Q&A, logistics — happens in that channel. Organiser-to-individual-artist private conversations happen via direct messages.
+
+**Announcement blast:** before go-live, the organiser posts in the private festival channel to notify accepted artists the festival is about to go live.
 
 ---
 

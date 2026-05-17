@@ -4,7 +4,7 @@
 - [x] Organiser festival setup — `docs/superpowers/specs/2026-05-17-organiser-festival-setup-design.md`
 - [x] Artist profile & platform experience — `docs/superpowers/specs/2026-05-17-artist-profile-design.md`
 - [x] Public app — `docs/superpowers/specs/2026-05-17-public-app-design.md`
-- [ ] Community boards
+- [x] Community boards — `docs/superpowers/specs/2026-05-17-community-boards-design.md`
 - [ ] Magazine & editorial tooling
 - [ ] Enterprise tier
 
