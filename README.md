@@ -172,7 +172,6 @@ The Discover feature gives them a reason to open the app between festivals — n
 - Social links (Instagram, website, TikTok, etc.)
 - Branded QR code (downloadable, printable — A5 card, wall label sizes)
 - Analytics (profile views, QR scans, link clicks, application views)
-- Blog posts (appears on profile, written via app)
 - "Support this artist" donation link (Buy Me a Coffee or similar)
 - Festival appearance badge (links to festival map, pre-pinned to their location)
 
