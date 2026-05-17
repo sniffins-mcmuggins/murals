@@ -6,7 +6,7 @@
 - [x] Public app — `docs/superpowers/specs/2026-05-17-public-app-design.md`
 - [x] Community boards — `docs/superpowers/specs/2026-05-17-community-boards-design.md`
 - [x] Magazine & editorial tooling — `docs/superpowers/specs/2026-05-17-magazine-editorial-design.md`
-- [ ] Enterprise tier
+- [ ] Enterprise tier — deferred until first enterprise conversation happens
 
 ## Product & Concept
 - [ ] Platform name — Render (renderltd.com) is the frontrunner, confirm and lock
