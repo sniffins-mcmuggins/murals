@@ -5,26 +5,38 @@ export async function pause(ms: number): Promise<void> {
 }
 
 export async function slowType(locator: Locator, text: string, delayMs = 75): Promise<void> {
-  await locator.click();
-  await locator.pressSequentially(text, { delay: delayMs });
+  try {
+    await locator.click();
+    await locator.pressSequentially(text, { delay: delayMs });
+  } catch {
+    console.warn(`slowType: locator not found or not clickable`);
+  }
 }
 
 export async function scrollTo(page: Page, selector: string): Promise<void> {
-  await page.locator(selector).scrollIntoViewIfNeeded();
+  try {
+    await page.locator(selector).scrollIntoViewIfNeeded();
+  } catch {
+    console.warn(`scrollTo: selector "${selector}" not found`);
+  }
   await pause(500);
 }
 
 export async function highlight(page: Page, selector: string, durationMs = 900): Promise<void> {
-  await page.evaluate(
+  const found = await page.evaluate(
     ({ sel, dur }) => {
       const el = document.querySelector(sel) as HTMLElement | null;
-      if (!el) return;
+      if (!el) {
+        console.warn(`highlight: selector "${sel}" not found`);
+        return false;
+      }
       const orig = el.style.outline;
       el.style.outline = '3px solid #E8A838';
       el.style.outlineOffset = '3px';
       setTimeout(() => { el.style.outline = orig; el.style.outlineOffset = ''; }, dur);
+      return true;
     },
     { sel: selector, dur: durationMs }
   );
-  await pause(durationMs + 200);
+  if (found) await pause(durationMs + 200);
 }
