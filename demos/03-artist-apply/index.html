@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>[ Platform Name ] — Demo 03: Artist Apply</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+:root{
+  --ink:#1A1A2E;--amber:#E8A838;--clay:#C45C3A;
+  --offwhite:#FAF7F2;--warm:#F0EAE0;--mid:#8A8896;
+  --light:#E2DDD6;--green:#2D9B6F;--red:#C4503A;
+}
+body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink)}
+
+/* ─── SCREENS ─── */
+.screen{display:none;min-height:100vh;animation:fadeIn 0.3s ease}
+.screen.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ─── NAV ─── */
+.app-nav{
+  position:sticky;top:0;z-index:500;
+  background:rgba(26,26,46,0.97);backdrop-filter:blur(12px);
+  padding:12px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.nav-back{
+  display:flex;align-items:center;gap:8px;
+  background:none;border:none;cursor:pointer;
+  color:var(--amber);font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  padding:6px 0;opacity:0;pointer-events:none;transition:opacity 0.2s;
+}
+.nav-back.show{opacity:1;pointer-events:all}
+.nav-logo{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;font-weight:300;color:var(--offwhite);
+  position:absolute;left:50%;transform:translateX(-50%);
+}
+.nav-logo span{color:var(--amber);font-style:italic}
+.nav-right{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--mid);
+}
+
+/* ─── LABEL ─── */
+.lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;display:block;margin-bottom:12px}
+
+/* ══════════════════════════════════
+   HOME SCREEN
+══════════════════════════════════ */
+.home-hero{
+  background:var(--ink);
+  padding:56px 24px 48px;
+  position:relative;overflow:hidden;
+}
+.home-hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--amber)}
+.home-hero-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(44px,10vw,80px);
+  font-weight:300;line-height:0.95;
+  color:var(--offwhite);letter-spacing:-1px;
+  margin-bottom:6px;
+}
+.home-hero-title em{color:var(--amber);font-style:italic}
+.home-hero-title .br{color:rgba(255,255,255,0.2)}
+.home-sub{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(15px,3vw,22px);
+  color:rgba(250,247,242,0.45);
+  font-weight:300;margin-top:16px;
+  max-width:480px;line-height:1.5;
+}
+.home-body{max-width:600px;margin:0 auto;padding:0 24px}
+.home-section-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:26px;font-weight:300;
+  color:var(--ink);margin:40px 0 16px;
+}
+.home-section-title em{color:var(--clay);font-style:italic}
+
+/* Festival cards */
+.fest-card{
+  background:white;border:1px solid var(--light);
+  border-radius:8px;margin-bottom:12px;
+  overflow:hidden;cursor:pointer;
+  transition:transform 0.15s,box-shadow 0.15s;
+}
+.fest-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(26,26,46,0.1)}
+.fest-card-img{
+  width:100%;height:140px;object-fit:cover;
+  background:linear-gradient(135deg,var(--clay),var(--amber));
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.fest-card-img .year-badge{
+  position:absolute;top:12px;right:12px;
+  background:var(--ink);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:4px 10px;border-radius:3px;
+}
+.fest-card-img .live-badge{
+  position:absolute;top:12px;left:12px;
+  background:var(--clay);color:white;
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:4px 10px;border-radius:3px;
+}
+.fest-card-img .coming-badge{
+  position:absolute;top:12px;left:12px;
+  background:rgba(26,26,46,0.7);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:4px 10px;border-radius:3px;
+}
+.fest-card-img-inner{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;
+  font-size:48px;font-weight:300;
+  color:rgba(255,255,255,0.2);
+}
+.fest-card-body{padding:16px 18px}
+.fest-card-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;font-weight:600;color:var(--ink);
+  margin-bottom:4px;
+}
+.fest-card-meta{font-size:11px;color:var(--mid);margin-bottom:10px}
+.fest-card-desc{font-size:12px;color:#5A5A6A;line-height:1.6;font-weight:300;margin-bottom:12px}
+.fest-card-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding-top:10px;border-top:1px solid var(--light);
+}
+.fest-card-stats{font-size:11px;color:var(--mid)}
+.btn-view{
+  background:var(--ink);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:7px 14px;border-radius:3px;
+  border:none;cursor:pointer;transition:background 0.15s;
+}
+.btn-view:hover{background:var(--clay)}
+.btn-view.amber{background:var(--amber);color:var(--ink)}
+.btn-view.amber:hover{background:#d4952e}
+
+/* ══════════════════════════════════
+   FESTIVAL SCREEN
+══════════════════════════════════ */
+.fest-header{
+  background:var(--ink);
+  padding:28px 24px 24px;
+  border-bottom:3px solid var(--amber);
+}
+.fest-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(26px,6vw,42px);font-weight:600;
+  color:var(--offwhite);line-height:1.1;
+  margin-bottom:4px;
+}
+.fest-meta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.fest-meta-pill{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:1.5px;padding:5px 10px;border-radius:3px;
+  background:rgba(255,255,255,0.08);color:rgba(250,247,242,0.6);
+}
+.fest-meta-pill.amber{background:var(--amber);color:var(--ink)}
+
+/* ══════════════════════════════════
+   ORGANISER HEADER (reused for notifications)
+══════════════════════════════════ */
+.org-header{
+  background:var(--ink);padding:24px;
+  border-bottom:3px solid var(--amber);
+}
+.org-fest-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(22px,5vw,36px);font-weight:600;
+  color:var(--offwhite);line-height:1;
+  margin-bottom:4px;
+}
+
+/* ─── UTILS ─── */
+.divider{height:1px;background:var(--light);margin:24px 0}
+.section-block{padding:0 24px}
+.mb16{margin-bottom:16px}
+
+/* ── new for demo 03 ── */
+.apply-hero{background:var(--ink);padding:28px 24px 24px;border-bottom:3px solid var(--amber)}
+.apply-section{padding:24px}
+.apply-section h2{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:var(--ink);margin-bottom:20px}
+.form-step{margin-bottom:24px}
+.form-step label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--mid);display:block;margin-bottom:6px}
+.form-step input,.form-step textarea,.form-step select{width:100%;background:white;border:1px solid var(--light);border-radius:4px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);outline:none;margin-bottom:4px}
+.form-step input:focus,.form-step textarea:focus{border-color:var(--amber)}
+.form-step textarea{min-height:90px;resize:vertical}
+.form-step .hint{font-size:11px;color:var(--mid)}
+.radio-row{display:flex;gap:10px;flex-wrap:wrap}
+.radio-opt{background:var(--warm);border:1px solid var(--light);border-radius:4px;padding:8px 14px;font-size:12px;cursor:pointer;transition:border-color 0.15s,background 0.15s}
+.radio-opt.selected{border-color:var(--amber);background:rgba(232,168,56,0.1);color:var(--ink)}
+.submit-btn{width:100%;background:var(--amber);color:var(--ink);border:none;border-radius:4px;padding:14px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;margin-top:8px}
+.submitted-hero{background:var(--ink);padding:48px 24px;text-align:center}
+.submitted-icon{font-size:48px;margin-bottom:16px}
+.submitted-hero h2{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--offwhite);margin-bottom:8px}
+.submitted-hero p{font-size:13px;color:var(--mid);line-height:1.7}
+.notif-item{background:white;border:1px solid var(--light);border-radius:6px;padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s}
+.notif-item.unread{border-color:var(--amber);border-left:4px solid var(--amber)}
+.notif-item:hover{border-color:var(--amber)}
+.notif-sender{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1.5px;color:var(--clay);margin-bottom:4px}
+.notif-title{font-size:14px;font-weight:500;color:var(--ink);margin-bottom:2px}
+.notif-preview{font-size:11px;color:var(--mid)}
+.acceptance-card{background:white;border:1px solid var(--light);border-radius:8px;overflow:hidden;margin:24px}
+.acceptance-card .ac-header{background:var(--ink);padding:20px;text-align:center}
+.acceptance-card .ac-icon{font-size:36px;margin-bottom:8px}
+.acceptance-card .ac-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;color:var(--offwhite)}
+.acceptance-card .ac-body{padding:20px}
+.acceptance-card .ac-body p{font-size:13px;color:#5A5A6A;line-height:1.7;margin-bottom:12px}
+.acceptance-highlight{background:var(--warm);border-left:3px solid var(--amber);padding:12px 16px;border-radius:0 4px 4px 0;margin-bottom:16px}
+.acceptance-highlight p{font-size:12px;color:var(--ink);font-weight:500;margin:0}
+</style>
+</head>
+<body>
+<nav class="app-nav" id="appNav">
+  <button class="nav-back" id="backBtn" onclick="goBack()" style="opacity:0;pointer-events:none;display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;color:var(--amber);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px">← Back</button>
+  <div class="nav-logo">[ Platform <span>Name</span> ]</div>
+  <div class="nav-right" id="navRight">Demo</div>
+</nav>
+
+<!-- HOME -->
+<div id="s-home" class="screen active">
+  <div class="home-hero">
+    <span class="lbl" style="color:var(--amber)">Paint Festival Platform</span>
+    <div class="home-hero-title">[ Platform <em>Name</em> ]</div>
+    <p class="home-sub">The home for paint festivals and the artists who make them.</p>
+  </div>
+  <div class="home-body">
+    <p class="home-section-title">Coming <em>soon</em></p>
+    <div class="fest-card" onclick="showScreen('s-festival-open')">
+      <div class="fest-card-img" style="background:linear-gradient(135deg,var(--clay),var(--amber))">
+        <div class="fest-card-img-inner" style="font-family:'Cormorant Garamond',serif;font-size:36px;color:rgba(255,255,255,0.25)">CPF 2027</div>
+        <span class="live-badge" style="background:var(--green)">APPLICATIONS OPEN</span>
+        <span class="year-badge">Cheltenham</span>
+      </div>
+      <div class="fest-card-body">
+        <div class="fest-card-name">Cheltenham Paint Festival 2027</div>
+        <div class="fest-card-meta">October 2027 · Cheltenham Town Centre · Applications close 28 Feb 2027</div>
+        <div class="fest-card-desc">The 11th edition of Cheltenham's flagship paint festival. 12 artist slots. All mediums welcome. Walls across the town centre.</div>
+        <div class="fest-card-footer">
+          <span class="fest-card-stats">12 slots · Closes 28 Feb 2027</span>
+          <button class="btn-view amber">APPLY NOW</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FESTIVAL OPEN -->
+<div id="s-festival-open" class="screen">
+  <div class="apply-hero">
+    <span class="lbl" style="color:var(--green)">● Applications Open</span>
+    <div class="fest-name">Cheltenham<br>Paint Festival 2027</div>
+    <div class="fest-meta-row">
+      <span class="fest-meta-pill amber">CLOSES 28 FEB 2027</span>
+      <span class="fest-meta-pill">October 2027</span>
+      <span class="fest-meta-pill">Cheltenham, GL50</span>
+    </div>
+  </div>
+  <div style="padding:20px 24px;background:var(--warm);border-bottom:1px solid var(--light)">
+    <p style="font-size:13px;color:#5A5A6A;line-height:1.7;font-weight:300;margin-bottom:12px">The 11th edition of Cheltenham Paint Festival returns October 2027. 12 artist slots, walls across the town centre. All mediums. All scales. Local and international artists welcome.</p>
+    <button class="btn-view amber" style="font-size:9px" onclick="showScreen('s-apply-form')">APPLY TO CPF 2027 →</button>
+  </div>
+  <div style="padding:20px 24px">
+    <p class="home-section-title" style="margin-top:0">What we look for</p>
+    <p style="font-size:13px;color:#5A5A6A;line-height:1.7">Large-scale ambition, site-specific thinking, community engagement. We welcome artists at all career stages — CPF has launched careers and it should keep doing that.</p>
+  </div>
+</div>
+
+<!-- APPLICATION FORM -->
+<div id="s-apply-form" class="screen">
+  <div class="apply-hero">
+    <span class="lbl" style="color:var(--amber)">Your Application</span>
+    <div class="fest-name">CPF 2027</div>
+  </div>
+  <div class="apply-section">
+    <div class="form-step">
+      <label>Describe the work you are proposing</label>
+      <textarea id="q-proposed" placeholder="Tell us about the piece you have in mind…"></textarea>
+    </div>
+    <div class="form-step">
+      <label>Wall size required (W × H in metres)</label>
+      <input id="q-wall" type="text" placeholder="e.g. 12m × 8m">
+    </div>
+    <div class="form-step">
+      <label>Have you worked on outdoor murals at this scale before?</label>
+      <div class="radio-row">
+        <div class="radio-opt" id="rq-yes" onclick="selectRadio('rq','yes')">Yes</div>
+        <div class="radio-opt" id="rq-no" onclick="selectRadio('rq','no')">No</div>
+      </div>
+    </div>
+    <div class="form-step">
+      <label>Three examples of your recent work (URLs)</label>
+      <input id="q-p1" type="text" placeholder="kharrow.co.uk/cheltenham-college">
+      <input id="q-p2" type="text" placeholder="kharrow.co.uk/oxford-street-2024">
+      <input id="q-p3" type="text" placeholder="instagram.com/kit.harrow">
+    </div>
+    <div class="form-step">
+      <label>Do you have public liability insurance?</label>
+      <div class="radio-row">
+        <div class="radio-opt" id="ri-yes" onclick="selectRadio('ri','yes')">Yes</div>
+        <div class="radio-opt" id="ri-no" onclick="selectRadio('ri','no')">No</div>
+      </div>
+    </div>
+    <div class="form-step">
+      <label>Preferred medium</label>
+      <div class="radio-row">
+        <div class="radio-opt" id="rm-spray" onclick="selectRadio('rm','spray')">Spray</div>
+        <div class="radio-opt" id="rm-brush" onclick="selectRadio('rm','brush')">Brush</div>
+        <div class="radio-opt" id="rm-mixed" onclick="selectRadio('rm','mixed')">Mixed</div>
+      </div>
+    </div>
+    <div class="form-step">
+      <label>Are you available for the full festival period (3–19 October)?</label>
+      <div class="radio-row">
+        <div class="radio-opt" id="ra-full" onclick="selectRadio('ra','full')">Yes — full period</div>
+        <div class="radio-opt" id="ra-partial" onclick="selectRadio('ra','partial')">Partial</div>
+        <div class="radio-opt" id="ra-no" onclick="selectRadio('ra','no')">No</div>
+      </div>
+    </div>
+    <div class="form-step">
+      <label>Anything else the panel should know? <span class="hint">(Optional)</span></label>
+      <textarea id="q-other" placeholder="Optional…"></textarea>
+    </div>
+    <button class="submit-btn" onclick="showScreen('s-submitted')">SUBMIT APPLICATION →</button>
+  </div>
+</div>
+
+<!-- SUBMITTED -->
+<div id="s-submitted" class="screen">
+  <div class="submitted-hero">
+    <div class="submitted-icon">✓</div>
+    <h2>Application submitted</h2>
+    <p>Thank you, Kit. We'll review your application and be in touch by March 2027. You'll get a notification here and by email.</p>
+  </div>
+  <div style="padding:24px">
+    <p style="font-size:13px;color:var(--mid);margin-bottom:16px">While you wait, explore other artists on the platform or follow festivals you're interested in.</p>
+    <button class="btn-view" style="font-size:9px" onclick="showScreen('s-notifications')">VIEW NOTIFICATIONS →</button>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div id="s-notifications" class="screen">
+  <div class="org-header" style="padding:20px 24px">
+    <span class="lbl" style="color:var(--amber)">Notifications</span>
+    <div class="org-fest-name" style="font-size:24px">Inbox</div>
+  </div>
+  <div style="padding:20px 24px">
+    <div class="notif-item unread" onclick="showScreen('s-acceptance')">
+      <div class="notif-sender">CHELTENHAM PAINT FESTIVAL 2027</div>
+      <div class="notif-title">🎉 Your application has been accepted</div>
+      <div class="notif-preview">Congratulations Kit — we're delighted to offer you a place at CPF 2027…</div>
+    </div>
+    <div class="notif-item" style="opacity:0.5">
+      <div class="notif-sender">PLATFORM</div>
+      <div class="notif-title">Application received — CPF 2027</div>
+      <div class="notif-preview">We've received your application. You'll hear back by March 2027.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ACCEPTANCE -->
+<div id="s-acceptance" class="screen">
+  <div class="acceptance-card">
+    <div class="ac-header">
+      <div class="ac-icon">🎉</div>
+      <div class="ac-title">You're in, Kit.</div>
+    </div>
+    <div class="ac-body">
+      <p>Congratulations — the CPF selection panel is delighted to offer you a place at <strong>Cheltenham Paint Festival 2027</strong>.</p>
+      <div class="acceptance-highlight"><p>Festival dates: 3–19 October 2027</p></div>
+      <div class="acceptance-highlight"><p>Your wall: to be confirmed. We'll be in touch by April 2027 with location details.</p></div>
+      <p>Next steps: you'll receive an artist agreement by email. Please sign and return it within 14 days.</p>
+      <button class="btn-view amber" style="width:100%;text-align:center;font-size:9px">VIEW FESTIVAL DETAILS →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let screenHistory = ['s-home'];
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if(screenHistory[screenHistory.length-1]!==id) screenHistory.push(id);
+  const back=document.getElementById('backBtn');
+  if(back){ back.style.opacity=screenHistory.length>1?'1':'0'; back.style.pointerEvents=screenHistory.length>1?'all':'none'; }
+}
+function goBack(){
+  if(screenHistory.length<=1) return;
+  screenHistory.pop();
+  showScreen(screenHistory[screenHistory.length-1]);
+}
+function selectRadio(group, val){
+  document.querySelectorAll(`[id^="${group}-"]`).forEach(el=>el.classList.remove('selected'));
+  document.getElementById(`${group}-${val}`)?.classList.add('selected');
+}
+</script>
+</body>
+</html>
