@@ -5,7 +5,7 @@ export default defineConfig({
   testMatch: '**/*.ts',
   use: {
     headless: false,
-    slowMo: 80,
+    slowMo: 27,
     video: 'on',
     launchOptions: {
       args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage'],

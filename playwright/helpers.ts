@@ -4,7 +4,7 @@ export async function pause(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function slowType(locator: Locator, text: string, delayMs = 75): Promise<void> {
+export async function slowType(locator: Locator, text: string, delayMs = 25): Promise<void> {
   try {
     await locator.click();
     await locator.pressSequentially(text, { delay: delayMs });
@@ -19,10 +19,10 @@ export async function scrollTo(page: Page, selector: string): Promise<void> {
   } catch {
     console.warn(`scrollTo: selector "${selector}" not found`);
   }
-  await pause(500);
+  await pause(167);
 }
 
-export async function highlight(page: Page, selector: string, durationMs = 900): Promise<void> {
+export async function highlight(page: Page, selector: string, durationMs = 300): Promise<void> {
   const found = await page.evaluate(
     ({ sel, dur }) => {
       const el = document.querySelector(sel) as HTMLElement | null;
@@ -38,5 +38,5 @@ export async function highlight(page: Page, selector: string, durationMs = 900):
     },
     { sel: selector, dur: durationMs }
   );
-  if (found) await pause(durationMs + 200);
+  if (found) await pause(durationMs + 67);
 }
