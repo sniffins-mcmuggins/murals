@@ -35,7 +35,7 @@ body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink
   font-size:10px;letter-spacing:2px;text-transform:uppercase;
   padding:6px 0;opacity:0;pointer-events:none;transition:opacity 0.2s;
 }
-.nav-back.show{opacity:1;pointer-events:all}
+.nav-back.show{opacity:1;pointer-events:auto}
 .nav-logo{
   font-family:'Cormorant Garamond',serif;
   font-size:18px;font-weight:300;color:var(--offwhite);
@@ -393,7 +393,7 @@ function showScreen(id){
   window.scrollTo(0,0);
   if(screenHistory[screenHistory.length-1]!==id) screenHistory.push(id);
   const back=document.getElementById('backBtn');
-  if(back){ back.style.opacity=screenHistory.length>1?'1':'0'; back.style.pointerEvents=screenHistory.length>1?'all':'none'; }
+  if(back){ back.style.opacity=screenHistory.length>1?'1':'0'; back.style.pointerEvents=screenHistory.length>1?'auto':'none'; }
 }
 function goBack(){
   if(screenHistory.length<=1) return;
