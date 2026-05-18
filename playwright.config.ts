@@ -7,6 +7,9 @@ export default defineConfig({
     headless: false,
     slowMo: 80,
     video: 'on',
+    launchOptions: {
+      args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage'],
+    },
   },
   outputDir: './output',
   reporter: 'list',
