@@ -644,7 +644,7 @@ body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink
       <img class="app-avatar" src="https://picsum.photos/seed/rosa/80/80" alt="">
       <div class="app-info"><div class="app-name">Rosa Vane</div><div class="app-detail">Large-scale figural · Bristol · CPF 2024, 2025</div></div>
       <span class="app-status accepted">ACCEPTED</span>
-      <div class="app-actions"><button class="btn-profile" onclick="showArtistDetail('rosa')">VIEW</button></div>
+      <div class="app-actions"><button class="btn-profile" onclick="showAppDetail('rosa')">VIEW</button></div>
     </div>
     <div class="app-item" id="app-kit-live" style="border-color:var(--amber)">
       <img class="app-avatar" src="https://picsum.photos/seed/kit/80/80" alt="">
@@ -728,6 +728,12 @@ const CPF_QUESTIONS = [
 ];
 
 const APP_DATA = {
+  rosa: {
+    name:'Rosa Vane', meta:'Large-scale figural · Bristol · CPF 2024, 2025',
+    proposed:'Monumental figures in conversation with architecture.',
+    wall:'15m W × 10m H',
+    portfolio:['rosavane.co.uk/work','instagram.com/rosavane'],
+  },
   kit: {
     name:'Kit Harrow', meta:'Typography & text · Cheltenham-based · CPF 2025 alumni',
     proposed:'A piece built entirely from words that already exist on this building — <em>found text, amplified</em>. Planning permissions, planning notices, decades of civic language, reconfigured into something that feels inevitable.',
