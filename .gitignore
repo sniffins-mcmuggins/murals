@@ -3,6 +3,7 @@ videos/
 node_modules/
 dist/
 .worktrees/
+.env
 
 # Go
 api/bin/
