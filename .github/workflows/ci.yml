@@ -62,8 +62,13 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Build golangci-lint from module
+        run: go build -o $(go env GOPATH)/bin/golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+
       - name: golangci-lint
-        run: go tool golangci-lint run
+        uses: golangci/golangci-lint-action@v9
+        with:
+          install-mode: none
 
       - name: Test
         run: go test ./... -race -count=1
