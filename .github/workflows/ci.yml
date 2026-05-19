@@ -62,9 +62,7 @@ jobs:
         run: go mod download
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          install-mode: none
+        run: go tool golangci-lint run ./...
 
       - name: Test
         run: go test ./... -race -count=1
