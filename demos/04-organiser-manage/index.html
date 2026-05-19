@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>[ Platform Name ] — Organiser Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow-x:hidden}
+:root{
+  --ink:#1A1A2E;--amber:#E8A838;--clay:#C45C3A;
+  --offwhite:#FAF7F2;--warm:#F0EAE0;--mid:#8A8896;
+  --light:#E2DDD6;--green:#3D9970;--red:#C0392B;
+}
+body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink)}
+
+/* ─── SCREENS ─── */
+.screen{display:none;min-height:100vh;animation:fadeIn 0.3s ease}
+.screen.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ─── NAV ─── */
+.app-nav{
+  position:sticky;top:0;z-index:500;
+  background:rgba(26,26,46,0.97);backdrop-filter:blur(12px);
+  padding:12px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.nav-back{
+  display:flex;align-items:center;gap:8px;
+  background:none;border:none;cursor:pointer;
+  color:var(--amber);font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:2px;text-transform:uppercase;
+  padding:6px 0;opacity:0;pointer-events:none;transition:opacity 0.2s;
+}
+.nav-back.show{opacity:1;pointer-events:all}
+.nav-logo{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;font-weight:300;color:var(--offwhite);
+  position:absolute;left:50%;transform:translateX(-50%);
+}
+.nav-logo span{color:var(--amber);font-style:italic}
+.nav-right{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--mid);
+}
+
+/* ─── LABEL ─── */
+.lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;display:block;margin-bottom:12px}
+
+/* ══════════════════════════════════
+   HOME SCREEN
+══════════════════════════════════ */
+.home-hero{
+  background:var(--ink);
+  padding:56px 24px 48px;
+  position:relative;overflow:hidden;
+}
+.home-hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--amber)}
+.home-hero-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(44px,10vw,80px);
+  font-weight:300;line-height:0.95;
+  color:var(--offwhite);letter-spacing:-1px;
+  margin-bottom:6px;
+}
+.home-hero-title em{color:var(--amber);font-style:italic}
+.home-hero-title .br{color:rgba(255,255,255,0.2)}
+.home-sub{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(15px,3vw,22px);
+  color:rgba(250,247,242,0.45);
+  font-weight:300;margin-top:16px;
+  max-width:480px;line-height:1.5;
+}
+.home-body{max-width:600px;margin:0 auto;padding:0 24px}
+.home-section-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:26px;font-weight:300;
+  color:var(--ink);margin:40px 0 16px;
+}
+.home-section-title em{color:var(--clay);font-style:italic}
+
+/* Festival cards */
+.fest-card{
+  background:white;border:1px solid var(--light);
+  border-radius:8px;margin-bottom:12px;
+  overflow:hidden;cursor:pointer;
+  transition:transform 0.15s,box-shadow 0.15s;
+}
+.fest-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(26,26,46,0.1)}
+.fest-card-img{
+  width:100%;height:140px;object-fit:cover;
+  background:linear-gradient(135deg,var(--clay),var(--amber));
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.fest-card-img .year-badge{
+  position:absolute;top:12px;right:12px;
+  background:var(--ink);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:4px 10px;border-radius:3px;
+}
+.fest-card-img .live-badge{
+  position:absolute;top:12px;left:12px;
+  background:var(--clay);color:white;
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:4px 10px;border-radius:3px;
+}
+.fest-card-img .coming-badge{
+  position:absolute;top:12px;left:12px;
+  background:rgba(26,26,46,0.7);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:4px 10px;border-radius:3px;
+}
+.fest-card-img-inner{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;
+  font-size:48px;font-weight:300;
+  color:rgba(255,255,255,0.2);
+}
+.fest-card-body{padding:16px 18px}
+.fest-card-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;font-weight:600;color:var(--ink);
+  margin-bottom:4px;
+}
+.fest-card-meta{font-size:11px;color:var(--mid);margin-bottom:10px}
+.fest-card-desc{font-size:12px;color:#5A5A6A;line-height:1.6;font-weight:300;margin-bottom:12px}
+.fest-card-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  padding-top:10px;border-top:1px solid var(--light);
+}
+.fest-card-stats{font-size:11px;color:var(--mid)}
+.btn-view{
+  background:var(--ink);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:7px 14px;border-radius:3px;
+  border:none;cursor:pointer;transition:background 0.15s;
+}
+.btn-view:hover{background:var(--clay)}
+.btn-view.amber{background:var(--amber);color:var(--ink)}
+.btn-view.amber:hover{background:#d4952e}
+
+/* email capture */
+.email-capture{
+  background:var(--ink);border-radius:8px;
+  padding:28px 24px;margin:32px 0;
+}
+.email-capture h3{
+  font-family:'Cormorant Garamond',serif;
+  font-size:24px;font-weight:300;
+  color:var(--offwhite);margin-bottom:6px;
+}
+.email-capture p{font-size:12px;color:var(--mid);margin-bottom:16px;font-weight:300}
+.email-row{display:flex;gap:8px}
+.email-input{
+  flex:1;background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12);border-radius:4px;
+  padding:10px 14px;color:var(--offwhite);font-size:12px;
+  font-family:'DM Sans',sans-serif;outline:none;
+}
+.email-input::placeholder{color:rgba(138,136,150,0.6)}
+.email-input:focus{border-color:var(--amber)}
+.btn-submit{
+  background:var(--amber);color:var(--ink);
+  border:none;border-radius:4px;padding:10px 18px;
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;cursor:pointer;white-space:nowrap;
+}
+
+/* ══════════════════════════════════
+   FESTIVAL SCREEN
+══════════════════════════════════ */
+.fest-header{
+  background:var(--ink);
+  padding:28px 24px 24px;
+  border-bottom:3px solid var(--amber);
+}
+.fest-header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.fest-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(26px,6vw,42px);font-weight:600;
+  color:var(--offwhite);line-height:1.1;
+  margin-bottom:4px;
+}
+.fest-meta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.fest-meta-pill{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:1.5px;padding:5px 10px;border-radius:3px;
+  background:rgba(255,255,255,0.08);color:rgba(250,247,242,0.6);
+}
+.fest-meta-pill.amber{background:var(--amber);color:var(--ink)}
+.btn-org-view{
+  background:rgba(232,168,56,0.15);
+  border:1px solid var(--amber);color:var(--amber);
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:8px 14px;border-radius:3px;
+  cursor:pointer;white-space:nowrap;transition:background 0.15s;
+  flex-shrink:0;
+}
+.btn-org-view:hover{background:rgba(232,168,56,0.25)}
+
+/* Tabs */
+.fest-tabs{
+  display:flex;background:var(--ink);
+  border-bottom:1px solid rgba(255,255,255,0.07);
+}
+.fest-tab{
+  flex:1;padding:12px;text-align:center;
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;text-transform:uppercase;
+  color:var(--mid);cursor:pointer;border:none;
+  background:none;transition:color 0.15s;
+  border-bottom:2px solid transparent;
+}
+.fest-tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+
+/* Artist list below map */
+.artist-list{padding:20px 24px}
+.artist-list-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px;font-weight:600;
+  color:var(--ink);margin-bottom:16px;
+}
+.artist-row{
+  display:flex;align-items:center;gap:14px;
+  padding:12px 0;border-bottom:1px solid var(--light);
+  cursor:pointer;transition:background 0.1s;
+}
+.artist-row:hover{background:rgba(232,168,56,0.04);margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:4px}
+.artist-row-avatar{
+  width:44px;height:44px;border-radius:50%;
+  object-fit:cover;flex-shrink:0;border:2px solid var(--light);
+}
+.artist-row-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;font-weight:600;color:var(--ink);
+}
+.artist-row-medium{font-size:11px;color:var(--mid)}
+.artist-row-loc{
+  margin-left:auto;font-size:10px;color:var(--mid);
+  text-align:right;flex-shrink:0;
+}
+
+/* ══════════════════════════════════
+   ARTIST PROFILE SCREEN
+══════════════════════════════════ */
+.artist-hero{
+  background:var(--ink);
+  padding:32px 24px 28px;
+  position:relative;overflow:hidden;
+}
+.artist-hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--clay)}
+.artist-avatar{
+  width:72px;height:72px;border-radius:50%;
+  object-fit:cover;border:3px solid var(--clay);
+  margin-bottom:14px;
+}
+.artist-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(32px,8vw,52px);font-weight:600;
+  color:var(--offwhite);line-height:1;
+  margin-bottom:4px;
+}
+.artist-medium-tag{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;padding:5px 12px;border-radius:3px;
+  background:var(--clay);color:white;display:inline-block;
+  margin-bottom:12px;
+}
+.artist-location{
+  font-size:12px;color:rgba(250,247,242,0.45);
+  font-weight:300;
+}
+
+.artist-body{padding:24px}
+.artist-bio{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;font-weight:300;
+  line-height:1.65;color:var(--ink);
+  margin-bottom:24px;
+}
+.artist-bio em{color:var(--clay);font-style:italic}
+
+/* Gallery */
+.gallery-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:6px;margin-bottom:24px;
+}
+.gallery-grid .main-img{grid-column:1/-1}
+.gallery-img{
+  width:100%;aspect-ratio:4/3;object-fit:cover;
+  border-radius:4px;background:var(--warm);
+}
+.gallery-img.main-img{aspect-ratio:16/9}
+
+/* Festival badge */
+.fest-badge{
+  background:var(--warm);border:1px solid var(--light);
+  border-radius:6px;padding:14px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;cursor:pointer;transition:border-color 0.15s;
+}
+.fest-badge:hover{border-color:var(--amber)}
+.fest-badge-left .badge-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--clay);margin-bottom:4px}
+.fest-badge-left .badge-name{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--ink)}
+.fest-badge-right{font-size:18px;color:var(--amber)}
+
+/* Socials */
+.socials-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+.social-btn{
+  display:flex;align-items:center;gap:7px;
+  background:var(--ink);color:var(--offwhite);
+  padding:9px 14px;border-radius:5px;
+  font-size:11px;font-weight:500;
+  text-decoration:none;transition:background 0.15s;
+}
+.social-btn:hover{background:var(--clay)}
+.social-btn .social-icon{font-size:14px}
+
+/* QR section */
+.qr-section{
+  background:var(--ink);border-radius:8px;
+  padding:20px;display:flex;
+  align-items:center;gap:20px;
+  margin-bottom:24px;
+}
+.qr-text h4{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;font-weight:600;
+  color:var(--offwhite);margin-bottom:4px;
+}
+.qr-text p{font-size:11px;color:var(--mid);line-height:1.6;font-weight:300}
+
+/* Analytics teaser */
+.analytics-row{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:8px;margin-bottom:24px;
+}
+.analytics-card{
+  background:var(--warm);border:1px solid var(--light);
+  border-radius:6px;padding:14px;text-align:center;
+}
+.analytics-card .an{
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px;font-weight:700;color:var(--clay);
+}
+.analytics-card .al{font-size:10px;color:var(--mid);margin-top:2px}
+
+/* donate */
+.donate-row{
+  text-align:center;padding:16px;
+  border-top:1px solid var(--light);
+}
+.donate-row p{font-size:11px;color:var(--mid);margin-bottom:8px}
+.donate-btn{
+  background:none;border:1px solid var(--light);
+  border-radius:4px;padding:8px 18px;
+  font-size:11px;color:var(--ink);cursor:pointer;
+  transition:border-color 0.15s;
+}
+.donate-btn:hover{border-color:var(--amber)}
+
+/* ══════════════════════════════════
+   ORGANISER DASHBOARD
+══════════════════════════════════ */
+.org-header{
+  background:var(--ink);padding:24px;
+  border-bottom:3px solid var(--amber);
+}
+.org-fest-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(22px,5vw,36px);font-weight:600;
+  color:var(--offwhite);line-height:1;
+  margin-bottom:4px;
+}
+.org-meta{font-size:11px;color:var(--mid);margin-bottom:12px}
+.org-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px}
+.org-stat{
+  background:rgba(255,255,255,0.05);
+  border-radius:5px;padding:12px;text-align:center;
+}
+.org-stat .on{
+  font-family:'Cormorant Garamond',serif;
+  font-size:26px;font-weight:700;color:var(--amber);
+  line-height:1;
+}
+.org-stat .ol{font-size:9px;color:var(--mid);margin-top:3px}
+
+.org-tabs{
+  display:flex;background:white;
+  border-bottom:1px solid var(--light);
+}
+.org-tab{
+  flex:1;padding:13px;text-align:center;
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;text-transform:uppercase;
+  color:var(--mid);cursor:pointer;border:none;
+  background:none;transition:color 0.15s;
+  border-bottom:2px solid transparent;
+}
+.org-tab.active{color:var(--clay);border-bottom-color:var(--clay)}
+
+.org-section{padding:20px 24px}
+.org-section-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px;font-weight:600;
+  color:var(--ink);margin-bottom:16px;
+}
+
+/* Applications */
+.app-item{
+  background:white;border:1px solid var(--light);
+  border-radius:6px;padding:14px 16px;
+  margin-bottom:8px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+  transition:border-color 0.2s;
+}
+.app-item.accepted{border-color:var(--green);background:rgba(61,153,112,0.04)}
+.app-item.declined{opacity:0.5}
+.app-item.waitlisted{border-color:var(--amber)}
+.app-avatar{
+  width:40px;height:40px;border-radius:50%;
+  object-fit:cover;flex-shrink:0;border:2px solid var(--light);
+}
+.app-info{flex:1;min-width:120px}
+.app-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:16px;font-weight:600;color:var(--ink);
+}
+.app-detail{font-size:10.5px;color:var(--mid)}
+.app-status{
+  font-family:'DM Mono',monospace;font-size:8.5px;
+  letter-spacing:1.5px;padding:4px 9px;border-radius:3px;
+}
+.app-status.accepted{background:rgba(61,153,112,0.15);color:var(--green)}
+.app-status.pending{background:rgba(232,168,56,0.15);color:#B5821C}
+.app-status.declined{background:rgba(192,57,43,0.1);color:var(--red)}
+.app-status.waitlisted{background:rgba(138,136,150,0.15);color:var(--mid)}
+
+.app-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-accept{
+  background:var(--green);color:white;
+  border:none;border-radius:3px;
+  padding:6px 11px;font-family:'DM Mono',monospace;
+  font-size:8px;letter-spacing:1.5px;cursor:pointer;
+  transition:opacity 0.15s;
+}
+.btn-accept:hover{opacity:0.85}
+.btn-decline{
+  background:none;color:var(--mid);
+  border:1px solid var(--light);border-radius:3px;
+  padding:6px 11px;font-family:'DM Mono',monospace;
+  font-size:8px;letter-spacing:1.5px;cursor:pointer;
+  transition:border-color 0.15s;
+}
+.btn-decline:hover{border-color:var(--red);color:var(--red)}
+.btn-profile{
+  background:none;color:var(--amber);
+  border:1px solid rgba(232,168,56,0.3);border-radius:3px;
+  padding:6px 11px;font-family:'DM Mono',monospace;
+  font-size:8px;letter-spacing:1.5px;cursor:pointer;
+  transition:background 0.15s;
+}
+.btn-profile:hover{background:rgba(232,168,56,0.1)}
+
+/* hidden tab panels */
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* ─── FOOTER ─── */
+.app-footer{
+  background:var(--ink);padding:28px 24px;
+  text-align:center;margin-top:32px;
+}
+.app-footer .f-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;font-weight:300;color:var(--offwhite);
+}
+.app-footer .f-name span{color:var(--amber);font-style:italic}
+.app-footer .f-tag{
+  font-family:'DM Mono',monospace;font-size:9px;
+  letter-spacing:2px;color:var(--mid);margin-top:6px;
+}
+
+/* ─── UTILS ─── */
+.divider{height:1px;background:var(--light);margin:24px 0}
+.section-block{padding:0 24px}
+.mb16{margin-bottom:16px}
+
+/* ── new for demo 04 ── */
+.empty-state{text-align:center;padding:60px 24px}
+.empty-state h2{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:300;color:var(--ink);margin-bottom:12px}
+.empty-state p{font-size:13px;color:var(--mid);margin-bottom:28px;line-height:1.7}
+.btn-primary{background:var(--amber);color:var(--ink);border:none;border-radius:4px;padding:12px 24px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer}
+.btn-secondary{background:none;color:var(--ink);border:1px solid var(--light);border-radius:4px;padding:12px 24px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;cursor:pointer}
+.form-field{margin-bottom:20px}
+.form-field label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--mid);display:block;margin-bottom:6px}
+.form-field input,.form-field textarea{width:100%;background:white;border:1px solid var(--light);border-radius:4px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);outline:none}
+.form-field input:focus,.form-field textarea:focus{border-color:var(--amber)}
+.form-field textarea{min-height:80px;resize:vertical}
+.question-item{background:white;border:1px solid var(--light);border-radius:6px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px}
+.drag-handle{font-size:18px;color:var(--light);cursor:grab;flex-shrink:0;margin-top:2px}
+.question-item.highlight-q{border-color:var(--amber);background:rgba(232,168,56,0.05)}
+.new-question-row{background:var(--warm);border:1px dashed var(--light);border-radius:6px;padding:14px 16px;margin-bottom:8px;display:flex;gap:10px}
+.new-question-row input{flex:1;background:white;border:1px solid var(--light);border-radius:4px;padding:8px 12px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
+.new-question-row input:focus{border-color:var(--amber)}
+.modal-overlay{position:fixed;inset:0;background:rgba(26,26,46,0.7);display:flex;align-items:center;justify-content:center;z-index:900}
+.modal{background:white;border-radius:8px;padding:28px;max-width:440px;width:90%}
+.modal h3{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:var(--ink);margin-bottom:8px}
+.modal p{font-size:13px;color:var(--mid);margin-bottom:20px;line-height:1.6}
+.modal textarea{width:100%;background:var(--warm);border:1px solid var(--light);border-radius:4px;padding:10px 14px;font-family:'DM Sans',sans-serif;font-size:12px;min-height:80px;outline:none;margin-bottom:16px}
+.modal textarea:focus{border-color:var(--amber)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.app-detail-section{padding:20px 24px}
+.app-detail-section h3{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;margin-bottom:14px}
+.portfolio-links a{display:block;font-family:'DM Mono',monospace;font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:6px;text-decoration:none}
+.live-badge-animated{animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+.counter-animate{transition:all 0.3s ease}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--offwhite);padding:12px 20px;border-radius:6px;font-size:12px;z-index:999;animation:slideUp 0.3s ease}
+@keyframes slideUp{from{transform:translateX(-50%) translateY(20px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--warm);border-radius:6px;margin-bottom:16px}
+.toggle{width:48px;height:26px;background:var(--light);border-radius:13px;position:relative;cursor:pointer;transition:background 0.2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;left:3px;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.2)}
+.toggle.on::after{left:25px}
+</style>
+</head>
+<body>
+
+<nav class="app-nav" id="appNav">
+  <button class="nav-back" id="backBtn" style="opacity:0;pointer-events:none">← Back</button>
+  <div class="nav-logo">[ Platform <span>Name</span> ]</div>
+  <div class="nav-right" id="navRight">Organiser</div>
+</nav>
+
+<!-- SCREEN: Empty 2027 state -->
+<div id="s-org-empty" class="screen active">
+  <div class="org-header">
+    <span class="lbl" style="color:var(--amber)">Organiser Dashboard</span>
+    <div class="org-fest-name">Cheltenham Paint Festival</div>
+    <div class="org-meta">2026 complete · Ready to set up 2027</div>
+  </div>
+  <div class="empty-state">
+    <span class="lbl" style="color:var(--clay);text-align:center;display:block">2027 Season</span>
+    <h2>Ready to open<br>applications?</h2>
+    <p>Set up your 2027 festival, build your application form, and go live when you're ready. Artists will be able to apply directly through the platform.</p>
+    <button class="btn-primary create-festival-btn" onclick="showScreen('s-create-festival')">+ CREATE CPF 2027</button>
+  </div>
+</div>
+
+<!-- SCREEN: Create festival form -->
+<div id="s-create-festival" class="screen">
+  <div class="org-header">
+    <span class="lbl" style="color:var(--amber)">New Festival</span>
+    <div class="org-fest-name">Create CPF 2027</div>
+  </div>
+  <div class="org-section">
+    <div class="form-field">
+      <label>Festival name</label>
+      <input id="festival-name" type="text" placeholder="e.g. Cheltenham Paint Festival 2027">
+    </div>
+    <div class="form-field">
+      <label>Dates</label>
+      <input id="festival-dates" type="text" placeholder="e.g. 3–19 October 2027">
+    </div>
+    <div class="form-field">
+      <label>Location</label>
+      <input id="festival-location" type="text" placeholder="e.g. Cheltenham Town Centre, GL50">
+    </div>
+    <div class="form-field">
+      <label>Description</label>
+      <textarea id="festival-description" placeholder="A short description shown to artists browsing festivals…"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn-secondary" onclick="showScreen('s-org-empty')">Cancel</button>
+      <button class="btn-primary" id="next-form-builder-btn" onclick="showScreen('s-form-builder')">NEXT: BUILD FORM →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Form builder -->
+<div id="s-form-builder" class="screen">
+  <div class="org-header">
+    <span class="lbl" style="color:var(--amber)">Application Form</span>
+    <div class="org-fest-name">CPF 2027 · Form Builder</div>
+    <div class="org-meta">Carried forward from CPF 2026 · Drag to reorder · Add or remove questions</div>
+  </div>
+  <div class="org-section">
+    <div class="form-questions-list" id="formQuestionsList"></div>
+    <div class="new-question-row" id="newQuestionRow" style="display:none">
+      <input id="new-question-input" placeholder="Type your new question…">
+      <button class="btn-primary" id="save-question-btn" style="padding:8px 14px;font-size:9px" onclick="addNewQuestion()">ADD</button>
+    </div>
+    <button class="btn-secondary" id="add-question-btn" onclick="showNewQuestionRow()" style="margin-bottom:16px">+ ADD QUESTION</button>
+    <div style="margin-top:8px">
+      <button class="btn-primary" id="go-live-btn" onclick="showScreen('s-go-live-confirm')">REVIEW &amp; GO LIVE →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Go live confirmation -->
+<div id="s-go-live-confirm" class="screen">
+  <div class="org-header">
+    <span class="lbl" style="color:var(--amber)">Almost there</span>
+    <div class="org-fest-name">Ready to go live?</div>
+  </div>
+  <div class="org-section">
+    <div style="background:var(--warm);border-radius:8px;padding:20px;margin-bottom:20px">
+      <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;line-height:1.6;color:var(--ink)">Once live, <em style="color:var(--clay)">Cheltenham Paint Festival 2027</em> will appear on the platform and artists can start applying.</p>
+    </div>
+    <div style="font-size:12px;color:var(--mid);line-height:1.7;margin-bottom:24px">
+      <p>✓ Festival listing: Cheltenham Paint Festival 2027</p>
+      <p>✓ Dates: 3–19 October 2027</p>
+      <p>✓ Application form: 9 questions</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-secondary" onclick="showScreen('s-form-builder')">← BACK</button>
+      <button class="btn-primary" id="confirm-go-live-btn" onclick="goLive()">GO LIVE NOW</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Live dashboard with applications -->
+<div id="s-org-live" class="screen">
+  <div class="org-header">
+    <span class="lbl" style="color:var(--green)">● LIVE · Applications Open</span>
+    <div class="org-fest-name">Cheltenham Paint Festival 2027</div>
+    <div class="org-meta">Applications open · Closing 28 February 2027</div>
+    <div class="org-stats">
+      <div class="org-stat"><div class="on" id="stat-total">0</div><div class="ol">Applications</div></div>
+      <div class="org-stat"><div class="on" id="stat-accepted-live">0</div><div class="ol">Accepted</div></div>
+      <div class="org-stat"><div class="on" id="stat-pending">0</div><div class="ol">Pending</div></div>
+      <div class="org-stat"><div class="on">12</div><div class="ol">Slots left</div></div>
+    </div>
+  </div>
+  <div class="org-section application-list">
+    <div class="org-section-title">Applications</div>
+    <div class="app-item accepted">
+      <img class="app-avatar" src="https://picsum.photos/seed/rosa/80/80" alt="">
+      <div class="app-info"><div class="app-name">Rosa Vane</div><div class="app-detail">Large-scale figural · Bristol · CPF 2024, 2025</div></div>
+      <span class="app-status accepted">ACCEPTED</span>
+      <div class="app-actions"><button class="btn-profile" onclick="showAppDetail('rosa')">VIEW</button></div>
+    </div>
+    <div class="app-item" id="app-kit-live" style="border-color:var(--amber)">
+      <img class="app-avatar" src="https://picsum.photos/seed/kit/80/80" alt="">
+      <div class="app-info"><div class="app-name">Kit Harrow</div><div class="app-detail">Typography &amp; text · Cheltenham · CPF 2025</div></div>
+      <span class="app-status pending">PENDING</span>
+      <div class="app-actions">
+        <button class="btn-profile btn-view-detail" onclick="showAppDetail('kit')">REVIEW</button>
+      </div>
+    </div>
+    <div class="app-item" id="app-tomas-live">
+      <img class="app-avatar" src="https://picsum.photos/seed/tomas/80/80" alt="">
+      <div class="app-info"><div class="app-name">Tomás Cruz</div><div class="app-detail">Community portraiture · Cardiff · Meeting of Styles 2025</div></div>
+      <span class="app-status pending">PENDING</span>
+      <div class="app-actions">
+        <button class="btn-profile btn-view-detail" onclick="showAppDetail('tomas')">REVIEW</button>
+      </div>
+    </div>
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--light)">
+      <button class="btn-secondary" id="bulk-reminder-btn" onclick="showBulkConfirm()">✉ SEND UPDATE TO 2 PENDING</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: Application detail -->
+<div id="s-app-detail" class="screen">
+  <div class="org-header" id="app-detail-header">
+    <span class="lbl" style="color:var(--amber)">Application Review</span>
+    <div class="org-fest-name" id="app-detail-name"></div>
+    <div class="org-meta" id="app-detail-meta"></div>
+  </div>
+  <div class="app-detail-section">
+    <h3>Proposed work</h3>
+    <div class="proposed-work" style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:300;line-height:1.65;color:var(--ink);margin-bottom:24px" id="app-detail-proposed"></div>
+    <h3>Wall size</h3>
+    <p style="font-size:13px;margin-bottom:20px" id="app-detail-wall"></p>
+    <h3>Portfolio</h3>
+    <div class="portfolio-links" id="app-detail-portfolio"></div>
+    <div style="display:flex;gap:10px;margin-top:24px">
+      <button class="btn-secondary" onclick="showScreen('s-org-live')">← BACK</button>
+      <button class="btn-primary btn-accept-from-detail" onclick="acceptFromDetail()">ACCEPT</button>
+      <button class="btn-secondary btn-decline-from-detail" onclick="showDeclineModal()" style="border-color:var(--red);color:var(--red)">DECLINE</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Decline with message -->
+<div id="decline-modal" style="display:none" class="modal-overlay">
+  <div class="modal">
+    <h3>Decline with a note</h3>
+    <p>This message will be sent to the artist alongside the decision.</p>
+    <textarea id="decline-message" placeholder="Thank you for applying…"></textarea>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeDeclineModal()">Cancel</button>
+      <button class="btn-primary" id="send-decline-btn" onclick="sendDecline()">SEND DECLINE</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Bulk confirm -->
+<div id="bulk-modal" style="display:none" class="modal-overlay">
+  <div class="modal">
+    <h3>Send update to pending artists</h3>
+    <p>This will send an email to 2 artists still under review, letting them know their application is being considered.</p>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeBulkModal()">Cancel</button>
+      <button class="btn-primary" id="confirm-bulk-btn" onclick="sendBulk()">SEND UPDATE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CPF_QUESTIONS = [
+  {q:'Describe the work you are proposing for CPF 2027.',type:'Long text'},
+  {q:'What size of wall do you require? (Approximate metres W × H)',type:'Short text'},
+  {q:'Have you worked on outdoor murals at this scale before?',type:'Yes / No'},
+  {q:'Please provide links to three examples of your recent work.',type:'URLs'},
+  {q:'Do you have public liability insurance?',type:'Yes / No'},
+  {q:'What is your preferred medium?',type:'Multiple choice · Spray / Brush / Mixed'},
+  {q:'Are you available for the full festival period (3–19 Oct)?',type:'Yes / No / Partial'},
+  {q:'Is there anything else the selection panel should know?',type:'Long text · Optional'},
+];
+
+const APP_DATA = {
+  rosa: {
+    name:'Rosa Vane', meta:'Large-scale figural · Bristol · CPF 2024, 2025',
+    proposed:'Monumental figures in conversation with architecture.',
+    wall:'15m W × 10m H',
+    portfolio:['rosavane.co.uk/work','instagram.com/rosavane'],
+  },
+  kit: {
+    name:'Kit Harrow', meta:'Typography & text · Cheltenham-based · CPF 2025 alumni',
+    proposed:'A piece built entirely from words that already exist on this building — <em>found text, amplified</em>. Planning permissions, planning notices, decades of civic language, reconfigured into something that feels inevitable.',
+    wall:'12m W × 8m H',
+    portfolio:['kharrow.co.uk/work/cheltenham-college','kharrow.co.uk/work/oxford-street-2024','instagram.com/kit.harrow'],
+  },
+  tomas: {
+    name:'Tomás Cruz', meta:'Community portraiture · Cardiff-based · Meeting of Styles 2025',
+    proposed:'A large-scale portrait of five Cheltenham residents identified through community engagement over the preceding months. Each subject painted at 1:1 scale, seated together on a shared wall.',
+    wall:'20m W × 10m H',
+    portfolio:['tomascruz.co.uk/community','tomascruz.co.uk/bath-road-2024','instagram.com/tomas.cruz.art'],
+  },
+};
+
+let currentAppId = null;
+
+let screenHistory = ['s-org-empty'];
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if(el) el.classList.add('active');
+  window.scrollTo(0,0);
+  if(screenHistory[screenHistory.length-1]!==id) screenHistory.push(id);
+  const backBtn=document.getElementById('backBtn');
+  if(backBtn) backBtn.style.opacity=screenHistory.length>1?'1':'0';
+}
+
+function buildFormQuestions(){
+  const list=document.getElementById('formQuestionsList');
+  if(!list||list.children.length>0) return;
+  list.innerHTML=CPF_QUESTIONS.map((q,i)=>`
+    <div class="question-item">
+      <span class="drag-handle">⠿</span>
+      <div style="flex:1">
+        <p style="font-size:13px;color:var(--ink);margin-bottom:4px;font-weight:500">${q.q}</p>
+        <span style="font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1.5px;color:var(--mid)">${q.type}</span>
+      </div>
+      <span style="font-size:12px;color:var(--mid);cursor:pointer">✕</span>
+    </div>`).join('');
+}
+
+function showNewQuestionRow(){
+  document.getElementById('newQuestionRow').style.display='flex';
+  document.getElementById('add-question-btn').style.display='none';
+  document.getElementById('new-question-input').focus();
+}
+
+function addNewQuestion(){
+  const input=document.getElementById('new-question-input');
+  const list=document.getElementById('formQuestionsList');
+  const div=document.createElement('div');
+  div.className='question-item highlight-q';
+  div.innerHTML=`<span class="drag-handle">⠿</span><div style="flex:1"><p style="font-size:13px;color:var(--ink);margin-bottom:4px;font-weight:500">${input.value}</p><span style="font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1.5px;color:var(--mid)">Short text</span></div>`;
+  list.appendChild(div);
+  document.getElementById('newQuestionRow').style.display='none';
+  document.getElementById('add-question-btn').style.display='block';
+}
+
+function goLive(){
+  showScreen('s-org-live');
+  let t=0, p=0;
+  const total=document.getElementById('stat-total');
+  const pending=document.getElementById('stat-pending');
+  const timer=setInterval(()=>{
+    t=Math.min(t+1,3);
+    p=Math.min(p+1,2);
+    total.textContent=t;
+    pending.textContent=p;
+    if(t>=3) clearInterval(timer);
+  },600);
+}
+
+function showAppDetail(id){
+  currentAppId=id;
+  const d=APP_DATA[id];
+  document.getElementById('app-detail-name').textContent=d.name;
+  document.getElementById('app-detail-meta').textContent=d.meta;
+  document.getElementById('app-detail-proposed').innerHTML=d.proposed;
+  document.getElementById('app-detail-wall').textContent=d.wall;
+  document.getElementById('app-detail-portfolio').innerHTML=d.portfolio.map(l=>`<a href="#">${l}</a>`).join('');
+  showScreen('s-app-detail');
+}
+
+function acceptFromDetail(){
+  const id=currentAppId;
+  const item=document.getElementById('app-'+id+'-live');
+  if(item){
+    item.querySelector('.app-status').textContent='ACCEPTED';
+    item.querySelector('.app-status').className='app-status accepted';
+    item.classList.add('accepted');
+    item.querySelector('.app-actions').innerHTML='<button class="btn-profile">VIEW</button>';
+    const acc=document.getElementById('stat-accepted-live');
+    acc.textContent=parseInt(acc.textContent||'0')+1;
+    const pend=document.getElementById('stat-pending');
+    pend.textContent=Math.max(0,parseInt(pend.textContent||'0')-1);
+  }
+  showScreen('s-org-live');
+  showToast('✓ '+APP_DATA[id].name+' accepted');
+}
+
+function showDeclineModal(){ document.getElementById('decline-modal').style.display='flex'; }
+function closeDeclineModal(){ document.getElementById('decline-modal').style.display='none'; }
+function sendDecline(){
+  const id=currentAppId;
+  const item=document.getElementById('app-'+id+'-live');
+  if(item){
+    item.querySelector('.app-status').textContent='DECLINED';
+    item.querySelector('.app-status').className='app-status declined';
+    item.classList.add('declined');
+    item.querySelector('.app-actions').innerHTML='';
+    const pend=document.getElementById('stat-pending');
+    pend.textContent=Math.max(0,parseInt(pend.textContent||'0')-1);
+  }
+  closeDeclineModal();
+  showScreen('s-org-live');
+  showToast('Decline sent to '+APP_DATA[id].name);
+}
+
+function showBulkConfirm(){ document.getElementById('bulk-modal').style.display='flex'; }
+function closeBulkModal(){ document.getElementById('bulk-modal').style.display='none'; }
+function sendBulk(){
+  closeBulkModal();
+  showToast('✓ Update sent to 2 pending artists');
+}
+
+function showToast(msg){
+  const t=document.createElement('div');
+  t.className='toast';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+buildFormQuestions();
+</script>
+</body>
+</html>

@@ -172,7 +172,6 @@ The Discover feature gives them a reason to open the app between festivals — n
 - Social links (Instagram, website, TikTok, etc.)
 - Branded QR code (downloadable, printable — A5 card, wall label sizes)
 - Analytics (profile views, QR scans, link clicks, application views)
-- Blog posts (appears on profile, written via app)
 - "Support this artist" donation link (Buy Me a Coffee or similar)
 - Festival appearance badge (links to festival map, pre-pinned to their location)
 
@@ -550,16 +549,69 @@ First Global client should be acquired at discount/free for reference credibilit
 
 ---
 
+## Local Development
+
+### Prerequisites
+
+- Go ≥ 1.22
+- Node ≥ 20
+- Docker (with Compose plugin)
+- [Task](https://taskfile.dev/installation/) (`brew install go-task` on macOS)
+
+### Quickstart
+
+```bash
+task up        # Start the full local stack (api, web, db, minio, prometheus)
+task e2e       # Run end-to-end tests against the running stack
+task down      # Stop the stack
+```
+
+### All available commands
+
+```
+task --list
+```
+
+| Command | What it does |
+|---------|-------------|
+| `task up` | Start docker-compose stack (detached) |
+| `task down` | Stop docker-compose stack |
+| `task test` | Run all tests (api + web + mobile in parallel) |
+| `task lint` | Run all linters |
+| `task generate` | Regenerate OpenAPI types + sqlc queries |
+| `task db:migrate` | Apply pending migrations |
+| `task db:migrate:down` | Roll back last migration |
+| `task db:new -- <name>` | Scaffold a new migration file pair |
+| `task db:seed` | Load seed data |
+| `task db:generate` | Generate sqlc Go types from SQL queries |
+| `task openapi:gen` | Generate Go server interfaces + TS client |
+| `task e2e` | Run Playwright end-to-end tests |
+| `task api:dev` | Start Go API with hot reload (air) |
+| `task web:dev` | Start Next.js dev server |
+| `task mobile:ios` | Run RN app on iOS simulator |
+| `task mobile:android` | Run RN app on Android emulator |
+
+Per-app Taskfiles (`api/`, `web/`, `mobile/`) expose the same targets via `task -d <dir> <target>` or through the root includes (`task api:test`, `task web:lint`, etc.).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
+
+---
+
 ## File Index
 
 ```
 /
 ├── README.md                     ← This file. Full project context.
-├── docs/
-│   ├── project_board.html        ← Visual overview (mobile-friendly, scrollable)
-│   ├── cpf_demo.html             ← Static demo for CPF organiser meeting
-│   └── platform_overview.pdf     ← PDF overview for sharing (branding friend version)
-└── [codebase TBD]
+├── Taskfile.yml                  ← Root task runner (delegates to per-app Taskfiles)
+├── api/                          ← Go REST API (cmd/api, internal/*)
+├── web/                          ← Next.js browser platform
+├── mobile/                       ← React Native public app (no Expo)
+├── db/                           ← Migrations, seed data, sqlc config
+├── openapi/                      ← OpenAPI spec + generated TS client
+├── infra/                        ← docker-compose, prometheus config
+├── docs/superpowers/specs/       ← Design specs and build plans
+├── cpf_demo.html                 ← Static demo for CPF organiser meeting
+└── .github/workflows/            ← CI (added in E1.3)
 ```
 
 ### Demo Notes (`cpf_demo.html`)

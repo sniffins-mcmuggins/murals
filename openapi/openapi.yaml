@@ -1,0 +1,102 @@
+openapi: "3.0.3"
+
+info:
+  title: Render API
+  description: REST API for the Render paint festival platform.
+  version: "0.1.0"
+  contact:
+    name: Render
+    url: https://renderltd.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.renderltd.com
+    description: Production
+
+tags:
+  - name: health
+    description: Service health and readiness
+
+components:
+  schemas:
+    Problem:
+      description: RFC 7807 problem details object returned on all error responses.
+      type: object
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "about:blank"
+        title:
+          type: string
+          example: "Unprocessable Entity"
+        status:
+          type: integer
+          example: 422
+        detail:
+          type: string
+          example: "email is required"
+        instance:
+          type: string
+          format: uri
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: Missing or invalid authentication token.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: Authenticated but not authorised for this action.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnprocessableEntity:
+      description: Validation error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Service health check
+      description: Returns 200 when the API and database are reachable. Used by docker-compose healthchecks and load balancers.
+      tags: [health]
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                    example: ok
+        "503":
+          description: Service is unhealthy (database unreachable).
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"

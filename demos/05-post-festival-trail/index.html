@@ -661,7 +661,6 @@ body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink
           <span class="fest-meta-pill">Cheltenham, GL50</span>
         </div>
       </div>
-      <button class="btn-org-view" onclick="showScreen('s-organiser')">⚙ Organiser View</button>
     </div>
   </div>
 
@@ -695,7 +694,6 @@ body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink
           <span class="fest-meta-pill">Cheltenham, GL50</span>
         </div>
       </div>
-      <button class="btn-org-view" onclick="showScreen('s-organiser')">⚙ Organiser View</button>
     </div>
   </div>
 
@@ -707,10 +705,10 @@ body{background:var(--offwhite);font-family:'DM Sans',sans-serif;color:var(--ink
 
   <div id="map-tab" class="tab-panel active">
     <div id="fest-map"></div>
-    <div style="background:var(--warm);padding:10px 16px;border-bottom:1px solid var(--light);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="background:var(--warm);padding:10px 16px;border-bottom:1px solid var(--light);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--clay)">◆ STILL THERE</span>
       <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--mid)">○ REMOVED</span>
-      <span style="font-size:11px;color:var(--mid);margin-left:auto">Tap a pin to navigate</span>
+      <span style="font-size:11px;color:var(--mid);margin-left:auto">4 of 6 murals still visible</span>
     </div>
   </div>
 
@@ -1129,17 +1127,39 @@ function makeIcon(color='#C45C3A', label=''){
   });
 }
 
+const PIN_STATUS = {
+  rosa: 'there', joel: 'there', amara: 'there',
+  kit: 'removed', suki: 'there', tomas: 'removed'
+};
+
 function initFestMap(){
-  if(festMap) { setTimeout(()=>festMap.invalidateSize(),100); return; }
+  if(festMap){ setTimeout(()=>festMap.invalidateSize(),100); return; }
   festMap = L.map('fest-map',{zoomControl:true}).setView([51.9000, -2.0790], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom:19
   }).addTo(festMap);
 
-  Object.entries(ARTISTS).forEach(([id,a],i)=>{
-    const marker = L.marker([a.lat, a.lng], {icon: makeIcon('#C45C3A', (i+1).toString())}).addTo(festMap);
-    marker.bindPopup(makePopup(a, id), {maxWidth:260});
+  Object.entries(ARTISTS).forEach(([id,a])=>{
+    const status = PIN_STATUS[id] || 'there';
+    const color = status === 'there' ? '#C45C3A' : '#8A8896';
+    const label = status === 'there' ? '◆' : '○';
+    const marker = L.marker([a.lat, a.lng], {icon: makeIcon(color, label)}).addTo(festMap);
+    const statusBadge = status === 'there'
+      ? '<span style="background:rgba(196,92,58,0.15);color:#C45C3A;font-family:\'DM Mono\',monospace;font-size:8px;letter-spacing:1.5px;padding:2px 7px;border-radius:2px">◆ STILL THERE</span>'
+      : '<span style="background:rgba(138,136,150,0.15);color:#8A8896;font-family:\'DM Mono\',monospace;font-size:8px;letter-spacing:1.5px;padding:2px 7px;border-radius:2px">○ REMOVED</span>';
+    marker.bindPopup(L.popup().setContent(`
+      <div class="popup-inner">
+        <div class="popup-artist-name">${a.name}</div>
+        <div class="popup-medium">${a.medium}</div>
+        <div style="margin-bottom:8px">${statusBadge}</div>
+        <div class="popup-w3w">/// ${a.w3w}</div>
+        <div class="popup-btns">
+          <button class="popup-btn view" onclick="showArtist('${id}')">VIEW ARTIST</button>
+          ${status==='there' ? `<button class="popup-btn nav-gmaps" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lng}','_blank')">NAVIGATE</button>` : ''}
+        </div>
+      </div>
+    `), {maxWidth:260});
   });
 }
 

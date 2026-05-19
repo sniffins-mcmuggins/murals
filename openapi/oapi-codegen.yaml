@@ -1,0 +1,10 @@
+# oapi-codegen v2 configuration
+# Generates Go server interfaces + types from openapi/openapi.yaml
+# Output: api/internal/openapi/
+
+package: openapi
+generate:
+  chi-server: true
+  models: true
+  strict-server: true
+output: ../api/internal/openapi/api.gen.go

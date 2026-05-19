@@ -1,0 +1,26 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: "Start Go API with hot reload (air)"
+    cmd: air
+
+  build:
+    desc: "Build the Go API binary"
+    cmd: go build -o bin/api ./cmd/api
+
+  test:
+    desc: "Run Go tests (unit + integration)"
+    cmd: go test ./... -race -count=1
+
+  test:unit:
+    desc: "Run unit tests only (no integration)"
+    cmd: go test ./... -race -count=1 -short
+
+  lint:
+    desc: "Run golangci-lint"
+    cmd: golangci-lint run ./...
+
+  tidy:
+    desc: "Tidy Go module dependencies"
+    cmd: go mod tidy

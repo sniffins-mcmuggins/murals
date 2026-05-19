@@ -1,0 +1,24 @@
+version: '3'
+
+tasks:
+  ios:
+    desc: "Run React Native on iOS simulator"
+    cmd: npx react-native run-ios
+
+  android:
+    desc: "Run React Native on Android emulator"
+    cmd: npx react-native run-android
+
+  test:
+    desc: "Run RN tests (Jest)"
+    cmd: npm test
+
+  lint:
+    desc: "Run ESLint + TypeScript check"
+    cmds:
+      - npm run lint
+      - npm run typecheck
+
+  install:
+    desc: "Install npm dependencies"
+    cmd: npm install
