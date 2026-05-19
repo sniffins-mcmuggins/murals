@@ -2,3 +2,19 @@ output/
 videos/
 node_modules/
 dist/
+.worktrees/
+
+# Go
+api/bin/
+api/tmp/
+
+# Next.js
+web/.next/
+web/out/
+
+# React Native
+mobile/android/
+mobile/ios/Pods/
+
+# Generated (committed — see openapi:gen)
+# openapi/generated/ is intentionally NOT ignored

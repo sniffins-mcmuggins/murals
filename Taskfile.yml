@@ -1,0 +1,78 @@
+version: '3'
+
+includes:
+  api:
+    taskfile: ./api/Taskfile.yml
+    dir: ./api
+  web:
+    taskfile: ./web/Taskfile.yml
+    dir: ./web
+  mobile:
+    taskfile: ./mobile/Taskfile.yml
+    dir: ./mobile
+
+vars:
+  COMPOSE_FILE: infra/docker-compose.yml
+
+tasks:
+  up:
+    desc: "Start the full local stack (detached)"
+    cmd: docker compose -f {{.COMPOSE_FILE}} up -d
+
+  down:
+    desc: "Stop the local stack"
+    cmd: docker compose -f {{.COMPOSE_FILE}} down
+
+  test:
+    desc: "Run all tests (api, web, mobile in parallel)"
+    deps: [api:test, web:test, mobile:test]
+
+  lint:
+    desc: "Run all linters (api, web, mobile in parallel)"
+    deps: [api:lint, web:lint, mobile:lint]
+
+  generate:
+    desc: "Run all code generators (openapi + sqlc)"
+    deps: [openapi:gen, db:generate]
+
+  db:migrate:
+    desc: "Apply database migrations (up)"
+    cmd: migrate -path db/migrations -database "{{.DATABASE_URL}}" up
+    vars:
+      DATABASE_URL:
+        sh: echo "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}"
+
+  db:migrate:down:
+    desc: "Roll back the last migration"
+    cmd: migrate -path db/migrations -database "{{.DATABASE_URL}}" down 1
+    vars:
+      DATABASE_URL:
+        sh: echo "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}"
+
+  db:new:
+    desc: "Scaffold a new migration pair: task db:new -- <name>"
+    cmd: migrate create -ext sql -dir db/migrations -seq {{.CLI_ARGS}}
+
+  db:generate:
+    desc: "Generate type-safe Go from SQL queries (sqlc)"
+    cmd: sqlc generate -f db/sqlc.yaml
+
+  db:seed:
+    desc: "Load seed data into the local database"
+    cmd: psql "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}" -f db/seeds/seed.sql
+
+  openapi:gen:
+    desc: "Generate Go server interfaces + TS client from openapi/openapi.yaml"
+    cmds:
+      - oapi-codegen -config openapi/oapi-codegen.yaml openapi/openapi.yaml
+      - npx openapi-typescript openapi/openapi.yaml -o openapi/generated/client.ts
+
+  openapi:diff:
+    desc: "Check that generated files are up-to-date (used in CI)"
+    cmds:
+      - task: openapi:gen
+      - git diff --exit-code openapi/generated/
+
+  e2e:
+    desc: "Run end-to-end tests (requires stack to be up)"
+    cmd: npx playwright test

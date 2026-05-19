@@ -1,0 +1,24 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: "Start Next.js dev server"
+    cmd: npm run dev
+
+  build:
+    desc: "Build Next.js for production"
+    cmd: npm run build
+
+  test:
+    desc: "Run web tests (vitest)"
+    cmd: npm test
+
+  lint:
+    desc: "Run ESLint + TypeScript check"
+    cmds:
+      - npm run lint
+      - npm run typecheck
+
+  install:
+    desc: "Install npm dependencies"
+    cmd: npm install
