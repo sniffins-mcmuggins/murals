@@ -36,7 +36,7 @@ func main() {
 		slog.Error("migrate init", "err", err)
 		os.Exit(1)
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	switch direction {
 	case "up":

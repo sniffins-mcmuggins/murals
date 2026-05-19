@@ -1,6 +1,7 @@
 package health_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,7 @@ func TestHealthHandler(t *testing.T) {
 	db := testutil.NewDB(t)
 
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/healthz", nil)
 	health.Handler(db).ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {

@@ -25,8 +25,8 @@ func NewMinIO(t *testing.T) *minio.Client {
 			"MINIO_ROOT_USER":     "rendertest",
 			"MINIO_ROOT_PASSWORD": "rendertest123",
 		},
-		Cmd:         []string{"server", "/data"},
-		WaitingFor:  wait.ForHTTP("/minio/health/live").WithPort("9000"),
+		Cmd:        []string{"server", "/data"},
+		WaitingFor: wait.ForHTTP("/minio/health/live").WithPort("9000"),
 	}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
