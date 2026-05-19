@@ -63,10 +63,7 @@ jobs:
         run: go mod download
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          working-directory: api
+        run: go tool golangci-lint run
 
       - name: Test
         run: go test ./... -race -count=1

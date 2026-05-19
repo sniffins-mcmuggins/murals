@@ -19,7 +19,7 @@ tasks:
 
   lint:
     desc: "Run golangci-lint"
-    cmd: golangci-lint run ./...
+    cmd: go tool golangci-lint run ./...
 
   tidy:
     desc: "Tidy Go module dependencies"
