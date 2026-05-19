@@ -11,16 +11,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   # ── PATH FILTER ───────────────────────────────────────────────────────────
   # Detects which areas changed so downstream jobs can skip when irrelevant.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      api:     ${{ steps.filter.outputs.api }}
-      web:     ${{ steps.filter.outputs.web }}
-      mobile:  ${{ steps.filter.outputs.mobile }}
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+      mobile: ${{ steps.filter.outputs.mobile }}
       openapi: ${{ steps.filter.outputs.openapi }}
     steps:
       - uses: actions/checkout@v4
@@ -56,17 +55,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           cache-dependency-path: api/go.sum
 
       - name: Download modules
         run: go mod download
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          working-directory: api
+        run: go tool golangci-lint run ./...
 
       - name: Test
         run: go test ./... -race -count=1
@@ -152,7 +148,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           cache-dependency-path: api/go.sum
 
       - name: Install codegen tools

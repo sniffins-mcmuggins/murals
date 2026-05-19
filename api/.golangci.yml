@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - bodyclose
+    - noctx
+    - sqlclosecheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/sniffins-mcmuggins/render
+
+issues:
+  exclude-rules:
+    # generated file
+    - path: internal/openapi/api\.gen\.go
+      linters: [all]
