@@ -63,15 +63,16 @@ tasks:
 
   openapi:gen:
     desc: "Generate Go server interfaces + TS client from openapi/openapi.yaml"
+    dir: openapi
     cmds:
-      - oapi-codegen -config openapi/oapi-codegen.yaml openapi/openapi.yaml
-      - npx openapi-typescript openapi/openapi.yaml -o openapi/generated/client.ts
+      - go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest -config oapi-codegen.yaml openapi.yaml
+      - npx openapi-typescript openapi.yaml -o generated/client.ts
 
   openapi:diff:
     desc: "Check that generated files are up-to-date (used in CI)"
     cmds:
       - task: openapi:gen
-      - git diff --exit-code openapi/generated/
+      - git diff --exit-code openapi/generated/ api/internal/openapi/
 
   e2e:
     desc: "Run end-to-end tests (requires stack to be up)"
