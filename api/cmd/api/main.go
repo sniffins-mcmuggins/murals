@@ -1,20 +1,85 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"context"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/sniffins-mcmuggins/render/api/internal/config"
+	"github.com/sniffins-mcmuggins/render/api/internal/db"
+	"github.com/sniffins-mcmuggins/render/api/internal/health"
+	"github.com/sniffins-mcmuggins/render/api/internal/metrics"
+	"github.com/sniffins-mcmuggins/render/api/internal/middleware"
 )
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	cfg := config.Load()
+
+	logger := newLogger(cfg.LogLevel)
+	slog.SetDefault(logger)
+
+	ctx := context.Background()
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("database connection failed", "err", err)
+		os.Exit(1)
 	}
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "ok")
-	})
-	log.Printf("api listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	defer pool.Close()
+
+	r := chi.NewRouter()
+	r.Use(chiMiddleware.RealIP)
+	r.Use(middleware.Logger(logger))
+	r.Use(middleware.Recover)
+	r.Use(metrics.Middleware())
+
+	r.Get("/healthz", health.Handler(pool))
+	r.Handle("/metrics", metrics.Handler())
+
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      r,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	go func() {
+		slog.Info("api starting", "port", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+	<-quit
+
+	slog.Info("shutting down")
+	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutCtx); err != nil {
+		slog.Error("shutdown error", "err", err)
+	}
+}
+
+func newLogger(level string) *slog.Logger {
+	var l slog.Level
+	switch level {
+	case "debug":
+		l = slog.LevelDebug
+	case "warn":
+		l = slog.LevelWarn
+	case "error":
+		l = slog.LevelError
+	default:
+		l = slog.LevelInfo
+	}
+	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: l}))
 }

@@ -37,25 +37,20 @@ tasks:
 
   db:migrate:
     desc: "Apply database migrations (up)"
-    cmd: migrate -path db/migrations -database "{{.DATABASE_URL}}" up
-    vars:
-      DATABASE_URL:
-        sh: echo "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}"
+    cmd: go run -C api ./cmd/migrate up
 
   db:migrate:down:
     desc: "Roll back the last migration"
-    cmd: migrate -path db/migrations -database "{{.DATABASE_URL}}" down 1
-    vars:
-      DATABASE_URL:
-        sh: echo "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}"
+    cmd: go run -C api ./cmd/migrate down
 
   db:new:
     desc: "Scaffold a new migration pair: task db:new -- <name>"
-    cmd: migrate create -ext sql -dir db/migrations -seq {{.CLI_ARGS}}
+    cmd: go run -C api github.com/golang-migrate/migrate/v4/cmd/migrate@latest create -ext sql -dir ../db/migrations -seq {{.CLI_ARGS}}
 
   db:generate:
     desc: "Generate type-safe Go from SQL queries (sqlc)"
-    cmd: sqlc generate -f db/sqlc.yaml
+    dir: db
+    cmd: go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate -f sqlc.yaml
 
   db:seed:
     desc: "Load seed data into the local database"
