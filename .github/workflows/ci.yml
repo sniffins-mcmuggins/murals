@@ -11,16 +11,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   # ── PATH FILTER ───────────────────────────────────────────────────────────
   # Detects which areas changed so downstream jobs can skip when irrelevant.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      api:     ${{ steps.filter.outputs.api }}
-      web:     ${{ steps.filter.outputs.web }}
-      mobile:  ${{ steps.filter.outputs.mobile }}
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+      mobile: ${{ steps.filter.outputs.mobile }}
       openapi: ${{ steps.filter.outputs.openapi }}
     steps:
       - uses: actions/checkout@v4
@@ -61,9 +60,6 @@ jobs:
 
       - name: Download modules
         run: go mod download
-
-      - name: Build golangci-lint from module
-        run: go build -o $(go env GOPATH)/bin/golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
