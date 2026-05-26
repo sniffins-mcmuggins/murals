@@ -76,6 +76,8 @@ function FestivalDetail({
           slug: data.slug,
           ...(data.description ? { description: data.description } : {}),
           ...(data.locationLabel ? { locationLabel: data.locationLabel } : {}),
+          ...(data.startDate ? { startDate: data.startDate } : { startDate: null }),
+          ...(data.endDate ? { endDate: data.endDate } : { endDate: null }),
         },
       })
       if (res.error) throw new Error('Failed to save festival')

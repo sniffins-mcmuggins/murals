@@ -450,11 +450,13 @@ type PostFestivalsJSONBody struct {
 
 // PatchFestivalsFestivalIDJSONBody defines parameters for PatchFestivalsFestivalID.
 type PatchFestivalsFestivalIDJSONBody struct {
-	Description   *string         `json:"description,omitempty"`
-	LocationLabel *string         `json:"locationLabel,omitempty"`
-	Name          *string         `json:"name,omitempty"`
-	Slug          *string         `json:"slug,omitempty"`
-	Status        *FestivalStatus `json:"status,omitempty"`
+	Description   *string             `json:"description,omitempty"`
+	EndDate       *openapi_types.Date `json:"endDate,omitempty"`
+	LocationLabel *string             `json:"locationLabel,omitempty"`
+	Name          *string             `json:"name,omitempty"`
+	Slug          *string             `json:"slug,omitempty"`
+	StartDate     *openapi_types.Date `json:"startDate,omitempty"`
+	Status        *FestivalStatus     `json:"status,omitempty"`
 }
 
 // PostFestivalsFestivalIDApplyJSONBody defines parameters for PostFestivalsFestivalIDApply.

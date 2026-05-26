@@ -539,6 +539,10 @@ export interface paths {
                         slug?: string;
                         description?: string;
                         locationLabel?: string;
+                        /** Format: date */
+                        startDate?: string | null;
+                        /** Format: date */
+                        endDate?: string | null;
                         status?: components["schemas"]["FestivalStatus"];
                     };
                 };

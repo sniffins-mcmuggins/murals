@@ -1238,6 +1238,14 @@ paths:
                   type: string
                 locationLabel:
                   type: string
+                startDate:
+                  type: string
+                  format: date
+                  nullable: true
+                endDate:
+                  type: string
+                  format: date
+                  nullable: true
                 status:
                   $ref: "#/components/schemas/FestivalStatus"
       responses:
