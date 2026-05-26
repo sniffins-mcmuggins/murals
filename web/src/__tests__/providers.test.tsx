@@ -5,25 +5,27 @@ import { Providers } from '../app/providers'
 
 function QueryClientProbe() {
   const client = useQueryClient()
-  return <div data-testid="probe">{client ? 'mounted' : 'missing'}</div>
+  const staleTime = client.getDefaultOptions().queries?.staleTime
+  return <div data-testid="stale-time">{String(staleTime)}</div>
 }
 
 describe('Providers', () => {
-  it('renders children inside a QueryClientProvider', () => {
-    render(
-      <Providers>
-        <QueryClientProbe />
-      </Providers>,
-    )
-    expect(screen.getByTestId('probe')).toHaveTextContent('mounted')
+  it('renders children inside a QueryClientProvider without throwing', () => {
+    expect(() =>
+      render(
+        <Providers>
+          <QueryClientProbe />
+        </Providers>,
+      ),
+    ).not.toThrow()
   })
 
-  it('staleTime default is 60 seconds', () => {
+  it('sets staleTime default to 60 seconds', () => {
     render(
       <Providers>
         <QueryClientProbe />
       </Providers>,
     )
-    expect(screen.getByTestId('probe')).toBeInTheDocument()
+    expect(screen.getByTestId('stale-time')).toHaveTextContent('60000')
   })
 })
