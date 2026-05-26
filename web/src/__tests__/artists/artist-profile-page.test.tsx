@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { components } from '../../../openapi/client/node_modules/openapi-fetch/../../../generated/client'
+import type { components } from '@render/api-client'
 
 vi.mock('@/lib/api', () => ({
   apiClient: {
