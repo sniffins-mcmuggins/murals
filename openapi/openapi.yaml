@@ -19,6 +19,8 @@ tags:
     description: Service health and readiness
   - name: auth
     description: Authentication and user identity
+  - name: images
+    description: Image upload pipeline (presign → PUT → confirm)
 
 components:
   schemas:
@@ -98,6 +100,53 @@ components:
           description: JWT — also set as the session HTTP-only cookie.
         user:
           $ref: "#/components/schemas/User"
+
+    PresignRequest:
+      type: object
+      required: [contentType]
+      properties:
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/gif, image/webp]
+          example: image/jpeg
+
+    PresignResponse:
+      type: object
+      required: [uploadUrl, s3Key]
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+          description: Presigned MinIO PUT URL valid for 15 minutes. Client PUTs image bytes directly to this URL — the API server is not in the upload path.
+        s3Key:
+          type: string
+          description: Storage key for the uploaded object. Pass to POST /images/confirm after the PUT succeeds.
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890.jpg
+
+    ConfirmRequest:
+      type: object
+      required: [s3Key]
+      properties:
+        s3Key:
+          type: string
+          description: The key returned by POST /images/presign.
+        resourceType:
+          type: string
+          description: Domain resource type this image belongs to (e.g. artist_profile). Association is recorded in E5.
+          example: artist_profile
+        resourceId:
+          type: string
+          format: uuid
+          description: ID of the owning resource. Recorded in E5.
+
+    ConfirmResponse:
+      type: object
+      required: [cdnUrl]
+      properties:
+        cdnUrl:
+          type: string
+          format: uri
+          description: Public URL to the uploaded object. Points to MinIO in dev (CDN_BASE_URL) and CloudFront in production.
 
   securitySchemes:
     cookieAuth:
@@ -234,3 +283,65 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /images/presign:
+    post:
+      operationId: postImagesPresign
+      summary: Request a presigned PUT URL for direct upload to object storage
+      description: |
+        Returns a URL the client uses to PUT image bytes directly to MinIO (dev) or S3 (prod).
+        The API server is not in the upload data path. URL is valid for 15 minutes.
+        Call POST /images/confirm after the PUT succeeds.
+      tags: [images]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresignRequest"
+      responses:
+        "200":
+          description: Presigned URL issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /images/confirm:
+    post:
+      operationId: postImagesConfirm
+      summary: Confirm a completed upload and receive the CDN URL
+      description: |
+        Call after successfully PUTting bytes to the presigned URL.
+        The server verifies the object exists in storage and returns a public CDN URL.
+        Resource association is deferred to E5.
+      tags: [images]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmRequest"
+      responses:
+        "200":
+          description: Upload confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfirmResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"

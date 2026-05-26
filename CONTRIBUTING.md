@@ -75,6 +75,21 @@ task db:migrate:down  # roll back if needed
 
 Migrations run automatically in CI against a test Postgres container (testcontainers-go). Do not use `IF NOT EXISTS` guards — migrations are applied exactly once.
 
+## CDN URL strategy (Phase 1 → Phase 2 swap)
+
+Image CDN URLs are constructed via `image.PublicURL(cdnBase, s3Key string) string`.
+
+| Environment | `CDN_BASE_URL` value | Points to |
+|-------------|---------------------|-----------|
+| Local dev | `http://localhost:9000/render-images` | MinIO S3 endpoint |
+| Production (Phase 2) | `https://cdn.renderltd.com` | CloudFront distribution |
+
+The Phase 1 → Phase 2 swap is a single env-var change — no code changes needed.
+
+The `render-images` bucket is configured with `anonymous: download` by the `minio-init` service on `task up`, so local CDN URLs are publicly GETable without auth headers.
+
+**To change the CDN base URL in dev:** set `CDN_BASE_URL` in the `api` service environment in `infra/docker-compose.yml`, or in a local `.env` file at the repo root.
+
 ## Generating sqlc queries
 
 1. Write SQL in `db/queries/<domain>.sql` with sqlc annotations (`-- name: ... :one`)

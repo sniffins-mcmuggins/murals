@@ -78,6 +78,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/images/presign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a presigned PUT URL for direct upload to object storage
+         * @description Returns a URL the client uses to PUT image bytes directly to MinIO (dev) or S3 (prod).
+         *     The API server is not in the upload data path. URL is valid for 15 minutes.
+         *     Call POST /images/confirm after the PUT succeeds.
+         */
+        post: operations["postImagesPresign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/images/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a completed upload and receive the CDN URL
+         * @description Call after successfully PUTting bytes to the presigned URL.
+         *     The server verifies the object exists in storage and returns a public CDN URL.
+         *     Resource association is deferred to E5.
+         */
+        post: operations["postImagesConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -128,6 +172,46 @@ export interface components {
             /** @description JWT — also set as the session HTTP-only cookie. */
             token: string;
             user: components["schemas"]["User"];
+        };
+        PresignRequest: {
+            /**
+             * @example image/jpeg
+             * @enum {string}
+             */
+            contentType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+        };
+        PresignResponse: {
+            /**
+             * Format: uri
+             * @description Presigned MinIO PUT URL valid for 15 minutes. Client PUTs image bytes directly to this URL — the API server is not in the upload path.
+             */
+            uploadUrl: string;
+            /**
+             * @description Storage key for the uploaded object. Pass to POST /images/confirm after the PUT succeeds.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890.jpg
+             */
+            s3Key: string;
+        };
+        ConfirmRequest: {
+            /** @description The key returned by POST /images/presign. */
+            s3Key: string;
+            /**
+             * @description Domain resource type this image belongs to (e.g. artist_profile). Association is recorded in E5.
+             * @example artist_profile
+             */
+            resourceType?: string;
+            /**
+             * Format: uuid
+             * @description ID of the owning resource. Recorded in E5.
+             */
+            resourceId?: string;
+        };
+        ConfirmResponse: {
+            /**
+             * Format: uri
+             * @description Public URL to the uploaded object. Points to MinIO in dev (CDN_BASE_URL) and CloudFront in production.
+             */
+            cdnUrl: string;
         };
     };
     responses: {
@@ -297,6 +381,59 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    postImagesPresign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresignRequest"];
+            };
+        };
+        responses: {
+            /** @description Presigned URL issued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresignResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    postImagesConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Upload confirmed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfirmResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
         };
     };
 }
