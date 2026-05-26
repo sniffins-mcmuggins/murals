@@ -63,3 +63,42 @@ func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, slug, sta
 	}
 	return fest.ID.String()
 }
+
+func createTestArtistProfile(t *testing.T, pool *pgxpool.Pool, userID, displayName string) string {
+	t.Helper()
+	q := sqlcdb.New(pool)
+	profile, err := q.CreateArtistProfile(context.Background(), sqlcdb.CreateArtistProfileParams{
+		UserID:      pgUUID(t, userID),
+		DisplayName: displayName,
+	})
+	if err != nil {
+		t.Fatalf("create artist profile for %s: %v", userID, err)
+	}
+	return profile.ID.String()
+}
+
+func createTestApplicationForm(t *testing.T, pool *pgxpool.Pool, festivalID string) string {
+	t.Helper()
+	q := sqlcdb.New(pool)
+	form, err := q.UpsertApplicationForm(context.Background(), sqlcdb.UpsertApplicationFormParams{
+		FestivalID: pgUUID(t, festivalID),
+		Fields:     []byte(`[]`),
+	})
+	if err != nil {
+		t.Fatalf("create application form for festival %s: %v", festivalID, err)
+	}
+	return form.ID.String()
+}
+
+func createTestApplicationFormWithFields(t *testing.T, pool *pgxpool.Pool, festivalID string, fieldsJSON string) string {
+	t.Helper()
+	q := sqlcdb.New(pool)
+	form, err := q.UpsertApplicationForm(context.Background(), sqlcdb.UpsertApplicationFormParams{
+		FestivalID: pgUUID(t, festivalID),
+		Fields:     []byte(fieldsJSON),
+	})
+	if err != nil {
+		t.Fatalf("create application form with fields for festival %s: %v", festivalID, err)
+	}
+	return form.ID.String()
+}
