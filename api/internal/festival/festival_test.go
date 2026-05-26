@@ -33,7 +33,7 @@ func TestCreateFestival(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 201, got %d: %s", resp.StatusCode, body)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestCreateFestival_RequiresOrganiser(t *testing.T) {
@@ -53,7 +53,7 @@ func TestCreateFestival_RequiresOrganiser(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestGetFestival_PublicDraftReturns404(t *testing.T) {
@@ -73,7 +73,7 @@ func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for draft festival (public), got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Organiser request with token - draft → 200
 	resp = doRequest(t, srv, "GET", "/festivals/"+festID, "", orgToken)
@@ -81,7 +81,7 @@ func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200 for draft festival (owner), got %d: %s", resp.StatusCode, body)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
@@ -103,7 +103,7 @@ func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Correct organiser → 200
 	resp = doRequest(t, srv, "PATCH", "/festivals/"+festID,
@@ -113,8 +113,8 @@ func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
 	}
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	_ = resp.Body.Close()
 	if body["name"] != "Updated Name" {
 		t.Errorf("expected updated name, got %v", body["name"])
 	}
@@ -138,14 +138,14 @@ func TestDeleteFestival_SoftDelete(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 204, got %d: %s", resp.StatusCode, body)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Verify gone
 	resp = doRequest(t, srv, "GET", "/festivals/"+festID, "", orgToken)
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 after delete, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestListFestivals(t *testing.T) {
@@ -166,8 +166,8 @@ func TestListFestivals(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 	var list []map[string]any
-	json.NewDecoder(resp.Body).Decode(&list)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	_ = resp.Body.Close()
 	if len(list) != 2 {
 		t.Errorf("expected 2 festivals, got %d", len(list))
 	}

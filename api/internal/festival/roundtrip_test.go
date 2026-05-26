@@ -119,11 +119,13 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	// 2. Log in as organiser
 	loginResp := do("POST", "/auth/login",
 		`{"email":"rtorg@example.com","password":"hunter2hunter"}`, "")
+	defer func() { _ = loginResp.Body.Close() }()
 	assertStatus(loginResp, http.StatusOK)
 	orgToken := decodeJSON(loginResp)["token"].(string)
 
 	// 3. Get organiser user ID
 	meResp := do("GET", "/me", "", orgToken)
+	defer func() { _ = meResp.Body.Close() }()
 	assertStatus(meResp, http.StatusOK)
 	orgUserID := decodeJSON(meResp)["id"].(string)
 	_ = orgUserID
@@ -134,6 +136,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		orgToken)
 	assertStatus(resp, http.StatusCreated)
 	fest := decodeJSON(resp)
+	_ = resp.Body.Close()
 	festID := fest["id"].(string)
 	if fest["status"] != "draft" {
 		t.Errorf("expected draft status, got %v", fest["status"])
@@ -145,6 +148,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		orgToken)
 	assertStatus(resp, http.StatusOK)
 	form := decodeJSON(resp)
+	_ = resp.Body.Close()
 	if form["festival_id"] != festID {
 		t.Errorf("form festival_id mismatch: %v", form["festival_id"])
 	}
@@ -158,6 +162,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	resp = do("PATCH", "/festivals/"+festID, `{"status":"open"}`, orgToken)
 	assertStatus(resp, http.StatusOK)
 	updated := decodeJSON(resp)
+	_ = resp.Body.Close()
 	if updated["status"] != "open" {
 		t.Errorf("expected open status, got %v", updated["status"])
 	}
@@ -171,11 +176,13 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	// 9. Log in as artist
 	artistLogin := do("POST", "/auth/login",
 		`{"email":"rtartist@example.com","password":"hunter2hunter"}`, "")
+	defer func() { _ = artistLogin.Body.Close() }()
 	assertStatus(artistLogin, http.StatusOK)
 	artistToken := decodeJSON(artistLogin)["token"].(string)
 
 	// 10. Get artist user ID via /me, create profile directly via sqlc
 	meResp2 := do("GET", "/me", "", artistToken)
+	defer func() { _ = meResp2.Body.Close() }()
 	assertStatus(meResp2, http.StatusOK)
 	artistUserID := decodeJSON(meResp2)["id"].(string)
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Roundtrip Artist")
@@ -186,6 +193,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		artistToken)
 	assertStatus(resp, http.StatusCreated)
 	app := decodeJSON(resp)
+	_ = resp.Body.Close()
 	applicationID := app["id"].(string)
 	if app["status"] != "submitted" {
 		t.Errorf("expected submitted, got %v", app["status"])
@@ -195,6 +203,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	resp = do("GET", "/festivals/"+festID+"/applications", "", orgToken)
 	assertStatus(resp, http.StatusOK)
 	apps := decodeJSONArray(resp)
+	_ = resp.Body.Close()
 	if len(apps) != 1 {
 		t.Errorf("expected 1 application, got %d", len(apps))
 	}
@@ -203,6 +212,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	resp = do("POST", "/festivals/"+festID+"/applications/"+applicationID+"/accept", "", orgToken)
 	assertStatus(resp, http.StatusOK)
 	accepted := decodeJSON(resp)
+	_ = resp.Body.Close()
 	if accepted["status"] != "accepted" {
 		t.Errorf("expected accepted, got %v", accepted["status"])
 	}
@@ -216,6 +226,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	resp = do("GET", "/festivals/slug/rt-festival-2027/map", "", "")
 	assertStatus(resp, http.StatusOK)
 	mapData := decodeJSON(resp)
+	_ = resp.Body.Close()
 	pins := mapData["pins"].([]any)
 	if len(pins) != 0 {
 		t.Errorf("expected 0 pins (no pin coordinates set), got %d", len(pins))
@@ -243,6 +254,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	resp = do("GET", "/festivals/slug/rt-festival-2027/map", "", "")
 	assertStatus(resp, http.StatusOK)
 	mapData2 := decodeJSON(resp)
+	_ = resp.Body.Close()
 	pins2 := mapData2["pins"].([]any)
 	if len(pins2) != 1 {
 		t.Fatalf("expected 1 pin, got %d", len(pins2))
@@ -285,10 +297,10 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	resp := doRequest(t, srv, "POST", "/festivals/"+festID+"/apply", `{"answers":{}}`, artistToken)
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.Fatalf("expected 422 for closed form, got %d: %s", resp.StatusCode, body)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	_ = orgToken
 }
 
@@ -322,12 +334,12 @@ func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	resp := doRequest(t, srv, "GET", "/festivals/slug/rt-map-pins/map", "", "")
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
 	}
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	_ = resp.Body.Close()
 	pins := body["pins"].([]any)
 	if len(pins) != 0 {
 		t.Errorf("expected 0 pins for unpinned artist, got %d", len(pins))

@@ -75,8 +75,8 @@ func TestListApplications(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
 	var list []map[string]any
-	json.NewDecoder(resp.Body).Decode(&list)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	_ = resp.Body.Close()
 	if len(list) != 1 {
 		t.Errorf("expected 1 application, got %d", len(list))
 	}
@@ -99,8 +99,8 @@ func TestAcceptApplication(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
 	var app map[string]any
-	json.NewDecoder(resp.Body).Decode(&app)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&app)
+	_ = resp.Body.Close()
 	if app["status"] != "accepted" {
 		t.Errorf("expected status accepted, got %v", app["status"])
 	}
@@ -123,8 +123,8 @@ func TestDeclineApplication(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
 	var app map[string]any
-	json.NewDecoder(resp.Body).Decode(&app)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&app)
+	_ = resp.Body.Close()
 	if app["status"] != "declined" {
 		t.Errorf("expected status declined, got %v", app["status"])
 	}
@@ -146,5 +146,5 @@ func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }

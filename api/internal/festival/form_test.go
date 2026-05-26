@@ -35,8 +35,8 @@ func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
 	var form map[string]any
-	json.NewDecoder(resp.Body).Decode(&form)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&form)
+	_ = resp.Body.Close()
 	fields := form["fields"].([]any)
 	if len(fields) != 1 {
 		t.Errorf("expected 1 field, got %d", len(fields))
@@ -50,8 +50,8 @@ func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 		t.Fatalf("expected 200 on update, got %d: %s", resp2.StatusCode, b)
 	}
 	var form2 map[string]any
-	json.NewDecoder(resp2.Body).Decode(&form2)
-	resp2.Body.Close()
+	_ = json.NewDecoder(resp2.Body).Decode(&form2)
+	_ = resp2.Body.Close()
 	if len(form2["fields"].([]any)) != 2 {
 		t.Errorf("expected 2 fields after update, got %d", len(form2["fields"].([]any)))
 	}
@@ -74,7 +74,7 @@ func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestGetForm_Public(t *testing.T) {
@@ -95,7 +95,7 @@ func TestGetForm_Public(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestGetForm_NotFound(t *testing.T) {
@@ -114,5 +114,5 @@ func TestGetForm_NotFound(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }

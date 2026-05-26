@@ -68,8 +68,8 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
 	}
 	var body map[string]any
-	json.NewDecoder(resp.Body).Decode(&body)
-	resp.Body.Close()
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	_ = resp.Body.Close()
 
 	pins, ok := body["pins"].([]any)
 	if !ok || len(pins) != 1 {
@@ -100,7 +100,5 @@ func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for non-live festival, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
-
-func strPtr(s string) *string { return &s }

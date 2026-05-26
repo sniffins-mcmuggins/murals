@@ -16,9 +16,9 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
-	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
+	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
 	"github.com/sniffins-mcmuggins/render/api/internal/metrics"

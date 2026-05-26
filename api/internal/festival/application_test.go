@@ -36,7 +36,7 @@ func TestSubmitApplication_Success(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 201, got %d: %s", resp.StatusCode, b)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestSubmitApplication_MissingRequiredField(t *testing.T) {
@@ -62,7 +62,7 @@ func TestSubmitApplication_MissingRequiredField(t *testing.T) {
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Fatalf("expected 422, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestSubmitApplication_DuplicateReturns409(t *testing.T) {
@@ -86,13 +86,13 @@ func TestSubmitApplication_DuplicateReturns409(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("first apply: expected 201, got %d: %s", resp.StatusCode, b)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	resp2 := doRequest(t, srv, "POST", "/festivals/"+festID+"/apply", `{"answers":{}}`, artistToken)
 	if resp2.StatusCode != http.StatusConflict {
 		t.Fatalf("second apply: expected 409, got %d", resp2.StatusCode)
 	}
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 }
 
 func TestSubmitApplication_RequiresArtistRole(t *testing.T) {
@@ -112,5 +112,5 @@ func TestSubmitApplication_RequiresArtistRole(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for organiser, got %d", resp.StatusCode)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
