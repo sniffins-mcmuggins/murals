@@ -32,13 +32,14 @@ describe('CollectionDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Default mocks
-    mockUseQueryClient.mockReturnValue({ invalidateQueries: vi.fn() })
+    mockUseQueryClient.mockReturnValue({ invalidateQueries: vi.fn() } as unknown as ReturnType<typeof useQueryClient>)
     mockUseMutation.mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useMutation>)
     mockUseUploadImage.mockReturnValue({
       upload: vi.fn(),
+      state: 'idle' as const,
       isUploading: false,
       error: null,
     })
@@ -126,7 +127,7 @@ describe('CollectionDetailPage', () => {
       mockUseQuery
         .mockReturnValueOnce({ data: collection, isLoading: false } as unknown as ReturnType<typeof useQuery>)
         .mockReturnValueOnce({ data: [], isLoading: false } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), isUploading: false, error: null })
+      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), state: 'idle' as const, isUploading: false, error: null })
       render(React.createElement(CollectionDetailPage, { params: mockParams }))
       await waitFor(() => {
         expect(screen.getByText('Choose file')).toBeInTheDocument()
@@ -137,7 +138,7 @@ describe('CollectionDetailPage', () => {
       mockUseQuery
         .mockReturnValueOnce({ data: collection, isLoading: false } as unknown as ReturnType<typeof useQuery>)
         .mockReturnValueOnce({ data: [], isLoading: false } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), isUploading: true, error: null })
+      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), state: 'uploading' as const, isUploading: true, error: null })
       const { rerender } = render(React.createElement(CollectionDetailPage, { params: mockParams }))
       await waitFor(() => {
         expect(screen.getByText('Uploading…')).toBeInTheDocument()
@@ -150,7 +151,7 @@ describe('CollectionDetailPage', () => {
       mockUseQuery
         .mockReturnValueOnce({ data: collection, isLoading: false } as unknown as ReturnType<typeof useQuery>)
         .mockReturnValueOnce({ data: [], isLoading: false } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), isUploading: false, error: 'File too large' })
+      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), state: 'error' as const, isUploading: false, error: 'File too large' })
       render(React.createElement(CollectionDetailPage, { params: mockParams }))
       await waitFor(() => {
         const alert = screen.getByRole('alert')
@@ -164,8 +165,8 @@ describe('CollectionDetailPage', () => {
       mockUseQuery
         .mockReturnValueOnce({ data: collection, isLoading: false } as unknown as ReturnType<typeof useQuery>)
         .mockReturnValueOnce({ data: [], isLoading: false } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: mockUpload, isUploading: false, error: null })
-      mockUseQueryClient.mockReturnValue({ invalidateQueries: mockInvalidateQueries })
+      mockUseUploadImage.mockReturnValue({ upload: mockUpload, state: 'idle' as const, isUploading: false, error: null })
+      mockUseQueryClient.mockReturnValue({ invalidateQueries: mockInvalidateQueries } as unknown as ReturnType<typeof useQueryClient>)
 
       const { container } = render(React.createElement(CollectionDetailPage, { params: mockParams }))
       await waitFor(() => {
@@ -189,7 +190,7 @@ describe('CollectionDetailPage', () => {
         data: collection,
         isLoading: false,
       } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: mockUpload, isUploading: false, error: null })
+      mockUseUploadImage.mockReturnValue({ upload: mockUpload, state: 'idle' as const, isUploading: false, error: null })
 
       render(React.createElement(CollectionDetailPage, { params: mockParams }))
 
@@ -208,7 +209,7 @@ describe('CollectionDetailPage', () => {
         data: collection,
         isLoading: false,
       } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: mockUpload, isUploading: false, error: null })
+      mockUseUploadImage.mockReturnValue({ upload: mockUpload, state: 'idle' as const, isUploading: false, error: null })
 
       render(React.createElement(CollectionDetailPage, { params: mockParams }))
 
@@ -226,7 +227,7 @@ describe('CollectionDetailPage', () => {
         data: collection,
         isLoading: false,
       } as unknown as ReturnType<typeof useQuery>)
-      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), isUploading: false, error: null })
+      mockUseUploadImage.mockReturnValue({ upload: vi.fn(), state: 'idle' as const, isUploading: false, error: null })
 
       render(React.createElement(CollectionDetailPage, { params: mockParams }))
 
