@@ -45,7 +45,9 @@ func TestListPublicProfiles(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	// Empty initially
-	resp, err := http.Get(srv.URL + "/public/profiles")
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/public/profiles", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var empty struct {
@@ -73,7 +75,9 @@ func TestListPublicProfiles_Pagination(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp, err := http.Get(srv.URL + "/public/profiles?page=1&per_page=2")
+	req2, err := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/public/profiles?page=1&per_page=2", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req2)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
