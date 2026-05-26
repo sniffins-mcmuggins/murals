@@ -122,6 +122,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create artist profile
+         * @description Creates an artist profile for the authenticated user. One profile per user. Requires role=artist.
+         */
+        post: operations["postProfiles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get own artist profile */
+        get: operations["getProfileMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update own artist profile */
+        patch: operations["patchProfileMe"];
+        trace?: never;
+    };
+    "/profiles/{profileID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get public artist profile */
+        get: operations["getProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profileID}/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List collections for an artist profile */
+        get: operations["listCollections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a collection
+         * @description Creates a collection for the authenticated artist's profile. Requires an existing artist profile.
+         */
+        post: operations["postCollections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collectionID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a collection */
+        get: operations["getCollection"];
+        put?: never;
+        post?: never;
+        /** Delete a collection */
+        delete: operations["deleteCollection"];
+        options?: never;
+        head?: never;
+        /** Update a collection */
+        patch: operations["patchCollection"];
+        trace?: never;
+    };
+    "/collections/{collectionID}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an uploaded image to a collection
+         * @description Attach an image that has already been confirmed via POST /images/confirm.
+         *     Appends to the end of the collection's image list (display_order = current count).
+         */
+        post: operations["attachCollectionImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collectionID}/images/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder images in a collection
+         * @description Accepts an ordered array of image IDs. Sets display_order by position (0-indexed).
+         *     Returns the images in the new order.
+         */
+        put: operations["reorderCollectionImages"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collectionID}/images/{imageID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an image from a collection */
+        delete: operations["deleteCollectionImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -213,6 +383,105 @@ export interface components {
              */
             cdnUrl: string;
         };
+        ArtistProfile: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
+            display_name: string;
+            bio: string;
+            /** @description City/region. Only present if show_location is true (public response). */
+            location_label?: string | null;
+            /**
+             * @example [
+             *       "mural",
+             *       "stencil"
+             *     ]
+             */
+            medium_tags: string[];
+            /**
+             * @example {
+             *       "instagram": "https://instagram.com/artist"
+             *     }
+             */
+            social_links: {
+                [key: string]: string;
+            };
+            avatar_s3_key?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CreateProfileRequest: {
+            /** @example Alice Muralist */
+            displayName: string;
+        };
+        UpdateProfileRequest: {
+            displayName?: string;
+            bio?: string;
+            locationLabel?: string | null;
+            /** @description Controls whether location_label appears on the public profile. */
+            showLocation?: boolean;
+            mediumTags?: string[];
+            socialLinks?: {
+                [key: string]: string;
+            };
+            avatarS3Key?: string | null;
+        };
+        /** @enum {string} */
+        CollectionStatus: "active" | "archived" | "ongoing";
+        Collection: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            artist_profile_id: string;
+            name: string;
+            description: string;
+            cover_s3_key?: string | null;
+            status: components["schemas"]["CollectionStatus"];
+            display_order: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CreateCollectionRequest: {
+            /** @example Bristol 2024 */
+            name: string;
+            description?: string;
+        };
+        UpdateCollectionRequest: {
+            name?: string;
+            description?: string;
+            coverS3Key?: string | null;
+            status?: components["schemas"]["CollectionStatus"];
+        };
+        CollectionImage: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            collection_id: string;
+            s3_key: string;
+            /** Format: uri */
+            cdn_url: string;
+            display_order: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AttachImageRequest: {
+            /** @description The s3Key returned by POST /images/presign and confirmed via POST /images/confirm. */
+            s3Key: string;
+            /**
+             * Format: uri
+             * @description The cdnUrl returned by POST /images/confirm.
+             */
+            cdnUrl: string;
+        };
+        ReorderImagesRequest: {
+            /** @description Ordered list of image IDs. display_order is set by position (0-indexed). */
+            imageIds: string[];
+        };
     };
     responses: {
         /** @description Invalid request body or parameters. */
@@ -244,6 +513,15 @@ export interface components {
         };
         /** @description Resource not found. */
         NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Conflict — resource already exists. */
+        Conflict: {
             headers: {
                 [name: string]: unknown;
             };
@@ -434,6 +712,309 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    postProfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Profile created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getProfileMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own profile (includes private fields like show_location setting). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    patchProfileMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public artist profile. location_label is omitted if artist has not enabled show_location. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listCollections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of collections ordered by display_order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"][];
+                };
+            };
+        };
+    };
+    postCollections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCollectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Collection created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Collection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    patchCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCollectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated collection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    attachCollectionImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachImageRequest"];
+            };
+        };
+        responses: {
+            /** @description Image attached. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionImage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderCollectionImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderImagesRequest"];
+            };
+        };
+        responses: {
+            /** @description Images in new order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionImage"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCollectionImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+                imageID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
 }
