@@ -594,6 +594,9 @@ type ServerInterface interface {
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// List the authenticated artist's applications
+	// (GET /me/applications)
+	GetMyApplications(w http.ResponseWriter, r *http.Request)
 	// Create artist profile
 	// (POST /profiles)
 	PostProfiles(w http.ResponseWriter, r *http.Request)
@@ -768,6 +771,12 @@ func (_ Unimplemented) PostImagesPresign(w http.ResponseWriter, r *http.Request)
 // Return the authenticated user
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List the authenticated artist's applications
+// (GET /me/applications)
+func (_ Unimplemented) GetMyApplications(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1517,6 +1526,28 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// GetMyApplications operation middleware
+func (siw *ServerInterfaceWrapper) GetMyApplications(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyApplications(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostProfiles operation middleware
 func (siw *ServerInterfaceWrapper) PostProfiles(w http.ResponseWriter, r *http.Request) {
 
@@ -1901,6 +1932,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/applications", wrapper.GetMyApplications)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/profiles", wrapper.PostProfiles)
@@ -3403,6 +3437,43 @@ func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	return err
 }
 
+type GetMyApplicationsRequestObject struct {
+}
+
+type GetMyApplicationsResponseObject interface {
+	VisitGetMyApplicationsResponse(w http.ResponseWriter) error
+}
+
+type GetMyApplications200JSONResponse []Application
+
+func (response GetMyApplications200JSONResponse) VisitGetMyApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyApplications401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyApplications401ApplicationProblemPlusJSONResponse) VisitGetMyApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PostProfilesRequestObject struct {
 	Body *PostProfilesJSONRequestBody
 }
@@ -3777,6 +3848,9 @@ type StrictServerInterface interface {
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// List the authenticated artist's applications
+	// (GET /me/applications)
+	GetMyApplications(ctx context.Context, request GetMyApplicationsRequestObject) (GetMyApplicationsResponseObject, error)
 	// Create artist profile
 	// (POST /profiles)
 	PostProfiles(ctx context.Context, request PostProfilesRequestObject) (PostProfilesResponseObject, error)
@@ -4541,6 +4615,30 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyApplications operation middleware
+func (sh *strictHandler) GetMyApplications(w http.ResponseWriter, r *http.Request) {
+	var request GetMyApplicationsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyApplications(ctx, request.(GetMyApplicationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyApplications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyApplicationsResponseObject); ok {
+		if err := validResponse.VisitGetMyApplicationsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

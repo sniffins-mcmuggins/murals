@@ -94,6 +94,7 @@ func main() {
 	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(pool))
 
 	// Applications
+	r.Get("/me/applications", festival.GetMyApplicationsHandler(pool))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(pool))
 
 	// Review
