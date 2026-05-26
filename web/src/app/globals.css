@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Colours ───────────────────────────────────────────────────────────── */
+  --color-ink:      #1A1A2E;
+  --color-amber:    #E8A838;
+  --color-clay:     #C45C3A;
+  --color-offwhite: #FAF7F2;
+  --color-warm:     #F0EAE0;
+  --color-mid:      #8A8896;
+  --color-light:    #E2DDD6;
+
+  /* ── Typography ────────────────────────────────────────────────────────── */
+  /* next/font injects --font-cormorant, --font-dm-sans, --font-dm-mono      */
+  /* onto <html>. These @theme rules map them to Tailwind font utilities.    */
+  --font-sans:  var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), Georgia, serif;
+  --font-mono:  var(--font-dm-mono), ui-monospace, "Courier New", monospace;
+}
