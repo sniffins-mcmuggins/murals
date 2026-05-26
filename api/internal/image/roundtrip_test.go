@@ -56,11 +56,11 @@ func TestImageUploadRoundTrip(t *testing.T) {
 
 	decodeJSON := func(resp *http.Response) map[string]any {
 		t.Helper()
+		defer func() { _ = resp.Body.Close() }()
 		var m map[string]any
 		if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
 			t.Fatalf("decode JSON: %v", err)
 		}
-		resp.Body.Close()
 		return m
 	}
 
@@ -71,13 +71,14 @@ func TestImageUploadRoundTrip(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("signup: expected 201, got %d: %s", resp.StatusCode, body)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// 2. Log in, extract JWT
 	resp = apiReq("POST", "/auth/login",
 		`{"email":"roundtrip@example.com","password":"hunter2hunter"}`, "")
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		t.Fatalf("login: expected 200, got %d: %s", resp.StatusCode, body)
 	}
 	token := decodeJSON(resp)["token"].(string)
@@ -86,6 +87,7 @@ func TestImageUploadRoundTrip(t *testing.T) {
 	resp = apiReq("POST", "/images/presign", `{"contentType":"image/png"}`, token)
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		t.Fatalf("presign: expected 200, got %d: %s", resp.StatusCode, body)
 	}
 	presignData := decodeJSON(resp)
@@ -108,13 +110,14 @@ func TestImageUploadRoundTrip(t *testing.T) {
 		body, _ := io.ReadAll(putResp.Body)
 		t.Fatalf("PUT to MinIO: expected 200, got %d: %s", putResp.StatusCode, body)
 	}
-	putResp.Body.Close()
+	_ = putResp.Body.Close()
 
 	// 5. Confirm
 	confirmBody := `{"s3Key":"` + s3Key + `","resourceType":"artist_profile","resourceId":"test-id"}`
 	resp = apiReq("POST", "/images/confirm", confirmBody, token)
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		t.Fatalf("confirm: expected 200, got %d: %s", resp.StatusCode, body)
 	}
 	cdnURL := decodeJSON(resp)["cdnUrl"].(string)
@@ -136,7 +139,7 @@ func TestImageUploadRoundTrip(t *testing.T) {
 		t.Fatalf("GET via CDN URL: expected 200, got %d: %s", getResp.StatusCode, body)
 	}
 	fetched, _ := io.ReadAll(getResp.Body)
-	getResp.Body.Close()
+	_ = getResp.Body.Close()
 	if !bytes.Equal(fetched, imageBytes) {
 		t.Errorf("fetched bytes don't match uploaded bytes\n  got:  %q\n  want: %q", fetched, imageBytes)
 	}

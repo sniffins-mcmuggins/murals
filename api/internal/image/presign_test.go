@@ -54,7 +54,7 @@ func TestPresignHandler_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PUT to presigned URL: %v", err)
 	}
-	defer putResp.Body.Close()
+	defer func() { _ = putResp.Body.Close() }()
 	if putResp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(putResp.Body)
 		t.Fatalf("PUT to presigned URL: expected 200, got %d: %s", putResp.StatusCode, body)
