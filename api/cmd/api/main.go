@@ -14,6 +14,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
@@ -60,6 +61,22 @@ func main() {
 	r.Get("/me", auth.MeHandler(pool))
 	r.Post("/images/presign", image.PresignHandler(mc, cfg.MinioBucket))
 	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
+
+	// Artist profiles
+	r.Post("/profiles", artist.CreateProfileHandler(pool))
+	r.Get("/profiles/me", artist.GetMyProfileHandler(pool))
+	r.Patch("/profiles/me", artist.UpdateProfileHandler(pool))
+	r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
+	r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(pool))
+
+	// Collections
+	r.Post("/collections", artist.CreateCollectionHandler(pool))
+	r.Get("/collections/{collectionID}", artist.GetCollectionHandler(pool))
+	r.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(pool))
+	r.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(pool))
+	r.Post("/collections/{collectionID}/images", artist.AttachImageHandler(pool))
+	r.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(pool))
+	r.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
