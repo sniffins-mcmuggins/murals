@@ -1,4 +1,6 @@
 import type { components } from '../generated/client'
+import createClient from 'openapi-fetch'
+import type { paths } from '../generated/client'
 
 export class ApiError extends Error {
   readonly status: number
@@ -16,4 +18,14 @@ export class ApiError extends Error {
     this.instance = problem.instance
     this.type = problem.type
   }
+}
+
+interface ApiClientOptions {
+  baseUrl: string
+  getToken?: () => string | null | undefined | Promise<string | null | undefined>
+}
+
+export function createApiClient({ baseUrl, getToken }: ApiClientOptions) {
+  const client = createClient<paths>({ baseUrl })
+  return client
 }

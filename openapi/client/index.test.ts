@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { vi } from 'vitest'
 import { ApiError } from './index'
+import { createApiClient } from './index'
+
+function mockFetch(status: number, body: unknown): ReturnType<typeof vi.fn> {
+  return vi.fn().mockResolvedValue(
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  )
+}
 
 describe('ApiError', () => {
   it('is an instance of Error with status and title', () => {
@@ -24,5 +35,20 @@ describe('ApiError', () => {
     expect(err.detail).toBe('email is required')
     expect(err.instance).toBe('/auth/signup')
     expect(err.type).toBe('about:blank')
+  })
+})
+
+describe('createApiClient — no auth', () => {
+  it('makes a request without an Authorization header when getToken is not provided', async () => {
+    const fetch = mockFetch(200, { status: 'ok' })
+    vi.stubGlobal('fetch', fetch)
+
+    const client = createApiClient({ baseUrl: 'http://localhost:8080' })
+    await client.GET('/healthz')
+
+    const req = fetch.mock.calls[0][0] as Request
+    expect(req.headers.get('Authorization')).toBeNull()
+
+    vi.unstubAllGlobals()
   })
 })
