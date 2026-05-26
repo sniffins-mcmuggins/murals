@@ -13,7 +13,13 @@ type Festival = components['schemas']['Festival']
 export function HomeScreen(_props: Partial<HomeScreenProps>) {
   const navigation = useNavigation<HomeScreenProps['navigation']>()
 
-  const { data: festivals, isLoading, isError, refetch, isFetching } = useQuery({
+  const {
+    data: festivals,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['public-festivals'],
     queryFn: async () => {
       const { data, error } = await apiClient.GET('/public/festivals', {
@@ -49,18 +55,14 @@ export function HomeScreen(_props: Partial<HomeScreenProps>) {
     <FlatList
       testID="home-screen"
       data={festivals}
-      keyExtractor={(f) => f.id}
+      keyExtractor={(f) => f.id ?? ''}
       renderItem={({ item }) => (
         <FestivalCard
           festival={item}
-          onPress={() =>
-            navigation.navigate('Map', { festivalSlug: item.slug })
-          }
+          onPress={() => item.slug && navigation.navigate('Map', { festivalSlug: item.slug })}
         />
       )}
-      refreshControl={
-        <RefreshControl refreshing={isFetching} onRefresh={refetch} />
-      }
+      refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
       contentContainerStyle={styles.list}
       ListEmptyComponent={
         <View style={styles.center}>

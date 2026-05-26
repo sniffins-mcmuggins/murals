@@ -16,7 +16,16 @@ const mockProfile = {
 }
 
 const mockCollections = [
-  { id: 'col-1', artist_profile_id: 'profile-1', name: 'Street Series', description: '', status: 'published', display_order: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  {
+    id: 'col-1',
+    artist_profile_id: 'profile-1',
+    name: 'Street Series',
+    description: '',
+    status: 'published',
+    display_order: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ]
 
 jest.mock('../../../lib/api', () => ({

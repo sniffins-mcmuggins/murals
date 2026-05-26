@@ -33,8 +33,9 @@ export type FestivalMapScreenProps = CompositeScreenProps<
   BottomTabScreenProps<RootTabParamList>
 >
 
-export type ArtistProfileScreenProps<T extends HomeStackParamList | MapStackParamList | DiscoverStackParamList> =
-  StackScreenProps<T, 'ArtistProfile'>
+export type ArtistProfileScreenProps<
+  T extends HomeStackParamList | MapStackParamList | DiscoverStackParamList,
+> = StackScreenProps<T, 'ArtistProfile'>
 
 export type DiscoverScreenProps = CompositeScreenProps<
   StackScreenProps<DiscoverStackParamList, 'DiscoverScreen'>,

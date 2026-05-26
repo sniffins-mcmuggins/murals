@@ -1,9 +1,8 @@
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native'
 import React from 'react'
 import { BottomTabNavigator } from './BottomTabNavigator'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const linking: any = {
+const linking: LinkingOptions<any> = {
   prefixes: ['render://'],
   config: {
     screens: {

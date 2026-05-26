@@ -1,13 +1,7 @@
 import { useRoute, type RouteProp } from '@react-navigation/native'
 import { useQuery } from '@tanstack/react-query'
 import React from 'react'
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { apiClient } from '../../lib/api'
 
 // Stack-agnostic route type — works in HomeStack, MapStack, and DiscoverStack.

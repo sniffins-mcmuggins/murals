@@ -45,8 +45,15 @@ export function distanceKm(a: Coords, b: Coords): number {
   const c =
     2 *
     Math.atan2(
-      Math.sqrt(sinLat * sinLat + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng),
-      Math.sqrt(1 - sinLat * sinLat - Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng),
+      Math.sqrt(
+        sinLat * sinLat +
+          Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng,
+      ),
+      Math.sqrt(
+        1 -
+          sinLat * sinLat -
+          Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng,
+      ),
     )
   return R * c
 }

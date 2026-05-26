@@ -30,9 +30,7 @@ export function FestivalMapScreen() {
 
   const onWebViewLoad = useCallback(() => {
     if (!webViewRef.current || !mapData?.pins) return
-    webViewRef.current.postMessage(
-      JSON.stringify({ type: 'SET_PINS', pins: mapData.pins }),
-    )
+    webViewRef.current.postMessage(JSON.stringify({ type: 'SET_PINS', pins: mapData.pins }))
   }, [mapData])
 
   const onMessage = useCallback(
@@ -71,7 +69,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   webview: { flex: 1 },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(250,247,242,0.7)',

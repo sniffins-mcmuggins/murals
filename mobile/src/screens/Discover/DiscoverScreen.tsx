@@ -177,9 +177,7 @@ export function DiscoverScreen(_props: Partial<DiscoverScreenProps>) {
             <ArtistCard
               profile={item.profile}
               distanceLabel={`${item.distanceKm.toFixed(1)} km`}
-              onPress={() =>
-                navigation.navigate('ArtistProfile', { profileID: item.profile.id })
-              }
+              onPress={() => navigation.navigate('ArtistProfile', { profileID: item.profile.id })}
             />
           )}
           ListEmptyComponent={

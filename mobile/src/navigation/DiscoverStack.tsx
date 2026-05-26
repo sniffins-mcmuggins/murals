@@ -9,7 +9,11 @@ const Stack = createStackNavigator<DiscoverStackParamList>()
 export function DiscoverStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen name="DiscoverScreen" component={DiscoverScreen} options={{ title: 'Discover' }} />
+      <Stack.Screen
+        name="DiscoverScreen"
+        component={DiscoverScreen}
+        options={{ title: 'Discover' }}
+      />
       <Stack.Screen name="ArtistProfile" component={ArtistProfileScreen} options={{ title: '' }} />
     </Stack.Navigator>
   )

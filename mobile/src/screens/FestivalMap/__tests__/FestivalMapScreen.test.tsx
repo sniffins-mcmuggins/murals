@@ -20,7 +20,8 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('react-native-webview', () => {
   const { View } = require('react-native')
-  return { WebView: (props: any) => <View testID="webview" {...props} /> }
+  const WebViewMock = (props: any) => <View testID="webview" {...props} />
+  return { __esModule: true, default: WebViewMock, WebView: WebViewMock }
 })
 
 function Wrapper({ children }: { children: React.ReactNode }) {

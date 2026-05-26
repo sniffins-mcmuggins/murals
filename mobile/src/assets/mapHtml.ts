@@ -5,7 +5,7 @@ export const MAP_HTML = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Festival Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #map { width: 100%; height: 100%; }
@@ -47,6 +47,6 @@ export const MAP_HTML = `<!DOCTYPE html>
     }
     window.addEventListener('message', handleMessage);
     document.addEventListener('message', handleMessage);
-  <\/script>
+  </script>
 </body>
 </html>`
