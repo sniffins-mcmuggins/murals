@@ -241,27 +241,17 @@ Install `openapi-fetch` (already a dep of `openapi/client`).
 **`src/lib/api.ts`:**
 ```ts
 import { createApiClient } from '@render/api-client'
-import { useAuth } from './auth'
 
-let client: ReturnType<typeof createApiClient> | null = null
+export const apiClient = createApiClient({
+  baseUrl: process.env.API_BASE_URL ?? 'http://localhost:3001',
+  // Phase 1: all calls are unauthenticated (public-only app).
+  // Phase 2: wire getToken from AuthContext when auth screens are added.
+})
 
-export function getApiClient(getToken?: () => string | null): ReturnType<typeof createApiClient> {
-  if (!client) {
-    client = createApiClient({
-      baseUrl: process.env.API_BASE_URL ?? 'http://localhost:3001',
-      getToken,
-    })
-  }
-  return client
-}
-
-export function useApiClient() {
-  const { token } = useAuth()
-  return getApiClient(() => token)
-}
+export type { components, paths, operations } from '@render/api-client'
 ```
 
-The singleton pattern avoids creating a new client on every render. `useApiClient` is the hook used in screen components. Re-exports all types from `@render/api-client` for convenience.
+A module-level singleton keeps Phase 1 simple — all API calls are unauthenticated. Phase 2 will add a `getToken` callback once login/signup screens exist. Screens import `apiClient` directly. Re-exports all API types for convenience.
 
 ---
 
@@ -286,6 +276,8 @@ These four are implemented in parallel after the foundation merges.
 **`FestivalCard`** is a shared component in `src/components/` used by Home only for now.
 
 ### #66 — FestivalMap screen
+
+Install: `react-native-webview`.
 
 **Data:** `GET /festivals/slug/{slug}/map` via TanStack Query (no auth), after screen mounts.
 
@@ -333,7 +325,25 @@ const linking = {
 }
 ```
 
-Deep links open in whichever tab was last active.
+Deep links open in whichever tab was last active. The full linking config passed to `NavigationContainer`:
+```ts
+const linking = {
+  prefixes: ['render://'],
+  config: {
+    screens: {
+      Home: {
+        screens: { HomeScreen: '', ArtistProfile: 'artists/:profileID' },
+      },
+      Map: {
+        screens: { FestivalMap: 'festivals/:festivalSlug/map', ArtistProfile: 'artists/:profileID' },
+      },
+      Discover: {
+        screens: { DiscoverScreen: 'discover', ArtistProfile: 'artists/:profileID' },
+      },
+    },
+  },
+}
+```
 
 **iOS:** add `render` scheme to `Info.plist` under `CFBundleURLTypes`. **Android:** add intent filter in `AndroidManifest.xml` for `render://` scheme.
 
@@ -356,7 +366,7 @@ Deep links open in whichever tab was last active.
 - If granted: call `getCurrentPosition()`, then `GET /public/festivals?status=live`, then for each festival `GET /festivals/slug/{slug}/map`. Collect all `MapPin[]`, deduplicate by `artist_id`, sort by distance from device. Render as `ArtistCard` list with distance label.
 - Nearby uses festival pins as a proxy for artist geo-data — sufficient for Phase 1 (all accepted artists have pin coordinates). A dedicated geo-search endpoint is Phase 2.
 
-**`src/lib/location.ts`:** wraps `react-native` `PermissionsAndroid` (Android) and `Geolocation.requestAuthorization()` (iOS) into a unified `requestLocationPermission(): Promise<boolean>` and `getCurrentPosition(): Promise<{ lat: number, lng: number }>`.
+**`src/lib/location.ts`:** wraps `@react-native-community/geolocation` and `react-native` `PermissionsAndroid` (Android) into a unified `requestLocationPermission(): Promise<boolean>` and `getCurrentPosition(): Promise<{ lat: number, lng: number }>`. Package: `@react-native-community/geolocation`.
 
 ---
 
