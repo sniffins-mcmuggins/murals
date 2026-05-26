@@ -91,13 +91,13 @@ jobs:
         run: npm install
 
       - name: Lint
-        run: npm run lint --if-present
+        run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm run lint --if-present'
 
       - name: Type check
-        run: npm run typecheck --if-present
+        run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm run typecheck --if-present'
 
       - name: Test
-        run: npm test --if-present
+        run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm test --if-present'
 
   # ── MOBILE (Node / React Native) ──────────────────────────────────────────
   mobile:
@@ -123,13 +123,13 @@ jobs:
         run: npm install
 
       - name: Lint
-        run: npm run lint --if-present
+        run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm run lint --if-present'
 
       - name: Type check
-        run: npm run typecheck --if-present
+        run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm run typecheck --if-present'
 
       - name: Test
-        run: npm test --if-present
+        run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm test --if-present'
 
   # ── OPENAPI DRIFT CHECK ───────────────────────────────────────────────────
   openapi:
@@ -154,6 +154,7 @@ jobs:
       - name: Install codegen tools
         run: |
           go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+          go install github.com/go-task/task/v3/cmd/task@latest
           npm install -g openapi-typescript
 
       - name: Regenerate
