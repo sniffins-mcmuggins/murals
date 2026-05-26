@@ -91,3 +91,43 @@ func (q *Queries) GetFestivalMapPins(ctx context.Context, festivalID pgtype.UUID
 	}
 	return items, nil
 }
+
+const setFestivalArtistPin = `-- name: SetFestivalArtistPin :one
+UPDATE festival_artists
+SET pin_lat    = $3,
+    pin_lng    = $4,
+    w3w        = $5,
+    updated_at = now()
+WHERE festival_id = $1 AND artist_id = $2
+RETURNING festival_id, artist_id, status, pin_lat, pin_lng, w3w, created_at, updated_at
+`
+
+type SetFestivalArtistPinParams struct {
+	FestivalID pgtype.UUID    `db:"festival_id" json:"festival_id"`
+	ArtistID   pgtype.UUID    `db:"artist_id" json:"artist_id"`
+	PinLat     pgtype.Numeric `db:"pin_lat" json:"pin_lat"`
+	PinLng     pgtype.Numeric `db:"pin_lng" json:"pin_lng"`
+	W3w        *string        `db:"w3w" json:"w3w"`
+}
+
+func (q *Queries) SetFestivalArtistPin(ctx context.Context, arg SetFestivalArtistPinParams) (FestivalArtist, error) {
+	row := q.db.QueryRow(ctx, setFestivalArtistPin,
+		arg.FestivalID,
+		arg.ArtistID,
+		arg.PinLat,
+		arg.PinLng,
+		arg.W3w,
+	)
+	var i FestivalArtist
+	err := row.Scan(
+		&i.FestivalID,
+		&i.ArtistID,
+		&i.Status,
+		&i.PinLat,
+		&i.PinLng,
+		&i.W3w,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

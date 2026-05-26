@@ -5,6 +5,15 @@ ON CONFLICT (festival_id, artist_id) DO UPDATE
     SET status = EXCLUDED.status, updated_at = now()
 RETURNING *;
 
+-- name: SetFestivalArtistPin :one
+UPDATE festival_artists
+SET pin_lat    = $3,
+    pin_lng    = $4,
+    w3w        = $5,
+    updated_at = now()
+WHERE festival_id = $1 AND artist_id = $2
+RETURNING *;
+
 -- name: GetFestivalMapPins :many
 SELECT fa.festival_id,
        fa.artist_id,
