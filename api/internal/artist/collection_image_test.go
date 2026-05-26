@@ -100,6 +100,9 @@ func TestAttachImage_SecondImageOrder(t *testing.T) {
 		var img map[string]any
 		_ = json.NewDecoder(resp.Body).Decode(&img)
 		resp.Body.Close()
+		if resp.StatusCode != http.StatusCreated {
+			t.Errorf("image %d: expected 201, got %d", i, resp.StatusCode)
+		}
 		if int(img["display_order"].(float64)) != i {
 			t.Errorf("image %d: expected display_order %d, got %v", i, i, img["display_order"])
 		}
@@ -161,6 +164,15 @@ func TestReorderImages_Success(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&images)
 	if images[0]["id"] != imageIDs[1] {
 		t.Errorf("expected %s first after reorder, got %v", imageIDs[1], images[0]["id"])
+	}
+	if images[0]["display_order"].(float64) != 0 {
+		t.Errorf("expected images[0] display_order 0, got %v", images[0]["display_order"])
+	}
+	if images[1]["id"] != imageIDs[0] {
+		t.Errorf("expected %s second after reorder, got %v", imageIDs[0], images[1]["id"])
+	}
+	if images[1]["display_order"].(float64) != 1 {
+		t.Errorf("expected images[1] display_order 1, got %v", images[1]["display_order"])
 	}
 }
 

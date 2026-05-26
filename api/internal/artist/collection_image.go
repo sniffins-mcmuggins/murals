@@ -158,19 +158,48 @@ func ReorderImagesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		existing, err := q.ListCollectionImages(r.Context(), collection.ID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		validIDs := make(map[string]bool, len(existing))
+		for _, img := range existing {
+			validIDs[img.ID.String()] = true
+		}
+		for _, id := range req.ImageIDs {
+			if !validIDs[id] {
+				httperr.UnprocessableEntity(w, "image not found in collection: "+id)
+				return
+			}
+		}
+
+		tx, err := pool.BeginTx(r.Context(), pgx.TxOptions{})
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		defer tx.Rollback(r.Context())
+		tq := sqlcdb.New(tx)
+
 		for i, idStr := range req.ImageIDs {
 			imgUUID, err := pgUUIDFromString(idStr)
 			if err != nil {
 				httperr.BadRequest(w, "invalid image id: "+idStr)
 				return
 			}
-			if err := q.UpdateCollectionImageOrder(r.Context(), sqlcdb.UpdateCollectionImageOrderParams{
+			if err := tq.UpdateCollectionImageOrder(r.Context(), sqlcdb.UpdateCollectionImageOrderParams{
 				ID:           imgUUID,
 				DisplayOrder: int32(i),
 			}); err != nil {
 				httperr.InternalServerError(w)
 				return
 			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			httperr.InternalServerError(w)
+			return
 		}
 
 		images, err := q.ListCollectionImages(r.Context(), collection.ID)
