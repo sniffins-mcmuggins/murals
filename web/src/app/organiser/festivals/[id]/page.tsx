@@ -143,7 +143,15 @@ function FestivalDetail({
 
       <div className="flex items-start justify-between mb-6">
         <h1 className="font-serif text-4xl text-ink">{festival.name}</h1>
-        <span className="font-mono text-xs text-mid uppercase tracking-wider mt-2">{festival.status}</span>
+        <div className="flex items-center gap-4 mt-2">
+          <Link
+            href={`/organiser/festivals/${festivalId}/applications`}
+            className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors"
+          >
+            View applications
+          </Link>
+          <span className="font-mono text-xs text-mid uppercase tracking-wider">{festival.status}</span>
+        </div>
       </div>
 
       {/* Edit form */}
