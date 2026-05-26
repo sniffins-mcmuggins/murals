@@ -11,11 +11,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
+	"github.com/sniffins-mcmuggins/render/api/internal/image"
 	"github.com/sniffins-mcmuggins/render/api/internal/metrics"
 	"github.com/sniffins-mcmuggins/render/api/internal/middleware"
 )
@@ -34,6 +37,15 @@ func main() {
 	}
 	defer pool.Close()
 
+	mc, err := minio.New(cfg.MinioEndpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
+		Secure: cfg.MinioUseSSL,
+	})
+	if err != nil {
+		slog.Error("minio client init failed", "err", err)
+		os.Exit(1)
+	}
+
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RealIP)
 	r.Use(middleware.Logger(logger))
@@ -46,6 +58,8 @@ func main() {
 	r.Post("/auth/signup", auth.SignupHandler(pool))
 	r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
 	r.Get("/me", auth.MeHandler(pool))
+	r.Post("/images/presign", image.PresignHandler(mc, cfg.MinioBucket))
+	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
