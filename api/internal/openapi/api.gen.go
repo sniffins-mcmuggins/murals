@@ -20,6 +20,30 @@ const (
 	CookieAuthScopes cookieAuthContextKey = "cookieAuth.Scopes"
 )
 
+// Defines values for PresignRequestContentType.
+const (
+	Imagegif  PresignRequestContentType = "image/gif"
+	Imagejpeg PresignRequestContentType = "image/jpeg"
+	Imagepng  PresignRequestContentType = "image/png"
+	Imagewebp PresignRequestContentType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the PresignRequestContentType enum.
+func (e PresignRequestContentType) Valid() bool {
+	switch e {
+	case Imagegif:
+		return true
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	case Imagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	Admin     UserRole = "admin"
@@ -56,6 +80,24 @@ func (e GetHealth200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// ConfirmRequest defines model for ConfirmRequest.
+type ConfirmRequest struct {
+	// ResourceId ID of the owning resource. Recorded in E5.
+	ResourceId *openapi_types.UUID `json:"resourceId,omitempty"`
+
+	// ResourceType Domain resource type this image belongs to (e.g. artist_profile). Association is recorded in E5.
+	ResourceType *string `json:"resourceType,omitempty"`
+
+	// S3Key The key returned by POST /images/presign.
+	S3Key string `json:"s3Key"`
+}
+
+// ConfirmResponse defines model for ConfirmResponse.
+type ConfirmResponse struct {
+	// CdnUrl Public URL to the uploaded object. Points to MinIO in dev (CDN_BASE_URL) and CloudFront in production.
+	CdnUrl string `json:"cdnUrl"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    openapi_types.Email `json:"email"`
@@ -67,6 +109,23 @@ type LoginResponse struct {
 	// Token JWT — also set as the session HTTP-only cookie.
 	Token string `json:"token"`
 	User  User   `json:"user"`
+}
+
+// PresignRequest defines model for PresignRequest.
+type PresignRequest struct {
+	ContentType PresignRequestContentType `json:"contentType"`
+}
+
+// PresignRequestContentType defines model for PresignRequest.ContentType.
+type PresignRequestContentType string
+
+// PresignResponse defines model for PresignResponse.
+type PresignResponse struct {
+	// S3Key Storage key for the uploaded object. Pass to POST /images/confirm after the PUT succeeds.
+	S3Key string `json:"s3Key"`
+
+	// UploadUrl Presigned MinIO PUT URL valid for 15 minutes. Client PUTs image bytes directly to this URL — the API server is not in the upload path.
+	UploadUrl string `json:"uploadUrl"`
 }
 
 // Problem RFC 7807 problem details object returned on all error responses.
@@ -96,6 +155,9 @@ type User struct {
 // UserRole defines model for UserRole.
 type UserRole string
 
+// NotFound RFC 7807 problem details object returned on all error responses.
+type NotFound = Problem
+
 // Unauthorized RFC 7807 problem details object returned on all error responses.
 type Unauthorized = Problem
 
@@ -117,6 +179,12 @@ type PostAuthLoginJSONRequestBody = LoginRequest
 // PostAuthSignupJSONRequestBody defines body for PostAuthSignup for application/json ContentType.
 type PostAuthSignupJSONRequestBody = SignupRequest
 
+// PostImagesConfirmJSONRequestBody defines body for PostImagesConfirm for application/json ContentType.
+type PostImagesConfirmJSONRequestBody = ConfirmRequest
+
+// PostImagesPresignJSONRequestBody defines body for PostImagesPresign for application/json ContentType.
+type PostImagesPresignJSONRequestBody = PresignRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Authenticate and receive a JWT
@@ -128,6 +196,12 @@ type ServerInterface interface {
 	// Service health check
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// Confirm a completed upload and receive the CDN URL
+	// (POST /images/confirm)
+	PostImagesConfirm(w http.ResponseWriter, r *http.Request)
+	// Request a presigned PUT URL for direct upload to object storage
+	// (POST /images/presign)
+	PostImagesPresign(w http.ResponseWriter, r *http.Request)
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -152,6 +226,18 @@ func (_ Unimplemented) PostAuthSignup(w http.ResponseWriter, r *http.Request) {
 // Service health check
 // (GET /healthz)
 func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Confirm a completed upload and receive the CDN URL
+// (POST /images/confirm)
+func (_ Unimplemented) PostImagesConfirm(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Request a presigned PUT URL for direct upload to object storage
+// (POST /images/presign)
+func (_ Unimplemented) PostImagesPresign(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -203,6 +289,50 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostImagesConfirm operation middleware
+func (siw *ServerInterfaceWrapper) PostImagesConfirm(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostImagesConfirm(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostImagesPresign operation middleware
+func (siw *ServerInterfaceWrapper) PostImagesPresign(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostImagesPresign(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -357,11 +487,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealth)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/images/confirm", wrapper.PostImagesConfirm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/images/presign", wrapper.PostImagesPresign)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
 	})
 
 	return r
 }
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
 
 type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
@@ -494,6 +632,130 @@ func (response GetHealth503ApplicationProblemPlusJSONResponse) VisitGetHealthRes
 	return err
 }
 
+type PostImagesConfirmRequestObject struct {
+	Body *PostImagesConfirmJSONRequestBody
+}
+
+type PostImagesConfirmResponseObject interface {
+	VisitPostImagesConfirmResponse(w http.ResponseWriter) error
+}
+
+type PostImagesConfirm200JSONResponse ConfirmResponse
+
+func (response PostImagesConfirm200JSONResponse) VisitPostImagesConfirmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostImagesConfirm401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostImagesConfirm401ApplicationProblemPlusJSONResponse) VisitPostImagesConfirmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostImagesConfirm404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PostImagesConfirm404ApplicationProblemPlusJSONResponse) VisitPostImagesConfirmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostImagesConfirm422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PostImagesConfirm422ApplicationProblemPlusJSONResponse) VisitPostImagesConfirmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostImagesPresignRequestObject struct {
+	Body *PostImagesPresignJSONRequestBody
+}
+
+type PostImagesPresignResponseObject interface {
+	VisitPostImagesPresignResponse(w http.ResponseWriter) error
+}
+
+type PostImagesPresign200JSONResponse PresignResponse
+
+func (response PostImagesPresign200JSONResponse) VisitPostImagesPresignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostImagesPresign401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostImagesPresign401ApplicationProblemPlusJSONResponse) VisitPostImagesPresignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostImagesPresign422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PostImagesPresign422ApplicationProblemPlusJSONResponse) VisitPostImagesPresignResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -542,6 +804,12 @@ type StrictServerInterface interface {
 	// Service health check
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// Confirm a completed upload and receive the CDN URL
+	// (POST /images/confirm)
+	PostImagesConfirm(ctx context.Context, request PostImagesConfirmRequestObject) (PostImagesConfirmResponseObject, error)
+	// Request a presigned PUT URL for direct upload to object storage
+	// (POST /images/presign)
+	PostImagesPresign(ctx context.Context, request PostImagesPresignRequestObject) (PostImagesPresignResponseObject, error)
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -655,6 +923,68 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
 		if err := validResponse.VisitGetHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostImagesConfirm operation middleware
+func (sh *strictHandler) PostImagesConfirm(w http.ResponseWriter, r *http.Request) {
+	var request PostImagesConfirmRequestObject
+
+	var body PostImagesConfirmJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostImagesConfirm(ctx, request.(PostImagesConfirmRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostImagesConfirm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostImagesConfirmResponseObject); ok {
+		if err := validResponse.VisitPostImagesConfirmResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostImagesPresign operation middleware
+func (sh *strictHandler) PostImagesPresign(w http.ResponseWriter, r *http.Request) {
+	var request PostImagesPresignRequestObject
+
+	var body PostImagesPresignJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostImagesPresign(ctx, request.(PostImagesPresignRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostImagesPresign")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostImagesPresignResponseObject); ok {
+		if err := validResponse.VisitPostImagesPresignResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
