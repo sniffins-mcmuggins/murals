@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -141,6 +142,27 @@ const (
 func (e GetHealth200JSONResponseBodyStatus) Valid() bool {
 	switch e {
 	case Ok:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPublicFestivalsParamsStatus.
+const (
+	Archived ListPublicFestivalsParamsStatus = "archived"
+	Live     ListPublicFestivalsParamsStatus = "live"
+	Open     ListPublicFestivalsParamsStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the ListPublicFestivalsParamsStatus enum.
+func (e ListPublicFestivalsParamsStatus) Valid() bool {
+	switch e {
+	case Archived:
+		return true
+	case Live:
+		return true
+	case Open:
 		return true
 	default:
 		return false
@@ -325,6 +347,19 @@ type Problem struct {
 	Type     *string `json:"type,omitempty"`
 }
 
+// ProfileListResponse defines model for ProfileListResponse.
+type ProfileListResponse struct {
+	// Page Current page number (1-based).
+	Page int `json:"page"`
+
+	// PerPage Number of profiles per page.
+	PerPage  int             `json:"per_page"`
+	Profiles []ArtistProfile `json:"profiles"`
+
+	// Total Total number of profiles.
+	Total int `json:"total"`
+}
+
 // ReorderImagesRequest defines model for ReorderImagesRequest.
 type ReorderImagesRequest struct {
 	// ImageIds Ordered list of image IDs. display_order is set by position (0-indexed).
@@ -369,6 +404,9 @@ type User struct {
 
 // UserRole defines model for UserRole.
 type UserRole string
+
+// BadRequest RFC 7807 problem details object returned on all error responses.
+type BadRequest = Problem
 
 // Conflict RFC 7807 problem details object returned on all error responses.
 type Conflict = Problem
@@ -422,6 +460,20 @@ type PutFestivalsFestivalIDFormJSONBody struct {
 
 // GetHealth200JSONResponseBodyStatus defines parameters for GetHealth.
 type GetHealth200JSONResponseBodyStatus string
+
+// ListPublicFestivalsParams defines parameters for ListPublicFestivals.
+type ListPublicFestivalsParams struct {
+	Status *ListPublicFestivalsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// ListPublicFestivalsParamsStatus defines parameters for ListPublicFestivals.
+type ListPublicFestivalsParamsStatus string
+
+// ListPublicProfilesParams defines parameters for ListPublicProfiles.
+type ListPublicProfilesParams struct {
+	Page    *int `form:"page,omitempty" json:"page,omitempty"`
+	PerPage *int `form:"per_page,omitempty" json:"per_page,omitempty"`
+}
 
 // PostAuthLoginJSONRequestBody defines body for PostAuthLogin for application/json ContentType.
 type PostAuthLoginJSONRequestBody = LoginRequest
@@ -557,6 +609,12 @@ type ServerInterface interface {
 	// List collections for an artist profile
 	// (GET /profiles/{profileID}/collections)
 	ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
+	// List public festivals by status
+	// (GET /public/festivals)
+	ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams)
+	// Paginated list of public artist profiles
+	// (GET /public/profiles)
+	ListPublicProfiles(w http.ResponseWriter, r *http.Request, params ListPublicProfilesParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -740,6 +798,18 @@ func (_ Unimplemented) GetProfile(w http.ResponseWriter, r *http.Request, profil
 // List collections for an artist profile
 // (GET /profiles/{profileID}/collections)
 func (_ Unimplemented) ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List public festivals by status
+// (GET /public/festivals)
+func (_ Unimplemented) ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Paginated list of public artist profiles
+// (GET /public/profiles)
+func (_ Unimplemented) ListPublicProfiles(w http.ResponseWriter, r *http.Request, params ListPublicProfilesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1565,6 +1635,85 @@ func (siw *ServerInterfaceWrapper) ListCollections(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListPublicFestivals operation middleware
+func (siw *ServerInterfaceWrapper) ListPublicFestivals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicFestivalsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublicFestivals(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPublicProfiles operation middleware
+func (siw *ServerInterfaceWrapper) ListPublicProfiles(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicProfilesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "per_page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "per_page", r.URL.Query(), &params.PerPage, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "per_page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "per_page", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublicProfiles(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1768,9 +1917,17 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}/collections", wrapper.ListCollections)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/public/festivals", wrapper.ListPublicFestivals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/public/profiles", wrapper.ListPublicProfiles)
+	})
 
 	return r
 }
+
+type BadRequestApplicationProblemPlusJSONResponse Problem
 
 type ConflictApplicationProblemPlusJSONResponse Problem
 
@@ -3483,6 +3640,66 @@ func (response ListCollections200JSONResponse) VisitListCollectionsResponse(w ht
 	return err
 }
 
+type ListPublicFestivalsRequestObject struct {
+	Params ListPublicFestivalsParams
+}
+
+type ListPublicFestivalsResponseObject interface {
+	VisitListPublicFestivalsResponse(w http.ResponseWriter) error
+}
+
+type ListPublicFestivals200JSONResponse []Festival
+
+func (response ListPublicFestivals200JSONResponse) VisitListPublicFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicFestivals400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListPublicFestivals400ApplicationProblemPlusJSONResponse) VisitListPublicFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPublicProfilesRequestObject struct {
+	Params ListPublicProfilesParams
+}
+
+type ListPublicProfilesResponseObject interface {
+	VisitListPublicProfilesResponse(w http.ResponseWriter) error
+}
+
+type ListPublicProfiles200JSONResponse ProfileListResponse
+
+func (response ListPublicProfiles200JSONResponse) VisitListPublicProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Authenticate and receive a JWT
@@ -3575,6 +3792,12 @@ type StrictServerInterface interface {
 	// List collections for an artist profile
 	// (GET /profiles/{profileID}/collections)
 	ListCollections(ctx context.Context, request ListCollectionsRequestObject) (ListCollectionsResponseObject, error)
+	// List public festivals by status
+	// (GET /public/festivals)
+	ListPublicFestivals(ctx context.Context, request ListPublicFestivalsRequestObject) (ListPublicFestivalsResponseObject, error)
+	// Paginated list of public artist profiles
+	// (GET /public/profiles)
+	ListPublicProfiles(ctx context.Context, request ListPublicProfilesRequestObject) (ListPublicProfilesResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -4456,6 +4679,58 @@ func (sh *strictHandler) ListCollections(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListCollectionsResponseObject); ok {
 		if err := validResponse.VisitListCollectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPublicFestivals operation middleware
+func (sh *strictHandler) ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams) {
+	var request ListPublicFestivalsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPublicFestivals(ctx, request.(ListPublicFestivalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPublicFestivals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPublicFestivalsResponseObject); ok {
+		if err := validResponse.VisitListPublicFestivalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPublicProfiles operation middleware
+func (sh *strictHandler) ListPublicProfiles(w http.ResponseWriter, r *http.Request, params ListPublicProfilesParams) {
+	var request ListPublicProfilesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPublicProfiles(ctx, request.(ListPublicProfilesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPublicProfiles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPublicProfilesResponseObject); ok {
+		if err := validResponse.VisitListPublicProfilesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

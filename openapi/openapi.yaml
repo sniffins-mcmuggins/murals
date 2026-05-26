@@ -445,6 +445,24 @@ components:
           items:
             $ref: "#/components/schemas/MapPin"
 
+    ProfileListResponse:
+      type: object
+      required: [profiles, total, page, per_page]
+      properties:
+        profiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtistProfile"
+        total:
+          type: integer
+          description: Total number of profiles.
+        page:
+          type: integer
+          description: Current page number (1-based).
+        per_page:
+          type: integer
+          description: Number of profiles per page.
+
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -1037,6 +1055,63 @@ paths:
                   $ref: "#/components/schemas/Festival"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /public/festivals:
+    get:
+      operationId: listPublicFestivals
+      summary: List public festivals by status
+      description: Returns festivals visible to unauthenticated visitors, filtered by status.
+      tags: [festival]
+      security: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [live, open, archived]
+            default: live
+      responses:
+        "200":
+          description: List of matching festivals.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Festival"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /public/profiles:
+    get:
+      operationId: listPublicProfiles
+      summary: Paginated list of public artist profiles
+      tags: [artist]
+      security: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Paginated artist profiles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileListResponse"
 
   /festivals/slug/{slug}/map:
     parameters:

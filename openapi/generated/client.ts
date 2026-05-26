@@ -365,6 +365,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/festivals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List public festivals by status
+         * @description Returns festivals visible to unauthenticated visitors, filtered by status.
+         */
+        get: operations["listPublicFestivals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paginated list of public artist profiles */
+        get: operations["listPublicProfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/festivals/slug/{slug}/map": {
         parameters: {
             query?: never;
@@ -1020,6 +1057,15 @@ export interface components {
         MapData: {
             pins?: components["schemas"]["MapPin"][];
         };
+        ProfileListResponse: {
+            profiles: components["schemas"]["ArtistProfile"][];
+            /** @description Total number of profiles. */
+            total: number;
+            /** @description Current page number (1-based). */
+            page: number;
+            /** @description Number of profiles per page. */
+            per_page: number;
+        };
     };
     responses: {
         /** @description Invalid request body or parameters. */
@@ -1553,6 +1599,52 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listPublicFestivals: {
+        parameters: {
+            query?: {
+                status?: "live" | "open" | "archived";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of matching festivals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Festival"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    listPublicProfiles: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated artist profiles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileListResponse"];
+                };
+            };
         };
     };
 }
