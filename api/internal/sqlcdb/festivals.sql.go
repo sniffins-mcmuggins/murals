@@ -142,6 +142,43 @@ func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgty
 	return items, nil
 }
 
+const listPublicFestivals = `-- name: ListPublicFestivals :many
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC
+`
+
+func (q *Queries) ListPublicFestivals(ctx context.Context, status FestivalStatus) ([]Festival, error) {
+	rows, err := q.db.Query(ctx, listPublicFestivals, status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Festival
+	for rows.Next() {
+		var i Festival
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganiserID,
+			&i.Name,
+			&i.Slug,
+			&i.Description,
+			&i.LocationLabel,
+			&i.StartDate,
+			&i.EndDate,
+			&i.Status,
+			&i.DeletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const softDeleteFestival = `-- name: SoftDeleteFestival :exec
 UPDATE festivals SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
 `
