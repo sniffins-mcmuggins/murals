@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  migrate:
+    desc: "Apply database migrations (up)"
+    cmd: go run -C ../api ./cmd/migrate up
+
+  migrate:down:
+    desc: "Roll back the last migration"
+    cmd: go run -C ../api ./cmd/migrate down
+
+  new:
+    desc: "Scaffold a new migration pair: task db:new -- <name>"
+    cmd: go run -C ../api github.com/golang-migrate/migrate/v4/cmd/migrate@latest create -ext sql -dir ../db/migrations -seq {{.CLI_ARGS}}
+
+  generate:
+    desc: "Generate type-safe Go from SQL queries (sqlc)"
+    cmd: go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate -f sqlc.yaml
+
+  seed:
+    desc: "Load seed data into the local database"
+    cmd: psql "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}" -f seeds/seed.sql

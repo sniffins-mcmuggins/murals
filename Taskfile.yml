@@ -4,6 +4,12 @@ includes:
   api:
     taskfile: ./api/Taskfile.yml
     dir: ./api
+  db:
+    taskfile: ./db/Taskfile.yml
+    dir: ./db
+  openapi:
+    taskfile: ./openapi/Taskfile.yml
+    dir: ./openapi
   web:
     taskfile: ./web/Taskfile.yml
     dir: ./web
@@ -34,55 +40,6 @@ tasks:
   generate:
     desc: "Run all code generators (openapi + sqlc)"
     deps: [openapi:gen, db:generate]
-
-  db:migrate:
-    desc: "Apply database migrations (up)"
-    cmd: go run -C api ./cmd/migrate up
-
-  db:migrate:down:
-    desc: "Roll back the last migration"
-    cmd: go run -C api ./cmd/migrate down
-
-  db:new:
-    desc: "Scaffold a new migration pair: task db:new -- <name>"
-    cmd: go run -C api github.com/golang-migrate/migrate/v4/cmd/migrate@latest create -ext sql -dir ../db/migrations -seq {{.CLI_ARGS}}
-
-  db:generate:
-    desc: "Generate type-safe Go from SQL queries (sqlc)"
-    dir: db
-    cmd: go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate -f sqlc.yaml
-
-  db:seed:
-    desc: "Load seed data into the local database"
-    cmd: psql "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}" -f db/seeds/seed.sql
-
-  openapi:gen:
-    desc: "Generate Go server interfaces + TS client from openapi/openapi.yaml"
-    dir: openapi
-    cmds:
-      - go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest -config oapi-codegen.yaml openapi.yaml
-      - npx openapi-typescript openapi.yaml -o generated/client.ts
-
-  openapi:diff:
-    desc: "Check that generated files are up-to-date (used in CI)"
-    cmds:
-      - task: openapi:gen
-      - git diff --exit-code openapi/generated/ api/internal/openapi/
-
-  openapi:install:
-    desc: "Install openapi/client dependencies"
-    dir: openapi/client
-    cmd: npm install
-
-  openapi:test:
-    desc: "Run shared TS client tests (vitest)"
-    dir: openapi/client
-    cmd: npm test
-
-  openapi:lint:
-    desc: "Type-check shared TS client"
-    dir: openapi/client
-    cmd: npm run typecheck
 
   e2e:
     desc: "Run end-to-end tests (requires stack to be up)"

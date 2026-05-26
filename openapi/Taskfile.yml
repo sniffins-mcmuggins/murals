@@ -1,0 +1,29 @@
+version: '3'
+
+tasks:
+  gen:
+    desc: "Generate Go server interfaces + TS client from openapi/openapi.yaml"
+    cmds:
+      - go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest -config oapi-codegen.yaml openapi.yaml
+      - npx openapi-typescript openapi.yaml -o generated/client.ts
+
+  diff:
+    desc: "Check that generated files are up-to-date (used in CI)"
+    cmds:
+      - task: gen
+      - git diff --exit-code generated/ ../api/internal/openapi/
+
+  install:
+    desc: "Install openapi/client dependencies"
+    dir: client
+    cmd: npm install
+
+  test:
+    desc: "Run shared TS client tests (vitest)"
+    dir: client
+    cmd: npm test
+
+  lint:
+    desc: "Type-check shared TS client"
+    dir: client
+    cmd: npm run typecheck
