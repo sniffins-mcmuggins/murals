@@ -6,10 +6,54 @@ package sqlcdb
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type CollectionStatus string
+
+const (
+	CollectionStatusActive   CollectionStatus = "active"
+	CollectionStatusArchived CollectionStatus = "archived"
+	CollectionStatusOngoing  CollectionStatus = "ongoing"
+)
+
+func (e *CollectionStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CollectionStatus(s)
+	case string:
+		*e = CollectionStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CollectionStatus: %T", src)
+	}
+	return nil
+}
+
+type NullCollectionStatus struct {
+	CollectionStatus CollectionStatus `json:"collection_status"`
+	Valid            bool             `json:"valid"` // Valid is true if CollectionStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCollectionStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.CollectionStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CollectionStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCollectionStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CollectionStatus), nil
+}
 
 type UserRole string
 
@@ -52,6 +96,41 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.UserRole), nil
+}
+
+type ArtistProfile struct {
+	ID            pgtype.UUID        `db:"id" json:"id"`
+	UserID        pgtype.UUID        `db:"user_id" json:"user_id"`
+	DisplayName   string             `db:"display_name" json:"display_name"`
+	Bio           string             `db:"bio" json:"bio"`
+	LocationLabel *string            `db:"location_label" json:"location_label"`
+	ShowLocation  bool               `db:"show_location" json:"show_location"`
+	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
+	SocialLinks   json.RawMessage    `db:"social_links" json:"social_links"`
+	AvatarS3Key   *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Collection struct {
+	ID              pgtype.UUID        `db:"id" json:"id"`
+	ArtistProfileID pgtype.UUID        `db:"artist_profile_id" json:"artist_profile_id"`
+	Name            string             `db:"name" json:"name"`
+	Description     string             `db:"description" json:"description"`
+	CoverS3Key      *string            `db:"cover_s3_key" json:"cover_s3_key"`
+	Status          CollectionStatus   `db:"status" json:"status"`
+	DisplayOrder    int32              `db:"display_order" json:"display_order"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CollectionImage struct {
+	ID           pgtype.UUID        `db:"id" json:"id"`
+	CollectionID pgtype.UUID        `db:"collection_id" json:"collection_id"`
+	S3Key        string             `db:"s3_key" json:"s3_key"`
+	CdnUrl       string             `db:"cdn_url" json:"cdn_url"`
+	DisplayOrder int32              `db:"display_order" json:"display_order"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type MigrationsHealth struct {
