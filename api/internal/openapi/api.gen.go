@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -19,6 +20,27 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 	CookieAuthScopes cookieAuthContextKey = "cookieAuth.Scopes"
 )
+
+// Defines values for CollectionStatus.
+const (
+	Active   CollectionStatus = "active"
+	Archived CollectionStatus = "archived"
+	Ongoing  CollectionStatus = "ongoing"
+)
+
+// Valid indicates whether the value is a known member of the CollectionStatus enum.
+func (e CollectionStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Archived:
+		return true
+	case Ongoing:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for PresignRequestContentType.
 const (
@@ -80,6 +102,57 @@ func (e GetHealth200JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// ArtistProfile defines model for ArtistProfile.
+type ArtistProfile struct {
+	AvatarS3Key *string            `json:"avatar_s3_key,omitempty"`
+	Bio         string             `json:"bio"`
+	CreatedAt   time.Time          `json:"created_at"`
+	DisplayName string             `json:"display_name"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// LocationLabel City/region. Only present if show_location is true (public response).
+	LocationLabel *string            `json:"location_label,omitempty"`
+	MediumTags    []string           `json:"medium_tags"`
+	SocialLinks   map[string]string  `json:"social_links"`
+	UpdatedAt     time.Time          `json:"updated_at"`
+	UserId        openapi_types.UUID `json:"user_id"`
+}
+
+// AttachImageRequest defines model for AttachImageRequest.
+type AttachImageRequest struct {
+	// CdnUrl The cdnUrl returned by POST /images/confirm.
+	CdnUrl string `json:"cdnUrl"`
+
+	// S3Key The s3Key returned by POST /images/presign and confirmed via POST /images/confirm.
+	S3Key string `json:"s3Key"`
+}
+
+// Collection defines model for Collection.
+type Collection struct {
+	ArtistProfileId openapi_types.UUID `json:"artist_profile_id"`
+	CoverS3Key      *string            `json:"cover_s3_key,omitempty"`
+	CreatedAt       time.Time          `json:"created_at"`
+	Description     string             `json:"description"`
+	DisplayOrder    int                `json:"display_order"`
+	Id              openapi_types.UUID `json:"id"`
+	Name            string             `json:"name"`
+	Status          CollectionStatus   `json:"status"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+}
+
+// CollectionImage defines model for CollectionImage.
+type CollectionImage struct {
+	CdnUrl       string             `json:"cdn_url"`
+	CollectionId openapi_types.UUID `json:"collection_id"`
+	CreatedAt    time.Time          `json:"created_at"`
+	DisplayOrder int                `json:"display_order"`
+	Id           openapi_types.UUID `json:"id"`
+	S3Key        string             `json:"s3_key"`
+}
+
+// CollectionStatus defines model for CollectionStatus.
+type CollectionStatus string
+
 // ConfirmRequest defines model for ConfirmRequest.
 type ConfirmRequest struct {
 	// ResourceId ID of the owning resource. Recorded in E5.
@@ -96,6 +169,17 @@ type ConfirmRequest struct {
 type ConfirmResponse struct {
 	// CdnUrl Public URL to the uploaded object. Points to MinIO in dev (CDN_BASE_URL) and CloudFront in production.
 	CdnUrl string `json:"cdnUrl"`
+}
+
+// CreateCollectionRequest defines model for CreateCollectionRequest.
+type CreateCollectionRequest struct {
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+}
+
+// CreateProfileRequest defines model for CreateProfileRequest.
+type CreateProfileRequest struct {
+	DisplayName string `json:"displayName"`
 }
 
 // LoginRequest defines model for LoginRequest.
@@ -137,11 +221,38 @@ type Problem struct {
 	Type     *string `json:"type,omitempty"`
 }
 
+// ReorderImagesRequest defines model for ReorderImagesRequest.
+type ReorderImagesRequest struct {
+	// ImageIds Ordered list of image IDs. display_order is set by position (0-indexed).
+	ImageIds []openapi_types.UUID `json:"imageIds"`
+}
+
 // SignupRequest defines model for SignupRequest.
 type SignupRequest struct {
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
 	Role     *UserRole           `json:"role,omitempty"`
+}
+
+// UpdateCollectionRequest defines model for UpdateCollectionRequest.
+type UpdateCollectionRequest struct {
+	CoverS3Key  *string           `json:"coverS3Key,omitempty"`
+	Description *string           `json:"description,omitempty"`
+	Name        *string           `json:"name,omitempty"`
+	Status      *CollectionStatus `json:"status,omitempty"`
+}
+
+// UpdateProfileRequest defines model for UpdateProfileRequest.
+type UpdateProfileRequest struct {
+	AvatarS3Key   *string   `json:"avatarS3Key,omitempty"`
+	Bio           *string   `json:"bio,omitempty"`
+	DisplayName   *string   `json:"displayName,omitempty"`
+	LocationLabel *string   `json:"locationLabel,omitempty"`
+	MediumTags    *[]string `json:"mediumTags,omitempty"`
+
+	// ShowLocation Controls whether location_label appears on the public profile.
+	ShowLocation *bool              `json:"showLocation,omitempty"`
+	SocialLinks  *map[string]string `json:"socialLinks,omitempty"`
 }
 
 // User defines model for User.
@@ -154,6 +265,12 @@ type User struct {
 
 // UserRole defines model for UserRole.
 type UserRole string
+
+// Conflict RFC 7807 problem details object returned on all error responses.
+type Conflict = Problem
+
+// Forbidden RFC 7807 problem details object returned on all error responses.
+type Forbidden = Problem
 
 // NotFound RFC 7807 problem details object returned on all error responses.
 type NotFound = Problem
@@ -179,11 +296,29 @@ type PostAuthLoginJSONRequestBody = LoginRequest
 // PostAuthSignupJSONRequestBody defines body for PostAuthSignup for application/json ContentType.
 type PostAuthSignupJSONRequestBody = SignupRequest
 
+// PostCollectionsJSONRequestBody defines body for PostCollections for application/json ContentType.
+type PostCollectionsJSONRequestBody = CreateCollectionRequest
+
+// PatchCollectionJSONRequestBody defines body for PatchCollection for application/json ContentType.
+type PatchCollectionJSONRequestBody = UpdateCollectionRequest
+
+// AttachCollectionImageJSONRequestBody defines body for AttachCollectionImage for application/json ContentType.
+type AttachCollectionImageJSONRequestBody = AttachImageRequest
+
+// ReorderCollectionImagesJSONRequestBody defines body for ReorderCollectionImages for application/json ContentType.
+type ReorderCollectionImagesJSONRequestBody = ReorderImagesRequest
+
 // PostImagesConfirmJSONRequestBody defines body for PostImagesConfirm for application/json ContentType.
 type PostImagesConfirmJSONRequestBody = ConfirmRequest
 
 // PostImagesPresignJSONRequestBody defines body for PostImagesPresign for application/json ContentType.
 type PostImagesPresignJSONRequestBody = PresignRequest
+
+// PostProfilesJSONRequestBody defines body for PostProfiles for application/json ContentType.
+type PostProfilesJSONRequestBody = CreateProfileRequest
+
+// PatchProfileMeJSONRequestBody defines body for PatchProfileMe for application/json ContentType.
+type PatchProfileMeJSONRequestBody = UpdateProfileRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -193,6 +328,27 @@ type ServerInterface interface {
 	// Create a new user account
 	// (POST /auth/signup)
 	PostAuthSignup(w http.ResponseWriter, r *http.Request)
+	// Create a collection
+	// (POST /collections)
+	PostCollections(w http.ResponseWriter, r *http.Request)
+	// Delete a collection
+	// (DELETE /collections/{collectionID})
+	DeleteCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// Get a collection
+	// (GET /collections/{collectionID})
+	GetCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// Update a collection
+	// (PATCH /collections/{collectionID})
+	PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// Attach an uploaded image to a collection
+	// (POST /collections/{collectionID}/images)
+	AttachCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// Reorder images in a collection
+	// (PUT /collections/{collectionID}/images/order)
+	ReorderCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// Remove an image from a collection
+	// (DELETE /collections/{collectionID}/images/{imageID})
+	DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID)
 	// Service health check
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -205,6 +361,21 @@ type ServerInterface interface {
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// Create artist profile
+	// (POST /profiles)
+	PostProfiles(w http.ResponseWriter, r *http.Request)
+	// Get own artist profile
+	// (GET /profiles/me)
+	GetProfileMe(w http.ResponseWriter, r *http.Request)
+	// Update own artist profile
+	// (PATCH /profiles/me)
+	PatchProfileMe(w http.ResponseWriter, r *http.Request)
+	// Get public artist profile
+	// (GET /profiles/{profileID})
+	GetProfile(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
+	// List collections for an artist profile
+	// (GET /profiles/{profileID}/collections)
+	ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -220,6 +391,48 @@ func (_ Unimplemented) PostAuthLogin(w http.ResponseWriter, r *http.Request) {
 // Create a new user account
 // (POST /auth/signup)
 func (_ Unimplemented) PostAuthSignup(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a collection
+// (POST /collections)
+func (_ Unimplemented) PostCollections(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a collection
+// (DELETE /collections/{collectionID})
+func (_ Unimplemented) DeleteCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a collection
+// (GET /collections/{collectionID})
+func (_ Unimplemented) GetCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a collection
+// (PATCH /collections/{collectionID})
+func (_ Unimplemented) PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Attach an uploaded image to a collection
+// (POST /collections/{collectionID}/images)
+func (_ Unimplemented) AttachCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reorder images in a collection
+// (PUT /collections/{collectionID}/images/order)
+func (_ Unimplemented) ReorderCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Remove an image from a collection
+// (DELETE /collections/{collectionID}/images/{imageID})
+func (_ Unimplemented) DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -244,6 +457,36 @@ func (_ Unimplemented) PostImagesPresign(w http.ResponseWriter, r *http.Request)
 // Return the authenticated user
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create artist profile
+// (POST /profiles)
+func (_ Unimplemented) PostProfiles(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get own artist profile
+// (GET /profiles/me)
+func (_ Unimplemented) GetProfileMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update own artist profile
+// (PATCH /profiles/me)
+func (_ Unimplemented) PatchProfileMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get public artist profile
+// (GET /profiles/{profileID})
+func (_ Unimplemented) GetProfile(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List collections for an artist profile
+// (GET /profiles/{profileID}/collections)
+func (_ Unimplemented) ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -275,6 +518,233 @@ func (siw *ServerInterfaceWrapper) PostAuthSignup(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostAuthSignup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostCollections operation middleware
+func (siw *ServerInterfaceWrapper) PostCollections(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostCollections(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCollection operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCollection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCollection(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCollection operation middleware
+func (siw *ServerInterfaceWrapper) GetCollection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCollection(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchCollection operation middleware
+func (siw *ServerInterfaceWrapper) PatchCollection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchCollection(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AttachCollectionImage operation middleware
+func (siw *ServerInterfaceWrapper) AttachCollectionImage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AttachCollectionImage(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReorderCollectionImages operation middleware
+func (siw *ServerInterfaceWrapper) ReorderCollectionImages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderCollectionImages(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCollectionImage operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCollectionImage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "imageID" -------------
+	var imageID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "imageID", chi.URLParam(r, "imageID"), &imageID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "imageID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCollectionImage(w, r, collectionID, imageID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -355,6 +825,124 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostProfiles operation middleware
+func (siw *ServerInterfaceWrapper) PostProfiles(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostProfiles(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetProfileMe operation middleware
+func (siw *ServerInterfaceWrapper) GetProfileMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetProfileMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchProfileMe operation middleware
+func (siw *ServerInterfaceWrapper) PatchProfileMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchProfileMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetProfile operation middleware
+func (siw *ServerInterfaceWrapper) GetProfile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "profileID" -------------
+	var profileID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "profileID", chi.URLParam(r, "profileID"), &profileID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetProfile(w, r, profileID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCollections operation middleware
+func (siw *ServerInterfaceWrapper) ListCollections(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "profileID" -------------
+	var profileID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "profileID", chi.URLParam(r, "profileID"), &profileID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCollections(w, r, profileID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -484,6 +1072,27 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/auth/signup", wrapper.PostAuthSignup)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/collections", wrapper.PostCollections)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/collections/{collectionID}", wrapper.DeleteCollection)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/collections/{collectionID}", wrapper.GetCollection)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/collections/{collectionID}", wrapper.PatchCollection)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/collections/{collectionID}/images", wrapper.AttachCollectionImage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/collections/{collectionID}/images/order", wrapper.ReorderCollectionImages)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/collections/{collectionID}/images/{imageID}", wrapper.DeleteCollectionImage)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealth)
 	})
 	r.Group(func(r chi.Router) {
@@ -495,9 +1104,28 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
 	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/profiles", wrapper.PostProfiles)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/me", wrapper.GetProfileMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/profiles/me", wrapper.PatchProfileMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/{profileID}", wrapper.GetProfile)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/{profileID}/collections", wrapper.ListCollections)
+	})
 
 	return r
 }
+
+type ConflictApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
@@ -591,6 +1219,440 @@ func (response PostAuthSignup422ApplicationProblemPlusJSONResponse) VisitPostAut
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostCollectionsRequestObject struct {
+	Body *PostCollectionsJSONRequestBody
+}
+
+type PostCollectionsResponseObject interface {
+	VisitPostCollectionsResponse(w http.ResponseWriter) error
+}
+
+type PostCollections201JSONResponse Collection
+
+func (response PostCollections201JSONResponse) VisitPostCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostCollections401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostCollections401ApplicationProblemPlusJSONResponse) VisitPostCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostCollections404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PostCollections404ApplicationProblemPlusJSONResponse) VisitPostCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollectionRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+}
+
+type DeleteCollectionResponseObject interface {
+	VisitDeleteCollectionResponse(w http.ResponseWriter) error
+}
+
+type DeleteCollection204Response struct {
+}
+
+func (response DeleteCollection204Response) VisitDeleteCollectionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteCollection401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteCollection401ApplicationProblemPlusJSONResponse) VisitDeleteCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollection403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteCollection403ApplicationProblemPlusJSONResponse) VisitDeleteCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollection404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteCollection404ApplicationProblemPlusJSONResponse) VisitDeleteCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCollectionRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+}
+
+type GetCollectionResponseObject interface {
+	VisitGetCollectionResponse(w http.ResponseWriter) error
+}
+
+type GetCollection200JSONResponse Collection
+
+func (response GetCollection200JSONResponse) VisitGetCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCollection404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetCollection404ApplicationProblemPlusJSONResponse) VisitGetCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchCollectionRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+	Body         *PatchCollectionJSONRequestBody
+}
+
+type PatchCollectionResponseObject interface {
+	VisitPatchCollectionResponse(w http.ResponseWriter) error
+}
+
+type PatchCollection200JSONResponse Collection
+
+func (response PatchCollection200JSONResponse) VisitPatchCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchCollection401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchCollection401ApplicationProblemPlusJSONResponse) VisitPatchCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchCollection403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PatchCollection403ApplicationProblemPlusJSONResponse) VisitPatchCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchCollection404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PatchCollection404ApplicationProblemPlusJSONResponse) VisitPatchCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AttachCollectionImageRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+	Body         *AttachCollectionImageJSONRequestBody
+}
+
+type AttachCollectionImageResponseObject interface {
+	VisitAttachCollectionImageResponse(w http.ResponseWriter) error
+}
+
+type AttachCollectionImage201JSONResponse CollectionImage
+
+func (response AttachCollectionImage201JSONResponse) VisitAttachCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AttachCollectionImage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AttachCollectionImage401ApplicationProblemPlusJSONResponse) VisitAttachCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AttachCollectionImage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AttachCollectionImage403ApplicationProblemPlusJSONResponse) VisitAttachCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AttachCollectionImage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AttachCollectionImage404ApplicationProblemPlusJSONResponse) VisitAttachCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCollectionImagesRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+	Body         *ReorderCollectionImagesJSONRequestBody
+}
+
+type ReorderCollectionImagesResponseObject interface {
+	VisitReorderCollectionImagesResponse(w http.ResponseWriter) error
+}
+
+type ReorderCollectionImages200JSONResponse []CollectionImage
+
+func (response ReorderCollectionImages200JSONResponse) VisitReorderCollectionImagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCollectionImages401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderCollectionImages401ApplicationProblemPlusJSONResponse) VisitReorderCollectionImagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCollectionImages403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderCollectionImages403ApplicationProblemPlusJSONResponse) VisitReorderCollectionImagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCollectionImages404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderCollectionImages404ApplicationProblemPlusJSONResponse) VisitReorderCollectionImagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollectionImageRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+	ImageID      openapi_types.UUID `json:"imageID"`
+}
+
+type DeleteCollectionImageResponseObject interface {
+	VisitDeleteCollectionImageResponse(w http.ResponseWriter) error
+}
+
+type DeleteCollectionImage204Response struct {
+}
+
+func (response DeleteCollectionImage204Response) VisitDeleteCollectionImageResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteCollectionImage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteCollectionImage401ApplicationProblemPlusJSONResponse) VisitDeleteCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollectionImage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteCollectionImage403ApplicationProblemPlusJSONResponse) VisitDeleteCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollectionImage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteCollectionImage404ApplicationProblemPlusJSONResponse) VisitDeleteCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -793,6 +1855,243 @@ func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	return err
 }
 
+type PostProfilesRequestObject struct {
+	Body *PostProfilesJSONRequestBody
+}
+
+type PostProfilesResponseObject interface {
+	VisitPostProfilesResponse(w http.ResponseWriter) error
+}
+
+type PostProfiles201JSONResponse ArtistProfile
+
+func (response PostProfiles201JSONResponse) VisitPostProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostProfiles401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostProfiles401ApplicationProblemPlusJSONResponse) VisitPostProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostProfiles403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PostProfiles403ApplicationProblemPlusJSONResponse) VisitPostProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostProfiles409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PostProfiles409ApplicationProblemPlusJSONResponse) VisitPostProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProfileMeRequestObject struct {
+}
+
+type GetProfileMeResponseObject interface {
+	VisitGetProfileMeResponse(w http.ResponseWriter) error
+}
+
+type GetProfileMe200JSONResponse ArtistProfile
+
+func (response GetProfileMe200JSONResponse) VisitGetProfileMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProfileMe401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetProfileMe401ApplicationProblemPlusJSONResponse) VisitGetProfileMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProfileMe404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetProfileMe404ApplicationProblemPlusJSONResponse) VisitGetProfileMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchProfileMeRequestObject struct {
+	Body *PatchProfileMeJSONRequestBody
+}
+
+type PatchProfileMeResponseObject interface {
+	VisitPatchProfileMeResponse(w http.ResponseWriter) error
+}
+
+type PatchProfileMe200JSONResponse ArtistProfile
+
+func (response PatchProfileMe200JSONResponse) VisitPatchProfileMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchProfileMe401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchProfileMe401ApplicationProblemPlusJSONResponse) VisitPatchProfileMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchProfileMe404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PatchProfileMe404ApplicationProblemPlusJSONResponse) VisitPatchProfileMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProfileRequestObject struct {
+	ProfileID openapi_types.UUID `json:"profileID"`
+}
+
+type GetProfileResponseObject interface {
+	VisitGetProfileResponse(w http.ResponseWriter) error
+}
+
+type GetProfile200JSONResponse ArtistProfile
+
+func (response GetProfile200JSONResponse) VisitGetProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProfile404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetProfile404ApplicationProblemPlusJSONResponse) VisitGetProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionsRequestObject struct {
+	ProfileID openapi_types.UUID `json:"profileID"`
+}
+
+type ListCollectionsResponseObject interface {
+	VisitListCollectionsResponse(w http.ResponseWriter) error
+}
+
+type ListCollections200JSONResponse []Collection
+
+func (response ListCollections200JSONResponse) VisitListCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Authenticate and receive a JWT
@@ -801,6 +2100,27 @@ type StrictServerInterface interface {
 	// Create a new user account
 	// (POST /auth/signup)
 	PostAuthSignup(ctx context.Context, request PostAuthSignupRequestObject) (PostAuthSignupResponseObject, error)
+	// Create a collection
+	// (POST /collections)
+	PostCollections(ctx context.Context, request PostCollectionsRequestObject) (PostCollectionsResponseObject, error)
+	// Delete a collection
+	// (DELETE /collections/{collectionID})
+	DeleteCollection(ctx context.Context, request DeleteCollectionRequestObject) (DeleteCollectionResponseObject, error)
+	// Get a collection
+	// (GET /collections/{collectionID})
+	GetCollection(ctx context.Context, request GetCollectionRequestObject) (GetCollectionResponseObject, error)
+	// Update a collection
+	// (PATCH /collections/{collectionID})
+	PatchCollection(ctx context.Context, request PatchCollectionRequestObject) (PatchCollectionResponseObject, error)
+	// Attach an uploaded image to a collection
+	// (POST /collections/{collectionID}/images)
+	AttachCollectionImage(ctx context.Context, request AttachCollectionImageRequestObject) (AttachCollectionImageResponseObject, error)
+	// Reorder images in a collection
+	// (PUT /collections/{collectionID}/images/order)
+	ReorderCollectionImages(ctx context.Context, request ReorderCollectionImagesRequestObject) (ReorderCollectionImagesResponseObject, error)
+	// Remove an image from a collection
+	// (DELETE /collections/{collectionID}/images/{imageID})
+	DeleteCollectionImage(ctx context.Context, request DeleteCollectionImageRequestObject) (DeleteCollectionImageResponseObject, error)
 	// Service health check
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -813,6 +2133,21 @@ type StrictServerInterface interface {
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// Create artist profile
+	// (POST /profiles)
+	PostProfiles(ctx context.Context, request PostProfilesRequestObject) (PostProfilesResponseObject, error)
+	// Get own artist profile
+	// (GET /profiles/me)
+	GetProfileMe(ctx context.Context, request GetProfileMeRequestObject) (GetProfileMeResponseObject, error)
+	// Update own artist profile
+	// (PATCH /profiles/me)
+	PatchProfileMe(ctx context.Context, request PatchProfileMeRequestObject) (PatchProfileMeResponseObject, error)
+	// Get public artist profile
+	// (GET /profiles/{profileID})
+	GetProfile(ctx context.Context, request GetProfileRequestObject) (GetProfileResponseObject, error)
+	// List collections for an artist profile
+	// (GET /profiles/{profileID}/collections)
+	ListCollections(ctx context.Context, request ListCollectionsRequestObject) (ListCollectionsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -899,6 +2234,215 @@ func (sh *strictHandler) PostAuthSignup(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostAuthSignupResponseObject); ok {
 		if err := validResponse.VisitPostAuthSignupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostCollections operation middleware
+func (sh *strictHandler) PostCollections(w http.ResponseWriter, r *http.Request) {
+	var request PostCollectionsRequestObject
+
+	var body PostCollectionsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostCollections(ctx, request.(PostCollectionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostCollections")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostCollectionsResponseObject); ok {
+		if err := validResponse.VisitPostCollectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteCollection operation middleware
+func (sh *strictHandler) DeleteCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request DeleteCollectionRequestObject
+
+	request.CollectionID = collectionID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteCollection(ctx, request.(DeleteCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteCollectionResponseObject); ok {
+		if err := validResponse.VisitDeleteCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCollection operation middleware
+func (sh *strictHandler) GetCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request GetCollectionRequestObject
+
+	request.CollectionID = collectionID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCollection(ctx, request.(GetCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCollectionResponseObject); ok {
+		if err := validResponse.VisitGetCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchCollection operation middleware
+func (sh *strictHandler) PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request PatchCollectionRequestObject
+
+	request.CollectionID = collectionID
+
+	var body PatchCollectionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchCollection(ctx, request.(PatchCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchCollectionResponseObject); ok {
+		if err := validResponse.VisitPatchCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AttachCollectionImage operation middleware
+func (sh *strictHandler) AttachCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request AttachCollectionImageRequestObject
+
+	request.CollectionID = collectionID
+
+	var body AttachCollectionImageJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AttachCollectionImage(ctx, request.(AttachCollectionImageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AttachCollectionImage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AttachCollectionImageResponseObject); ok {
+		if err := validResponse.VisitAttachCollectionImageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReorderCollectionImages operation middleware
+func (sh *strictHandler) ReorderCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request ReorderCollectionImagesRequestObject
+
+	request.CollectionID = collectionID
+
+	var body ReorderCollectionImagesJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReorderCollectionImages(ctx, request.(ReorderCollectionImagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReorderCollectionImages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReorderCollectionImagesResponseObject); ok {
+		if err := validResponse.VisitReorderCollectionImagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteCollectionImage operation middleware
+func (sh *strictHandler) DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID) {
+	var request DeleteCollectionImageRequestObject
+
+	request.CollectionID = collectionID
+	request.ImageID = imageID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteCollectionImage(ctx, request.(DeleteCollectionImageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteCollectionImage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteCollectionImageResponseObject); ok {
+		if err := validResponse.VisitDeleteCollectionImageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1009,6 +2553,144 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostProfiles operation middleware
+func (sh *strictHandler) PostProfiles(w http.ResponseWriter, r *http.Request) {
+	var request PostProfilesRequestObject
+
+	var body PostProfilesJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostProfiles(ctx, request.(PostProfilesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostProfiles")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostProfilesResponseObject); ok {
+		if err := validResponse.VisitPostProfilesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetProfileMe operation middleware
+func (sh *strictHandler) GetProfileMe(w http.ResponseWriter, r *http.Request) {
+	var request GetProfileMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetProfileMe(ctx, request.(GetProfileMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetProfileMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetProfileMeResponseObject); ok {
+		if err := validResponse.VisitGetProfileMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchProfileMe operation middleware
+func (sh *strictHandler) PatchProfileMe(w http.ResponseWriter, r *http.Request) {
+	var request PatchProfileMeRequestObject
+
+	var body PatchProfileMeJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchProfileMe(ctx, request.(PatchProfileMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchProfileMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchProfileMeResponseObject); ok {
+		if err := validResponse.VisitPatchProfileMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetProfile operation middleware
+func (sh *strictHandler) GetProfile(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	var request GetProfileRequestObject
+
+	request.ProfileID = profileID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetProfile(ctx, request.(GetProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetProfileResponseObject); ok {
+		if err := validResponse.VisitGetProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCollections operation middleware
+func (sh *strictHandler) ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	var request ListCollectionsRequestObject
+
+	request.ProfileID = profileID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCollections(ctx, request.(ListCollectionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCollections")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCollectionsResponseObject); ok {
+		if err := validResponse.VisitListCollectionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

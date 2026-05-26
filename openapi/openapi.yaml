@@ -21,6 +21,8 @@ tags:
     description: Authentication and user identity
   - name: images
     description: Image upload pipeline (presign → PUT → confirm)
+  - name: artist
+    description: Artist profiles, collections, and collection images
 
 components:
   schemas:
@@ -148,6 +150,176 @@ components:
           format: uri
           description: Public URL to the uploaded object. Points to MinIO in dev (CDN_BASE_URL) and CloudFront in production.
 
+    ArtistProfile:
+      type: object
+      required: [id, user_id, display_name, bio, medium_tags, social_links, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        bio:
+          type: string
+        location_label:
+          type: string
+          nullable: true
+          description: City/region. Only present if show_location is true (public response).
+        medium_tags:
+          type: array
+          items:
+            type: string
+          example: ["mural", "stencil"]
+        social_links:
+          type: object
+          additionalProperties:
+            type: string
+          example: {"instagram": "https://instagram.com/artist"}
+        avatar_s3_key:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateProfileRequest:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+          example: Alice Muralist
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        bio:
+          type: string
+        locationLabel:
+          type: string
+          nullable: true
+        showLocation:
+          type: boolean
+          description: Controls whether location_label appears on the public profile.
+        mediumTags:
+          type: array
+          items:
+            type: string
+        socialLinks:
+          type: object
+          additionalProperties:
+            type: string
+        avatarS3Key:
+          type: string
+          nullable: true
+
+    CollectionStatus:
+      type: string
+      enum: [active, archived, ongoing]
+
+    Collection:
+      type: object
+      required: [id, artist_profile_id, name, description, status, display_order, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        artist_profile_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        cover_s3_key:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/CollectionStatus"
+        display_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCollectionRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Bristol 2024
+        description:
+          type: string
+
+    UpdateCollectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        coverS3Key:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/CollectionStatus"
+
+    CollectionImage:
+      type: object
+      required: [id, collection_id, s3_key, cdn_url, display_order, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        collection_id:
+          type: string
+          format: uuid
+        s3_key:
+          type: string
+        cdn_url:
+          type: string
+          format: uri
+        display_order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    AttachImageRequest:
+      type: object
+      required: [s3Key, cdnUrl]
+      properties:
+        s3Key:
+          type: string
+          description: The s3Key returned by POST /images/presign and confirmed via POST /images/confirm.
+        cdnUrl:
+          type: string
+          format: uri
+          description: The cdnUrl returned by POST /images/confirm.
+
+    ReorderImagesRequest:
+      type: object
+      required: [imageIds]
+      properties:
+        imageIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Ordered list of image IDs. display_order is set by position (0-indexed).
+
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -179,6 +351,12 @@ components:
             $ref: "#/components/schemas/Problem"
     NotFound:
       description: Resource not found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: Conflict — resource already exists.
       content:
         application/problem+json:
           schema:
@@ -345,3 +523,334 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+
+  /profiles:
+    post:
+      operationId: postProfiles
+      summary: Create artist profile
+      description: Creates an artist profile for the authenticated user. One profile per user. Requires role=artist.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProfileRequest"
+      responses:
+        "201":
+          description: Profile created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /profiles/me:
+    get:
+      operationId: getProfileMe
+      summary: Get own artist profile
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Own profile (includes private fields like show_location setting).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchProfileMe
+      summary: Update own artist profile
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/{profileID}:
+    get:
+      operationId: getProfile
+      summary: Get public artist profile
+      tags: [artist]
+      parameters:
+        - name: profileID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Public artist profile. location_label is omitted if artist has not enabled show_location.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/{profileID}/collections:
+    get:
+      operationId: listCollections
+      summary: List collections for an artist profile
+      tags: [artist]
+      parameters:
+        - name: profileID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Array of collections ordered by display_order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Collection"
+
+  /collections:
+    post:
+      operationId: postCollections
+      summary: Create a collection
+      description: Creates a collection for the authenticated artist's profile. Requires an existing artist profile.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollectionRequest"
+      responses:
+        "201":
+          description: Collection created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /collections/{collectionID}:
+    get:
+      operationId: getCollection
+      summary: Get a collection
+      tags: [artist]
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Collection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchCollection
+      summary: Update a collection
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCollectionRequest"
+      responses:
+        "200":
+          description: Updated collection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteCollection
+      summary: Delete a collection
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /collections/{collectionID}/images:
+    post:
+      operationId: attachCollectionImage
+      summary: Attach an uploaded image to a collection
+      description: |
+        Attach an image that has already been confirmed via POST /images/confirm.
+        Appends to the end of the collection's image list (display_order = current count).
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachImageRequest"
+      responses:
+        "201":
+          description: Image attached.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /collections/{collectionID}/images/order:
+    put:
+      operationId: reorderCollectionImages
+      summary: Reorder images in a collection
+      description: |
+        Accepts an ordered array of image IDs. Sets display_order by position (0-indexed).
+        Returns the images in the new order.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderImagesRequest"
+      responses:
+        "200":
+          description: Images in new order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CollectionImage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /collections/{collectionID}/images/{imageID}:
+    delete:
+      operationId: deleteCollectionImage
+      summary: Remove an image from a collection
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: imageID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
