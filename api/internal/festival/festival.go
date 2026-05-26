@@ -317,6 +317,38 @@ func UpdateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// ListPublicHandler handles GET /public/festivals. No auth required.
+// Returns festivals filtered by status (default: live).
+func ListPublicHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		statusParam := r.URL.Query().Get("status")
+		if statusParam == "" {
+			statusParam = "live"
+		}
+		status := sqlcdb.FestivalStatus(statusParam)
+		switch status {
+		case sqlcdb.FestivalStatusLive, sqlcdb.FestivalStatusOpen, sqlcdb.FestivalStatusArchived:
+		default:
+			httperr.BadRequest(w, "status must be live, open, or archived")
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		festivals, err := q.ListPublicFestivals(r.Context(), status)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		resp := make([]festivalResponse, len(festivals))
+		for i, f := range festivals {
+			resp[i] = toFestivalResponse(f)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
 // DeleteHandler handles DELETE /festivals/{festivalID}. Requires auth + ownership. Soft-deletes.
 func DeleteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
