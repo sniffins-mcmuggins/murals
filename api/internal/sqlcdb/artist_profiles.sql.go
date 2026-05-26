@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPublicProfiles = `-- name: CountPublicProfiles :one
+SELECT COUNT(*) FROM artist_profiles
+`
+
+func (q *Queries) CountPublicProfiles(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicProfiles)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createArtistProfile = `-- name: CreateArtistProfile :one
 INSERT INTO artist_profiles (user_id, display_name)
 VALUES ($1, $2)
@@ -86,6 +97,49 @@ func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UU
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listPublicProfiles = `-- name: ListPublicProfiles :many
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at FROM artist_profiles
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListPublicProfilesParams struct {
+	Limit  int32 `db:"limit" json:"limit"`
+	Offset int32 `db:"offset" json:"offset"`
+}
+
+func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfilesParams) ([]ArtistProfile, error) {
+	rows, err := q.db.Query(ctx, listPublicProfiles, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ArtistProfile
+	for rows.Next() {
+		var i ArtistProfile
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.DisplayName,
+			&i.Bio,
+			&i.LocationLabel,
+			&i.ShowLocation,
+			&i.MediumTags,
+			&i.SocialLinks,
+			&i.AvatarS3Key,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateArtistProfile = `-- name: UpdateArtistProfile :one

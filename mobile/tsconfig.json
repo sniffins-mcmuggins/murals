@@ -1,0 +1,12 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "baseUrl": ".",
+    "paths": {
+      "@render/api-client": ["../openapi/client/index.ts"]
+    }
+  },
+  "include": ["src", "App.tsx", "index.js"]
+}

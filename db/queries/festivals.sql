@@ -27,3 +27,6 @@ RETURNING *;
 
 -- name: SoftDeleteFestival :exec
 UPDATE festivals SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: ListPublicFestivals :many
+SELECT * FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC;

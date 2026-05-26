@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -28,6 +29,13 @@ type profileResponse struct {
 	AvatarS3Key   *string         `json:"avatar_s3_key,omitempty"`
 	CreatedAt     string          `json:"created_at"`
 	UpdatedAt     string          `json:"updated_at"`
+}
+
+type profileListResponse struct {
+	Profiles []profileResponse `json:"profiles"`
+	Total    int               `json:"total"`
+	Page     int               `json:"page"`
+	PerPage  int               `json:"per_page"`
 }
 
 func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
@@ -248,5 +256,50 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(updated, false))
+	}
+}
+
+// ListPublicProfilesHandler handles GET /public/profiles. No auth required.
+// Returns paginated public artist profiles.
+func ListPublicProfilesHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		page, perPage := 1, 20
+		if p := r.URL.Query().Get("page"); p != "" {
+			if n, err := strconv.Atoi(p); err == nil && n > 0 {
+				page = n
+			}
+		}
+		if pp := r.URL.Query().Get("per_page"); pp != "" {
+			if n, err := strconv.Atoi(pp); err == nil && n > 0 && n <= 100 {
+				perPage = n
+			}
+		}
+
+		q := sqlcdb.New(pool)
+		profiles, err := q.ListPublicProfiles(r.Context(), sqlcdb.ListPublicProfilesParams{
+			Limit:  int32(perPage),
+			Offset: int32((page - 1) * perPage),
+		})
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		total, err := q.CountPublicProfiles(r.Context())
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		resp := profileListResponse{
+			Profiles: make([]profileResponse, len(profiles)),
+			Total:    int(total),
+			Page:     page,
+			PerPage:  perPage,
+		}
+		for i, p := range profiles {
+			resp.Profiles[i] = toProfileResponse(p, true)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }

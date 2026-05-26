@@ -83,6 +83,8 @@ func main() {
 	r.Post("/festivals", festival.CreateHandler(pool))
 	r.Get("/festivals", festival.ListHandler(pool))
 	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(pool))
+	r.Get("/public/festivals", festival.ListPublicHandler(pool))
+	r.Get("/public/profiles", artist.ListPublicProfilesHandler(pool))
 	r.Get("/festivals/{festivalID}", festival.GetHandler(pool))
 	r.Patch("/festivals/{festivalID}", festival.UpdateHandler(pool))
 	r.Delete("/festivals/{festivalID}", festival.DeleteHandler(pool))

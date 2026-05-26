@@ -16,8 +16,11 @@ web/out/
 web/tsconfig.tsbuildinfo
 
 # React Native
-mobile/android/
 mobile/ios/Pods/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/app/.cxx/
 
 # Generated (committed — see openapi:gen)
 # openapi/generated/ is intentionally NOT ignored

@@ -16,9 +16,9 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = problem.status
     this.title = problem.title
-    this.detail = problem.detail
-    this.instance = problem.instance
-    this.type = problem.type
+    if (problem.detail !== undefined) this.detail = problem.detail
+    if (problem.instance !== undefined) this.instance = problem.instance
+    if (problem.type !== undefined) this.type = problem.type
   }
 }
 
