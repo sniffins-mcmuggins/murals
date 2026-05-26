@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -33,6 +35,7 @@ func createTestUser(t *testing.T, db *pgxpool.Pool, email, password string) {
 }
 
 func TestLoginHandler_Success(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	createTestUser(t, db, "dave@example.com", "correctpassword")
 
@@ -45,38 +48,25 @@ func TestLoginHandler_Success(t *testing.T) {
 
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var resp map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if resp["token"] == nil || resp["token"] == "" {
-		t.Error("expected token in response body")
-	}
-	if resp["user"] == nil {
-		t.Error("expected user in response body")
-	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.NotEmpty(t, resp["token"], "expected token in response body")
+	assert.NotNil(t, resp["user"], "expected user in response body")
 
-	cookies := w.Result().Cookies()
 	var sessionCookie *http.Cookie
-	for _, c := range cookies {
+	for _, c := range w.Result().Cookies() {
 		if c.Name == "session" {
 			sessionCookie = c
 		}
 	}
-	if sessionCookie == nil {
-		t.Fatal("session cookie not set")
-		return
-	}
-	if !sessionCookie.HttpOnly {
-		t.Error("session cookie must be HttpOnly")
-	}
+	require.NotNil(t, sessionCookie, "session cookie not set")
+	assert.True(t, sessionCookie.HttpOnly, "session cookie must be HttpOnly")
 }
 
 func TestLoginHandler_WrongPassword(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	createTestUser(t, db, "eve@example.com", "correctpassword")
 
@@ -89,12 +79,11 @@ func TestLoginHandler_WrongPassword(t *testing.T) {
 
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
-	}
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
 }
 
 func TestLoginHandler_UnknownEmail(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	handler := auth.LoginHandler(db, testSecret)
 
@@ -105,7 +94,5 @@ func TestLoginHandler_UnknownEmail(t *testing.T) {
 
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
-	}
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
 }

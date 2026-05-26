@@ -3,10 +3,13 @@ package image_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	imageutil "github.com/sniffins-mcmuggins/render/api/internal/image"
 )
 
 func TestPublicURL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		cdnBase  string
 		s3Key    string
@@ -31,8 +34,6 @@ func TestPublicURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		got := imageutil.PublicURL(tt.cdnBase, tt.s3Key)
-		if got != tt.expected {
-			t.Errorf("PublicURL(%q, %q) = %q, want %q", tt.cdnBase, tt.s3Key, got, tt.expected)
-		}
+		assert.Equal(t, tt.expected, got, "PublicURL(%q, %q)", tt.cdnBase, tt.s3Key)
 	}
 }

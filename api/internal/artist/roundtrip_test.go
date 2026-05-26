@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -16,6 +18,7 @@ import (
 )
 
 func TestArtistDomainRoundTrip(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 
 	r := chi.NewRouter()
@@ -44,7 +47,8 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 		if body != "" {
 			reqBody = strings.NewReader(body)
 		}
-		req, _ := http.NewRequestWithContext(t.Context(), method, srv.URL+path, reqBody)
+		req, err := http.NewRequestWithContext(t.Context(), method, srv.URL+path, reqBody)
+		require.NoError(t, err)
 		if body != "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
@@ -52,41 +56,27 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
 		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("%s %s: %v", method, path, err)
-		}
+		require.NoError(t, err)
 		return resp
 	}
 
 	decodeJSON := func(resp *http.Response) map[string]any {
 		t.Helper()
 		body, err := io.ReadAll(resp.Body)
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			t.Errorf("close body: %v", closeErr)
-		}
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
+		require.NoError(t, resp.Body.Close())
+		require.NoError(t, err, "read body")
 		var m map[string]any
-		if err := json.Unmarshal(body, &m); err != nil {
-			t.Fatalf("decode JSON: %v", err)
-		}
+		require.NoError(t, json.Unmarshal(body, &m), "decode JSON")
 		return m
 	}
 
 	decodeJSONArray := func(resp *http.Response) []map[string]any {
 		t.Helper()
 		body, err := io.ReadAll(resp.Body)
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			t.Errorf("close body: %v", closeErr)
-		}
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
+		require.NoError(t, resp.Body.Close())
+		require.NoError(t, err, "read body")
 		var arr []map[string]any
-		if err := json.Unmarshal(body, &arr); err != nil {
-			t.Fatalf("decode JSON array: %v", err)
-		}
+		require.NoError(t, json.Unmarshal(body, &arr), "decode JSON array")
 		return arr
 	}
 
@@ -94,9 +84,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 		t.Helper()
 		if resp.StatusCode != want {
 			body, _ := io.ReadAll(resp.Body)
-			if err := resp.Body.Close(); err != nil {
-				t.Errorf("close body: %v", err)
-			}
+			_ = resp.Body.Close()
 			t.Fatalf("expected %d, got %d: %s", want, resp.StatusCode, body)
 		}
 	}
@@ -105,9 +93,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	resp := do("POST", "/auth/signup",
 		`{"email":"roundtrip@example.com","password":"hunter2hunter","role":"artist"}`, "")
 	assertStatus(resp, http.StatusCreated)
-	if err := resp.Body.Close(); err != nil {
-		t.Errorf("close body: %v", err)
-	}
+	_ = resp.Body.Close()
 
 	// 2. Log in
 	loginResp := do("POST", "/auth/login", //nolint:bodyclose // body closed inside decodeJSON
@@ -120,9 +106,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	assertStatus(createProfResp, http.StatusCreated)
 	profile := decodeJSON(createProfResp)
 	profileID := profile["id"].(string)
-	if profile["display_name"] != "Round Trip Artist" {
-		t.Errorf("unexpected display_name: %v", profile["display_name"])
-	}
+	assert.Equal(t, "Round Trip Artist", profile["display_name"])
 
 	// 4. Update profile
 	updateProfResp := do("PATCH", "/profiles/me", //nolint:bodyclose // body closed inside decodeJSON
@@ -130,24 +114,18 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 		token)
 	assertStatus(updateProfResp, http.StatusOK)
 	updated := decodeJSON(updateProfResp)
-	if updated["bio"] != "I paint big things" {
-		t.Errorf("bio not updated: %v", updated["bio"])
-	}
+	assert.Equal(t, "I paint big things", updated["bio"])
 
 	// 5. Fetch own profile via /profiles/me
 	resp = do("GET", "/profiles/me", "", token)
 	assertStatus(resp, http.StatusOK)
-	if err := resp.Body.Close(); err != nil {
-		t.Errorf("close body: %v", err)
-	}
+	_ = resp.Body.Close()
 
 	// 6. Fetch public profile — no token
 	resp = do("GET", "/profiles/"+profileID, "", "") //nolint:bodyclose // body closed inside decodeJSON
 	assertStatus(resp, http.StatusOK)
 	public := decodeJSON(resp)
-	if public["display_name"] != "Round Trip Artist" {
-		t.Errorf("public profile display_name: %v", public["display_name"])
-	}
+	assert.Equal(t, "Round Trip Artist", public["display_name"])
 
 	// 7. Create two collections
 	resp = do("POST", "/collections", `{"name":"Alpha","description":"First"}`, token) //nolint:bodyclose // body closed inside decodeJSON
@@ -165,18 +143,14 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	resp = do("GET", "/profiles/"+profileID+"/collections", "", "") //nolint:bodyclose // body closed inside decodeJSONArray
 	assertStatus(resp, http.StatusOK)
 	collections := decodeJSONArray(resp)
-	if len(collections) != 2 {
-		t.Errorf("expected 2 collections, got %d", len(collections))
-	}
+	assert.Len(t, collections, 2)
 
 	// 9. Update collection
 	resp = do("PATCH", "/collections/"+colAlphaID, //nolint:bodyclose // body closed inside decodeJSON
 		`{"name":"Alpha Renamed","status":"ongoing"}`, token)
 	assertStatus(resp, http.StatusOK)
 	col := decodeJSON(resp)
-	if col["status"] != "ongoing" {
-		t.Errorf("expected ongoing, got %v", col["status"])
-	}
+	assert.Equal(t, "ongoing", col["status"])
 
 	// 10. Attach two images
 	resp = do("POST", "/collections/"+colAlphaID+"/images", //nolint:bodyclose // body closed inside decodeJSON
@@ -192,32 +166,25 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	img2ID := img2["id"].(string)
 
 	// 11. Reorder: put img2 before img1
-	reorderBody, _ := json.Marshal(map[string]any{"imageIds": []string{img2ID, img1ID}})
+	reorderBody, err := json.Marshal(map[string]any{"imageIds": []string{img2ID, img1ID}})
+	require.NoError(t, err)
 	resp = do("PUT", "/collections/"+colAlphaID+"/images/order", string(reorderBody), token) //nolint:bodyclose // body closed inside decodeJSONArray
 	assertStatus(resp, http.StatusOK)
 	images := decodeJSONArray(resp)
-	if images[0]["id"] != img2ID {
-		t.Errorf("expected img2 first after reorder, got %v", images[0]["id"])
-	}
+	assert.Equal(t, img2ID, images[0]["id"])
 
 	// 12. Delete one image
 	resp = do("DELETE", "/collections/"+colAlphaID+"/images/"+img1ID, "", token)
 	assertStatus(resp, http.StatusNoContent)
-	if err := resp.Body.Close(); err != nil {
-		t.Errorf("close body: %v", err)
-	}
+	_ = resp.Body.Close()
 
 	// 13. Delete collection
 	resp = do("DELETE", "/collections/"+colAlphaID, "", token)
 	assertStatus(resp, http.StatusNoContent)
-	if err := resp.Body.Close(); err != nil {
-		t.Errorf("close body: %v", err)
-	}
+	_ = resp.Body.Close()
 
 	// 14. Verify collection is gone
 	resp = do("GET", "/collections/"+colAlphaID, "", "")
 	assertStatus(resp, http.StatusNotFound)
-	if err := resp.Body.Close(); err != nil {
-		t.Errorf("close body: %v", err)
-	}
+	_ = resp.Body.Close()
 }

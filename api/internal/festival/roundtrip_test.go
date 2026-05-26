@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
@@ -20,6 +22,7 @@ import (
 )
 
 func TestFestivalDomainRoundTrip(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 
 	r := chi.NewRouter()
@@ -59,7 +62,8 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		if body != "" {
 			reqBody = strings.NewReader(body)
 		}
-		req, _ := http.NewRequestWithContext(t.Context(), method, srv.URL+path, reqBody)
+		req, err := http.NewRequestWithContext(t.Context(), method, srv.URL+path, reqBody)
+		require.NoError(t, err)
 		if body != "" {
 			req.Header.Set("Content-Type", "application/json")
 		}
@@ -67,9 +71,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
 		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("%s %s: %v", method, path, err)
-		}
+		require.NoError(t, err)
 		return resp
 	}
 
@@ -77,13 +79,9 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		t.Helper()
 		body, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
+		require.NoError(t, err, "read body")
 		var m map[string]any
-		if err := json.Unmarshal(body, &m); err != nil {
-			t.Fatalf("decode JSON from %s: %v (body: %s)", resp.Request.URL.Path, err, body)
-		}
+		require.NoError(t, json.Unmarshal(body, &m), "decode JSON from %s", resp.Request.URL.Path)
 		return m
 	}
 
@@ -91,13 +89,9 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		t.Helper()
 		body, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
+		require.NoError(t, err, "read body")
 		var arr []map[string]any
-		if err := json.Unmarshal(body, &arr); err != nil {
-			t.Fatalf("decode JSON array: %v (body: %s)", err, body)
-		}
+		require.NoError(t, json.Unmarshal(body, &arr), "decode JSON array")
 		return arr
 	}
 
@@ -138,9 +132,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	fest := decodeJSON(resp)
 	_ = resp.Body.Close()
 	festID := fest["id"].(string)
-	if fest["status"] != "draft" {
-		t.Errorf("expected draft status, got %v", fest["status"])
-	}
+	assert.Equal(t, "draft", fest["status"])
 
 	// 5. Upsert application form
 	resp = do("PUT", "/festivals/"+festID+"/form",
@@ -149,9 +141,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	assertStatus(resp, http.StatusOK)
 	form := decodeJSON(resp)
 	_ = resp.Body.Close()
-	if form["festival_id"] != festID {
-		t.Errorf("form festival_id mismatch: %v", form["festival_id"])
-	}
+	assert.Equal(t, festID, form["festival_id"])
 
 	// 6. Get form (public)
 	resp = do("GET", "/festivals/"+festID+"/form", "", "")
@@ -163,9 +153,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	assertStatus(resp, http.StatusOK)
 	updated := decodeJSON(resp)
 	_ = resp.Body.Close()
-	if updated["status"] != "open" {
-		t.Errorf("expected open status, got %v", updated["status"])
-	}
+	assert.Equal(t, "open", updated["status"])
 
 	// 8. Sign up artist
 	resp = do("POST", "/auth/signup",
@@ -195,27 +183,21 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	app := decodeJSON(resp)
 	_ = resp.Body.Close()
 	applicationID := app["id"].(string)
-	if app["status"] != "submitted" {
-		t.Errorf("expected submitted, got %v", app["status"])
-	}
+	assert.Equal(t, "submitted", app["status"])
 
 	// 12. List applications (organiser)
 	resp = do("GET", "/festivals/"+festID+"/applications", "", orgToken)
 	assertStatus(resp, http.StatusOK)
 	apps := decodeJSONArray(resp)
 	_ = resp.Body.Close()
-	if len(apps) != 1 {
-		t.Errorf("expected 1 application, got %d", len(apps))
-	}
+	assert.Len(t, apps, 1)
 
 	// 13. Accept application
 	resp = do("POST", "/festivals/"+festID+"/applications/"+applicationID+"/accept", "", orgToken)
 	assertStatus(resp, http.StatusOK)
 	accepted := decodeJSON(resp)
 	_ = resp.Body.Close()
-	if accepted["status"] != "accepted" {
-		t.Errorf("expected accepted, got %v", accepted["status"])
-	}
+	assert.Equal(t, "accepted", accepted["status"])
 
 	// 14. Set festival to live
 	resp = do("PATCH", "/festivals/"+festID, `{"status":"live"}`, orgToken)
@@ -227,17 +209,14 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	assertStatus(resp, http.StatusOK)
 	mapData := decodeJSON(resp)
 	_ = resp.Body.Close()
-	pins := mapData["pins"].([]any)
-	if len(pins) != 0 {
-		t.Errorf("expected 0 pins (no pin coordinates set), got %d", len(pins))
-	}
+	assert.Len(t, mapData["pins"].([]any), 0, "expected 0 pins (no pin coordinates set)")
 
 	// 16. Assign a pin directly via sqlc (artist already has a festival_artist row from accept step)
 	q := sqlcdb.New(db)
 	lat := pgtype.Numeric{}
-	_ = lat.Scan("51.900740")
+	require.NoError(t, lat.Scan("51.900740"))
 	lng := pgtype.Numeric{}
-	_ = lng.Scan("-2.074060")
+	require.NoError(t, lng.Scan("-2.074060"))
 	w3w := "filled.count.soap"
 	_, err := q.SetFestivalArtistPin(context.Background(), sqlcdb.SetFestivalArtistPinParams{
 		FestivalID: pgUUID(t, festID),
@@ -246,9 +225,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		PinLng:     lng,
 		W3w:        &w3w,
 	})
-	if err != nil {
-		t.Fatalf("set pin: %v", err)
-	}
+	require.NoError(t, err, "set pin")
 
 	// 17. Map now shows the pin
 	resp = do("GET", "/festivals/slug/rt-festival-2027/map", "", "")
@@ -256,16 +233,13 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	mapData2 := decodeJSON(resp)
 	_ = resp.Body.Close()
 	pins2 := mapData2["pins"].([]any)
-	if len(pins2) != 1 {
-		t.Fatalf("expected 1 pin, got %d", len(pins2))
-	}
+	require.Len(t, pins2, 1)
 	pin := pins2[0].(map[string]any)
-	if pin["artist_id"] != artistProfileID {
-		t.Errorf("pin artist_id: expected %s, got %v", artistProfileID, pin["artist_id"])
-	}
+	assert.Equal(t, artistProfileID, pin["artist_id"])
 }
 
 func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	orgID, orgToken := createTestUser(t, db, "rtclosed-org@example.com", "organiser")
 	festID := createTestFestival(t, db, orgID, "rt-closed-form", "open")
@@ -280,9 +254,7 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 		Fields:     []byte(`[]`),
 		CloseAt:    closeAt,
 	})
-	if err != nil {
-		t.Fatalf("upsert form: %v", err)
-	}
+	require.NoError(t, err, "upsert form")
 
 	artistID, artistToken := createTestUser(t, db, "rtclosed-artist@example.com", "artist")
 	createTestArtistProfile(t, db, artistID, "Closed Form Artist")
@@ -295,16 +267,13 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "POST", "/festivals/"+festID+"/apply", `{"answers":{}}`, artistToken)
-	if resp.StatusCode != http.StatusUnprocessableEntity {
-		body, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		t.Fatalf("expected 422 for closed form, got %d: %s", resp.StatusCode, body)
-	}
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode, "expected 422 for closed form")
 	_ = resp.Body.Close()
 	_ = orgToken
 }
 
 func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	orgID, _ := createTestUser(t, db, "rtmap-org@example.com", "organiser")
 	festID := createTestFestival(t, db, orgID, "rt-map-pins", "live")
@@ -320,9 +289,7 @@ func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 		Status:     sqlcdb.FestivalArtistStatusAccepted,
 		// PinLat/PinLng left as zero — pin_lat/pin_lng will be NULL in DB
 	})
-	if err != nil {
-		t.Fatalf("add festival artist: %v", err)
-	}
+	require.NoError(t, err, "add festival artist")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(testSecret))
@@ -332,16 +299,9 @@ func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "GET", "/festivals/slug/rt-map-pins/map", "", "")
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	_ = resp.Body.Close()
-	pins := body["pins"].([]any)
-	if len(pins) != 0 {
-		t.Errorf("expected 0 pins for unpinned artist, got %d", len(pins))
-	}
+	assert.Len(t, body["pins"].([]any), 0, "expected 0 pins for unpinned artist")
 }

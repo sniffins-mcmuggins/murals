@@ -3,13 +3,14 @@ package festival_test
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
@@ -18,6 +19,7 @@ import (
 )
 
 func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	orgID, _ := createTestUser(t, db, "maporg@example.com", "organiser")
 	festID := createTestFestival(t, db, orgID, "map-fest-live", "live")
@@ -34,15 +36,13 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 		ArtistID:   pgUUID(t, artistProfileID),
 		Status:     sqlcdb.FestivalArtistStatusAccepted,
 	})
-	if err != nil {
-		t.Fatalf("add festival artist: %v", err)
-	}
+	require.NoError(t, err, "add festival artist")
 
 	// Then set the pin
 	lat := pgtype.Numeric{}
-	_ = lat.Scan("51.900740")
+	require.NoError(t, lat.Scan("51.900740"))
 	lng := pgtype.Numeric{}
-	_ = lng.Scan("-2.074060")
+	require.NoError(t, lng.Scan("-2.074060"))
 	w3w := "filled.count.soap"
 	_, err = q.SetFestivalArtistPin(context.Background(), sqlcdb.SetFestivalArtistPinParams{
 		FestivalID: pgUUID(t, festID),
@@ -51,9 +51,7 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 		PinLng:     lng,
 		W3w:        &w3w,
 	})
-	if err != nil {
-		t.Fatalf("set festival artist pin: %v", err)
-	}
+	require.NoError(t, err, "set festival artist pin")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(testSecret))
@@ -63,28 +61,21 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "GET", "/festivals/slug/map-fest-live/map", "", "")
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	_ = resp.Body.Close()
 
 	pins, ok := body["pins"].([]any)
-	if !ok || len(pins) != 1 {
-		t.Fatalf("expected 1 pin, got %v", body["pins"])
-	}
+	require.True(t, ok, "pins field missing or wrong type")
+	require.Len(t, pins, 1)
 	pin := pins[0].(map[string]any)
-	if pin["artist_id"] != artistProfileID {
-		t.Errorf("expected artist_id %s, got %v", artistProfileID, pin["artist_id"])
-	}
-	if pin["name"] != "Map Artist" {
-		t.Errorf("expected name 'Map Artist', got %v", pin["name"])
-	}
+	assert.Equal(t, artistProfileID, pin["artist_id"])
+	assert.Equal(t, "Map Artist", pin["name"])
 }
 
 func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	orgID, _ := createTestUser(t, db, "maporg2@example.com", "organiser")
 	createTestFestival(t, db, orgID, "map-fest-draft", "draft")
@@ -97,8 +88,6 @@ func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "GET", "/festivals/slug/map-fest-draft/map", "", "")
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected 404 for non-live festival, got %d", resp.StatusCode)
-	}
+	require.Equal(t, http.StatusNotFound, resp.StatusCode, "expected 404 for non-live festival")
 	_ = resp.Body.Close()
 }

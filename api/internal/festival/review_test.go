@@ -3,13 +3,14 @@ package festival_test
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
@@ -35,21 +36,15 @@ func setupReviewScenario(t *testing.T, db *pgxpool.Pool) reviewScenario {
 	// Insert application directly via sqlc
 	q := sqlcdb.New(db)
 	form, err := q.GetApplicationFormByFestivalID(context.Background(), pgUUID(t, festID))
-	if err != nil {
-		t.Fatalf("get form: %v", err)
-	}
+	require.NoError(t, err, "get form")
 	artistProfile, err := q.GetArtistProfileByUserID(context.Background(), pgUUID(t, artistID))
-	if err != nil {
-		t.Fatalf("get profile: %v", err)
-	}
+	require.NoError(t, err, "get profile")
 	app, err := q.CreateApplication(context.Background(), sqlcdb.CreateApplicationParams{
 		FormID:   form.ID,
 		ArtistID: artistProfile.ID,
 		Answers:  []byte(`{}`),
 	})
-	if err != nil {
-		t.Fatalf("create application: %v", err)
-	}
+	require.NoError(t, err, "create application")
 
 	return reviewScenario{
 		orgToken:      orgToken,
@@ -59,6 +54,7 @@ func setupReviewScenario(t *testing.T, db *pgxpool.Pool) reviewScenario {
 }
 
 func TestListApplications(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
 
@@ -70,19 +66,15 @@ func TestListApplications(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "GET", "/festivals/"+sc.festID+"/applications", "", sc.orgToken)
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var list []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
 	_ = resp.Body.Close()
-	if len(list) != 1 {
-		t.Errorf("expected 1 application, got %d", len(list))
-	}
+	assert.Len(t, list, 1)
 }
 
 func TestAcceptApplication(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
 
@@ -94,19 +86,15 @@ func TestAcceptApplication(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "POST", "/festivals/"+sc.festID+"/applications/"+sc.applicationID+"/accept", "", sc.orgToken)
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var app map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&app)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app))
 	_ = resp.Body.Close()
-	if app["status"] != "accepted" {
-		t.Errorf("expected status accepted, got %v", app["status"])
-	}
+	assert.Equal(t, "accepted", app["status"])
 }
 
 func TestDeclineApplication(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
 
@@ -118,19 +106,15 @@ func TestDeclineApplication(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "POST", "/festivals/"+sc.festID+"/applications/"+sc.applicationID+"/decline", "", sc.orgToken)
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
-	}
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var app map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&app)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app))
 	_ = resp.Body.Close()
-	if app["status"] != "declined" {
-		t.Errorf("expected status declined, got %v", app["status"])
-	}
+	assert.Equal(t, "declined", app["status"])
 }
 
 func TestReview_ForbiddenForNonOwner(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
 	_, otherToken := createTestUser(t, db, "revother@example.com", "organiser")
@@ -143,8 +127,6 @@ func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "GET", "/festivals/"+sc.festID+"/applications", "", otherToken)
-	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", resp.StatusCode)
-	}
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	_ = resp.Body.Close()
 }
