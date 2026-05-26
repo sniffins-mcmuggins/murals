@@ -1,0 +1,144 @@
+'use client'
+
+import { useState, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { apiClient } from '@/lib/api'
+
+type Role = 'artist' | 'organiser'
+
+export default function SignupPage() {
+  const router = useRouter()
+
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<Role>('artist')
+  const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError(null)
+    setPending(true)
+
+    try {
+      const { response } = await apiClient.POST('/auth/signup', {
+        body: { email, password, role },
+      })
+
+      if (response.status === 409) {
+        setError('Email already registered')
+        return
+      }
+
+      if (response.status === 422) {
+        setError('Please check your details and try again.')
+        return
+      }
+
+      if (!response.ok) {
+        setError('Something went wrong. Please try again.')
+        return
+      }
+
+      // Redirect to login — user must sign in after signing up.
+      router.push('/login?registered=1')
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-warm flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-offwhite border border-light rounded-2xl p-8 shadow-sm">
+        <h1 className="font-serif text-3xl text-ink mb-2">Create account</h1>
+        <p className="font-sans text-mid text-sm mb-8">
+          Join the Render platform for paint festival artists and organisers.
+        </p>
+
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          <div>
+            <label
+              htmlFor="email"
+              className="block font-sans text-sm text-ink mb-1"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite placeholder:text-mid focus:outline-none focus:border-amber"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block font-sans text-sm text-ink mb-1"
+            >
+              Password
+              <span className="text-mid ml-1 font-mono text-xs">(min 8 chars)</span>
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite placeholder:text-mid focus:outline-none focus:border-amber"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="role"
+              className="block font-sans text-sm text-ink mb-1"
+            >
+              I am a…
+            </label>
+            <select
+              id="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+              className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
+            >
+              <option value="artist">Artist</option>
+              <option value="organiser">Festival organiser</option>
+            </select>
+          </div>
+
+          {error && (
+            <p role="alert" className="font-sans text-sm text-clay">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-full bg-amber text-ink font-sans font-medium text-sm rounded-lg py-2.5 hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {pending ? 'Creating account…' : 'Create account'}
+          </button>
+        </form>
+
+        <p className="mt-6 font-sans text-sm text-mid text-center">
+          Already have an account?{' '}
+          <Link href="/login" className="text-ink underline underline-offset-2">
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </main>
+  )
+}
