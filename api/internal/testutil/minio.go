@@ -1,7 +1,9 @@
 package testutil
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/minio/minio-go/v7"
@@ -10,11 +12,21 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-const testBucket = "render-images-test"
+// MinIOServer holds a running test MinIO container and its connection details.
+type MinIOServer struct {
+	Client   *minio.Client
+	Endpoint string // "host:port"
+	Bucket   string
+}
 
-// NewMinIO starts a throwaway MinIO container and returns a connected client
-// with the test bucket already created. Container stops on t.Cleanup.
-func NewMinIO(t *testing.T) *minio.Client {
+// CDNBase returns the base URL for the test bucket, matching the CDN_BASE_URL env var pattern.
+func (s MinIOServer) CDNBase() string {
+	return "http://" + s.Endpoint + "/" + s.Bucket
+}
+
+// NewMinIOServer starts a throwaway MinIO container and returns the client with
+// connection details. The bucket is created with public-read. Container stops on t.Cleanup.
+func NewMinIOServer(t *testing.T) MinIOServer {
 	t.Helper()
 	ctx := context.Background()
 
@@ -50,7 +62,8 @@ func NewMinIO(t *testing.T) *minio.Client {
 		t.Fatalf("minio port: %v", err)
 	}
 
-	client, err := minio.New(host+":"+port.Port(), &minio.Options{
+	endpoint := host + ":" + port.Port()
+	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4("rendertest", "rendertest123", ""),
 		Secure: false,
 	})
@@ -58,9 +71,42 @@ func NewMinIO(t *testing.T) *minio.Client {
 		t.Fatalf("minio client: %v", err)
 	}
 
-	if err := client.MakeBucket(ctx, testBucket, minio.MakeBucketOptions{}); err != nil {
+	const bucket = "render-images-test"
+	if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
 		t.Fatalf("make bucket: %v", err)
 	}
 
-	return client
+	// Allow anonymous GET so CDN URL fetches work in round-trip tests (mirrors production minio-init)
+	policy := fmt.Sprintf(`{
+		"Version":"2012-10-17",
+		"Statement":[{
+			"Effect":"Allow",
+			"Principal":{"AWS":["*"]},
+			"Action":["s3:GetObject"],
+			"Resource":["arn:aws:s3:::%s/*"]
+		}]
+	}`, bucket)
+	if err := client.SetBucketPolicy(ctx, bucket, policy); err != nil {
+		t.Fatalf("set bucket policy: %v", err)
+	}
+
+	return MinIOServer{Client: client, Endpoint: endpoint, Bucket: bucket}
+}
+
+// NewMinIO starts a throwaway MinIO container and returns a connected client.
+// Use NewMinIOServer if you also need the endpoint or bucket name.
+func NewMinIO(t *testing.T) *minio.Client {
+	return NewMinIOServer(t).Client
+}
+
+// MinIOPutObject is a test helper for directly writing bytes to a MinIO bucket.
+func MinIOPutObject(t *testing.T, ms MinIOServer, key string, data []byte, contentType string) {
+	t.Helper()
+	_, err := ms.Client.PutObject(context.Background(), ms.Bucket, key,
+		bytes.NewReader(data), int64(len(data)),
+		minio.PutObjectOptions{ContentType: contentType},
+	)
+	if err != nil {
+		t.Fatalf("put object %s: %v", key, err)
+	}
 }
