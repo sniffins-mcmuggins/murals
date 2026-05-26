@@ -50,7 +50,11 @@ func TestAttachImage_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST image: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 201, got %d: %s", resp.StatusCode, body)
@@ -99,7 +103,9 @@ func TestAttachImage_SecondImageOrder(t *testing.T) {
 		}
 		var img map[string]any
 		_ = json.NewDecoder(resp.Body).Decode(&img)
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close body: %v", err)
+		}
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("image %d: expected 201, got %d", i, resp.StatusCode)
 		}
@@ -142,7 +148,9 @@ func TestReorderImages_Success(t *testing.T) {
 		resp, _ := http.DefaultClient.Do(req)
 		var img map[string]any
 		_ = json.NewDecoder(resp.Body).Decode(&img)
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close body: %v", err)
+		}
 		imageIDs = append(imageIDs, img["id"].(string))
 	}
 
@@ -155,7 +163,11 @@ func TestReorderImages_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PUT order: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
@@ -207,7 +219,9 @@ func TestDeleteImage_Success(t *testing.T) {
 	attachResp, _ := http.DefaultClient.Do(attachReq)
 	var img map[string]any
 	_ = json.NewDecoder(attachResp.Body).Decode(&img)
-	attachResp.Body.Close()
+	if err := attachResp.Body.Close(); err != nil {
+		t.Errorf("close attach body: %v", err)
+	}
 	imageID := img["id"].(string)
 
 	delReq, _ := http.NewRequestWithContext(t.Context(), http.MethodDelete,
@@ -217,7 +231,11 @@ func TestDeleteImage_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DELETE image: %v", err)
 	}
-	defer delResp.Body.Close()
+	defer func() {
+		if err := delResp.Body.Close(); err != nil {
+			t.Errorf("close del body: %v", err)
+		}
+	}()
 	if delResp.StatusCode != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d", delResp.StatusCode)
 	}

@@ -179,7 +179,7 @@ func ReorderImagesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.InternalServerError(w)
 			return
 		}
-		defer tx.Rollback(r.Context())
+		defer func() { _ = tx.Rollback(r.Context()) }()
 		tq := sqlcdb.New(tx)
 
 		for i, idStr := range req.ImageIDs {

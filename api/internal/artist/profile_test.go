@@ -65,11 +65,16 @@ func TestGetProfile_Public(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp, err := http.Get(srv.URL + "/profiles/" + profileID)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/profiles/"+profileID, nil)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET profile: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -87,11 +92,17 @@ func TestGetProfile_NotFound(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp, err := http.Get(srv.URL + "/profiles/00000000-0000-0000-0000-000000000000")
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet,
+		srv.URL+"/profiles/00000000-0000-0000-0000-000000000000", nil)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
