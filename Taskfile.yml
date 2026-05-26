@@ -24,8 +24,8 @@ tasks:
     cmd: docker compose -f {{.COMPOSE_FILE}} down
 
   test:
-    desc: "Run all tests (api, web, mobile in parallel)"
-    deps: [api:test, web:test, mobile:test]
+    desc: "Run all tests (api, web, mobile, openapi in parallel)"
+    deps: [api:test, web:test, mobile:test, openapi:test]
 
   lint:
     desc: "Run all linters (api, web, mobile in parallel)"
@@ -68,6 +68,21 @@ tasks:
     cmds:
       - task: openapi:gen
       - git diff --exit-code openapi/generated/ api/internal/openapi/
+
+  openapi:install:
+    desc: "Install openapi/client dependencies"
+    dir: openapi/client
+    cmd: npm install
+
+  openapi:test:
+    desc: "Run shared TS client tests (vitest)"
+    dir: openapi/client
+    cmd: npm test
+
+  openapi:lint:
+    desc: "Type-check shared TS client"
+    dir: openapi/client
+    cmd: npm run typecheck
 
   e2e:
     desc: "Run end-to-end tests (requires stack to be up)"
