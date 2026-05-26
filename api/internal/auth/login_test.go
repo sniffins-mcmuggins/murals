@@ -69,6 +69,7 @@ func TestLoginHandler_Success(t *testing.T) {
 	}
 	if sessionCookie == nil {
 		t.Fatal("session cookie not set")
+		return
 	}
 	if !sessionCookie.HttpOnly {
 		t.Error("session cookie must be HttpOnly")

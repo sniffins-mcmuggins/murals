@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
