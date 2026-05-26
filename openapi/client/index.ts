@@ -2,6 +2,8 @@ import type { components } from '../generated/client'
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { paths } from '../generated/client'
 
+export type { components, operations, paths } from '../generated/client'
+
 export class ApiError extends Error {
   readonly status: number
   readonly title: string
