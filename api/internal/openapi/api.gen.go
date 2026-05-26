@@ -556,6 +556,9 @@ type ServerInterface interface {
 	// Update a collection
 	// (PATCH /collections/{collectionID})
 	PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// List images in a collection
+	// (GET /collections/{collectionID}/images)
+	ListCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
 	// Attach an uploaded image to a collection
 	// (POST /collections/{collectionID}/images)
 	AttachCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
@@ -682,6 +685,12 @@ func (_ Unimplemented) GetCollection(w http.ResponseWriter, r *http.Request, col
 // Update a collection
 // (PATCH /collections/{collectionID})
 func (_ Unimplemented) PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List images in a collection
+// (GET /collections/{collectionID}/images)
+func (_ Unimplemented) ListCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1003,6 +1012,32 @@ func (siw *ServerInterfaceWrapper) PatchCollection(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PatchCollection(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCollectionImages operation middleware
+func (siw *ServerInterfaceWrapper) ListCollectionImages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCollectionImages(w, r, collectionID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1991,6 +2026,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/collections/{collectionID}", wrapper.PatchCollection)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/collections/{collectionID}/images", wrapper.ListCollectionImages)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/collections/{collectionID}/images", wrapper.AttachCollectionImage)
 	})
 	r.Group(func(r chi.Router) {
@@ -2399,6 +2437,44 @@ type PatchCollection404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response PatchCollection404ApplicationProblemPlusJSONResponse) VisitPatchCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionImagesRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+}
+
+type ListCollectionImagesResponseObject interface {
+	VisitListCollectionImagesResponse(w http.ResponseWriter) error
+}
+
+type ListCollectionImages200JSONResponse []CollectionImage
+
+func (response ListCollectionImages200JSONResponse) VisitListCollectionImagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionImages404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCollectionImages404ApplicationProblemPlusJSONResponse) VisitListCollectionImagesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4053,6 +4129,9 @@ type StrictServerInterface interface {
 	// Update a collection
 	// (PATCH /collections/{collectionID})
 	PatchCollection(ctx context.Context, request PatchCollectionRequestObject) (PatchCollectionResponseObject, error)
+	// List images in a collection
+	// (GET /collections/{collectionID}/images)
+	ListCollectionImages(ctx context.Context, request ListCollectionImagesRequestObject) (ListCollectionImagesResponseObject, error)
 	// Attach an uploaded image to a collection
 	// (POST /collections/{collectionID}/images)
 	AttachCollectionImage(ctx context.Context, request AttachCollectionImageRequestObject) (AttachCollectionImageResponseObject, error)
@@ -4342,6 +4421,32 @@ func (sh *strictHandler) PatchCollection(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PatchCollectionResponseObject); ok {
 		if err := validResponse.VisitPatchCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCollectionImages operation middleware
+func (sh *strictHandler) ListCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request ListCollectionImagesRequestObject
+
+	request.CollectionID = collectionID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCollectionImages(ctx, request.(ListCollectionImagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCollectionImages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCollectionImagesResponseObject); ok {
+		if err := validResponse.VisitListCollectionImagesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

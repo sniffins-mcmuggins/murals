@@ -75,6 +75,7 @@ func main() {
 	r.Get("/collections/{collectionID}", artist.GetCollectionHandler(pool))
 	r.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(pool))
 	r.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(pool))
+	r.Get("/collections/{collectionID}/images", artist.ListCollectionImagesHandler(pool))
 	r.Post("/collections/{collectionID}/images", artist.AttachImageHandler(pool))
 	r.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(pool))
 	r.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(pool))

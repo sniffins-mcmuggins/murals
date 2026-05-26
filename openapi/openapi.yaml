@@ -910,6 +910,29 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   /collections/{collectionID}/images:
+    get:
+      operationId: listCollectionImages
+      summary: List images in a collection
+      tags: [artist]
+      security: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of collection images ordered by display_order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CollectionImage"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       operationId: attachCollectionImage
       summary: Attach an uploaded image to a collection

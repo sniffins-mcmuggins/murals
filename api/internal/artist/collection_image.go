@@ -35,6 +35,32 @@ func toImageResponse(img sqlcdb.CollectionImage) collectionImageResponse {
 	}
 }
 
+// ListCollectionImagesHandler handles GET /collections/{collectionID}/images.
+// Public endpoint — no auth required; returns images ordered by display_order.
+func ListCollectionImagesHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		collectionUUID, err := pgUUIDFromString(chi.URLParam(r, "collectionID"))
+		if err != nil {
+			httperr.BadRequest(w, "invalid collectionID")
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		images, err := q.ListCollectionImages(r.Context(), collectionUUID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		resp := make([]collectionImageResponse, len(images))
+		for i, img := range images {
+			resp[i] = toImageResponse(img)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
 // AttachImageHandler handles POST /collections/{collectionID}/images. Requires owner.
 func AttachImageHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -240,7 +240,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List images in a collection */
+        get: operations["listCollectionImages"];
         put?: never;
         /**
          * Attach an uploaded image to a collection
@@ -1582,6 +1583,29 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listCollectionImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of collection images ordered by display_order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionImage"][];
+                };
+            };
             404: components["responses"]["NotFound"];
         };
     };
