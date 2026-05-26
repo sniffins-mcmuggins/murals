@@ -21,21 +21,66 @@ const (
 	CookieAuthScopes cookieAuthContextKey = "cookieAuth.Scopes"
 )
 
+// Defines values for ApplicationStatus.
+const (
+	Accepted  ApplicationStatus = "accepted"
+	Declined  ApplicationStatus = "declined"
+	Submitted ApplicationStatus = "submitted"
+)
+
+// Valid indicates whether the value is a known member of the ApplicationStatus enum.
+func (e ApplicationStatus) Valid() bool {
+	switch e {
+	case Accepted:
+		return true
+	case Declined:
+		return true
+	case Submitted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CollectionStatus.
 const (
-	Active   CollectionStatus = "active"
-	Archived CollectionStatus = "archived"
-	Ongoing  CollectionStatus = "ongoing"
+	CollectionStatusActive   CollectionStatus = "active"
+	CollectionStatusArchived CollectionStatus = "archived"
+	CollectionStatusOngoing  CollectionStatus = "ongoing"
 )
 
 // Valid indicates whether the value is a known member of the CollectionStatus enum.
 func (e CollectionStatus) Valid() bool {
 	switch e {
-	case Active:
+	case CollectionStatusActive:
 		return true
-	case Archived:
+	case CollectionStatusArchived:
 		return true
-	case Ongoing:
+	case CollectionStatusOngoing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FestivalStatus.
+const (
+	FestivalStatusArchived FestivalStatus = "archived"
+	FestivalStatusDraft    FestivalStatus = "draft"
+	FestivalStatusLive     FestivalStatus = "live"
+	FestivalStatusOpen     FestivalStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the FestivalStatus enum.
+func (e FestivalStatus) Valid() bool {
+	switch e {
+	case FestivalStatusArchived:
+		return true
+	case FestivalStatusDraft:
+		return true
+	case FestivalStatusLive:
+		return true
+	case FestivalStatusOpen:
 		return true
 	default:
 		return false
@@ -101,6 +146,32 @@ func (e GetHealth200JSONResponseBodyStatus) Valid() bool {
 		return false
 	}
 }
+
+// Application defines model for Application.
+type Application struct {
+	Answers   *map[string]interface{} `json:"answers,omitempty"`
+	ArtistId  *openapi_types.UUID     `json:"artist_id,omitempty"`
+	CreatedAt *time.Time              `json:"created_at,omitempty"`
+	FormId    *openapi_types.UUID     `json:"form_id,omitempty"`
+	Id        *openapi_types.UUID     `json:"id,omitempty"`
+	Status    *ApplicationStatus      `json:"status,omitempty"`
+	UpdatedAt *time.Time              `json:"updated_at,omitempty"`
+}
+
+// ApplicationForm defines model for ApplicationForm.
+type ApplicationForm struct {
+	CloseAt         *time.Time                `json:"close_at,omitempty"`
+	CreatedAt       *time.Time                `json:"created_at,omitempty"`
+	FestivalId      *openapi_types.UUID       `json:"festival_id,omitempty"`
+	Fields          *[]map[string]interface{} `json:"fields,omitempty"`
+	Id              *openapi_types.UUID       `json:"id,omitempty"`
+	MaxApplications *int                      `json:"max_applications,omitempty"`
+	OpenAt          *time.Time                `json:"open_at,omitempty"`
+	UpdatedAt       *time.Time                `json:"updated_at,omitempty"`
+}
+
+// ApplicationStatus defines model for ApplicationStatus.
+type ApplicationStatus string
 
 // ArtistProfile defines model for ArtistProfile.
 type ArtistProfile struct {
@@ -182,6 +253,24 @@ type CreateProfileRequest struct {
 	DisplayName string `json:"displayName"`
 }
 
+// Festival defines model for Festival.
+type Festival struct {
+	CreatedAt     *time.Time          `json:"created_at,omitempty"`
+	Description   *string             `json:"description,omitempty"`
+	EndDate       *openapi_types.Date `json:"end_date,omitempty"`
+	Id            *openapi_types.UUID `json:"id,omitempty"`
+	LocationLabel *string             `json:"location_label,omitempty"`
+	Name          *string             `json:"name,omitempty"`
+	OrganiserId   *openapi_types.UUID `json:"organiser_id,omitempty"`
+	Slug          *string             `json:"slug,omitempty"`
+	StartDate     *openapi_types.Date `json:"start_date,omitempty"`
+	Status        *FestivalStatus     `json:"status,omitempty"`
+	UpdatedAt     *time.Time          `json:"updated_at,omitempty"`
+}
+
+// FestivalStatus defines model for FestivalStatus.
+type FestivalStatus string
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    openapi_types.Email `json:"email"`
@@ -193,6 +282,21 @@ type LoginResponse struct {
 	// Token JWT — also set as the session HTTP-only cookie.
 	Token string `json:"token"`
 	User  User   `json:"user"`
+}
+
+// MapData defines model for MapData.
+type MapData struct {
+	Pins *[]MapPin `json:"pins,omitempty"`
+}
+
+// MapPin defines model for MapPin.
+type MapPin struct {
+	// ArtistId Artist profile UUID
+	ArtistId *openapi_types.UUID `json:"artist_id,omitempty"`
+	Lat      *float32            `json:"lat,omitempty"`
+	Lng      *float32            `json:"lng,omitempty"`
+	Name     *string             `json:"name,omitempty"`
+	W3w      *string             `json:"w3w,omitempty"`
 }
 
 // PresignRequest defines model for PresignRequest.
@@ -287,6 +391,35 @@ type bearerAuthContextKey string
 // cookieAuthContextKey is the context key for cookieAuth security scheme
 type cookieAuthContextKey string
 
+// PostFestivalsJSONBody defines parameters for PostFestivals.
+type PostFestivalsJSONBody struct {
+	Description   *string             `json:"description,omitempty"`
+	EndDate       *openapi_types.Date `json:"endDate,omitempty"`
+	LocationLabel *string             `json:"locationLabel,omitempty"`
+	Name          string              `json:"name"`
+	Slug          string              `json:"slug"`
+	StartDate     *openapi_types.Date `json:"startDate,omitempty"`
+}
+
+// PatchFestivalsFestivalIDJSONBody defines parameters for PatchFestivalsFestivalID.
+type PatchFestivalsFestivalIDJSONBody struct {
+	Description   *string         `json:"description,omitempty"`
+	LocationLabel *string         `json:"locationLabel,omitempty"`
+	Name          *string         `json:"name,omitempty"`
+	Slug          *string         `json:"slug,omitempty"`
+	Status        *FestivalStatus `json:"status,omitempty"`
+}
+
+// PostFestivalsFestivalIDApplyJSONBody defines parameters for PostFestivalsFestivalIDApply.
+type PostFestivalsFestivalIDApplyJSONBody struct {
+	Answers map[string]interface{} `json:"answers"`
+}
+
+// PutFestivalsFestivalIDFormJSONBody defines parameters for PutFestivalsFestivalIDForm.
+type PutFestivalsFestivalIDFormJSONBody struct {
+	Fields *[]map[string]interface{} `json:"fields,omitempty"`
+}
+
 // GetHealth200JSONResponseBodyStatus defines parameters for GetHealth.
 type GetHealth200JSONResponseBodyStatus string
 
@@ -307,6 +440,18 @@ type AttachCollectionImageJSONRequestBody = AttachImageRequest
 
 // ReorderCollectionImagesJSONRequestBody defines body for ReorderCollectionImages for application/json ContentType.
 type ReorderCollectionImagesJSONRequestBody = ReorderImagesRequest
+
+// PostFestivalsJSONRequestBody defines body for PostFestivals for application/json ContentType.
+type PostFestivalsJSONRequestBody PostFestivalsJSONBody
+
+// PatchFestivalsFestivalIDJSONRequestBody defines body for PatchFestivalsFestivalID for application/json ContentType.
+type PatchFestivalsFestivalIDJSONRequestBody PatchFestivalsFestivalIDJSONBody
+
+// PostFestivalsFestivalIDApplyJSONRequestBody defines body for PostFestivalsFestivalIDApply for application/json ContentType.
+type PostFestivalsFestivalIDApplyJSONRequestBody PostFestivalsFestivalIDApplyJSONBody
+
+// PutFestivalsFestivalIDFormJSONRequestBody defines body for PutFestivalsFestivalIDForm for application/json ContentType.
+type PutFestivalsFestivalIDFormJSONRequestBody PutFestivalsFestivalIDFormJSONBody
 
 // PostImagesConfirmJSONRequestBody defines body for PostImagesConfirm for application/json ContentType.
 type PostImagesConfirmJSONRequestBody = ConfirmRequest
@@ -349,6 +494,42 @@ type ServerInterface interface {
 	// Remove an image from a collection
 	// (DELETE /collections/{collectionID}/images/{imageID})
 	DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID)
+	// List my festivals
+	// (GET /festivals)
+	GetFestivals(w http.ResponseWriter, r *http.Request)
+	// Create a festival
+	// (POST /festivals)
+	PostFestivals(w http.ResponseWriter, r *http.Request)
+	// Get festival map data (public, live festivals only)
+	// (GET /festivals/slug/{slug}/map)
+	GetFestivalsSlugSlugMap(w http.ResponseWriter, r *http.Request, slug string)
+	// Delete a festival (soft delete)
+	// (DELETE /festivals/{festivalID})
+	DeleteFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Get a festival by ID
+	// (GET /festivals/{festivalID})
+	GetFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Update a festival
+	// (PATCH /festivals/{festivalID})
+	PatchFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// List applications for a festival
+	// (GET /festivals/{festivalID}/applications)
+	GetFestivalsFestivalIDApplications(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Accept an application
+	// (POST /festivals/{festivalID}/applications/{applicationID}/accept)
+	PostFestivalsFestivalIDApplicationsApplicationIDAccept(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, applicationID openapi_types.UUID)
+	// Decline an application
+	// (POST /festivals/{festivalID}/applications/{applicationID}/decline)
+	PostFestivalsFestivalIDApplicationsApplicationIDDecline(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, applicationID openapi_types.UUID)
+	// Submit an application
+	// (POST /festivals/{festivalID}/apply)
+	PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Get application form
+	// (GET /festivals/{festivalID}/form)
+	GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Upsert application form
+	// (PUT /festivals/{festivalID}/form)
+	PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
 	// Service health check
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -433,6 +614,78 @@ func (_ Unimplemented) ReorderCollectionImages(w http.ResponseWriter, r *http.Re
 // Remove an image from a collection
 // (DELETE /collections/{collectionID}/images/{imageID})
 func (_ Unimplemented) DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List my festivals
+// (GET /festivals)
+func (_ Unimplemented) GetFestivals(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a festival
+// (POST /festivals)
+func (_ Unimplemented) PostFestivals(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get festival map data (public, live festivals only)
+// (GET /festivals/slug/{slug}/map)
+func (_ Unimplemented) GetFestivalsSlugSlugMap(w http.ResponseWriter, r *http.Request, slug string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a festival (soft delete)
+// (DELETE /festivals/{festivalID})
+func (_ Unimplemented) DeleteFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a festival by ID
+// (GET /festivals/{festivalID})
+func (_ Unimplemented) GetFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a festival
+// (PATCH /festivals/{festivalID})
+func (_ Unimplemented) PatchFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List applications for a festival
+// (GET /festivals/{festivalID}/applications)
+func (_ Unimplemented) GetFestivalsFestivalIDApplications(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Accept an application
+// (POST /festivals/{festivalID}/applications/{applicationID}/accept)
+func (_ Unimplemented) PostFestivalsFestivalIDApplicationsApplicationIDAccept(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, applicationID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Decline an application
+// (POST /festivals/{festivalID}/applications/{applicationID}/decline)
+func (_ Unimplemented) PostFestivalsFestivalIDApplicationsApplicationIDDecline(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, applicationID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Submit an application
+// (POST /festivals/{festivalID}/apply)
+func (_ Unimplemented) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get application form
+// (GET /festivals/{festivalID}/form)
+func (_ Unimplemented) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Upsert application form
+// (PUT /festivals/{festivalID}/form)
+func (_ Unimplemented) PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -745,6 +998,366 @@ func (siw *ServerInterfaceWrapper) DeleteCollectionImage(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteCollectionImage(w, r, collectionID, imageID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFestivals operation middleware
+func (siw *ServerInterfaceWrapper) GetFestivals(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFestivals(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFestivals operation middleware
+func (siw *ServerInterfaceWrapper) PostFestivals(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFestivals(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFestivalsSlugSlugMap operation middleware
+func (siw *ServerInterfaceWrapper) GetFestivalsSlugSlugMap(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "slug" -------------
+	var slug string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slug", chi.URLParam(r, "slug"), &slug, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slug", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFestivalsSlugSlugMap(w, r, slug)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFestivalsFestivalID operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFestivalsFestivalID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFestivalsFestivalID(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFestivalsFestivalID operation middleware
+func (siw *ServerInterfaceWrapper) GetFestivalsFestivalID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFestivalsFestivalID(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchFestivalsFestivalID operation middleware
+func (siw *ServerInterfaceWrapper) PatchFestivalsFestivalID(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchFestivalsFestivalID(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFestivalsFestivalIDApplications operation middleware
+func (siw *ServerInterfaceWrapper) GetFestivalsFestivalIDApplications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFestivalsFestivalIDApplications(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFestivalsFestivalIDApplicationsApplicationIDAccept operation middleware
+func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDApplicationsApplicationIDAccept(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "applicationID" -------------
+	var applicationID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "applicationID", chi.URLParam(r, "applicationID"), &applicationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFestivalsFestivalIDApplicationsApplicationIDAccept(w, r, festivalID, applicationID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFestivalsFestivalIDApplicationsApplicationIDDecline operation middleware
+func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDApplicationsApplicationIDDecline(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "applicationID" -------------
+	var applicationID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "applicationID", chi.URLParam(r, "applicationID"), &applicationID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "applicationID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFestivalsFestivalIDApplicationsApplicationIDDecline(w, r, festivalID, applicationID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFestivalsFestivalIDApply operation middleware
+func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFestivalsFestivalIDApply(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFestivalsFestivalIDForm operation middleware
+func (siw *ServerInterfaceWrapper) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFestivalsFestivalIDForm(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutFestivalsFestivalIDForm operation middleware
+func (siw *ServerInterfaceWrapper) PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutFestivalsFestivalIDForm(w, r, festivalID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1091,6 +1704,42 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/collections/{collectionID}/images/{imageID}", wrapper.DeleteCollectionImage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals", wrapper.GetFestivals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/festivals", wrapper.PostFestivals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/slug/{slug}/map", wrapper.GetFestivalsSlugSlugMap)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/festivals/{festivalID}", wrapper.DeleteFestivalsFestivalID)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/{festivalID}", wrapper.GetFestivalsFestivalID)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/festivals/{festivalID}", wrapper.PatchFestivalsFestivalID)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/{festivalID}/applications", wrapper.GetFestivalsFestivalIDApplications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/festivals/{festivalID}/applications/{applicationID}/accept", wrapper.PostFestivalsFestivalIDApplicationsApplicationIDAccept)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/festivals/{festivalID}/applications/{applicationID}/decline", wrapper.PostFestivalsFestivalIDApplicationsApplicationIDDecline)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/festivals/{festivalID}/apply", wrapper.PostFestivalsFestivalIDApply)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/{festivalID}/form", wrapper.GetFestivalsFestivalIDForm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/festivals/{festivalID}/form", wrapper.PutFestivalsFestivalIDForm)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealth)
@@ -1657,6 +2306,748 @@ func (response DeleteCollectionImage404ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type GetFestivalsRequestObject struct {
+}
+
+type GetFestivalsResponseObject interface {
+	VisitGetFestivalsResponse(w http.ResponseWriter) error
+}
+
+type GetFestivals200JSONResponse []Festival
+
+func (response GetFestivals200JSONResponse) VisitGetFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivals401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivals401ApplicationProblemPlusJSONResponse) VisitGetFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsRequestObject struct {
+	Body *PostFestivalsJSONRequestBody
+}
+
+type PostFestivalsResponseObject interface {
+	VisitPostFestivalsResponse(w http.ResponseWriter) error
+}
+
+type PostFestivals201JSONResponse Festival
+
+func (response PostFestivals201JSONResponse) VisitPostFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivals401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivals401ApplicationProblemPlusJSONResponse) VisitPostFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivals403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivals403ApplicationProblemPlusJSONResponse) VisitPostFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivals409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivals409ApplicationProblemPlusJSONResponse) VisitPostFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsSlugSlugMapRequestObject struct {
+	Slug string `json:"slug"`
+}
+
+type GetFestivalsSlugSlugMapResponseObject interface {
+	VisitGetFestivalsSlugSlugMapResponse(w http.ResponseWriter) error
+}
+
+type GetFestivalsSlugSlugMap200JSONResponse MapData
+
+func (response GetFestivalsSlugSlugMap200JSONResponse) VisitGetFestivalsSlugSlugMapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsSlugSlugMap404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivalsSlugSlugMap404ApplicationProblemPlusJSONResponse) VisitGetFestivalsSlugSlugMapResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFestivalsFestivalIDRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type DeleteFestivalsFestivalIDResponseObject interface {
+	VisitDeleteFestivalsFestivalIDResponse(w http.ResponseWriter) error
+}
+
+type DeleteFestivalsFestivalID204Response struct {
+}
+
+func (response DeleteFestivalsFestivalID204Response) VisitDeleteFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteFestivalsFestivalID401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFestivalsFestivalID401ApplicationProblemPlusJSONResponse) VisitDeleteFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFestivalsFestivalID403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFestivalsFestivalID403ApplicationProblemPlusJSONResponse) VisitDeleteFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFestivalsFestivalID404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFestivalsFestivalID404ApplicationProblemPlusJSONResponse) VisitDeleteFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type GetFestivalsFestivalIDResponseObject interface {
+	VisitGetFestivalsFestivalIDResponse(w http.ResponseWriter) error
+}
+
+type GetFestivalsFestivalID200JSONResponse Festival
+
+func (response GetFestivalsFestivalID200JSONResponse) VisitGetFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalID404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivalsFestivalID404ApplicationProblemPlusJSONResponse) VisitGetFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalIDRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+	Body       *PatchFestivalsFestivalIDJSONRequestBody
+}
+
+type PatchFestivalsFestivalIDResponseObject interface {
+	VisitPatchFestivalsFestivalIDResponse(w http.ResponseWriter) error
+}
+
+type PatchFestivalsFestivalID200JSONResponse Festival
+
+func (response PatchFestivalsFestivalID200JSONResponse) VisitPatchFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalID401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFestivalsFestivalID401ApplicationProblemPlusJSONResponse) VisitPatchFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalID403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFestivalsFestivalID403ApplicationProblemPlusJSONResponse) VisitPatchFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalID404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFestivalsFestivalID404ApplicationProblemPlusJSONResponse) VisitPatchFestivalsFestivalIDResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDApplicationsRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type GetFestivalsFestivalIDApplicationsResponseObject interface {
+	VisitGetFestivalsFestivalIDApplicationsResponse(w http.ResponseWriter) error
+}
+
+type GetFestivalsFestivalIDApplications200JSONResponse []Application
+
+func (response GetFestivalsFestivalIDApplications200JSONResponse) VisitGetFestivalsFestivalIDApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDApplications401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivalsFestivalIDApplications401ApplicationProblemPlusJSONResponse) VisitGetFestivalsFestivalIDApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDApplications403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivalsFestivalIDApplications403ApplicationProblemPlusJSONResponse) VisitGetFestivalsFestivalIDApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDApplications404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivalsFestivalIDApplications404ApplicationProblemPlusJSONResponse) VisitGetFestivalsFestivalIDApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDAcceptRequestObject struct {
+	FestivalID    openapi_types.UUID `json:"festivalID"`
+	ApplicationID openapi_types.UUID `json:"applicationID"`
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDAcceptResponseObject interface {
+	VisitPostFestivalsFestivalIDApplicationsApplicationIDAcceptResponse(w http.ResponseWriter) error
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDAccept200JSONResponse Application
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDAccept200JSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDAcceptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDAccept401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDAccept401ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDAcceptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDAccept403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDAccept403ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDAcceptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDAccept404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDAccept404ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDAcceptResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDDeclineRequestObject struct {
+	FestivalID    openapi_types.UUID `json:"festivalID"`
+	ApplicationID openapi_types.UUID `json:"applicationID"`
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDDeclineResponseObject interface {
+	VisitPostFestivalsFestivalIDApplicationsApplicationIDDeclineResponse(w http.ResponseWriter) error
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDDecline200JSONResponse Application
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDDecline200JSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDDeclineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDDecline401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDDecline401ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDDeclineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDDecline403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDDecline403ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDDeclineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplicationsApplicationIDDecline404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsApplicationIDDecline404ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsApplicationIDDeclineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApplyRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+	Body       *PostFestivalsFestivalIDApplyJSONRequestBody
+}
+
+type PostFestivalsFestivalIDApplyResponseObject interface {
+	VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error
+}
+
+type PostFestivalsFestivalIDApply201JSONResponse Application
+
+func (response PostFestivalsFestivalIDApply201JSONResponse) VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApply401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApply401ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApply403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApply403ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApply404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApply404ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApply409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApply409ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDApply422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApply422ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDFormRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type GetFestivalsFestivalIDFormResponseObject interface {
+	VisitGetFestivalsFestivalIDFormResponse(w http.ResponseWriter) error
+}
+
+type GetFestivalsFestivalIDForm200JSONResponse ApplicationForm
+
+func (response GetFestivalsFestivalIDForm200JSONResponse) VisitGetFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse) VisitGetFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFestivalsFestivalIDFormRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+	Body       *PutFestivalsFestivalIDFormJSONRequestBody
+}
+
+type PutFestivalsFestivalIDFormResponseObject interface {
+	VisitPutFestivalsFestivalIDFormResponse(w http.ResponseWriter) error
+}
+
+type PutFestivalsFestivalIDForm200JSONResponse ApplicationForm
+
+func (response PutFestivalsFestivalIDForm200JSONResponse) VisitPutFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFestivalsFestivalIDForm401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutFestivalsFestivalIDForm401ApplicationProblemPlusJSONResponse) VisitPutFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFestivalsFestivalIDForm403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutFestivalsFestivalIDForm403ApplicationProblemPlusJSONResponse) VisitPutFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse) VisitPutFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -2121,6 +3512,42 @@ type StrictServerInterface interface {
 	// Remove an image from a collection
 	// (DELETE /collections/{collectionID}/images/{imageID})
 	DeleteCollectionImage(ctx context.Context, request DeleteCollectionImageRequestObject) (DeleteCollectionImageResponseObject, error)
+	// List my festivals
+	// (GET /festivals)
+	GetFestivals(ctx context.Context, request GetFestivalsRequestObject) (GetFestivalsResponseObject, error)
+	// Create a festival
+	// (POST /festivals)
+	PostFestivals(ctx context.Context, request PostFestivalsRequestObject) (PostFestivalsResponseObject, error)
+	// Get festival map data (public, live festivals only)
+	// (GET /festivals/slug/{slug}/map)
+	GetFestivalsSlugSlugMap(ctx context.Context, request GetFestivalsSlugSlugMapRequestObject) (GetFestivalsSlugSlugMapResponseObject, error)
+	// Delete a festival (soft delete)
+	// (DELETE /festivals/{festivalID})
+	DeleteFestivalsFestivalID(ctx context.Context, request DeleteFestivalsFestivalIDRequestObject) (DeleteFestivalsFestivalIDResponseObject, error)
+	// Get a festival by ID
+	// (GET /festivals/{festivalID})
+	GetFestivalsFestivalID(ctx context.Context, request GetFestivalsFestivalIDRequestObject) (GetFestivalsFestivalIDResponseObject, error)
+	// Update a festival
+	// (PATCH /festivals/{festivalID})
+	PatchFestivalsFestivalID(ctx context.Context, request PatchFestivalsFestivalIDRequestObject) (PatchFestivalsFestivalIDResponseObject, error)
+	// List applications for a festival
+	// (GET /festivals/{festivalID}/applications)
+	GetFestivalsFestivalIDApplications(ctx context.Context, request GetFestivalsFestivalIDApplicationsRequestObject) (GetFestivalsFestivalIDApplicationsResponseObject, error)
+	// Accept an application
+	// (POST /festivals/{festivalID}/applications/{applicationID}/accept)
+	PostFestivalsFestivalIDApplicationsApplicationIDAccept(ctx context.Context, request PostFestivalsFestivalIDApplicationsApplicationIDAcceptRequestObject) (PostFestivalsFestivalIDApplicationsApplicationIDAcceptResponseObject, error)
+	// Decline an application
+	// (POST /festivals/{festivalID}/applications/{applicationID}/decline)
+	PostFestivalsFestivalIDApplicationsApplicationIDDecline(ctx context.Context, request PostFestivalsFestivalIDApplicationsApplicationIDDeclineRequestObject) (PostFestivalsFestivalIDApplicationsApplicationIDDeclineResponseObject, error)
+	// Submit an application
+	// (POST /festivals/{festivalID}/apply)
+	PostFestivalsFestivalIDApply(ctx context.Context, request PostFestivalsFestivalIDApplyRequestObject) (PostFestivalsFestivalIDApplyResponseObject, error)
+	// Get application form
+	// (GET /festivals/{festivalID}/form)
+	GetFestivalsFestivalIDForm(ctx context.Context, request GetFestivalsFestivalIDFormRequestObject) (GetFestivalsFestivalIDFormResponseObject, error)
+	// Upsert application form
+	// (PUT /festivals/{festivalID}/form)
+	PutFestivalsFestivalIDForm(ctx context.Context, request PutFestivalsFestivalIDFormRequestObject) (PutFestivalsFestivalIDFormResponseObject, error)
 	// Service health check
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -2443,6 +3870,344 @@ func (sh *strictHandler) DeleteCollectionImage(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteCollectionImageResponseObject); ok {
 		if err := validResponse.VisitDeleteCollectionImageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFestivals operation middleware
+func (sh *strictHandler) GetFestivals(w http.ResponseWriter, r *http.Request) {
+	var request GetFestivalsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFestivals(ctx, request.(GetFestivalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFestivals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFestivalsResponseObject); ok {
+		if err := validResponse.VisitGetFestivalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostFestivals operation middleware
+func (sh *strictHandler) PostFestivals(w http.ResponseWriter, r *http.Request) {
+	var request PostFestivalsRequestObject
+
+	var body PostFestivalsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostFestivals(ctx, request.(PostFestivalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostFestivals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostFestivalsResponseObject); ok {
+		if err := validResponse.VisitPostFestivalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFestivalsSlugSlugMap operation middleware
+func (sh *strictHandler) GetFestivalsSlugSlugMap(w http.ResponseWriter, r *http.Request, slug string) {
+	var request GetFestivalsSlugSlugMapRequestObject
+
+	request.Slug = slug
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFestivalsSlugSlugMap(ctx, request.(GetFestivalsSlugSlugMapRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFestivalsSlugSlugMap")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFestivalsSlugSlugMapResponseObject); ok {
+		if err := validResponse.VisitGetFestivalsSlugSlugMapResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFestivalsFestivalID operation middleware
+func (sh *strictHandler) DeleteFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request DeleteFestivalsFestivalIDRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFestivalsFestivalID(ctx, request.(DeleteFestivalsFestivalIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFestivalsFestivalID")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFestivalsFestivalIDResponseObject); ok {
+		if err := validResponse.VisitDeleteFestivalsFestivalIDResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFestivalsFestivalID operation middleware
+func (sh *strictHandler) GetFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request GetFestivalsFestivalIDRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFestivalsFestivalID(ctx, request.(GetFestivalsFestivalIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFestivalsFestivalID")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFestivalsFestivalIDResponseObject); ok {
+		if err := validResponse.VisitGetFestivalsFestivalIDResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchFestivalsFestivalID operation middleware
+func (sh *strictHandler) PatchFestivalsFestivalID(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request PatchFestivalsFestivalIDRequestObject
+
+	request.FestivalID = festivalID
+
+	var body PatchFestivalsFestivalIDJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchFestivalsFestivalID(ctx, request.(PatchFestivalsFestivalIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchFestivalsFestivalID")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchFestivalsFestivalIDResponseObject); ok {
+		if err := validResponse.VisitPatchFestivalsFestivalIDResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFestivalsFestivalIDApplications operation middleware
+func (sh *strictHandler) GetFestivalsFestivalIDApplications(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request GetFestivalsFestivalIDApplicationsRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFestivalsFestivalIDApplications(ctx, request.(GetFestivalsFestivalIDApplicationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFestivalsFestivalIDApplications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFestivalsFestivalIDApplicationsResponseObject); ok {
+		if err := validResponse.VisitGetFestivalsFestivalIDApplicationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostFestivalsFestivalIDApplicationsApplicationIDAccept operation middleware
+func (sh *strictHandler) PostFestivalsFestivalIDApplicationsApplicationIDAccept(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, applicationID openapi_types.UUID) {
+	var request PostFestivalsFestivalIDApplicationsApplicationIDAcceptRequestObject
+
+	request.FestivalID = festivalID
+	request.ApplicationID = applicationID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostFestivalsFestivalIDApplicationsApplicationIDAccept(ctx, request.(PostFestivalsFestivalIDApplicationsApplicationIDAcceptRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostFestivalsFestivalIDApplicationsApplicationIDAccept")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostFestivalsFestivalIDApplicationsApplicationIDAcceptResponseObject); ok {
+		if err := validResponse.VisitPostFestivalsFestivalIDApplicationsApplicationIDAcceptResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostFestivalsFestivalIDApplicationsApplicationIDDecline operation middleware
+func (sh *strictHandler) PostFestivalsFestivalIDApplicationsApplicationIDDecline(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, applicationID openapi_types.UUID) {
+	var request PostFestivalsFestivalIDApplicationsApplicationIDDeclineRequestObject
+
+	request.FestivalID = festivalID
+	request.ApplicationID = applicationID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostFestivalsFestivalIDApplicationsApplicationIDDecline(ctx, request.(PostFestivalsFestivalIDApplicationsApplicationIDDeclineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostFestivalsFestivalIDApplicationsApplicationIDDecline")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostFestivalsFestivalIDApplicationsApplicationIDDeclineResponseObject); ok {
+		if err := validResponse.VisitPostFestivalsFestivalIDApplicationsApplicationIDDeclineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostFestivalsFestivalIDApply operation middleware
+func (sh *strictHandler) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request PostFestivalsFestivalIDApplyRequestObject
+
+	request.FestivalID = festivalID
+
+	var body PostFestivalsFestivalIDApplyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostFestivalsFestivalIDApply(ctx, request.(PostFestivalsFestivalIDApplyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostFestivalsFestivalIDApply")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostFestivalsFestivalIDApplyResponseObject); ok {
+		if err := validResponse.VisitPostFestivalsFestivalIDApplyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFestivalsFestivalIDForm operation middleware
+func (sh *strictHandler) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request GetFestivalsFestivalIDFormRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFestivalsFestivalIDForm(ctx, request.(GetFestivalsFestivalIDFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFestivalsFestivalIDForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFestivalsFestivalIDFormResponseObject); ok {
+		if err := validResponse.VisitGetFestivalsFestivalIDFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutFestivalsFestivalIDForm operation middleware
+func (sh *strictHandler) PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request PutFestivalsFestivalIDFormRequestObject
+
+	request.FestivalID = festivalID
+
+	var body PutFestivalsFestivalIDFormJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutFestivalsFestivalIDForm(ctx, request.(PutFestivalsFestivalIDFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutFestivalsFestivalIDForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutFestivalsFestivalIDFormResponseObject); ok {
+		if err := validResponse.VisitPutFestivalsFestivalIDFormResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

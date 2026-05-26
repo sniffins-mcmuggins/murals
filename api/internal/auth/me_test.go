@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
@@ -17,7 +19,7 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (coo
 	t.Helper()
 
 	signupBody := `{"email":"` + email + `","password":"` + password + `"}`
-	sr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", toBody(signupBody))
+	sr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", strings.NewReader(signupBody))
 	sr.Header.Set("Content-Type", "application/json")
 	sw := httptest.NewRecorder()
 	auth.SignupHandler(db).ServeHTTP(sw, sr)
@@ -26,7 +28,7 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (coo
 	}
 
 	loginBody := `{"email":"` + email + `","password":"` + password + `"}`
-	lr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", toBody(loginBody))
+	lr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", strings.NewReader(loginBody))
 	lr.Header.Set("Content-Type", "application/json")
 	lw := httptest.NewRecorder()
 	auth.LoginHandler(db, testSecret).ServeHTTP(lw, lr)
@@ -46,11 +48,8 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (coo
 	return cookie, token
 }
 
-func toBody(s string) *strings.Reader {
-	return strings.NewReader(s)
-}
-
 func TestMeHandler_AuthedCookie(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	cookie, _ := signupAndLogin(t, db, "frank@example.com", "password123")
 
@@ -61,20 +60,15 @@ func TestMeHandler_AuthedCookie(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-	if resp["email"] != "frank@example.com" {
-		t.Errorf("expected frank@example.com, got %v", resp["email"])
-	}
-	if resp["password_hash"] != nil {
-		t.Error("password_hash must not appear in response")
-	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "frank@example.com", resp["email"])
+	assert.Nil(t, resp["password_hash"], "password_hash must not appear in response")
 }
 
 func TestMeHandler_AuthedBearer(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	_, token := signupAndLogin(t, db, "grace@example.com", "password123")
 
@@ -85,12 +79,11 @@ func TestMeHandler_AuthedBearer(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 }
 
 func TestMeHandler_Unauthenticated(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	handler := auth.Middleware(testSecret)(auth.MeHandler(db))
 
@@ -98,7 +91,5 @@ func TestMeHandler_Unauthenticated(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
-	}
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
 }

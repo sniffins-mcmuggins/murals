@@ -18,6 +18,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
+	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
 	"github.com/sniffins-mcmuggins/render/api/internal/metrics"
@@ -77,6 +78,26 @@ func main() {
 	r.Post("/collections/{collectionID}/images", artist.AttachImageHandler(pool))
 	r.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(pool))
 	r.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(pool))
+
+	// Festivals
+	r.Post("/festivals", festival.CreateHandler(pool))
+	r.Get("/festivals", festival.ListHandler(pool))
+	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(pool))
+	r.Get("/festivals/{festivalID}", festival.GetHandler(pool))
+	r.Patch("/festivals/{festivalID}", festival.UpdateHandler(pool))
+	r.Delete("/festivals/{festivalID}", festival.DeleteHandler(pool))
+
+	// Application forms
+	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(pool))
+	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(pool))
+
+	// Applications
+	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(pool))
+
+	// Review
+	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

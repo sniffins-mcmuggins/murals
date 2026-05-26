@@ -12,6 +12,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApplicationStatus string
+
+const (
+	ApplicationStatusSubmitted ApplicationStatus = "submitted"
+	ApplicationStatusAccepted  ApplicationStatus = "accepted"
+	ApplicationStatusDeclined  ApplicationStatus = "declined"
+)
+
+func (e *ApplicationStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ApplicationStatus(s)
+	case string:
+		*e = ApplicationStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ApplicationStatus: %T", src)
+	}
+	return nil
+}
+
+type NullApplicationStatus struct {
+	ApplicationStatus ApplicationStatus `json:"application_status"`
+	Valid             bool              `json:"valid"` // Valid is true if ApplicationStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullApplicationStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ApplicationStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ApplicationStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullApplicationStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ApplicationStatus), nil
+}
+
 type CollectionStatus string
 
 const (
@@ -53,6 +96,93 @@ func (ns NullCollectionStatus) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.CollectionStatus), nil
+}
+
+type FestivalArtistStatus string
+
+const (
+	FestivalArtistStatusInvited  FestivalArtistStatus = "invited"
+	FestivalArtistStatusAccepted FestivalArtistStatus = "accepted"
+	FestivalArtistStatusDeclined FestivalArtistStatus = "declined"
+)
+
+func (e *FestivalArtistStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = FestivalArtistStatus(s)
+	case string:
+		*e = FestivalArtistStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for FestivalArtistStatus: %T", src)
+	}
+	return nil
+}
+
+type NullFestivalArtistStatus struct {
+	FestivalArtistStatus FestivalArtistStatus `json:"festival_artist_status"`
+	Valid                bool                 `json:"valid"` // Valid is true if FestivalArtistStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullFestivalArtistStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.FestivalArtistStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.FestivalArtistStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullFestivalArtistStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.FestivalArtistStatus), nil
+}
+
+type FestivalStatus string
+
+const (
+	FestivalStatusDraft    FestivalStatus = "draft"
+	FestivalStatusOpen     FestivalStatus = "open"
+	FestivalStatusLive     FestivalStatus = "live"
+	FestivalStatusArchived FestivalStatus = "archived"
+)
+
+func (e *FestivalStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = FestivalStatus(s)
+	case string:
+		*e = FestivalStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for FestivalStatus: %T", src)
+	}
+	return nil
+}
+
+type NullFestivalStatus struct {
+	FestivalStatus FestivalStatus `json:"festival_status"`
+	Valid          bool           `json:"valid"` // Valid is true if FestivalStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullFestivalStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.FestivalStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.FestivalStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullFestivalStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.FestivalStatus), nil
 }
 
 type UserRole string
@@ -98,6 +228,27 @@ func (ns NullUserRole) Value() (driver.Value, error) {
 	return string(ns.UserRole), nil
 }
 
+type Application struct {
+	ID        pgtype.UUID        `db:"id" json:"id"`
+	FormID    pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID  pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status    ApplicationStatus  `db:"status" json:"status"`
+	Answers   json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type ApplicationForm struct {
+	ID              pgtype.UUID        `db:"id" json:"id"`
+	FestivalID      pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Fields          json.RawMessage    `db:"fields" json:"fields"`
+	OpenAt          pgtype.Timestamptz `db:"open_at" json:"open_at"`
+	CloseAt         pgtype.Timestamptz `db:"close_at" json:"close_at"`
+	MaxApplications *int32             `db:"max_applications" json:"max_applications"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type ArtistProfile struct {
 	ID            pgtype.UUID        `db:"id" json:"id"`
 	UserID        pgtype.UUID        `db:"user_id" json:"user_id"`
@@ -131,6 +282,32 @@ type CollectionImage struct {
 	CdnUrl       string             `db:"cdn_url" json:"cdn_url"`
 	DisplayOrder int32              `db:"display_order" json:"display_order"`
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Festival struct {
+	ID            pgtype.UUID        `db:"id" json:"id"`
+	OrganiserID   pgtype.UUID        `db:"organiser_id" json:"organiser_id"`
+	Name          string             `db:"name" json:"name"`
+	Slug          string             `db:"slug" json:"slug"`
+	Description   string             `db:"description" json:"description"`
+	LocationLabel string             `db:"location_label" json:"location_label"`
+	StartDate     pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate       pgtype.Date        `db:"end_date" json:"end_date"`
+	Status        FestivalStatus     `db:"status" json:"status"`
+	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type FestivalArtist struct {
+	FestivalID pgtype.UUID          `db:"festival_id" json:"festival_id"`
+	ArtistID   pgtype.UUID          `db:"artist_id" json:"artist_id"`
+	Status     FestivalArtistStatus `db:"status" json:"status"`
+	PinLat     pgtype.Numeric       `db:"pin_lat" json:"pin_lat"`
+	PinLng     pgtype.Numeric       `db:"pin_lng" json:"pin_lng"`
+	W3w        *string              `db:"w3w" json:"w3w"`
+	CreatedAt  pgtype.Timestamptz   `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz   `db:"updated_at" json:"updated_at"`
 }
 
 type MigrationsHealth struct {

@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -16,6 +18,7 @@ import (
 )
 
 func TestCreateCollection_Success(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col1@example.com", "artist")
 	createTestProfile(t, db, userID, "Dave")
@@ -28,17 +31,14 @@ func TestCreateCollection_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
-	}
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	var resp map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&resp)
-	if resp["name"] != "Bristol 2024" {
-		t.Errorf("expected Bristol 2024, got %v", resp["name"])
-	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "Bristol 2024", resp["name"])
 }
 
 func TestCreateCollection_NoProfile(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	_, token := createTestUser(t, db, "col2@example.com", "artist")
 	handler := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
@@ -50,12 +50,11 @@ func TestCreateCollection_NoProfile(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
-	}
+	assert.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }
 
 func TestListCollections_Public(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col3@example.com", "artist")
 	profileID := createTestProfile(t, db, userID, "Eve")
@@ -68,9 +67,7 @@ func TestListCollections_Public(t *testing.T) {
 		r.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		createHandler.ServeHTTP(w, r)
-		if w.Code != http.StatusCreated {
-			t.Fatalf("create collection %s: expected 201, got %d", name, w.Code)
-		}
+		require.Equal(t, http.StatusCreated, w.Code, "create collection %s: %s", name, w.Body.String())
 	}
 
 	router := chi.NewRouter()
@@ -78,28 +75,21 @@ func TestListCollections_Public(t *testing.T) {
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
 
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet,
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
 		srv.URL+"/profiles/"+profileID+"/collections", nil)
+	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("GET collections: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Errorf("close body: %v", err)
-		}
-	}()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var list []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&list)
-	if len(list) != 2 {
-		t.Errorf("expected 2 collections, got %d", len(list))
-	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	assert.Len(t, list, 2)
 }
 
 func TestUpdateCollection_Success(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col4@example.com", "artist")
 	createTestProfile(t, db, userID, "Frank")
@@ -111,11 +101,9 @@ func TestUpdateCollection_Success(t *testing.T) {
 	r.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	createH.ServeHTTP(w, r)
-	if w.Code != http.StatusCreated {
-		t.Fatalf("create: got %d", w.Code)
-	}
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	var created map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&created)
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&created))
 	collectionID := created["id"].(string)
 
 	router := chi.NewRouter()
@@ -124,34 +112,25 @@ func TestUpdateCollection_Success(t *testing.T) {
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
 
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPatch,
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
 		srv.URL+"/collections/"+collectionID,
 		bytes.NewBufferString(`{"name":"Renamed","status":"archived"}`))
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("PATCH: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Errorf("close body: %v", err)
-		}
-	}()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var updated map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&updated)
-	if updated["name"] != "Renamed" {
-		t.Errorf("expected Renamed, got %v", updated["name"])
-	}
-	if updated["status"] != "archived" {
-		t.Errorf("expected archived, got %v", updated["status"])
-	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&updated))
+	assert.Equal(t, "Renamed", updated["name"])
+	assert.Equal(t, "archived", updated["status"])
 }
 
 func TestDeleteCollection_Success(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col5@example.com", "artist")
 	createTestProfile(t, db, userID, "Grace")
@@ -164,7 +143,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 	createH.ServeHTTP(w, r)
 	var created map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&created)
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&created))
 	collectionID := created["id"].(string)
 
 	router := chi.NewRouter()
@@ -173,24 +152,19 @@ func TestDeleteCollection_Success(t *testing.T) {
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
 
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodDelete,
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete,
 		srv.URL+"/collections/"+collectionID, nil)
+	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("DELETE: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Errorf("close body: %v", err)
-		}
-	}()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", resp.StatusCode)
-	}
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 }
 
 func TestUpdateCollection_WrongOwner(t *testing.T) {
+	t.Parallel()
 	db := testutil.NewDB(t)
 	ownerID, ownerToken := createTestUser(t, db, "col6owner@example.com", "artist")
 	createTestProfile(t, db, ownerID, "Owner")
@@ -202,7 +176,7 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 	w := httptest.NewRecorder()
 	createH.ServeHTTP(w, r)
 	var created map[string]any
-	_ = json.NewDecoder(w.Body).Decode(&created)
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&created))
 	collectionID := created["id"].(string)
 
 	otherID, otherToken := createTestUser(t, db, "col6other@example.com", "artist")
@@ -214,21 +188,15 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
 
-	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPatch,
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
 		srv.URL+"/collections/"+collectionID,
 		bytes.NewBufferString(`{"name":"Stolen"}`))
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+otherToken)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("PATCH: %v", err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Errorf("close body: %v", err)
-		}
-	}()
-	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", resp.StatusCode)
-	}
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }

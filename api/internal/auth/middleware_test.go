@@ -6,24 +6,23 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 )
 
 const testSecret = "test-secret"
 
 func TestMiddleware_ValidCookie(t *testing.T) {
+	t.Parallel()
 	token, err := auth.IssueToken("user-123", "artist", testSecret)
-	if err != nil {
-		t.Fatalf("issue token: %v", err)
-	}
+	require.NoError(t, err)
 
 	var capturedPrincipal auth.Principal
 	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, err := auth.User(r.Context())
-		if err != nil {
-			t.Errorf("expected principal, got error: %v", err)
-			return
-		}
+		require.NoError(t, err)
 		capturedPrincipal = p
 	}))
 
@@ -31,16 +30,14 @@ func TestMiddleware_ValidCookie(t *testing.T) {
 	r.AddCookie(&http.Cookie{Name: "session", Value: token})
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	if capturedPrincipal.UserID != "user-123" {
-		t.Errorf("expected user-123, got %q", capturedPrincipal.UserID)
-	}
-	if capturedPrincipal.Role != "artist" {
-		t.Errorf("expected artist, got %q", capturedPrincipal.Role)
-	}
+	assert.Equal(t, "user-123", capturedPrincipal.UserID)
+	assert.Equal(t, "artist", capturedPrincipal.Role)
 }
 
 func TestMiddleware_ValidBearerHeader(t *testing.T) {
-	token, _ := auth.IssueToken("user-456", "organiser", testSecret)
+	t.Parallel()
+	token, err := auth.IssueToken("user-456", "organiser", testSecret)
+	require.NoError(t, err)
 
 	var capturedPrincipal auth.Principal
 	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,51 +49,46 @@ func TestMiddleware_ValidBearerHeader(t *testing.T) {
 	r.Header.Set("Authorization", "Bearer "+token)
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	if capturedPrincipal.UserID != "user-456" {
-		t.Errorf("expected user-456, got %q", capturedPrincipal.UserID)
-	}
+	assert.Equal(t, "user-456", capturedPrincipal.UserID)
 }
 
 func TestMiddleware_NoToken_PassesThrough(t *testing.T) {
+	t.Parallel()
 	called := false
 	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		_, err := auth.User(r.Context())
-		if err == nil {
-			t.Error("expected ErrUnauthenticated, got nil")
-		}
+		assert.ErrorIs(t, err, auth.ErrUnauthenticated)
 	}))
 
 	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	if !called {
-		t.Error("handler was not called")
-	}
+	assert.True(t, called, "handler was not called")
 }
 
 func TestMiddleware_InvalidToken_PassesThrough(t *testing.T) {
+	t.Parallel()
 	called := false
 	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		_, err := auth.User(r.Context())
-		if err == nil {
-			t.Error("expected error for invalid token")
-		}
+		assert.Error(t, err, "expected error for invalid token")
 	}))
 
 	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 	r.AddCookie(&http.Cookie{Name: "session", Value: "not-a-jwt"})
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	if !called {
-		t.Error("handler was not called")
-	}
+	assert.True(t, called, "handler was not called")
 }
 
 func TestMiddleware_CookieTakesPrecedenceOverHeader(t *testing.T) {
-	cookieToken, _ := auth.IssueToken("cookie-user", "artist", testSecret)
-	headerToken, _ := auth.IssueToken("header-user", "organiser", testSecret)
+	t.Parallel()
+	cookieToken, err := auth.IssueToken("cookie-user", "artist", testSecret)
+	require.NoError(t, err)
+	headerToken, err := auth.IssueToken("header-user", "organiser", testSecret)
+	require.NoError(t, err)
 
 	var capturedID string
 	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -109,14 +101,11 @@ func TestMiddleware_CookieTakesPrecedenceOverHeader(t *testing.T) {
 	r.Header.Set("Authorization", "Bearer "+headerToken)
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	if capturedID != "cookie-user" {
-		t.Errorf("expected cookie-user, got %q", capturedID)
-	}
+	assert.Equal(t, "cookie-user", capturedID)
 }
 
 func TestMiddleware_IgnoresWrongContext(t *testing.T) {
+	t.Parallel()
 	_, err := auth.User(context.Background())
-	if err != auth.ErrUnauthenticated {
-		t.Errorf("expected ErrUnauthenticated, got %v", err)
-	}
+	assert.ErrorIs(t, err, auth.ErrUnauthenticated)
 }

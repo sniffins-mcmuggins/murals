@@ -292,6 +292,475 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/festivals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my festivals */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of festivals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Festival"][];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+            };
+        };
+        put?: never;
+        /** Create a festival */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        slug: string;
+                        description?: string;
+                        locationLabel?: string;
+                        /** Format: date */
+                        startDate?: string;
+                        /** Format: date */
+                        endDate?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Festival created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Festival"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                409: components["responses"]["Conflict"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/slug/{slug}/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        /** Get festival map data (public, live festivals only) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Map data with accepted artist pins */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MapData"];
+                    };
+                };
+                404: components["responses"]["NotFound"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        /** Get a festival by ID */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Festival */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Festival"];
+                    };
+                };
+                404: components["responses"]["NotFound"];
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a festival (soft delete) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deleted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update a festival */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        slug?: string;
+                        description?: string;
+                        locationLabel?: string;
+                        status?: components["schemas"]["FestivalStatus"];
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated festival */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Festival"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        trace?: never;
+    };
+    "/festivals/{festivalID}/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        /** Get application form */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Application form */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApplicationForm"];
+                    };
+                };
+                404: components["responses"]["NotFound"];
+            };
+        };
+        /** Upsert application form */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        fields?: Record<string, never>[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Application form */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApplicationForm"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit an application */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        answers: Record<string, never>;
+                    };
+                };
+            };
+            responses: {
+                /** @description Application submitted */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Application"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                409: components["responses"]["Conflict"];
+                422: components["responses"]["UnprocessableEntity"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        /** List applications for a festival */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of applications */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Application"][];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/{applicationID}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                applicationID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept an application */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                    applicationID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Updated application */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Application"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/{applicationID}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                applicationID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline an application */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                    applicationID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Updated application */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Application"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -481,6 +950,75 @@ export interface components {
         ReorderImagesRequest: {
             /** @description Ordered list of image IDs. display_order is set by position (0-indexed). */
             imageIds: string[];
+        };
+        /** @enum {string} */
+        FestivalStatus: "draft" | "open" | "live" | "archived";
+        Festival: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            organiser_id?: string;
+            name?: string;
+            slug?: string;
+            description?: string;
+            location_label?: string;
+            /** Format: date */
+            start_date?: string | null;
+            /** Format: date */
+            end_date?: string | null;
+            status?: components["schemas"]["FestivalStatus"];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        ApplicationForm: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            festival_id?: string;
+            fields?: Record<string, never>[];
+            /** Format: date-time */
+            open_at?: string | null;
+            /** Format: date-time */
+            close_at?: string | null;
+            max_applications?: number | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        /** @enum {string} */
+        ApplicationStatus: "submitted" | "accepted" | "declined";
+        Application: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            form_id?: string;
+            /** Format: uuid */
+            artist_id?: string;
+            status?: components["schemas"]["ApplicationStatus"];
+            answers?: Record<string, never>;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        MapPin: {
+            /**
+             * Format: uuid
+             * @description Artist profile UUID
+             */
+            artist_id?: string;
+            name?: string;
+            /** Format: float */
+            lat?: number;
+            /** Format: float */
+            lng?: number;
+            w3w?: string | null;
+        };
+        MapData: {
+            pins?: components["schemas"]["MapPin"][];
         };
     };
     responses: {

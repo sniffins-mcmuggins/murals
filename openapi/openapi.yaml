@@ -23,6 +23,8 @@ tags:
     description: Image upload pipeline (presign → PUT → confirm)
   - name: artist
     description: Artist profiles, collections, and collection images
+  - name: festival
+    description: Festival creation, management, applications, and map data
 
 components:
   schemas:
@@ -319,6 +321,129 @@ components:
             type: string
             format: uuid
           description: Ordered list of image IDs. display_order is set by position (0-indexed).
+
+    FestivalStatus:
+      type: string
+      enum: [draft, open, live, archived]
+
+    Festival:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organiser_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        location_label:
+          type: string
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          $ref: "#/components/schemas/FestivalStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ApplicationForm:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        festival_id:
+          type: string
+          format: uuid
+        fields:
+          type: array
+          items:
+            type: object
+        open_at:
+          type: string
+          format: date-time
+          nullable: true
+        close_at:
+          type: string
+          format: date-time
+          nullable: true
+        max_applications:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ApplicationStatus:
+      type: string
+      enum: [submitted, accepted, declined]
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        form_id:
+          type: string
+          format: uuid
+        artist_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        answers:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MapPin:
+      type: object
+      properties:
+        artist_id:
+          type: string
+          format: uuid
+          description: Artist profile UUID
+        name:
+          type: string
+        lat:
+          type: number
+          format: float
+        lng:
+          type: number
+          format: float
+        w3w:
+          type: string
+          nullable: true
+
+    MapData:
+      type: object
+      properties:
+        pins:
+          type: array
+          items:
+            $ref: "#/components/schemas/MapPin"
 
   securitySchemes:
     cookieAuth:
@@ -848,6 +973,343 @@ paths:
       responses:
         "204":
           description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals:
+    post:
+      tags: [festival]
+      summary: Create a festival
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                locationLabel:
+                  type: string
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        "201":
+          description: Festival created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Festival"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      tags: [festival]
+      summary: List my festivals
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of festivals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Festival"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /festivals/slug/{slug}/map:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [festival]
+      summary: Get festival map data (public, live festivals only)
+      security: []
+      responses:
+        "200":
+          description: Map data with accepted artist pins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MapData"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [festival]
+      summary: Get a festival by ID
+      security: []
+      responses:
+        "200":
+          description: Festival
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Festival"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [festival]
+      summary: Update a festival
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                description:
+                  type: string
+                locationLabel:
+                  type: string
+                status:
+                  $ref: "#/components/schemas/FestivalStatus"
+      responses:
+        "200":
+          description: Updated festival
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Festival"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [festival]
+      summary: Delete a festival (soft delete)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/form:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [festival]
+      summary: Upsert application form
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fields:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: Application form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationForm"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    get:
+      tags: [festival]
+      summary: Get application form
+      security: []
+      responses:
+        "200":
+          description: Application form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationForm"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/apply:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [festival]
+      summary: Submit an application
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers:
+                  type: object
+      responses:
+        "201":
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /festivals/{festivalID}/applications:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [festival]
+      summary: List applications for a festival
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/applications/{applicationID}/accept:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: applicationID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [festival]
+      summary: Accept an application
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/applications/{applicationID}/decline:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: applicationID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [festival]
+      summary: Decline an application
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
