@@ -1,21 +1,25 @@
-# dev: next dev with source mounted as volume (Next.js installed in E7.1)
+# dev: next dev with source mounted as volume
 FROM node:20-alpine AS dev
-WORKDIR /app
-CMD ["sh", "-c", "echo 'web: placeholder until E7.1' && sleep infinity"]
+WORKDIR /workspace/web
+CMD ["npm", "run", "dev"]
 
-# builder: production build
+# builder: production build (requires repo root as build context)
 FROM node:20-alpine AS builder
-WORKDIR /app
+WORKDIR /workspace
 COPY package*.json ./
-RUN npm ci
-COPY . .
+COPY web/package*.json ./web/
+COPY openapi/client/package*.json ./openapi/client/
+RUN npm ci --workspaces
+COPY web/ ./web/
+COPY openapi/client/ ./openapi/client/
+WORKDIR /workspace/web
 RUN npm run build
 
 # prod: minimal Next.js server
 FROM node:20-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder /workspace/web/.next/standalone ./
+COPY --from=builder /workspace/web/.next/static ./.next/static
+COPY --from=builder /workspace/web/public ./public
 CMD ["node", "server.js"]
