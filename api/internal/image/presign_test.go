@@ -44,8 +44,11 @@ func TestPresignHandler_Success(t *testing.T) {
 	}
 
 	// Verify the presigned URL accepts a real PUT
-	putReq, _ := http.NewRequestWithContext(t.Context(), http.MethodPut, uploadURL,
+	putReq, err := http.NewRequestWithContext(t.Context(), http.MethodPut, uploadURL,
 		bytes.NewBufferString("fake jpeg bytes"))
+	if err != nil {
+		t.Fatalf("build PUT request: %v", err)
+	}
 	putReq.Header.Set("Content-Type", "image/jpeg")
 	putResp, err := http.DefaultClient.Do(putReq)
 	if err != nil {
@@ -59,9 +62,8 @@ func TestPresignHandler_Success(t *testing.T) {
 }
 
 func TestPresignHandler_Unauthenticated(t *testing.T) {
-	ms := testutil.NewMinIOServer(t)
-	// No auth middleware — handler receives unauthenticated request
-	handler := imagehandler.PresignHandler(ms.Client, ms.Bucket)
+	// MinIO client is never reached — handler returns 401 before calling mc
+	handler := imagehandler.PresignHandler(nil, "unused-bucket")
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/presign",
 		strings.NewReader(`{"contentType":"image/jpeg"}`))
@@ -76,9 +78,9 @@ func TestPresignHandler_Unauthenticated(t *testing.T) {
 }
 
 func TestPresignHandler_UnsupportedContentType(t *testing.T) {
-	ms := testutil.NewMinIOServer(t)
+	// MinIO client is never reached — handler returns 422 before calling mc
 	token := testBearerToken(t)
-	handler := auth.Middleware(testSecret)(imagehandler.PresignHandler(ms.Client, ms.Bucket))
+	handler := auth.Middleware(testSecret)(imagehandler.PresignHandler(nil, "unused-bucket"))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/presign",
 		strings.NewReader(`{"contentType":"text/plain"}`))
