@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { vi } from 'vitest'
-import { ApiError } from './index'
-import { createApiClient } from './index'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, createApiClient } from './index'
+
+afterEach(() => vi.unstubAllGlobals())
 
 function mockFetch(status: number, body: unknown): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue(
@@ -48,8 +48,6 @@ describe('createApiClient — no auth', () => {
 
     const req = fetch.mock.calls[0][0] as Request
     expect(req.headers.get('Authorization')).toBeNull()
-
-    vi.unstubAllGlobals()
   })
 })
 
@@ -66,8 +64,6 @@ describe('createApiClient — auth middleware', () => {
 
     const req = fetch.mock.calls[0][0] as Request
     expect(req.headers.get('Authorization')).toBe('Bearer sync-token')
-
-    vi.unstubAllGlobals()
   })
 
   it('awaits an async getToken and injects the header', async () => {
@@ -82,8 +78,6 @@ describe('createApiClient — auth middleware', () => {
 
     const req = fetch.mock.calls[0][0] as Request
     expect(req.headers.get('Authorization')).toBe('Bearer async-token')
-
-    vi.unstubAllGlobals()
   })
 
   it('does not inject Authorization header when getToken returns null', async () => {
@@ -98,7 +92,5 @@ describe('createApiClient — auth middleware', () => {
 
     const req = fetch.mock.calls[0][0] as Request
     expect(req.headers.get('Authorization')).toBeNull()
-
-    vi.unstubAllGlobals()
   })
 })
