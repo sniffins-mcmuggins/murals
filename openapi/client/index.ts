@@ -1,5 +1,5 @@
 import type { components } from '../generated/client'
-import createClient from 'openapi-fetch'
+import createClient, { type Middleware } from 'openapi-fetch'
 import type { paths } from '../generated/client'
 
 export class ApiError extends Error {
@@ -27,5 +27,19 @@ interface ApiClientOptions {
 
 export function createApiClient({ baseUrl, getToken }: ApiClientOptions) {
   const client = createClient<paths>({ baseUrl })
+
+  if (getToken) {
+    const middleware: Middleware = {
+      async onRequest({ request }) {
+        const token = await getToken()
+        if (token) {
+          request.headers.set('Authorization', `Bearer ${token}`)
+        }
+        return request
+      },
+    }
+    client.use(middleware)
+  }
+
   return client
 }

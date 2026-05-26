@@ -52,3 +52,53 @@ describe('createApiClient — no auth', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('createApiClient — auth middleware', () => {
+  it('injects Authorization header when getToken returns a string', async () => {
+    const fetch = mockFetch(200, { status: 'ok' })
+    vi.stubGlobal('fetch', fetch)
+
+    const client = createApiClient({
+      baseUrl: 'http://localhost:8080',
+      getToken: () => 'sync-token',
+    })
+    await client.GET('/healthz')
+
+    const req = fetch.mock.calls[0][0] as Request
+    expect(req.headers.get('Authorization')).toBe('Bearer sync-token')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('awaits an async getToken and injects the header', async () => {
+    const fetch = mockFetch(200, { status: 'ok' })
+    vi.stubGlobal('fetch', fetch)
+
+    const client = createApiClient({
+      baseUrl: 'http://localhost:8080',
+      getToken: async () => 'async-token',
+    })
+    await client.GET('/healthz')
+
+    const req = fetch.mock.calls[0][0] as Request
+    expect(req.headers.get('Authorization')).toBe('Bearer async-token')
+
+    vi.unstubAllGlobals()
+  })
+
+  it('does not inject Authorization header when getToken returns null', async () => {
+    const fetch = mockFetch(200, { status: 'ok' })
+    vi.stubGlobal('fetch', fetch)
+
+    const client = createApiClient({
+      baseUrl: 'http://localhost:8080',
+      getToken: () => null,
+    })
+    await client.GET('/healthz')
+
+    const req = fetch.mock.calls[0][0] as Request
+    expect(req.headers.get('Authorization')).toBeNull()
+
+    vi.unstubAllGlobals()
+  })
+})
