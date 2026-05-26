@@ -31,8 +31,10 @@ services:
   # ── WEB ────────────────────────────────────────────────────────────────────
   web:
     build:
-      context: ../web
+      context: ..
+      dockerfile: web/Dockerfile
       target: dev
+    working_dir: /workspace/web
     ports:
       - "3000:3000"
     environment:
@@ -40,9 +42,9 @@ services:
       API_URL: "http://api:8080"
       NODE_ENV: "development"
     volumes:
-      - ../web:/app
-      - web_node_modules:/app/node_modules
-      - web_next:/app/.next
+      - ../:/workspace
+      - web_node_modules:/workspace/web/node_modules
+      - web_next:/workspace/web/.next
     depends_on:
       - api
     restart: unless-stopped

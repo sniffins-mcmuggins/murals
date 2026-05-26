@@ -13,6 +13,7 @@ api/tmp/
 # Next.js
 web/.next/
 web/out/
+web/tsconfig.tsbuildinfo
 
 # React Native
 mobile/android/
