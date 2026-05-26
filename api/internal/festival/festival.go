@@ -240,6 +240,8 @@ func UpdateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Description   string `json:"description"`
 			LocationLabel string `json:"locationLabel"`
 			Status        string `json:"status"`
+			StartDate     string `json:"startDate"`
+			EndDate       string `json:"endDate"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -262,9 +264,33 @@ func UpdateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if req.LocationLabel != "" {
 			locationLabel = req.LocationLabel
 		}
+		startDate := existing.StartDate
+		if req.StartDate != "" {
+			parsed, err := parseDateParam(req.StartDate)
+			if err != nil {
+				httperr.UnprocessableEntity(w, "invalid startDate: use YYYY-MM-DD")
+				return
+			}
+			startDate = parsed
+		}
+		endDate := existing.EndDate
+		if req.EndDate != "" {
+			parsed, err := parseDateParam(req.EndDate)
+			if err != nil {
+				httperr.UnprocessableEntity(w, "invalid endDate: use YYYY-MM-DD")
+				return
+			}
+			endDate = parsed
+		}
 		status := existing.Status
 		if req.Status != "" {
-			status = sqlcdb.FestivalStatus(req.Status)
+			switch req.Status {
+			case "draft", "open", "live", "archived":
+				status = sqlcdb.FestivalStatus(req.Status)
+			default:
+				httperr.UnprocessableEntity(w, "invalid status: must be draft, open, live, or archived")
+				return
+			}
 		}
 
 		updated, err := q.UpdateFestival(r.Context(), sqlcdb.UpdateFestivalParams{
@@ -273,8 +299,8 @@ func UpdateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Slug:          slug,
 			Description:   description,
 			LocationLabel: locationLabel,
-			StartDate:     existing.StartDate,
-			EndDate:       existing.EndDate,
+			StartDate:     startDate,
+			EndDate:       endDate,
 			Status:        status,
 		})
 		if err != nil {
