@@ -174,7 +174,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			DisplayName   string          `json:"displayName"`
 			Bio           string          `json:"bio"`
 			LocationLabel *string         `json:"locationLabel"`
-			ShowLocation  bool            `json:"showLocation"`
+			ShowLocation  *bool           `json:"showLocation"`
 			MediumTags    []string        `json:"mediumTags"`
 			SocialLinks   json.RawMessage `json:"socialLinks"`
 			AvatarS3Key   *string         `json:"avatarS3Key"`
@@ -226,13 +226,17 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if req.AvatarS3Key != nil {
 			avatarS3Key = req.AvatarS3Key
 		}
+		showLocation := existing.ShowLocation
+		if req.ShowLocation != nil {
+			showLocation = *req.ShowLocation
+		}
 
 		updated, err := q.UpdateArtistProfile(r.Context(), sqlcdb.UpdateArtistProfileParams{
 			ID:            existing.ID,
 			DisplayName:   displayName,
 			Bio:           bio,
 			LocationLabel: locationLabel,
-			ShowLocation:  req.ShowLocation,
+			ShowLocation:  showLocation,
 			MediumTags:    mediumTags,
 			SocialLinks:   socialLinks,
 			AvatarS3Key:   avatarS3Key,
