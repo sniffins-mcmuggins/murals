@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
@@ -38,9 +39,13 @@ func main() {
 	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Recover)
 	r.Use(metrics.Middleware())
+	r.Use(auth.Middleware(cfg.JWTSecret))
 
 	r.Get("/healthz", health.Handler(pool))
 	r.Handle("/metrics", metrics.Handler())
+	r.Post("/auth/signup", auth.SignupHandler(pool))
+	r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
+	r.Get("/me", auth.MeHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
