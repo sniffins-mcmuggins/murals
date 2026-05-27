@@ -1,5 +1,8 @@
-# dev: next dev with source mounted as volume
-FROM node:20-alpine AS dev
+# dev: next dev with source mounted as volume.
+# Debian-slim (glibc) intentionally — matches the GitHub runner's libc so
+# the bind-mounted node_modules from the host works without per-platform
+# reinstall. Alpine (musl) caused crashes on native modules like lightningcss.
+FROM node:20-slim AS dev
 WORKDIR /workspace/web
 CMD ["npm", "run", "dev"]
 
