@@ -41,8 +41,8 @@ func Middleware(pool *pgxpool.Pool, secret string) func(http.Handler) http.Handl
 				return
 			}
 			r = r.WithContext(setPrincipal(r.Context(), Principal{
-				UserID: claims.Subject,
-				Role:   claims.Role,
+				UserID:  claims.Subject,
+				IsAdmin: claims.IsAdmin,
 			}))
 			next.ServeHTTP(w, r)
 		})
