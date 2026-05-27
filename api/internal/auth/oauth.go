@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -45,9 +46,10 @@ func GoogleRedirectHandler(clientID, clientSecret, redirectBase string) http.Han
 }
 
 type googleUserInfo struct {
-	Sub   string `json:"sub"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	Sub           string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
 }
 
 // GoogleCallbackHandler handles GET /auth/oauth/google/callback.
@@ -73,6 +75,11 @@ func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, redirectB
 			return
 		}
 
+		if !userInfo.EmailVerified {
+			http.Error(w, "google account email not verified", http.StatusBadRequest)
+			return
+		}
+
 		user, err := upsertOAuthUser(r.Context(), pool, userInfo.Email, userInfo.Sub, "google")
 		if err != nil {
 			httperr.InternalServerError(w)
@@ -93,7 +100,13 @@ func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, redirectB
 			Path:     "/",
 			MaxAge:   int(tokenTTL.Seconds()),
 		})
-		http.SetCookie(w, &http.Cookie{Name: "oauth_state", MaxAge: -1, Path: "/"})
+		http.SetCookie(w, &http.Cookie{
+			Name:     "oauth_state",
+			MaxAge:   -1,
+			Path:     "/",
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
 		http.Redirect(w, r, redirectBase+"/dashboard", http.StatusSeeOther)
 	}
 }
@@ -105,6 +118,9 @@ func fetchGoogleUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("google userinfo: unexpected status %d", resp.StatusCode)
+	}
 	var info googleUserInfo
 	return &info, json.NewDecoder(resp.Body).Decode(&info)
 }
@@ -150,6 +166,8 @@ func upsertOAuthUser(ctx context.Context, pool *pgxpool.Pool, email, subject, pr
 
 func randomState() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand.Read failed: %v", err))
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
