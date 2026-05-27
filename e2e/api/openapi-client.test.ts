@@ -34,7 +34,7 @@ describe('OpenAPI typed client', () => {
     expect(res.data).toBeDefined()
     expect(res.data?.id).toBe(artist.userId)
     expect(res.data?.email).toBe(artist.email)
-    expect(res.data?.role).toBe('artist')
+    expect(res.data?.is_admin).toBe(false)
   })
 
   it('GET /me without auth surfaces a typed problem response', async () => {
