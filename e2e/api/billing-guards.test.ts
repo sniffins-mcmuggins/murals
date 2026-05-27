@@ -62,17 +62,10 @@ describe('billing guards (B1-B6)', () => {
     expect(body).toContain('invalid price_id')
   })
 
-  it('B3: POST /billing/organiser/setup-checkout as artist → 403 (organiser account required)', async () => {
-    const artist = await createArtist(suffix + 3)
-    const res = await fetch(`${API}/billing/organiser/setup-checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader(artist.token) },
-      body: JSON.stringify({}),
-    })
-    expect(res.status).toBe(403)
-    const body = await bodyText(res)
-    expect(body).toContain('organiser account required')
-  })
+  // B3 retired: the previous "role=artist gets 403 from setup-checkout" gate
+  // no longer exists. Any authenticated user can pay the organiser setup fee
+  // (whether they ever organise is decided by what they do next, not at signup).
+  // See spec docs/superpowers/specs/2026-05-27-unified-user-registration-design.md.
 
   it('B4: POST /billing/festival/{id}/activate-checkout without setup paid → 402 (organiser setup fee not paid)', async () => {
     const organiser = await createOrganiser(suffix + 4)

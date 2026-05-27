@@ -1,6 +1,6 @@
 -- name: CreateUser :one
-INSERT INTO users (email, password_hash, role)
-VALUES ($1, $2, $3)
+INSERT INTO users (email, password_hash)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: GetUserByEmail :one
@@ -19,8 +19,8 @@ LIMIT 1;
 -- first-login callbacks for the same OAuth identity will both succeed; the
 -- second one returns the row inserted by the first (no unique-violation 500).
 -- The DO UPDATE clause is a no-op write to make RETURNING * return a row.
-INSERT INTO users (email, password_hash, role, oauth_provider, oauth_subject)
-VALUES ($1, NULL, $2, $3, $4)
+INSERT INTO users (email, password_hash, oauth_provider, oauth_subject)
+VALUES ($1, NULL, $2, $3)
 ON CONFLICT (oauth_provider, oauth_subject) WHERE oauth_provider IS NOT NULL
 DO UPDATE SET oauth_provider = EXCLUDED.oauth_provider
 RETURNING *;

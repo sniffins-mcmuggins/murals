@@ -19,8 +19,8 @@ import (
 func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, prices Prices, siteBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
-		if err != nil || principal.Role != "organiser" {
-			httperr.Write(w, http.StatusForbidden, "Forbidden", "organiser account required")
+		if err != nil {
+			httperr.Unauthorized(w)
 			return
 		}
 

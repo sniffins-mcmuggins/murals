@@ -15,7 +15,6 @@ import (
 type signupRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
-	Role     string `json:"role"`
 }
 
 // SignupHandler handles POST /auth/signup.
@@ -37,11 +36,6 @@ func SignupHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		role := sqlcdb.UserRole(req.Role)
-		if role != sqlcdb.UserRoleArtist && role != sqlcdb.UserRoleOrganiser {
-			role = sqlcdb.UserRoleArtist
-		}
-
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
 		if err != nil {
 			httperr.InternalServerError(w)
@@ -53,7 +47,6 @@ func SignupHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		user, err := q.CreateUser(r.Context(), sqlcdb.CreateUserParams{
 			Email:        req.Email,
 			PasswordHash: &hashStr,
-			Role:         role,
 		})
 		if err != nil {
 			if isUniqueViolation(err) {

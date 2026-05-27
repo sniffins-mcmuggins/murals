@@ -46,16 +46,12 @@ func toAcceptedArtistResponse(row sqlcdb.GetAcceptedArtistsForFestivalRow) accep
 }
 
 // GetAcceptedArtistsHandler handles GET /festivals/{festivalID}/artists/accepted.
-// Requires auth + organiser role. Returns all accepted artists for the map editor sidebar.
+// Requires auth and ownership of the festival. Returns all accepted artists for the map editor sidebar.
 func GetAcceptedArtistsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
-			return
-		}
-		if principal.Role != "organiser" {
-			httperr.Forbidden(w)
 			return
 		}
 
@@ -97,16 +93,12 @@ func GetAcceptedArtistsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // SetArtistPinHandler handles PATCH /festivals/{festivalID}/artists/{artistID}/pin.
-// Requires auth + organiser role. Sets or updates the pin location for an accepted artist.
+// Requires auth and ownership of the festival. Sets or updates the pin location for an accepted artist.
 func SetArtistPinHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
-			return
-		}
-		if principal.Role != "organiser" {
-			httperr.Forbidden(w)
 			return
 		}
 

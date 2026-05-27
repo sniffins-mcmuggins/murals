@@ -19,7 +19,7 @@ func TestSignupHandler_Success(t *testing.T) {
 	db := testutil.NewDB(t)
 	handler := auth.SignupHandler(db)
 
-	body := `{"email":"alice@example.com","password":"hunter2hunter","role":"artist"}`
+	body := `{"email":"alice@example.com","password":"hunter2hunter"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", bytes.NewBufferString(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -30,7 +30,7 @@ func TestSignupHandler_Success(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
 	assert.Equal(t, "alice@example.com", resp["email"])
-	assert.Equal(t, "artist", resp["role"])
+	assert.Equal(t, false, resp["is_admin"])
 	assert.Nil(t, resp["password_hash"], "password_hash must not appear in response")
 }
 

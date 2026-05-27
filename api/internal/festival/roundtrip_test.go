@@ -106,7 +106,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 
 	// 1. Sign up organiser
 	resp := do("POST", "/auth/signup",
-		`{"email":"rtorg@example.com","password":"hunter2hunter","role":"organiser"}`, "")
+		`{"email":"rtorg@example.com","password":"hunter2hunter"}`, "")
 	assertStatus(resp, http.StatusCreated)
 	_ = resp.Body.Close()
 
@@ -157,7 +157,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 
 	// 8. Sign up artist
 	resp = do("POST", "/auth/signup",
-		`{"email":"rtartist@example.com","password":"hunter2hunter","role":"artist"}`, "")
+		`{"email":"rtartist@example.com","password":"hunter2hunter"}`, "")
 	assertStatus(resp, http.StatusCreated)
 	_ = resp.Body.Close()
 
@@ -241,7 +241,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "rtclosed-org@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "rtclosed-org@example.com")
 	festID := createTestFestival(t, db, orgID, "rt-closed-form", "open")
 
 	// Set close_at in the past
@@ -256,7 +256,7 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	})
 	require.NoError(t, err, "upsert form")
 
-	artistID, artistToken := createTestUser(t, db, "rtclosed-artist@example.com", "artist")
+	artistID, artistToken := createTestUser(t, db, "rtclosed-artist@example.com")
 	createTestArtistProfile(t, db, artistID, "Closed Form Artist")
 
 	r := chi.NewRouter()
@@ -275,11 +275,11 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "rtmap-org@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "rtmap-org@example.com")
 	festID := createTestFestival(t, db, orgID, "rt-map-pins", "live")
 
 	// Accept artist WITHOUT pin
-	artistUserID, _ := createTestUser(t, db, "rtmap-artist@example.com", "artist")
+	artistUserID, _ := createTestUser(t, db, "rtmap-artist@example.com")
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Unpinned Artist")
 
 	q := sqlcdb.New(db)

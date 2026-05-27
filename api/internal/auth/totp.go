@@ -276,7 +276,7 @@ func TOTPVerifyHandler(pool *pgxpool.Pool, encryptionKeyB64, jwtSecret string) h
 			return
 		}
 
-		token, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
+		token, err := IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return

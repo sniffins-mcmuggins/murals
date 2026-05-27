@@ -44,16 +44,12 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	}
 }
 
-// SubmitApplicationHandler handles POST /festivals/{festivalID}/apply. Requires artist role.
+// SubmitApplicationHandler handles POST /festivals/{festivalID}/apply. Requires the caller to have an artist profile; returns 409 profile_required if not.
 func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
-			return
-		}
-		if principal.Role != "artist" {
-			httperr.Forbidden(w)
 			return
 		}
 
@@ -120,7 +116,12 @@ func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		profile, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.Write(w, http.StatusUnprocessableEntity, "Unprocessable Entity", "artist profile required to apply")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"error":   "profile_required",
+					"message": "create an artist profile to apply",
+				})
 				return
 			}
 			httperr.InternalServerError(w)

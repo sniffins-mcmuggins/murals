@@ -140,11 +140,11 @@ describe('auth: password reset (A1–A7)', () => {
     const client = new Client({ connectionString: DB_URL })
     await client.connect()
     try {
-      // Seed an OAuth-only user — password_hash NULL, role artist.
+      // Seed an OAuth-only user — password_hash NULL.
       // oauth_subject must be unique within (provider, subject); use a uuid.
       await client.query(
-        `INSERT INTO users (email, oauth_provider, oauth_subject, role)
-         VALUES ($1, 'google', $2, 'artist')`,
+        `INSERT INTO users (email, oauth_provider, oauth_subject)
+         VALUES ($1, 'google', $2)`,
         [email, `e2e-${randomUUID()}`],
       )
     } finally {

@@ -112,27 +112,6 @@ func (e PresignRequestContentType) Valid() bool {
 	}
 }
 
-// Defines values for UserRole.
-const (
-	Admin     UserRole = "admin"
-	Artist    UserRole = "artist"
-	Organiser UserRole = "organiser"
-)
-
-// Valid indicates whether the value is a known member of the UserRole enum.
-func (e UserRole) Valid() bool {
-	switch e {
-	case Admin:
-		return true
-	case Artist:
-		return true
-	case Organiser:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for GetHealth200JSONResponseBodyStatus.
 const (
 	Ok GetHealth200JSONResponseBodyStatus = "ok"
@@ -379,7 +358,6 @@ type ReorderImagesRequest struct {
 type SignupRequest struct {
 	Email    openapi_types.Email `json:"email"`
 	Password string              `json:"password"`
-	Role     *UserRole           `json:"role,omitempty"`
 }
 
 // UpdateCollectionRequest defines model for UpdateCollectionRequest.
@@ -408,11 +386,8 @@ type User struct {
 	CreatedAt time.Time           `json:"created_at"`
 	Email     openapi_types.Email `json:"email"`
 	Id        openapi_types.UUID  `json:"id"`
-	Role      UserRole            `json:"role"`
+	IsAdmin   bool                `json:"is_admin"`
 }
-
-// UserRole defines model for UserRole.
-type UserRole string
 
 // BadRequest RFC 7807 problem details object returned on all error responses.
 type BadRequest = Problem

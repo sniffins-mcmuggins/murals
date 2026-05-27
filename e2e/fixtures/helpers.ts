@@ -27,21 +27,24 @@ export async function s3Put(url: string, body: Buffer, contentType: string): Pro
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
-export interface ArtistSetup {
+export interface UserSetup {
   token: string
   userId: string
   email: string
   password: string
 }
 
-export async function createArtist(suffix: string | number = Date.now()): Promise<ArtistSetup> {
-  const email = `artist-${suffix}@e2e.test`
+export async function createUser(
+  prefix = 'user',
+  suffix: string | number = Date.now(),
+): Promise<UserSetup> {
+  const email = `${prefix}-${suffix}@e2e.test`
   const password = 'testpass123'
 
   const signupRes = await fetch(`${API}/auth/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role: 'artist' }),
+    body: JSON.stringify({ email, password }),
   })
   if (!signupRes.ok) throw new Error(`Signup failed: ${signupRes.status}`)
 
@@ -56,34 +59,13 @@ export async function createArtist(suffix: string | number = Date.now()): Promis
   return { token, userId: user.id, email, password }
 }
 
-export interface OrganiserSetup {
-  token: string
-  userId: string
-  email: string
-  password: string
-}
-
-export async function createOrganiser(suffix: string | number = Date.now()): Promise<OrganiserSetup> {
-  const email = `organiser-${suffix}@e2e.test`
-  const password = 'testpass123'
-
-  const signupRes = await fetch(`${API}/auth/signup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, role: 'organiser' }),
-  })
-  if (!signupRes.ok) throw new Error(`Signup failed: ${signupRes.status}`)
-
-  const loginRes = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  if (!loginRes.ok) throw new Error(`Login failed: ${loginRes.status}`)
-  const { token, user } = await loginRes.json()
-
-  return { token, userId: user.id, email, password }
-}
+// Back-compat aliases. Roles are derived from owning an artist_profile /
+// festival now, not set at signup — but keeping the named helpers preserves
+// readability in existing specs ("createArtist" still signals intent).
+export type ArtistSetup = UserSetup
+export type OrganiserSetup = UserSetup
+export const createArtist = (suffix?: string | number) => createUser('artist', suffix)
+export const createOrganiser = (suffix?: string | number) => createUser('organiser', suffix)
 
 // ─── Artist profile helpers ────────────────────────────────────────────────────
 

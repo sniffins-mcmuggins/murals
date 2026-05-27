@@ -71,7 +71,7 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		token, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
+		token, err := IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return

@@ -23,11 +23,6 @@ func GetMyApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if principal.Role != "artist" {
-			httperr.Forbidden(w)
-			return
-		}
-
 		userUUID, err := pgUUIDFromString(principal.UserID)
 		if err != nil {
 			httperr.InternalServerError(w)

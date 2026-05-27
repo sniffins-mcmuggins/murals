@@ -50,13 +50,9 @@ components:
           type: string
           format: uri
 
-    UserRole:
-      type: string
-      enum: [artist, organiser, admin]
-
     User:
       type: object
-      required: [id, email, role, created_at]
+      required: [id, email, is_admin, created_at]
       properties:
         id:
           type: string
@@ -64,8 +60,8 @@ components:
         email:
           type: string
           format: email
-        role:
-          $ref: "#/components/schemas/UserRole"
+        is_admin:
+          type: boolean
         created_at:
           type: string
           format: date-time
@@ -82,8 +78,6 @@ components:
           type: string
           minLength: 8
           example: hunter2hunter
-        role:
-          $ref: "#/components/schemas/UserRole"
 
     LoginRequest:
       type: object
@@ -739,7 +733,7 @@ paths:
     post:
       operationId: postProfiles
       summary: Create artist profile
-      description: Creates an artist profile for the authenticated user. One profile per user. Requires role=artist.
+      description: Creates an artist profile for the authenticated user. One profile per user.
       tags: [artist]
       security:
         - cookieAuth: []

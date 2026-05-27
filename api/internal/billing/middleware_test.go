@@ -43,7 +43,6 @@ func TestRequirePlan_NoSubscription_Returns403UpgradeRequired(t *testing.T) {
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        "no-sub-" + uuid.NewString() + "@test",
 		PasswordHash: ptr("x"),
-		Role:         sqlcdb.UserRoleArtist,
 	})
 	require.NoError(t, err)
 
@@ -52,7 +51,7 @@ func TestRequirePlan_NoSubscription_Returns403UpgradeRequired(t *testing.T) {
 	handler := middleware(next)
 
 	r := httptest.NewRequestWithContext(
-		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), "artist"),
+		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), user.IsAdmin),
 		http.MethodGet, "/", nil,
 	)
 	w := httptest.NewRecorder()
@@ -73,7 +72,6 @@ func TestRequirePlan_ActiveProSub_PassesThrough(t *testing.T) {
 	user, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
 		Email:        "pro-" + uuid.NewString() + "@test",
 		PasswordHash: ptr("x"),
-		Role:         sqlcdb.UserRoleArtist,
 	})
 	require.NoError(t, err)
 
@@ -99,7 +97,7 @@ func TestRequirePlan_ActiveProSub_PassesThrough(t *testing.T) {
 	handler := middleware(next)
 
 	r := httptest.NewRequestWithContext(
-		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), "artist"),
+		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), user.IsAdmin),
 		http.MethodGet, "/", nil,
 	)
 	w := httptest.NewRecorder()
@@ -118,7 +116,6 @@ func TestRequirePlan_BasicSubFailsWhenProRequired(t *testing.T) {
 	user, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
 		Email:        "basic-" + uuid.NewString() + "@test",
 		PasswordHash: ptr("x"),
-		Role:         sqlcdb.UserRoleArtist,
 	})
 	require.NoError(t, err)
 
@@ -140,7 +137,7 @@ func TestRequirePlan_BasicSubFailsWhenProRequired(t *testing.T) {
 	handler := middleware(next)
 
 	r := httptest.NewRequestWithContext(
-		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), "artist"),
+		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), user.IsAdmin),
 		http.MethodGet, "/", nil,
 	)
 	w := httptest.NewRecorder()

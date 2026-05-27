@@ -27,10 +27,10 @@ type mapEditorScenario struct {
 
 func setupMapEditorScenario(t *testing.T, db *pgxpool.Pool) mapEditorScenario {
 	t.Helper()
-	orgID, orgToken := createTestUser(t, db, "medorg@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "medorg@example.com")
 	festID := createTestFestival(t, db, orgID, "med-festival", "open")
 
-	artistUserID, _ := createTestUser(t, db, "medartist@example.com", "artist")
+	artistUserID, _ := createTestUser(t, db, "medartist@example.com")
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Map Editor Artist")
 
 	// Accept the artist into the festival
@@ -87,7 +87,7 @@ func TestGetAcceptedArtists_ExcludesNonAccepted(t *testing.T) {
 	sc := setupMapEditorScenario(t, db)
 
 	// Add a second artist with submitted (not accepted) status
-	artist2UserID, _ := createTestUser(t, db, "medartist2@example.com", "artist")
+	artist2UserID, _ := createTestUser(t, db, "medartist2@example.com")
 	artist2ProfileID := createTestArtistProfile(t, db, artist2UserID, "Submitted Artist")
 	q := sqlcdb.New(db)
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
@@ -127,7 +127,7 @@ func TestGetAcceptedArtists_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupMapEditorScenario(t, db)
-	_, otherToken := createTestUser(t, db, "medother@example.com", "organiser")
+	_, otherToken := createTestUser(t, db, "medother@example.com")
 
 	srv := newMapEditorServer(db)
 	t.Cleanup(srv.Close)
@@ -182,7 +182,7 @@ func TestSetArtistPin_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupMapEditorScenario(t, db)
-	_, otherToken := createTestUser(t, db, "medpinother@example.com", "organiser")
+	_, otherToken := createTestUser(t, db, "medpinother@example.com")
 
 	srv := newMapEditorServer(db)
 	t.Cleanup(srv.Close)
@@ -217,7 +217,7 @@ func TestSetArtistPin_NotFoundForDeclinedArtist(t *testing.T) {
 	sc := setupMapEditorScenario(t, db)
 
 	// Add a declined artist to the festival
-	declinedUserID, _ := createTestUser(t, db, "meddeclined@example.com", "artist")
+	declinedUserID, _ := createTestUser(t, db, "meddeclined@example.com")
 	declinedProfileID := createTestArtistProfile(t, db, declinedUserID, "Declined Artist")
 	q := sqlcdb.New(db)
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
@@ -264,35 +264,4 @@ func TestSetArtistPin_RejectsOutOfRangeCoordinates(t *testing.T) {
 			_ = resp.Body.Close()
 		})
 	}
-}
-
-func TestGetAcceptedArtists_ForbiddenForArtistRole(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-	sc := setupMapEditorScenario(t, db)
-	_, artistToken := createTestUser(t, db, "medartist-role@example.com", "artist")
-
-	srv := newMapEditorServer(db)
-	t.Cleanup(srv.Close)
-
-	resp := doRequest(t, srv, "GET", "/festivals/"+sc.festID+"/artists/accepted", "", artistToken)
-	require.Equal(t, http.StatusForbidden, resp.StatusCode)
-	_ = resp.Body.Close()
-}
-
-func TestSetArtistPin_ForbiddenForArtistRole(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-	sc := setupMapEditorScenario(t, db)
-	_, artistToken := createTestUser(t, db, "medpin-artist-role@example.com", "artist")
-
-	srv := newMapEditorServer(db)
-	t.Cleanup(srv.Close)
-
-	body := `{"lat":51.9,"lng":-2.07}`
-	resp := doRequest(t, srv, "PATCH",
-		"/festivals/"+sc.festID+"/artists/"+sc.artistProfileID+"/pin",
-		body, artistToken)
-	require.Equal(t, http.StatusForbidden, resp.StatusCode)
-	_ = resp.Body.Close()
 }
