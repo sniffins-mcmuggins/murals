@@ -19,6 +19,9 @@ type Config struct {
 	LogLevel            string
 	AWSRegion           string
 	SESFromEmail        string
+	GoogleClientID      string
+	GoogleClientSecret  string
+	OAuthRedirectBase   string
 }
 
 func Load() Config {
@@ -37,6 +40,9 @@ func Load() Config {
 		LogLevel:            env("LOG_LEVEL", "info"),
 		AWSRegion:           env("AWS_REGION", "eu-west-2"),
 		SESFromEmail:        env("SES_FROM_EMAIL", "noreply@renderltd.com"),
+		GoogleClientID:      env("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:  env("GOOGLE_CLIENT_SECRET", ""),
+		OAuthRedirectBase:   env("OAUTH_REDIRECT_BASE", "http://localhost:3000"),
 	}
 }
 
