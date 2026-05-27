@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -173,6 +174,93 @@ func TOTPConfirmHandler(pool *pgxpool.Pool, encryptionKeyB64 string) http.Handle
 		}
 
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// TOTPVerifyHandler handles POST /auth/mfa/verify.
+// Accepts an mfa_pending JWT in the Authorization: Bearer header, validates a
+// TOTP code against the user's stored secret, and on success returns a full
+// session JWT (and sets the session cookie). The bearer token is parsed
+// directly here rather than via the auth middleware/context, because the
+// middleware deliberately refuses to attach a Principal for mfa_pending tokens.
+func TOTPVerifyHandler(pool *pgxpool.Pool, encryptionKeyB64, jwtSecret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "missing mfa_pending token")
+			return
+		}
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := ParseToken(tokenStr, jwtSecret)
+		if err != nil || claims.Scope != ScopeMFAPending {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid mfa_pending token")
+			return
+		}
+
+		var req struct {
+			Code string `json:"code"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httperr.BadRequest(w, "invalid request body")
+			return
+		}
+		if req.Code == "" {
+			httperr.BadRequest(w, "code is required")
+			return
+		}
+
+		userUUID, err := pgUUIDFromString(claims.Subject)
+		if err != nil {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid token subject")
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		user, err := q.GetUserByID(r.Context(), userUUID)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				httperr.Unauthorized(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		if !user.MfaEnabled || user.MfaSecret == nil {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "mfa not enabled")
+			return
+		}
+
+		secret, err := decryptTOTPSecret(*user.MfaSecret, encryptionKeyB64)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		if !totp.Validate(req.Code, secret) {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid TOTP code")
+			return
+		}
+
+		token, err := IssueToken(user.ID.String(), string(user.Role), jwtSecret)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    token,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+			Path:     "/",
+			MaxAge:   int(tokenTTL.Seconds()),
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(loginResponse{
+			Token: token,
+			User:  toUserResponse(user),
+		})
 	}
 }
 

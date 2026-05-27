@@ -151,3 +151,192 @@ func fetchUser(t *testing.T, db *pgxpool.Pool, email string) sqlcdb.User {
 	require.NoError(t, err)
 	return u
 }
+
+// enrollAndConfirmMFA runs the full enroll + confirm flow for an already-authed
+// user and returns the plaintext TOTP secret so subsequent tests can generate
+// valid codes (for /auth/mfa/verify).
+func enrollAndConfirmMFA(t *testing.T, db *pgxpool.Pool, token string) string {
+	t.Helper()
+
+	enrollHandler := auth.Middleware(testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	er := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll", nil)
+	er.Header.Set("Authorization", "Bearer "+token)
+	ew := httptest.NewRecorder()
+	enrollHandler.ServeHTTP(ew, er)
+	require.Equal(t, http.StatusOK, ew.Code, ew.Body.String())
+
+	var enrollResp map[string]any
+	require.NoError(t, json.NewDecoder(ew.Body).Decode(&enrollResp))
+	secret := enrollResp["secret"].(string)
+
+	code, err := totp.GenerateCode(secret, time.Now())
+	require.NoError(t, err)
+
+	confirmHandler := auth.Middleware(testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
+	body := `{"code":"` + code + `"}`
+	cr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/confirm", strings.NewReader(body))
+	cr.Header.Set("Authorization", "Bearer "+token)
+	cr.Header.Set("Content-Type", "application/json")
+	cw := httptest.NewRecorder()
+	confirmHandler.ServeHTTP(cw, cr)
+	require.Equal(t, http.StatusOK, cw.Code, cw.Body.String())
+
+	return secret
+}
+
+// loginRaw posts to /auth/login and returns the recorder so tests can assert
+// on body + cookies. It does NOT fail on non-200 (the MFA branch is 200, the
+// wrong-password branch is 401; callers decide).
+func loginRaw(t *testing.T, db *pgxpool.Pool, email, password string) *httptest.ResponseRecorder {
+	t.Helper()
+	body := `{"email":"` + email + `","password":"` + password + `"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	auth.LoginHandler(db, testSecret).ServeHTTP(w, r)
+	return w
+}
+
+func TestLogin_MFAEnabled_ReturnsMFAToken(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, token := signupAndLogin(t, db, "mfa-login@example.com", "password123")
+	enrollAndConfirmMFA(t, db, token)
+
+	w := loginRaw(t, db, "mfa-login@example.com", "password123")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+
+	assert.Equal(t, true, resp["mfa_required"], "expected mfa_required:true")
+	assert.NotEmpty(t, resp["mfa_token"], "expected non-empty mfa_token")
+	assert.Nil(t, resp["token"], "full session token must not be issued on the MFA branch")
+	assert.Nil(t, resp["user"], "user payload must not leak on the MFA branch")
+
+	for _, c := range w.Result().Cookies() {
+		assert.NotEqual(t, "session", c.Name, "session cookie must NOT be set before MFA verify")
+	}
+}
+
+func TestLogin_MFADisabled_ReturnsFullToken(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	createTestUser(t, db, "no-mfa@example.com", "password123")
+
+	w := loginRaw(t, db, "no-mfa@example.com", "password123")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.NotEmpty(t, resp["token"], "expected full token on non-MFA login")
+	assert.NotNil(t, resp["user"], "expected user payload on non-MFA login")
+	assert.Nil(t, resp["mfa_required"], "mfa_required must not appear when MFA is disabled")
+
+	var sessionCookie *http.Cookie
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "session" {
+			sessionCookie = c
+		}
+	}
+	require.NotNil(t, sessionCookie, "session cookie must be set on non-MFA login")
+}
+
+func TestTOTPVerify_ValidCode(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, sessionToken := signupAndLogin(t, db, "verify-ok@example.com", "password123")
+	secret := enrollAndConfirmMFA(t, db, sessionToken)
+
+	// Login → get mfa_token.
+	lw := loginRaw(t, db, "verify-ok@example.com", "password123")
+	require.Equal(t, http.StatusOK, lw.Code, lw.Body.String())
+	var loginResp map[string]any
+	require.NoError(t, json.NewDecoder(lw.Body).Decode(&loginResp))
+	mfaToken, _ := loginResp["mfa_token"].(string)
+	require.NotEmpty(t, mfaToken)
+
+	// Verify with a valid TOTP code.
+	code, err := totp.GenerateCode(secret, time.Now())
+	require.NoError(t, err)
+
+	verifyHandler := auth.TOTPVerifyHandler(db, testTOTPKey, testSecret)
+	body := `{"code":"` + code + `"}`
+	vr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/verify", strings.NewReader(body))
+	vr.Header.Set("Authorization", "Bearer "+mfaToken)
+	vr.Header.Set("Content-Type", "application/json")
+	vw := httptest.NewRecorder()
+	verifyHandler.ServeHTTP(vw, vr)
+	require.Equal(t, http.StatusOK, vw.Code, vw.Body.String())
+
+	var verifyResp map[string]any
+	require.NoError(t, json.NewDecoder(vw.Body).Decode(&verifyResp))
+	assert.NotEmpty(t, verifyResp["token"], "full session token expected after verify")
+	assert.NotNil(t, verifyResp["user"], "user payload expected after verify")
+
+	var sessionCookie *http.Cookie
+	for _, c := range vw.Result().Cookies() {
+		if c.Name == "session" {
+			sessionCookie = c
+		}
+	}
+	require.NotNil(t, sessionCookie, "session cookie must be set after verify")
+	assert.True(t, sessionCookie.HttpOnly)
+}
+
+func TestTOTPVerify_InvalidCode(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, sessionToken := signupAndLogin(t, db, "verify-bad@example.com", "password123")
+	enrollAndConfirmMFA(t, db, sessionToken)
+
+	lw := loginRaw(t, db, "verify-bad@example.com", "password123")
+	require.Equal(t, http.StatusOK, lw.Code, lw.Body.String())
+	var loginResp map[string]any
+	require.NoError(t, json.NewDecoder(lw.Body).Decode(&loginResp))
+	mfaToken := loginResp["mfa_token"].(string)
+
+	verifyHandler := auth.TOTPVerifyHandler(db, testTOTPKey, testSecret)
+	vr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/verify", strings.NewReader(`{"code":"000000"}`))
+	vr.Header.Set("Authorization", "Bearer "+mfaToken)
+	vr.Header.Set("Content-Type", "application/json")
+	vw := httptest.NewRecorder()
+	verifyHandler.ServeHTTP(vw, vr)
+
+	assert.Equal(t, http.StatusUnauthorized, vw.Code, vw.Body.String())
+	for _, c := range vw.Result().Cookies() {
+		assert.NotEqual(t, "session", c.Name, "session cookie must NOT be set on bad code")
+	}
+}
+
+func TestTOTPVerify_NoToken(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	verifyHandler := auth.TOTPVerifyHandler(db, testTOTPKey, testSecret)
+	vr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/verify", strings.NewReader(`{"code":"123456"}`))
+	vr.Header.Set("Content-Type", "application/json")
+	vw := httptest.NewRecorder()
+	verifyHandler.ServeHTTP(vw, vr)
+
+	assert.Equal(t, http.StatusUnauthorized, vw.Code, vw.Body.String())
+}
+
+func TestTOTPVerify_FullTokenRejected(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, fullToken := signupAndLogin(t, db, "verify-fulltoken@example.com", "password123")
+	// Enroll + confirm MFA so the user even has a secret — verifying with the
+	// full session token (Scope == "") must still be rejected because only
+	// mfa_pending-scoped tokens may exchange for a session.
+	enrollAndConfirmMFA(t, db, fullToken)
+
+	verifyHandler := auth.TOTPVerifyHandler(db, testTOTPKey, testSecret)
+	vr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/verify", strings.NewReader(`{"code":"123456"}`))
+	vr.Header.Set("Authorization", "Bearer "+fullToken)
+	vr.Header.Set("Content-Type", "application/json")
+	vw := httptest.NewRecorder()
+	verifyHandler.ServeHTTP(vw, vr)
+
+	assert.Equal(t, http.StatusUnauthorized, vw.Code, vw.Body.String())
+}

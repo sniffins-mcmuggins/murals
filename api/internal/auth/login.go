@@ -51,6 +51,23 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
+		// MFA-gated branch: don't issue a session token yet. Return a short-lived
+		// mfa_pending token the client must exchange via POST /auth/mfa/verify.
+		if user.MfaEnabled {
+			mfaToken, err := IssueMFAPendingToken(user.ID.String(), jwtSecret)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"mfa_required": true,
+				"mfa_token":    mfaToken,
+			})
+			return
+		}
+
 		token, err := IssueToken(user.ID.String(), string(user.Role), jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
