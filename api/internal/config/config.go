@@ -17,6 +17,8 @@ type Config struct {
 	CDNBaseURL          string
 	JWTSecret           string
 	LogLevel            string
+	AWSRegion           string
+	SESFromEmail        string
 }
 
 func Load() Config {
@@ -33,6 +35,8 @@ func Load() Config {
 		CDNBaseURL:          env("CDN_BASE_URL", "http://localhost:9000/render-images"),
 		JWTSecret:           env("JWT_SECRET", "dev-jwt-secret-change-in-prod"),
 		LogLevel:            env("LOG_LEVEL", "info"),
+		AWSRegion:           env("AWS_REGION", "eu-west-2"),
+		SESFromEmail:        env("SES_FROM_EMAIL", "noreply@renderltd.com"),
 	}
 }
 
