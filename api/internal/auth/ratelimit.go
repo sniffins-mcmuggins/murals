@@ -23,6 +23,34 @@ type rateLimiterEntry struct {
 
 var globalLimiter = &ipLimiter{limiters: make(map[string]*rateLimiterEntry)}
 
+// Limiter config — set by ConfigureRateLimit from main.go. Defaults keep tests
+// and dev runs working without explicit configuration; production binaries
+// override via env (see config.LoginRateLimitPerMin).
+var (
+	rateLimitMu     sync.RWMutex
+	rateLimitPerMin = 5
+	rateLimitBurst  = 5
+)
+
+// ConfigureRateLimit changes the per-IP limit for new buckets. Call once at
+// startup before serving traffic. Buckets already created keep their old
+// limits — fine for our use case (each process starts fresh).
+func ConfigureRateLimit(perMin, burst int) {
+	if perMin <= 0 || burst <= 0 {
+		return
+	}
+	rateLimitMu.Lock()
+	rateLimitPerMin = perMin
+	rateLimitBurst = burst
+	rateLimitMu.Unlock()
+}
+
+func currentLimit() (perMin, burst int) {
+	rateLimitMu.RLock()
+	defer rateLimitMu.RUnlock()
+	return rateLimitPerMin, rateLimitBurst
+}
+
 func init() {
 	// Clean stale entries every 10 minutes
 	go func() {
@@ -43,8 +71,8 @@ func (l *ipLimiter) get(ip string) *rate.Limiter {
 	defer l.mu.Unlock()
 	e, ok := l.limiters[ip]
 	if !ok {
-		// 5 requests per minute with a burst of 5
-		lim := rate.NewLimiter(rate.Every(time.Minute/5), 5)
+		perMin, burst := currentLimit()
+		lim := rate.NewLimiter(rate.Every(time.Minute/time.Duration(perMin)), burst)
 		l.limiters[ip] = &rateLimiterEntry{limiter: lim, lastSeen: time.Now()}
 		return lim
 	}
@@ -73,7 +101,8 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// RateLimitMiddleware limits requests to 5/min per IP on the wrapped handler.
+// RateLimitMiddleware limits requests per IP on the wrapped handler. The rate
+// is configured via ConfigureRateLimit (defaults: 5/min, burst 5).
 // Note: per-process — with multiple ECS tasks, upgrade to go-redis/redis_rate.
 func RateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

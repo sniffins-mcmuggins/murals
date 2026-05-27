@@ -19,6 +19,11 @@ services:
       CDN_BASE_URL: "http://localhost:9000/render-images"
       JWT_SECRET: "${JWT_SECRET:-dev-jwt-secret-change-in-prod}"
       LOG_LEVEL: "${LOG_LEVEL:-debug}"
+      # Every Playwright worker shares the same source IP from the API's
+      # POV, so the prod default of 5/min trips after ~5 logins. Loosen
+      # here for dev/test — prod keeps the config.go default (5/min).
+      LOGIN_RATE_LIMIT_PER_MIN: "${LOGIN_RATE_LIMIT_PER_MIN:-120}"
+      LOGIN_RATE_LIMIT_BURST: "${LOGIN_RATE_LIMIT_BURST:-60}"
     volumes:
       - ../api:/app
       - api_tmp:/app/tmp

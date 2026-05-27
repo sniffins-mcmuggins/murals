@@ -70,6 +70,12 @@ func main() {
 	// disappear into the void, leaving users with no recovery path.
 	mailer := buildMailer(ctx, cfg)
 
+	// Configure the per-IP rate limiter for auth routes. Prod keeps the
+	// default (5/min); compose/CI bumps it via env so every e2e worker
+	// (which shares the same source IP from the API's POV) doesn't trip the
+	// shared bucket within seconds.
+	auth.ConfigureRateLimit(cfg.LoginRateLimitPerMin, cfg.LoginRateLimitBurst)
+
 	r := chi.NewRouter()
 	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 	r.Use(chiMiddleware.RealIP)
