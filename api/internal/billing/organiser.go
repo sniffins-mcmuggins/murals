@@ -2,6 +2,7 @@ package billing
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -33,7 +34,12 @@ func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices Prices, 
 		q := sqlcdb.New(pool)
 
 		paid, err := q.HasPaidSetupFee(r.Context(), userUUID)
-		if err == nil && paid {
+		if err != nil {
+			slog.Error("check setup fee", "err", err, "user_id", principal.UserID)
+			httperr.InternalServerError(w)
+			return
+		}
+		if paid {
 			httperr.Write(w, http.StatusConflict, "Conflict", "setup fee already paid")
 			return
 		}
@@ -66,13 +72,17 @@ func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices Prices, 
 		}
 
 		sid := sess.ID
-		_, _ = q.CreateOrgPayment(r.Context(), sqlcdb.CreateOrgPaymentParams{
+		if _, err := q.CreateOrgPayment(r.Context(), sqlcdb.CreateOrgPaymentParams{
 			UserID:                  userUUID,
 			FestivalID:              pgtype.UUID{},
 			StripeCheckoutSessionID: &sid,
 			ChargeType:              "setup_fee",
 			AmountPence:             3500,
-		})
+		}); err != nil {
+			slog.Error("create org payment record", "err", err, "session_id", sess.ID, "user_id", principal.UserID)
+			httperr.InternalServerError(w)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"checkout_url": sess.URL})
