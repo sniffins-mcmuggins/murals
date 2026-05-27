@@ -182,7 +182,17 @@ The error names every matched element — read them. Common cases here:
 - `getByRole('heading', { name: 'Applications' })` matches h1 *and* an h2 panel title → `{ exact: true }`.
 - `getByRole('link', { name: 'Apply' })` matches every Apply link in a list → scope first: `getByRole('listitem').filter({ hasText: 'My Festival' }).getByRole('link', { name: 'Apply' })`.
 
-### Next.js: all pages return 500
+### Next.js: all pages return 500 — native module binary mismatch
+
+Symptom: `curl http://localhost:3000` returns 500 with `Cannot find module '../lightningcss.linux-arm64-{musl|gnu}.node'`. Root cause: the `web_root_node_modules` Docker volume was wiped (`down -v`) and the empty volume is now shadowed by the host bind-mount's macOS-only binaries. The `lightningcss` package (required by `@tailwindcss/postcss`) ships platform-specific `.node` files; the macOS binary can't load in the Linux container.
+
+Fix: rebuild the web image so Docker re-initialises the `web_root_node_modules` volume from the image's Linux binaries:
+```bash
+docker compose -f infra/docker-compose.yml up -d --build web
+```
+The volume is populated from the image on first start because the `web/Dockerfile` dev stage runs `npm ci --workspaces`.
+
+### Next.js: all pages return 500 — dynamic import in Server Component
 
 If `/`, `/login`, etc. all 500, look for `next/dynamic({ ssr: false })` used directly in a Server Component (a `page.tsx` without `'use client'`). The Next.js error is verbose in the web container logs: `docker compose logs web --tail=30`. Fix: extract the dynamic import into a `'use client'` wrapper component (see `web/src/app/(public)/festivals/[id]/map/FestivalMapClient.tsx` for the pattern).
 

@@ -63,6 +63,7 @@ services:
       NEXT_PUBLIC_STRIPE_ARTIST_PRO_MONTHLY: "${NEXT_PUBLIC_STRIPE_ARTIST_PRO_MONTHLY:-}"
     volumes:
       - ../:/workspace
+      - web_root_node_modules:/workspace/node_modules
       - web_node_modules:/workspace/web/node_modules
       - web_next:/workspace/web/.next
     depends_on:
@@ -147,5 +148,6 @@ volumes:
   minio_data:
   prometheus_data:
   api_tmp:
+  web_root_node_modules:
   web_node_modules:
   web_next:

@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 includes:
   api:
@@ -27,7 +27,7 @@ tasks:
 
   down:
     desc: "Stop the local stack"
-    cmd: docker compose -f {{.COMPOSE_FILE}} down
+    cmd: docker compose -f {{.COMPOSE_FILE}} down -t 2
 
   test:
     desc: "Run all tests (api, web, mobile, openapi in parallel)"
@@ -50,6 +50,17 @@ tasks:
     cmds:
       - task: e2e:api
       - cmd: npx playwright test
+
+  e2e:clean:
+    desc: "Full clean e2e run — wipe stack + volumes, fresh start, run all tests, always tear down"
+    cmds:
+      - task: down
+      - docker compose -f {{.COMPOSE_FILE}} up -d --build
+      - defer: { task: down }
+      - task: db:migrate
+      - bash -c 'n=0; until curl -sf http://localhost:8080/healthz >/dev/null 2>&1; do sleep 2; n=$((n+1)); [ $n -ge 30 ] && echo "API did not become ready" && exit 1; done; echo "API ready"'
+      - bash -c 'n=0; until curl -sf http://localhost:3000 >/dev/null 2>&1; do sleep 2; n=$((n+1)); [ $n -ge 60 ] && echo "Web did not become ready" && exit 1; done; echo "Web ready"'
+      - task: e2e
 
   hooks:install:
     desc: "Install git hooks via lefthook (run once after cloning)"

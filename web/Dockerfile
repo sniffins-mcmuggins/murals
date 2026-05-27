@@ -1,8 +1,15 @@
 # dev: next dev with source mounted as volume.
-# Debian-slim (glibc) intentionally — matches the GitHub runner's libc so
-# the bind-mounted node_modules from the host works without per-platform
-# reinstall. Alpine (musl) caused crashes on native modules like lightningcss.
+# node_modules are installed in the image so Linux-native binaries (e.g.
+# lightningcss) are present. web_root_node_modules and web_node_modules
+# Docker volumes shadow the host bind-mount paths and are initialised from
+# these image layers on first start — no cross-platform binary mismatch even
+# after down -v.
 FROM node:20-slim AS dev
+WORKDIR /workspace
+COPY package*.json ./
+COPY web/package*.json ./web/
+COPY openapi/client/package*.json ./openapi/client/
+RUN npm ci --workspaces
 WORKDIR /workspace/web
 CMD ["npm", "run", "dev"]
 
