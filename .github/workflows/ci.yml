@@ -10,6 +10,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Opt in to Node.js 24 for all JavaScript-based actions. GitHub forces
+# Node 24 from 2026-06-02; this silences the deprecation warnings ahead
+# of that cutover and surfaces any incompatibilities now rather than later.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # ── PATH FILTER ───────────────────────────────────────────────────────────
   # Detects which areas changed so downstream jobs can skip when irrelevant.
