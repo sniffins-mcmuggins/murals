@@ -1,4 +1,15 @@
-ALTER TABLE users ADD COLUMN stripe_customer_id text;
+-- Stripe-backed billing.
+--
+-- subscriptions: recurring plans (artist Basic/Pro, festival annual). The
+--   stripe_subscription_id is the source of truth — the row is upserted by
+--   webhook handlers keyed on it.
+-- organiser_payments: one-off charges (organiser setup fee, per-festival
+--   activation). status transitions pending -> paid in the webhook (gated on
+--   status='pending' to make the transition idempotent against Stripe
+--   retries; see api/internal/billing/webhook.go).
+--
+-- users.stripe_customer_id is declared in 000001_users — kept on the user row
+-- because customer creation is independent of having any specific charge.
 
 CREATE TABLE subscriptions (
   id                     uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
