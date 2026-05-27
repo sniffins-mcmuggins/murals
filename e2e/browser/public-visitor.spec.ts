@@ -49,6 +49,7 @@ test.describe('public visitor flow', () => {
     const acceptedRes = await fetch(`${API}/festivals/${festivalId}/artists/accepted`, {
       headers: { Authorization: `Bearer ${organiser.token}` },
     })
+    if (!acceptedRes.ok) throw new Error(`Get accepted artists failed: ${acceptedRes.status}`)
     const accepted = await acceptedRes.json()
     const artistId: string = accepted[0].artist_id
 

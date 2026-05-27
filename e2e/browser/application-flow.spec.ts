@@ -33,7 +33,7 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
   // ── beforeAll equivalent: set up test data via API ────────────────────────────
   const artist = await createArtist(suffix)
-  const { profileId } = await createProfile(artist.token, { displayName: `E2E Artist ${suffix}` })
+  await createProfile(artist.token, { displayName: `E2E Artist ${suffix}` })
   const organiser = await createOrganiser(suffix)
   const { festivalId, slug } = await createFestival(organiser.token, {
     name: `Flow Fest ${suffix}`,
