@@ -28,6 +28,19 @@ WHERE fa.festival_id = $1
   AND fa.pin_lat IS NOT NULL
   AND fa.pin_lng IS NOT NULL;
 
+-- name: GetAcceptedArtistForFestival :one
+SELECT fa.festival_id,
+       fa.artist_id,
+       fa.pin_lat,
+       fa.pin_lng,
+       fa.w3w,
+       ap.display_name
+FROM festival_artists fa
+JOIN artist_profiles ap ON ap.id = fa.artist_id
+WHERE fa.festival_id = $1
+  AND fa.artist_id = $2
+  AND fa.status = 'accepted';
+
 -- name: GetAcceptedArtistsForFestival :many
 SELECT fa.festival_id,
        fa.artist_id,
