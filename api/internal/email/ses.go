@@ -3,6 +3,7 @@ package email
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -34,5 +35,8 @@ func (s *Sender) Send(ctx context.Context, to, subject, bodyHTML string) error {
 			},
 		},
 	})
+	if err != nil {
+		slog.Error("ses send failed", "to", to, "err", err)
+	}
 	return err
 }
