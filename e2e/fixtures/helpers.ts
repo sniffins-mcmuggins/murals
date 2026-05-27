@@ -5,7 +5,7 @@ const API = process.env.API_URL ?? 'http://localhost:8080'
 // node:http PUT — used for MinIO presigned URLs because fetch() treats Host as a
 // forbidden header, preventing us from setting it explicitly. node:http lets us
 // control all headers. Host is derived from the URL so it matches the HMAC signature.
-async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
+export async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
   return new Promise((resolve) => {
     const { hostname, port, pathname, search } = new URL(url)
     const hostHeader = port ? `${hostname}:${port}` : hostname

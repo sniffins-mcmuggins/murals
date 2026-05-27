@@ -136,26 +136,20 @@ func SetArtistPinHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Pre-check: verify artist is accepted for this festival and capture display_name.
-		// This prevents writing pin data to declined/submitted artist records.
-		rows, err := q.GetAcceptedArtistsForFestival(r.Context(), festUUID)
+		// Verify artist is accepted for this festival; returns display_name for the response.
+		accepted, err := q.GetAcceptedArtistForFestival(r.Context(), sqlcdb.GetAcceptedArtistForFestivalParams{
+			FestivalID: festUUID,
+			ArtistID:   artistUUID,
+		})
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
 			httperr.InternalServerError(w)
 			return
 		}
-		var displayName string
-		found := false
-		for _, row := range rows {
-			if row.ArtistID == artistUUID {
-				displayName = row.DisplayName
-				found = true
-				break
-			}
-		}
-		if !found {
-			httperr.NotFound(w)
-			return
-		}
+		displayName := accepted.DisplayName
 
 		var req struct {
 			Lat float64 `json:"lat"`
@@ -164,6 +158,14 @@ func SetArtistPinHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
+			return
+		}
+		if req.Lat < -90 || req.Lat > 90 {
+			httperr.BadRequest(w, "lat must be between -90 and 90")
+			return
+		}
+		if req.Lng < -180 || req.Lng > 180 {
+			httperr.BadRequest(w, "lng must be between -180 and 180")
 			return
 		}
 

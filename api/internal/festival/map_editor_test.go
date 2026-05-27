@@ -239,6 +239,33 @@ func TestSetArtistPin_NotFoundForDeclinedArtist(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
+func TestSetArtistPin_RejectsOutOfRangeCoordinates(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupMapEditorScenario(t, db)
+	srv := newMapEditorServer(db)
+	t.Cleanup(srv.Close)
+
+	cases := []struct {
+		body string
+		name string
+	}{
+		{`{"lat":91,"lng":0}`, "lat > 90"},
+		{`{"lat":-91,"lng":0}`, "lat < -90"},
+		{`{"lat":0,"lng":181}`, "lng > 180"},
+		{`{"lat":0,"lng":-181}`, "lng < -180"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := doRequest(t, srv, "PATCH",
+				"/festivals/"+sc.festID+"/artists/"+sc.artistProfileID+"/pin",
+				tc.body, sc.orgToken)
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			_ = resp.Body.Close()
+		})
+	}
+}
+
 func TestGetAcceptedArtists_ForbiddenForArtistRole(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

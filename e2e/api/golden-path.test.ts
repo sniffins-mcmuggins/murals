@@ -1,29 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import * as http from 'node:http'
+import { s3Put } from '../fixtures/helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
-
-// node:http PUT for MinIO presigned URLs — fetch() treats Host as a forbidden header.
-// We derive Host from the URL so it matches the HMAC signature.
-async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
-  return new Promise((resolve) => {
-    const { hostname, port, pathname, search } = new URL(url)
-    const hostHeader = port ? `${hostname}:${port}` : hostname
-    const req = http.request(
-      {
-        hostname,
-        port: port ? parseInt(port, 10) : 80,
-        path: pathname + search,
-        method: 'PUT',
-        headers: { 'content-type': contentType, 'host': hostHeader, 'content-length': body.length },
-      },
-      (res) => { resolve({ ok: (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0 }); res.resume() },
-    )
-    req.on('error', () => resolve({ ok: false, status: 0 }))
-    req.write(body)
-    req.end()
-  })
-}
 
 function auth(token: string) {
   return { Authorization: `Bearer ${token}` }

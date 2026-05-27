@@ -63,7 +63,7 @@ func main() {
 	}
 
 	r := chi.NewRouter()
-	r.Use(corsMiddleware)
+	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 	r.Use(chiMiddleware.RealIP)
 	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Recover)
@@ -150,24 +150,33 @@ func main() {
 	}
 }
 
-// corsMiddleware reflects the Origin header with credentials support.
-// Required for browser-to-API requests when web and API run on different ports.
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin := r.Header.Get("Origin"); origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Add("Vary", "Origin")
-		}
-		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			w.Header().Set("Access-Control-Max-Age", "86400")
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// corsMiddleware sets CORS headers only for origins in the allowlist.
+// CORS_ALLOWED_ORIGINS must include every production domain; arbitrary origins
+// are rejected (no header set) to prevent credential-bearing cross-site requests.
+func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		allowed[o] = struct{}{}
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if origin := r.Header.Get("Origin"); origin != "" {
+				if _, ok := allowed[origin]; ok {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Access-Control-Allow-Credentials", "true")
+					w.Header().Add("Vary", "Origin")
+				}
+			}
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				w.Header().Set("Access-Control-Max-Age", "86400")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func newLogger(level string) *slog.Logger {
