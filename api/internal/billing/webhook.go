@@ -3,11 +3,13 @@ package billing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
@@ -124,8 +126,12 @@ func handleSubscriptionDeleted(ctx context.Context, pool *pgxpool.Pool, event st
 	q := sqlcdb.New(pool)
 	subID := sub.ID
 	existing, err := q.GetSubscriptionByStripeID(ctx, &subID)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		slog.Debug("stripe webhook: subscription not found for deletion", "subscription_id", sub.ID)
+		return
+	}
+	if err != nil {
+		slog.Error("stripe webhook: fetch subscription for deletion", "err", err, "subscription_id", sub.ID)
 		return
 	}
 
@@ -166,9 +172,13 @@ func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, event stri
 		StripeCheckoutSessionID: &sessionID,
 		StripePaymentIntentID:   piID,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Not an error — artist subscription checkout with no matching org payment row.
+		slog.Debug("stripe webhook: no org payment row for checkout session", "session_id", sess.ID)
+		return
+	}
 	if err != nil {
-		// Not necessarily an error — could be an artist subscription checkout with no matching org payment row.
-		slog.Debug("stripe webhook: no org payment row for checkout session", "session_id", sess.ID, "err", err)
+		slog.Error("stripe webhook: failed to mark org payment paid", "err", err, "session_id", sess.ID)
 	}
 }
 
@@ -190,8 +200,12 @@ func handlePaymentFailed(ctx context.Context, pool *pgxpool.Pool, event stripe.E
 
 	q := sqlcdb.New(pool)
 	existing, err := q.GetSubscriptionByStripeID(ctx, &subID)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		slog.Debug("stripe webhook: subscription not found for payment_failed", "subscription_id", subID)
+		return
+	}
+	if err != nil {
+		slog.Error("stripe webhook: fetch subscription for payment_failed", "err", err, "subscription_id", subID)
 		return
 	}
 
