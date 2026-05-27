@@ -1,0 +1,31 @@
+pre-commit:
+  parallel: true
+  commands:
+    go-lint:
+      glob: "api/**/*.go"
+      run: cd api && go tool golangci-lint run ./...
+    web-lint:
+      glob: "web/**/*.{ts,tsx,js,jsx}"
+      run: cd web && npm run lint
+    web-typecheck:
+      glob: "web/**/*.{ts,tsx}"
+      run: cd web && npm run typecheck
+    mobile-lint:
+      glob: "mobile/**/*.{ts,tsx,js,jsx}"
+      run: cd mobile && npm run lint
+    mobile-typecheck:
+      glob: "mobile/**/*.{ts,tsx}"
+      run: cd mobile && npm run typecheck
+
+pre-push:
+  parallel: true
+  commands:
+    go-test:
+      glob: "api/**/*.go"
+      run: cd api && go test ./... -race -count=1 -short
+    web-test:
+      glob: "web/**/*.{ts,tsx,js,jsx}"
+      run: cd web && npm test
+    mobile-test:
+      glob: "mobile/**/*.{ts,tsx,js,jsx}"
+      run: cd mobile && npm test

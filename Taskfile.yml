@@ -51,6 +51,10 @@ tasks:
       - task: e2e:api
       - cmd: npx playwright test
 
+  hooks:install:
+    desc: "Install git hooks via lefthook (run once after cloning)"
+    cmd: go tool lefthook install
+
   billing:stripe-listen:
     desc: "Forward Stripe webhooks to local API (requires Stripe CLI installed and logged in)"
     cmd: stripe listen --forward-to localhost:8080/billing/webhook
