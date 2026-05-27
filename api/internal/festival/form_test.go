@@ -22,7 +22,7 @@ func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 	festID := createTestFestival(t, db, orgID, "form-test-fest", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(db))
 	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(db))
 
@@ -56,7 +56,7 @@ func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 	festID := createTestFestival(t, db, orgID, "form-test-fest2", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -75,7 +75,7 @@ func TestGetForm_Public(t *testing.T) {
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -93,7 +93,7 @@ func TestGetForm_NotFound(t *testing.T) {
 	festID := createTestFestival(t, db, orgID, "form-no-form", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(db))
 
 	srv := httptest.NewServer(r)

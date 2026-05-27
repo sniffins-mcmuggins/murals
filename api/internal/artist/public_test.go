@@ -21,10 +21,11 @@ import (
 func createArtistWithProfile(t *testing.T, pool *pgxpool.Pool, email, displayName string) {
 	t.Helper()
 	hash, _ := bcrypt.GenerateFromPassword([]byte("pass"), bcrypt.MinCost)
+	hashStr := string(hash)
 	q := sqlcdb.New(pool)
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        email,
-		PasswordHash: string(hash),
+		PasswordHash: &hashStr,
 		Role:         sqlcdb.UserRoleArtist,
 	})
 	require.NoError(t, err)

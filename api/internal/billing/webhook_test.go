@@ -78,7 +78,7 @@ func TestMarkOrgPaymentPaidIfPending_IsIdempotent(t *testing.T) {
 
 	user, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
 		Email:        "org-" + uuid.NewString() + "@test",
-		PasswordHash: "x",
+		PasswordHash: ptr("x"),
 		Role:         sqlcdb.UserRoleOrganiser,
 	})
 	require.NoError(t, err)

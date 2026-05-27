@@ -6,62 +6,86 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
+	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
 const testSecret = "test-secret"
 
+// createUserAndIssueToken creates a real user row and returns the user's UUID
+// (as a string, suitable for JWT subject) plus a valid token bound to that
+// user's current session_version. The auth middleware reads the row from the
+// DB to validate the embedded sv, so the token has to refer to a real user.
+func createUserAndIssueToken(t *testing.T, db *pgxpool.Pool, email, role string) (userID, token string) {
+	t.Helper()
+	q := sqlcdb.New(db)
+	pwHash := "x"
+	user, err := q.CreateUser(t.Context(), sqlcdb.CreateUserParams{
+		Email:        email,
+		PasswordHash: &pwHash,
+		Role:         sqlcdb.UserRole(role),
+	})
+	require.NoError(t, err)
+	userID = user.ID.String()
+	token, err = auth.IssueToken(userID, role, user.SessionVersion, testSecret)
+	require.NoError(t, err)
+	return userID, token
+}
+
 func TestMiddleware_ValidCookie(t *testing.T) {
 	t.Parallel()
-	token, err := auth.IssueToken("user-123", "artist", testSecret)
-	require.NoError(t, err)
+	db := testutil.NewDB(t)
+	userID, token := createUserAndIssueToken(t, db, "mw-cookie@example.com", "artist")
 
 	var capturedPrincipal auth.Principal
-	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, err := auth.User(r.Context())
 		require.NoError(t, err)
 		capturedPrincipal = p
 	}))
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/me", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	r.AddCookie(&http.Cookie{Name: "session", Value: token})
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	assert.Equal(t, "user-123", capturedPrincipal.UserID)
+	assert.Equal(t, userID, capturedPrincipal.UserID)
 	assert.Equal(t, "artist", capturedPrincipal.Role)
 }
 
 func TestMiddleware_ValidBearerHeader(t *testing.T) {
 	t.Parallel()
-	token, err := auth.IssueToken("user-456", "organiser", testSecret)
-	require.NoError(t, err)
+	db := testutil.NewDB(t)
+	userID, token := createUserAndIssueToken(t, db, "mw-bearer@example.com", "organiser")
 
 	var capturedPrincipal auth.Principal
-	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, _ := auth.User(r.Context())
 		capturedPrincipal = p
 	}))
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/me", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	r.Header.Set("Authorization", "Bearer "+token)
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	assert.Equal(t, "user-456", capturedPrincipal.UserID)
+	assert.Equal(t, userID, capturedPrincipal.UserID)
 }
 
 func TestMiddleware_NoToken_PassesThrough(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	called := false
-	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		_, err := auth.User(r.Context())
 		assert.ErrorIs(t, err, auth.ErrUnauthenticated)
 	}))
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
 	assert.True(t, called, "handler was not called")
@@ -69,14 +93,15 @@ func TestMiddleware_NoToken_PassesThrough(t *testing.T) {
 
 func TestMiddleware_InvalidToken_PassesThrough(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	called := false
-	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		_, err := auth.User(r.Context())
 		assert.Error(t, err, "expected error for invalid token")
 	}))
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.AddCookie(&http.Cookie{Name: "session", Value: "not-a-jwt"})
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
@@ -85,27 +110,69 @@ func TestMiddleware_InvalidToken_PassesThrough(t *testing.T) {
 
 func TestMiddleware_CookieTakesPrecedenceOverHeader(t *testing.T) {
 	t.Parallel()
-	cookieToken, err := auth.IssueToken("cookie-user", "artist", testSecret)
-	require.NoError(t, err)
-	headerToken, err := auth.IssueToken("header-user", "organiser", testSecret)
-	require.NoError(t, err)
+	db := testutil.NewDB(t)
+	cookieUserID, cookieToken := createUserAndIssueToken(t, db, "mw-cookie-precedence@example.com", "artist")
+	_, headerToken := createUserAndIssueToken(t, db, "mw-header-precedence@example.com", "organiser")
 
 	var capturedID string
-	handler := auth.Middleware(testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p, _ := auth.User(r.Context())
 		capturedID = p.UserID
 	}))
 
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 	r.AddCookie(&http.Cookie{Name: "session", Value: cookieToken})
 	r.Header.Set("Authorization", "Bearer "+headerToken)
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
-	assert.Equal(t, "cookie-user", capturedID)
+	assert.Equal(t, cookieUserID, capturedID)
 }
 
 func TestMiddleware_IgnoresWrongContext(t *testing.T) {
 	t.Parallel()
 	_, err := auth.User(context.Background())
 	assert.ErrorIs(t, err, auth.ErrUnauthenticated)
+}
+
+// TestMiddleware_StaleSessionVersionRejected proves the password-reset
+// revocation path actually works: after IncrementSessionVersion is called on
+// a user, any JWT issued before the bump fails the middleware's sv check and
+// is treated as if no token was supplied.
+func TestMiddleware_StaleSessionVersionRejected(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, staleToken := createUserAndIssueToken(t, db, "mw-stale@example.com", "artist")
+
+	// Look the user up, bump session_version (simulating a password reset).
+	q := sqlcdb.New(db)
+	user, err := q.GetUserByEmail(t.Context(), "mw-stale@example.com")
+	require.NoError(t, err)
+	_, err = q.IncrementSessionVersion(t.Context(), user.ID)
+	require.NoError(t, err)
+
+	// The old token should now be rejected — handler runs, but no Principal.
+	called := false
+	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_, err := auth.User(r.Context())
+		assert.ErrorIs(t, err, auth.ErrUnauthenticated, "stale token must not produce a Principal")
+	}))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	r.AddCookie(&http.Cookie{Name: "session", Value: staleToken})
+	handler.ServeHTTP(httptest.NewRecorder(), r)
+	assert.True(t, called)
+
+	// A fresh token (with the new sv) should still work.
+	freshToken, err := auth.IssueToken(user.ID.String(), "artist", user.SessionVersion+1, testSecret)
+	require.NoError(t, err)
+	freshCalled := false
+	freshHandler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		freshCalled = true
+		_, err := auth.User(r.Context())
+		assert.NoError(t, err, "fresh token must produce a Principal")
+	}))
+	r2 := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	r2.AddCookie(&http.Cookie{Name: "session", Value: freshToken})
+	freshHandler.ServeHTTP(httptest.NewRecorder(), r2)
+	assert.True(t, freshCalled)
 }

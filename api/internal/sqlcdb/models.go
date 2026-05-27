@@ -327,6 +327,15 @@ type OrganiserPayment struct {
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type PasswordResetToken struct {
+	ID        pgtype.UUID        `db:"id" json:"id"`
+	UserID    pgtype.UUID        `db:"user_id" json:"user_id"`
+	TokenHash string             `db:"token_hash" json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type Subscription struct {
 	ID                   pgtype.UUID        `db:"id" json:"id"`
 	UserID               pgtype.UUID        `db:"user_id" json:"user_id"`
@@ -344,8 +353,13 @@ type Subscription struct {
 type User struct {
 	ID               pgtype.UUID        `db:"id" json:"id"`
 	Email            string             `db:"email" json:"email"`
-	PasswordHash     string             `db:"password_hash" json:"password_hash"`
+	PasswordHash     *string            `db:"password_hash" json:"password_hash"`
 	Role             UserRole           `db:"role" json:"role"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	OauthProvider    *string            `db:"oauth_provider" json:"oauth_provider"`
+	OauthSubject     *string            `db:"oauth_subject" json:"oauth_subject"`
+	MfaEnabled       bool               `db:"mfa_enabled" json:"mfa_enabled"`
+	MfaSecret        *string            `db:"mfa_secret" json:"mfa_secret"`
+	SessionVersion   int32              `db:"session_version" json:"session_version"`
 	StripeCustomerID *string            `db:"stripe_customer_id" json:"stripe_customer_id"`
 }

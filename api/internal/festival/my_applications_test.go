@@ -30,7 +30,7 @@ func TestGetMyApplications_ReturnsOwnApplications(t *testing.T) {
 	createTestArtistProfile(t, db, artistUserID, "My Apps Artist")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 	r.Get("/me/applications", festival.GetMyApplicationsHandler(db))
 
@@ -61,7 +61,7 @@ func TestGetMyApplications_RequiresAuth(t *testing.T) {
 	db := testutil.NewDB(t)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/me/applications", festival.GetMyApplicationsHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -80,7 +80,7 @@ func TestGetMyApplications_NoProfileReturnsEmptyArray(t *testing.T) {
 	_, artistToken := createTestUser(t, db, "myapps-noprofile@example.com", "artist")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/me/applications", festival.GetMyApplicationsHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -111,7 +111,7 @@ func TestGetMyApplications_DoesNotReturnOtherArtistsApplications(t *testing.T) {
 	createTestArtistProfile(t, db, artistAID, "Artist A")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 	r.Get("/me/applications", festival.GetMyApplicationsHandler(db))
 

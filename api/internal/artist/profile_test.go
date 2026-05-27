@@ -21,7 +21,7 @@ func TestCreateProfile_Success(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "artist1@example.com", "artist")
 	_ = userID
-	handler := auth.Middleware(testSecret)(artist.CreateProfileHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.CreateProfileHandler(db))
 
 	body := `{"displayName":"Alice Muralist"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/profiles", bytes.NewBufferString(body))
@@ -41,7 +41,7 @@ func TestCreateProfile_DuplicateProfile(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "artist2@example.com", "artist")
 	createTestProfile(t, db, userID, "Alice")
-	handler := auth.Middleware(testSecret)(artist.CreateProfileHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.CreateProfileHandler(db))
 
 	body := `{"displayName":"Alice Again"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/profiles", bytes.NewBufferString(body))
@@ -99,7 +99,7 @@ func TestUpdateProfile_Success(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "artist4@example.com", "artist")
 	createTestProfile(t, db, userID, "Carol")
-	handler := auth.Middleware(testSecret)(artist.UpdateProfileHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
 
 	body := `{"displayName":"Carol Updated","bio":"I paint walls","mediumTags":["mural","stencil"],"socialLinks":{"instagram":"https://instagram.com/carol"}}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me", bytes.NewBufferString(body))
@@ -119,7 +119,7 @@ func TestUpdateProfile_NoProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	_, token := createTestUser(t, db, "artist5@example.com", "artist")
-	handler := auth.Middleware(testSecret)(artist.UpdateProfileHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
 
 	body := `{"displayName":"Nobody"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me", bytes.NewBufferString(body))
@@ -136,7 +136,7 @@ func TestGetMyProfile_Success(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "artist6@example.com", "artist")
 	createTestProfile(t, db, userID, "Dana")
-	handler := auth.Middleware(testSecret)(artist.GetMyProfileHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.GetMyProfileHandler(db))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/profiles/me", nil)
 	r.Header.Set("Authorization", "Bearer "+token)
@@ -156,7 +156,7 @@ func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 	createTestProfile(t, db, userID, "Eve")
 
 	// First PATCH: enable show_location
-	enableHandler := auth.Middleware(testSecret)(artist.UpdateProfileHandler(db))
+	enableHandler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
 		bytes.NewBufferString(`{"showLocation":true}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -166,7 +166,7 @@ func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, "enable show_location: %s", w.Body.String())
 
 	// Second PATCH: update bio only, don't mention showLocation
-	updateHandler := auth.Middleware(testSecret)(artist.UpdateProfileHandler(db))
+	updateHandler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
 	r2 := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
 		bytes.NewBufferString(`{"bio":"New bio"}`))
 	r2.Header.Set("Content-Type", "application/json")
@@ -176,7 +176,7 @@ func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 	require.Equal(t, http.StatusOK, w2.Code, "update bio: %s", w2.Body.String())
 
 	// Verify bio was updated (show_location preserved implicitly)
-	getHandler := auth.Middleware(testSecret)(artist.GetMyProfileHandler(db))
+	getHandler := auth.Middleware(db, testSecret)(artist.GetMyProfileHandler(db))
 	r3 := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/profiles/me", nil)
 	r3.Header.Set("Authorization", "Bearer "+token)
 	w3 := httptest.NewRecorder()
