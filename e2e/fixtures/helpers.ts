@@ -1,4 +1,27 @@
+import * as http from 'node:http'
+
 const API = process.env.API_URL ?? 'http://localhost:8080'
+
+// node:http PUT — used for MinIO presigned URLs where we must override the Host
+// header to match the HMAC signature (fetch() treats Host as a forbidden header)
+async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
+  return new Promise((resolve) => {
+    const { hostname, port, pathname, search } = new URL(url)
+    const req = http.request(
+      {
+        hostname,
+        port: port ? parseInt(port, 10) : 80,
+        path: pathname + search,
+        method: 'PUT',
+        headers: { 'content-type': contentType, 'host': 'minio:9000', 'content-length': body.length },
+      },
+      (res) => { resolve({ ok: (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0 }); res.resume() },
+    )
+    req.on('error', () => resolve({ ok: false, status: 0 }))
+    req.write(body)
+    req.end()
+  })
+}
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -126,12 +149,9 @@ export async function uploadImage(
   // 2. Rewrite internal Docker URL to host-accessible URL
   const hostUploadUrl = (uploadUrl as string).replace('http://minio:9000', 'http://localhost:9000')
 
-  // 3. PUT to MinIO
-  const putRes = await fetch(hostUploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'image/jpeg' },
-    body: MINIMAL_JPEG,
-  })
+  // 3. PUT to MinIO — uses node:http so we can set Host: minio:9000 to match
+  //    the HMAC signature (fetch() silently drops Host as a forbidden header)
+  const putRes = await s3Put(hostUploadUrl, MINIMAL_JPEG, 'image/jpeg')
   if (!putRes.ok) throw new Error(`MinIO PUT failed: ${putRes.status}`)
 
   // 4. Confirm
@@ -201,7 +221,7 @@ export async function upsertForm(token: string, festivalId: string): Promise<voi
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      fields: [{ type: 'text', label: 'Artist statement', required: true }],
+      fields: [{ id: 'artist-statement', type: 'text', label: 'Artist statement', required: true }],
     }),
   })
   if (!res.ok) throw new Error(`Upsert form failed: ${res.status}`)
@@ -216,7 +236,7 @@ export async function submitApplication(
   const res = await fetch(`${API}/festivals/${festivalId}/apply`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ answers: { 'Artist statement': 'Test statement for e2e' } }),
+    body: JSON.stringify({ answers: { 'artist-statement': 'Test statement for e2e' } }),
   })
   if (!res.ok) throw new Error(`Submit application failed: ${res.status}`)
   const data = await res.json()

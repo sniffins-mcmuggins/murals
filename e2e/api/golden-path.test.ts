@@ -1,6 +1,28 @@
 import { describe, it, expect } from 'vitest'
+import * as http from 'node:http'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+
+// node:http PUT for MinIO presigned URLs — fetch() silently drops Host as a
+// forbidden header, breaking the HMAC signature validation
+async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
+  return new Promise((resolve) => {
+    const { hostname, port, pathname, search } = new URL(url)
+    const req = http.request(
+      {
+        hostname,
+        port: port ? parseInt(port, 10) : 80,
+        path: pathname + search,
+        method: 'PUT',
+        headers: { 'content-type': contentType, 'host': 'minio:9000', 'content-length': body.length },
+      },
+      (res) => { resolve({ ok: (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0 }); res.resume() },
+    )
+    req.on('error', () => resolve({ ok: false, status: 0 }))
+    req.write(body)
+    req.end()
+  })
+}
 
 function auth(token: string) {
   return { Authorization: `Bearer ${token}` }
@@ -89,11 +111,7 @@ describe('golden path', () => {
       'AQACEQMRAD8AJQAB/9k=',
       'base64',
     )
-    const putRes = await fetch(hostUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'image/jpeg' },
-      body: minimalJpeg,
-    })
+    const putRes = await s3Put(hostUrl, minimalJpeg, 'image/jpeg')
     expect(putRes.ok).toBe(true)
 
     // Confirm
@@ -159,7 +177,7 @@ describe('golden path', () => {
     const res = await fetch(`${API}/festivals/${festivalId}/form`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...auth(organiserToken) },
-      body: JSON.stringify({ fields: [{ type: 'text', label: 'Artist statement', required: true }] }),
+      body: JSON.stringify({ fields: [{ id: 'artist-statement', type: 'text', label: 'Artist statement', required: true }] }),
     })
     expect(res.status).toBe(200)
   })
@@ -179,7 +197,7 @@ describe('golden path', () => {
     const res = await fetch(`${API}/festivals/${festivalId}/apply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth(artistToken) },
-      body: JSON.stringify({ answers: { 'Artist statement': 'I paint large-scale murals' } }),
+      body: JSON.stringify({ answers: { 'artist-statement': 'I paint large-scale murals' } }),
     })
     expect(res.status).toBe(201)
     const data = await json(res)
@@ -241,10 +259,10 @@ describe('golden path', () => {
   it('19. public map data returns pin (unauthenticated)', async () => {
     const res = await fetch(`${API}/festivals/slug/${festivalSlug}/map`)
     expect(res.status).toBe(200)
-    const pins = await res.json()
-    expect(Array.isArray(pins)).toBe(true)
-    expect(pins.length).toBeGreaterThan(0)
-    expect(typeof pins[0].lat).toBe('number')
+    const body = await res.json()
+    expect(Array.isArray(body.pins)).toBe(true)
+    expect(body.pins.length).toBeGreaterThan(0)
+    expect(typeof body.pins[0].lat).toBe('number')
   })
 
   it('20. public festival list includes festival (unauthenticated)', async () => {

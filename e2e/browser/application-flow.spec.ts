@@ -114,10 +114,10 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
     const mapRes = await fetch(`${API}/festivals/slug/${slug}/map`)
     expect(mapRes.ok).toBe(true)
-    const pins = await mapRes.json()
-    expect(Array.isArray(pins)).toBe(true)
-    expect(pins.length).toBeGreaterThan(0)
-    expect(typeof pins[0].lat).toBe('number')
+    const mapData = await mapRes.json()
+    expect(Array.isArray(mapData.pins)).toBe(true)
+    expect(mapData.pins.length).toBeGreaterThan(0)
+    expect(typeof mapData.pins[0].lat).toBe('number')
   } finally {
     await artistCtx.close()
     await organiserCtx.close()
