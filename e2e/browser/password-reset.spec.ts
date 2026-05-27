@@ -37,5 +37,5 @@ test('A8 — forgot-password confirmation, reset via injected token, login with 
   await page.fill('#email', artist.email)
   await page.fill('#password', newPassword)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/')
+  await expect(page).toHaveURL('/dashboard')
 })

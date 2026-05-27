@@ -39,5 +39,5 @@ test('A15 — log in with MFA enabled and land on /', async ({ page }) => {
   await page.fill('#totp', totpCode(secret))
   await page.getByRole('button', { name: 'Verify' }).click()
 
-  await expect(page).toHaveURL('/')
+  await expect(page).toHaveURL('/dashboard')
 })

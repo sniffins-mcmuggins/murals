@@ -20,7 +20,7 @@ test('organiser setup: signup → create festival → publish → public page vi
   await page.fill('#email', email)
   await page.fill('#password', password)
   await page.click('button[type=submit]')
-  await expect(page).toHaveURL('/')
+  await expect(page).toHaveURL('/dashboard')
 
   // ── 3. Navigate to organiser festivals and create festival ────────────────────
   await page.goto('/organiser/festivals')
