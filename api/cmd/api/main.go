@@ -16,6 +16,7 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/billing"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
@@ -60,6 +61,17 @@ func main() {
 	if err != nil {
 		slog.Error("minio public client init failed", "err", err)
 		os.Exit(1)
+	}
+
+	stripeClient := billing.NewStripeClient(cfg.StripeSecretKey)
+	billingPrices := billing.Prices{
+		ArtistBasicAnnual: cfg.StripeArtistBasicAnnualPrice,
+		ArtistBasicMonth:  cfg.StripeArtistBasicMonthPrice,
+		ArtistProAnnual:   cfg.StripeArtistProAnnualPrice,
+		ArtistProMonth:    cfg.StripeArtistProMonthPrice,
+		OrgSetup:          cfg.StripeOrgSetupPrice,
+		FestivalMonth:     cfg.StripeFestivalMonthPrice,
+		FestivalAnnual:    cfg.StripeFestivalAnnualPrice,
 	}
 
 	r := chi.NewRouter()
@@ -121,6 +133,13 @@ func main() {
 	// Map editor
 	r.Get("/festivals/{festivalID}/artists/accepted", festival.GetAcceptedArtistsHandler(pool))
 	r.Patch("/festivals/{festivalID}/artists/{artistID}/pin", festival.SetArtistPinHandler(pool))
+
+	// Billing — webhook first (no auth required; Stripe POSTs directly)
+	r.Method(http.MethodPost, "/billing/webhook", billing.WebhookHandler(pool, stripeClient, cfg.StripeWebhookSecret, billingPrices))
+	r.Post("/billing/artist/checkout", billing.ArtistCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
+	r.Post("/billing/organiser/setup-checkout", billing.OrgSetupCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
+	r.Post("/billing/festival/{festivalID}/activate-checkout", billing.FestivalActivateCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
+	r.Post("/billing/portal", billing.CustomerPortalHandler(pool, stripeClient, cfg.SiteBase))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
