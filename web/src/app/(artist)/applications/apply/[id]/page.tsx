@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import DynamicForm, { type FormField } from '@/components/DynamicForm'
 import type { components } from '@render/api-client'
@@ -10,11 +11,18 @@ import type { components } from '@render/api-client'
 type ApplicationForm = components['schemas']['ApplicationForm']
 type Festival = components['schemas']['Festival']
 
+class ProfileRequiredError extends Error {
+  constructor() {
+    super('profile_required')
+  }
+}
+
 export default function ApplyPage() {
   const { id: festivalId } = useParams<{ id: string }>()
   const router = useRouter()
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [profileRequired, setProfileRequired] = useState(false)
 
   const festivalQuery = useQuery({
     queryKey: ['festival', festivalId],
@@ -46,14 +54,29 @@ export default function ApplyPage() {
         params: { path: { festivalID: festivalId } },
         body: { answers: answers as unknown as Record<string, never> },
       })
-      if (res.error) throw new Error('Failed to submit application. Please try again.')
+      if (res.error) {
+        if (res.response.status === 409) {
+          const body = res.error as { error?: string } | undefined
+          if (body?.error === 'profile_required') {
+            throw new ProfileRequiredError()
+          }
+        }
+        throw new Error('Failed to submit application. Please try again.')
+      }
       return res.data
     },
     onSuccess: () => {
       setSubmitted(true)
       setSubmitError(null)
+      setProfileRequired(false)
     },
     onError: (err: Error) => {
+      if (err instanceof ProfileRequiredError) {
+        setProfileRequired(true)
+        setSubmitError(null)
+        return
+      }
+      setProfileRequired(false)
       setSubmitError(err.message)
     },
   })
@@ -112,6 +135,23 @@ export default function ApplyPage() {
       </h1>
       {festival?.location_label && (
         <p className="font-sans text-mid mb-6">{festival.location_label}</p>
+      )}
+
+      {profileRequired && (
+        <div
+          role="alert"
+          className="border border-amber bg-warm rounded-lg p-4 mb-6"
+        >
+          <p className="font-sans text-sm text-ink mb-2">
+            You need an artist profile to apply.
+          </p>
+          <Link
+            href="/profile"
+            className="font-sans text-sm text-ink underline hover:text-amber"
+          >
+            Set up your artist profile →
+          </Link>
+        </div>
       )}
 
       {submitError && (
