@@ -167,6 +167,7 @@ jobs:
   e2e:
     name: E2E
     needs: [api, web]
+    if: always() && (needs.api.result == 'success' || needs.web.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
