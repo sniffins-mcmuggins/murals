@@ -22,6 +22,10 @@ type Config struct {
 	GoogleClientID      string
 	GoogleClientSecret  string
 	OAuthRedirectBase   string
+	AppleClientID       string
+	AppleTeamID         string
+	AppleKeyID          string
+	ApplePrivateKey     string
 }
 
 func Load() Config {
@@ -43,6 +47,10 @@ func Load() Config {
 		GoogleClientID:      env("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:  env("GOOGLE_CLIENT_SECRET", ""),
 		OAuthRedirectBase:   env("OAUTH_REDIRECT_BASE", "http://localhost:3000"),
+		AppleClientID:       env("APPLE_CLIENT_ID", ""),
+		AppleTeamID:         env("APPLE_TEAM_ID", ""),
+		AppleKeyID:          env("APPLE_KEY_ID", ""),
+		ApplePrivateKey:     env("APPLE_PRIVATE_KEY", ""),
 	}
 }
 
