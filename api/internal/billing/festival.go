@@ -2,10 +2,12 @@ package billing
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
 
@@ -19,8 +21,8 @@ import (
 func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, prices Prices, siteBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
-		if err != nil || principal.Role != "organiser" {
-			httperr.Write(w, http.StatusForbidden, "Forbidden", "organiser account required")
+		if err != nil {
+			httperr.Unauthorized(w)
 			return
 		}
 
@@ -38,6 +40,22 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, pric
 		}
 
 		q := sqlcdb.New(pool)
+
+		// Must own the festival being paid for.
+		fest, err := q.GetFestivalByID(r.Context(), festivalUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			slog.Error("get festival", "err", err, "festival_id", festivalIDStr)
+			httperr.InternalServerError(w)
+			return
+		}
+		if fest.OrganiserID.String() != principal.UserID {
+			httperr.Forbidden(w)
+			return
+		}
 
 		// Must have paid setup fee first.
 		paid, err := q.HasPaidSetupFee(r.Context(), userUUID)

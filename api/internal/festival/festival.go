@@ -74,10 +74,6 @@ func CreateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Unauthorized(w)
 			return
 		}
-		if principal.Role != "organiser" {
-			httperr.Forbidden(w)
-			return
-		}
 
 		var req struct {
 			Name          string `json:"name"`

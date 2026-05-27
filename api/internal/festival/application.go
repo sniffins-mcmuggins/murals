@@ -52,10 +52,6 @@ func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Unauthorized(w)
 			return
 		}
-		if principal.Role != "artist" {
-			httperr.Forbidden(w)
-			return
-		}
 
 		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
 		if err != nil {
@@ -120,7 +116,12 @@ func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		profile, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.Write(w, http.StatusUnprocessableEntity, "Unprocessable Entity", "artist profile required to apply")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"error":   "profile_required",
+					"message": "create an artist profile to apply",
+				})
 				return
 			}
 			httperr.InternalServerError(w)

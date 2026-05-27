@@ -54,10 +54,6 @@ func GetAcceptedArtistsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Unauthorized(w)
 			return
 		}
-		if principal.Role != "organiser" {
-			httperr.Forbidden(w)
-			return
-		}
 
 		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
 		if err != nil {
@@ -103,10 +99,6 @@ func SetArtistPinHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
-			return
-		}
-		if principal.Role != "organiser" {
-			httperr.Forbidden(w)
 			return
 		}
 

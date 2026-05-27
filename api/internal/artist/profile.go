@@ -73,10 +73,6 @@ func CreateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Unauthorized(w)
 			return
 		}
-		if principal.Role != "artist" {
-			httperr.Forbidden(w)
-			return
-		}
 
 		var req struct {
 			DisplayName string `json:"displayName"`
