@@ -23,7 +23,7 @@ func TestCreateFestival(t *testing.T) {
 	_, orgToken := createTestUser(t, db, "org@example.com", "organiser")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals", festival.CreateHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -42,7 +42,7 @@ func TestCreateFestival_RequiresOrganiser(t *testing.T) {
 	_, artistToken := createTestUser(t, db, "artist@example.com", "artist")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals", festival.CreateHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -62,7 +62,7 @@ func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 	festID := createTestFestival(t, db, orgID, "draft-fest", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/{festivalID}", festival.GetHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -87,7 +87,7 @@ func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 	festID := createTestFestival(t, db, orgID, "my-fest", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Patch("/festivals/{festivalID}", festival.UpdateHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -116,7 +116,7 @@ func TestDeleteFestival_SoftDelete(t *testing.T) {
 	festID := createTestFestival(t, db, orgID, "to-delete", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Delete("/festivals/{festivalID}", festival.DeleteHandler(db))
 	r.Get("/festivals/{festivalID}", festival.GetHandler(db))
 
@@ -141,7 +141,7 @@ func TestListFestivals(t *testing.T) {
 	createTestFestival(t, db, orgID, "fest-b", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals", festival.ListHandler(db))
 
 	srv := httptest.NewServer(r)

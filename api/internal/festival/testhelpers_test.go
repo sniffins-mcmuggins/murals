@@ -30,17 +30,18 @@ func createTestUser(t *testing.T, pool *pgxpool.Pool, email, role string) (userI
 	if err != nil {
 		t.Fatalf("bcrypt: %v", err)
 	}
+	hashStr := string(hash)
 	q := sqlcdb.New(pool)
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        email,
-		PasswordHash: string(hash),
+		PasswordHash: &hashStr,
 		Role:         sqlcdb.UserRole(role),
 	})
 	if err != nil {
 		t.Fatalf("create user %s: %v", email, err)
 	}
 	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, role, testSecret)
+	token, err = auth.IssueToken(userID, role, user.SessionVersion, testSecret)
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
 	}

@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,7 +33,9 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		}
 
 		q := sqlcdb.New(pool)
-		user, err := q.GetUserByEmail(r.Context(), req.Email)
+		// Normalize email to match signup-time storage (lowercased + trimmed).
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		user, err := q.GetUserByEmail(r.Context(), email)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid credentials")
@@ -42,12 +45,33 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		if user.PasswordHash == nil {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid credentials")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
 			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid credentials")
 			return
 		}
 
-		token, err := IssueToken(user.ID.String(), string(user.Role), jwtSecret)
+		// MFA-gated branch: don't issue a session token yet. Return a short-lived
+		// mfa_pending token the client must exchange via POST /auth/mfa/verify.
+		if user.MfaEnabled {
+			mfaToken, err := IssueMFAPendingToken(user.ID.String(), jwtSecret)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"mfa_required": true,
+				"mfa_token":    mfaToken,
+			})
+			return
+		}
+
+		token, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return

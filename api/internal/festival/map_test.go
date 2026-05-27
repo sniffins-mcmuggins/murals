@@ -54,7 +54,7 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	require.NoError(t, err, "set festival artist pin")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -81,7 +81,7 @@ func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	createTestFestival(t, db, orgID, "map-fest-draft", "draft")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(db))
 
 	srv := httptest.NewServer(r)

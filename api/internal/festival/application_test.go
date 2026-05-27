@@ -25,7 +25,7 @@ func TestSubmitApplication_Success(t *testing.T) {
 	createTestArtistProfile(t, db, artistID, "Apply Artist")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -49,7 +49,7 @@ func TestSubmitApplication_MissingRequiredField(t *testing.T) {
 	createTestArtistProfile(t, db, artistID, "Apply Artist 2")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -73,7 +73,7 @@ func TestSubmitApplication_DuplicateReturns409(t *testing.T) {
 	createTestArtistProfile(t, db, artistID, "Apply Artist 3")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -96,7 +96,7 @@ func TestSubmitApplication_RequiresArtistRole(t *testing.T) {
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 
 	srv := httptest.NewServer(r)

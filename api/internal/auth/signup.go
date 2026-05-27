@@ -48,10 +48,11 @@ func SignupHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		hashStr := string(hash)
 		q := sqlcdb.New(pool)
 		user, err := q.CreateUser(r.Context(), sqlcdb.CreateUserParams{
 			Email:        req.Email,
-			PasswordHash: string(hash),
+			PasswordHash: &hashStr,
 			Role:         role,
 		})
 		if err != nil {

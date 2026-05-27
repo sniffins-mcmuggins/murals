@@ -26,7 +26,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	db := testutil.NewDB(t)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/auth/signup", auth.SignupHandler(db))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Get("/me", auth.MeHandler(db))
@@ -260,7 +260,7 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	createTestArtistProfile(t, db, artistID, "Closed Form Artist")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -292,7 +292,7 @@ func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	require.NoError(t, err, "add festival artist")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(db))
 
 	srv := httptest.NewServer(r)

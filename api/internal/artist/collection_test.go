@@ -22,7 +22,7 @@ func TestCreateCollection_Success(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col1@example.com", "artist")
 	createTestProfile(t, db, userID, "Dave")
-	handler := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 
 	body := `{"name":"Bristol 2024","description":"My Bristol work"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections", bytes.NewBufferString(body))
@@ -41,7 +41,7 @@ func TestCreateCollection_NoProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	_, token := createTestUser(t, db, "col2@example.com", "artist")
-	handler := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	handler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 
 	body := `{"name":"My Work"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections", bytes.NewBufferString(body))
@@ -58,7 +58,7 @@ func TestListCollections_Public(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col3@example.com", "artist")
 	profileID := createTestProfile(t, db, userID, "Eve")
-	createHandler := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createHandler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 
 	for _, name := range []string{"Alpha", "Beta"} {
 		body := fmt.Sprintf(`{"name":%q}`, name)
@@ -94,7 +94,7 @@ func TestUpdateCollection_Success(t *testing.T) {
 	userID, token := createTestUser(t, db, "col4@example.com", "artist")
 	createTestProfile(t, db, userID, "Frank")
 
-	createH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"Original"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -107,7 +107,7 @@ func TestUpdateCollection_Success(t *testing.T) {
 	collectionID := created["id"].(string)
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(db))
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
@@ -135,7 +135,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 	userID, token := createTestUser(t, db, "col5@example.com", "artist")
 	createTestProfile(t, db, userID, "Grace")
 
-	createH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"ToDelete"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -147,7 +147,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 	collectionID := created["id"].(string)
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(db))
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
@@ -168,7 +168,7 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 	db := testutil.NewDB(t)
 	ownerID, ownerToken := createTestUser(t, db, "col6owner@example.com", "artist")
 	createTestProfile(t, db, ownerID, "Owner")
-	createH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"Private"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -183,7 +183,7 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 	createTestProfile(t, db, otherID, "Other")
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(db))
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)

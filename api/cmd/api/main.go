@@ -18,6 +18,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
+	"github.com/sniffins-mcmuggins/render/api/internal/email"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
@@ -62,18 +63,54 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Email sender: SES in production, no-op locally when SES isn't configured.
+	//
+	// In prod set SES_REQUIRED=true so a missing/broken SES config is fatal.
+	// Falling back silently to NoopMailer would mean password reset emails
+	// disappear into the void, leaving users with no recovery path.
+	mailer := buildMailer(ctx, cfg)
+
+	// Configure the per-IP rate limiter for auth routes. Prod keeps the
+	// default (5/min); compose/CI bumps it via env so every e2e worker
+	// (which shares the same source IP from the API's POV) doesn't trip the
+	// shared bucket within seconds.
+	auth.ConfigureRateLimit(cfg.LoginRateLimitPerMin, cfg.LoginRateLimitBurst)
+
 	r := chi.NewRouter()
 	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 	r.Use(chiMiddleware.RealIP)
 	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Recover)
 	r.Use(metrics.Middleware())
-	r.Use(auth.Middleware(cfg.JWTSecret))
+	r.Use(auth.Middleware(pool, cfg.JWTSecret))
 
 	r.Get("/healthz", health.Handler(pool))
 	r.Handle("/metrics", metrics.Handler())
 	r.Post("/auth/signup", auth.SignupHandler(pool))
-	r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
+
+	// Rate-limited auth routes (5/min per IP) — login, password reset, and MFA verify.
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RateLimitMiddleware)
+		r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
+		r.Post("/auth/forgot-password", auth.ForgotPasswordHandler(pool, mailer, cfg.WebPublicBase))
+		r.Post("/auth/reset-password", auth.ResetPasswordHandler(pool))
+		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
+	})
+
+	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
+	r.Post("/auth/mfa/enroll", auth.TOTPEnrollHandler(pool, cfg.TOTPEncryptionKey))
+	r.Post("/auth/mfa/confirm", auth.TOTPConfirmHandler(pool, cfg.TOTPEncryptionKey))
+
+	// OAuth — only register if the provider is configured.
+	if cfg.GoogleClientID != "" {
+		r.Get("/auth/oauth/google", auth.GoogleRedirectHandler(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.APIPublicBase))
+		r.Get("/auth/oauth/google/callback", auth.GoogleCallbackHandler(pool, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.APIPublicBase, cfg.WebPublicBase, cfg.JWTSecret))
+	}
+	if cfg.AppleClientID != "" {
+		r.Get("/auth/oauth/apple", auth.AppleRedirectHandler(cfg.AppleClientID, cfg.APIPublicBase))
+		r.Post("/auth/oauth/apple/callback", auth.AppleCallbackHandler(pool, cfg.AppleClientID, cfg.AppleTeamID, cfg.AppleKeyID, cfg.ApplePrivateKey, cfg.APIPublicBase, cfg.WebPublicBase, cfg.JWTSecret))
+	}
+
 	r.Get("/me", auth.MeHandler(pool))
 	r.Post("/images/presign", image.PresignHandler(mcPublic, cfg.MinioBucket))
 	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
@@ -148,6 +185,30 @@ func main() {
 	if err := srv.Shutdown(shutCtx); err != nil {
 		slog.Error("shutdown error", "err", err)
 	}
+}
+
+// buildMailer wires up SES if configured, otherwise returns NoopMailer for
+// local dev. When SES_REQUIRED=true any error in this chain (missing config,
+// init failure) is fatal — see SESRequired in config.go for the why.
+func buildMailer(ctx context.Context, cfg config.Config) auth.EmailSender {
+	if cfg.SESFromEmail == "" || cfg.AWSRegion == "" {
+		if cfg.SESRequired {
+			slog.Error("SES_REQUIRED=true but SES_FROM_EMAIL or AWS_REGION is missing")
+			os.Exit(1)
+		}
+		slog.Warn("SES not configured — using NoopMailer (password reset emails disabled)")
+		return auth.NoopMailer{}
+	}
+	sender, err := email.NewSender(ctx, cfg.AWSRegion, cfg.SESFromEmail)
+	if err != nil {
+		if cfg.SESRequired {
+			slog.Error("SES init failed and SES_REQUIRED=true", "err", err)
+			os.Exit(1)
+		}
+		slog.Warn("SES init failed — falling back to NoopMailer", "err", err)
+		return auth.NoopMailer{}
+	}
+	return sender
 }
 
 // corsMiddleware sets CORS headers only for origins in the allowlist.

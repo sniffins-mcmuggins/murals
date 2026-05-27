@@ -17,10 +17,11 @@ import (
 
 func TestConfirmHandler_Success(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	ms := testutil.NewMinIOServer(t)
 	testutil.MinIOPutObject(t, ms, "test-object.jpg", []byte("fake image bytes"), "image/jpeg")
-	token := testBearerToken(t)
-	handler := auth.Middleware(testSecret)(imagehandler.ConfirmHandler(ms.Client, ms.Bucket, ms.CDNBase()))
+	token := testBearerToken(t, db)
+	handler := auth.Middleware(db, testSecret)(imagehandler.ConfirmHandler(ms.Client, ms.Bucket, ms.CDNBase()))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/confirm",
 		strings.NewReader(`{"s3Key":"test-object.jpg","resourceType":"artist_profile","resourceId":"some-uuid"}`))
@@ -39,9 +40,10 @@ func TestConfirmHandler_Success(t *testing.T) {
 
 func TestConfirmHandler_ObjectNotFound(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	ms := testutil.NewMinIOServer(t)
-	token := testBearerToken(t)
-	handler := auth.Middleware(testSecret)(imagehandler.ConfirmHandler(ms.Client, ms.Bucket, ms.CDNBase()))
+	token := testBearerToken(t, db)
+	handler := auth.Middleware(db, testSecret)(imagehandler.ConfirmHandler(ms.Client, ms.Bucket, ms.CDNBase()))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/confirm",
 		strings.NewReader(`{"s3Key":"nonexistent.jpg"}`))
@@ -56,9 +58,10 @@ func TestConfirmHandler_ObjectNotFound(t *testing.T) {
 
 func TestConfirmHandler_MissingS3Key(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	// MinIO client is never reached — handler returns 422 before calling mc
-	token := testBearerToken(t)
-	handler := auth.Middleware(testSecret)(imagehandler.ConfirmHandler(nil, "unused-bucket", "http://unused"))
+	token := testBearerToken(t, db)
+	handler := auth.Middleware(db, testSecret)(imagehandler.ConfirmHandler(nil, "unused-bucket", "http://unused"))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/confirm",
 		strings.NewReader(`{"resourceType":"artist_profile"}`))
