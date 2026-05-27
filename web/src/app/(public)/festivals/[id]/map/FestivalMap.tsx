@@ -151,6 +151,7 @@ export default function FestivalMap({ pins, festivalName }: Props) {
           />
 
           <div
+            data-testid="map-pin-panel"
             className={[
               'absolute z-[500] bg-offwhite shadow-lg border border-light',
               // Desktop: right sidebar

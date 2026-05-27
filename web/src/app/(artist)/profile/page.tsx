@@ -9,7 +9,7 @@ export default async function ProfilePage() {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get('session')
   const authedClient = createApiClient({
-    baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
+    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
   })
   if (sessionCookie?.value) {
     const sv = sessionCookie.value

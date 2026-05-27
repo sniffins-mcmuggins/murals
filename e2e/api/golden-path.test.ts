@@ -3,18 +3,19 @@ import * as http from 'node:http'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 
-// node:http PUT for MinIO presigned URLs — fetch() silently drops Host as a
-// forbidden header, breaking the HMAC signature validation
+// node:http PUT for MinIO presigned URLs — fetch() treats Host as a forbidden header.
+// We derive Host from the URL so it matches the HMAC signature.
 async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
   return new Promise((resolve) => {
     const { hostname, port, pathname, search } = new URL(url)
+    const hostHeader = port ? `${hostname}:${port}` : hostname
     const req = http.request(
       {
         hostname,
         port: port ? parseInt(port, 10) : 80,
         path: pathname + search,
         method: 'PUT',
-        headers: { 'content-type': contentType, 'host': 'minio:9000', 'content-length': body.length },
+        headers: { 'content-type': contentType, 'host': hostHeader, 'content-length': body.length },
       },
       (res) => { resolve({ ok: (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0 }); res.resume() },
     )
@@ -99,9 +100,6 @@ describe('golden path', () => {
     const { uploadUrl, s3Key: key } = await presignRes.json()
     s3Key = key
 
-    // Rewrite internal Docker URL for host access
-    const hostUrl = (uploadUrl as string).replace('http://minio:9000', 'http://localhost:9000')
-
     // PUT minimal JPEG to MinIO
     const minimalJpeg = Buffer.from(
       '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw' +
@@ -111,7 +109,7 @@ describe('golden path', () => {
       'AQACEQMRAD8AJQAB/9k=',
       'base64',
     )
-    const putRes = await s3Put(hostUrl, minimalJpeg, 'image/jpeg')
+    const putRes = await s3Put(uploadUrl as string, minimalJpeg, 'image/jpeg')
     expect(putRes.ok).toBe(true)
 
     // Confirm

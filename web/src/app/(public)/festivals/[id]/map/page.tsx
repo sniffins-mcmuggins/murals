@@ -1,18 +1,9 @@
 import type { Metadata } from 'next'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import type { MapPin } from './FestivalMap'
-
-const FestivalMap = dynamic(() => import('./FestivalMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full bg-warm">
-      <p className="font-sans text-mid text-sm">Loading map…</p>
-    </div>
-  ),
-})
+import FestivalMapClient from './FestivalMapClient'
 
 type Props = {
   params: Promise<{ id: string }>
@@ -78,7 +69,7 @@ export default async function FestivalMapPage({ params }: Props) {
 
       {/* Full-height map */}
       <div className="flex-1 relative overflow-hidden">
-        <FestivalMap pins={pins} festivalName={festivalName} />
+        <FestivalMapClient pins={pins} festivalName={festivalName} />
       </div>
     </div>
   )

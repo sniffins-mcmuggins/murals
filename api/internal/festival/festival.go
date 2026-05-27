@@ -160,7 +160,8 @@ func GetHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if fest.Status != sqlcdb.FestivalStatusLive {
+		publiclyVisible := fest.Status == sqlcdb.FestivalStatusLive || fest.Status == sqlcdb.FestivalStatusOpen
+		if !publiclyVisible {
 			principal, authErr := auth.User(r.Context())
 			if authErr != nil || fest.OrganiserID.String() != principal.UserID {
 				httperr.NotFound(w)

@@ -67,6 +67,7 @@ export default function ProfileForm({ profile, userId }: Props) {
         <label className="block font-sans text-sm text-ink mb-1">Display name</label>
         <input
           type="text"
+          name="displayName"
           value={displayName}
           onChange={e => setDisplayName(e.target.value)}
           required

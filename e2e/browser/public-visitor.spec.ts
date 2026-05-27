@@ -73,13 +73,13 @@ test.describe('public visitor flow', () => {
     // ── 3. At least one marker is visible ────────────────────────────────────────
     await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10_000 })
 
-    // ── 4. Click marker to open popup ────────────────────────────────────────────
+    // ── 4. Click marker to open pin panel ────────────────────────────────────────
     await page.locator('.leaflet-marker-icon').first().click()
-    await expect(page.locator('.leaflet-popup')).toBeVisible()
-    await expect(page.locator('.leaflet-popup')).toContainText(artistDisplayName)
+    await expect(page.locator('[data-testid="map-pin-panel"]')).toBeVisible()
+    await expect(page.locator('[data-testid="map-pin-panel"]')).toContainText(artistDisplayName)
 
     // ── 5. Navigate to artist profile ────────────────────────────────────────────
-    await page.locator('.leaflet-popup').getByRole('link').click()
+    await page.locator('[data-testid="map-pin-panel"]').getByRole('link').first().click()
     await expect(page).toHaveURL(new RegExp(`/artists/${profileId}`))
     await expect(page.getByRole('heading', { name: artistDisplayName })).toBeVisible()
 

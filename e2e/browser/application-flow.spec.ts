@@ -52,11 +52,11 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
   try {
     await artistPage.goto('/applications')
-    await expect(artistPage.getByRole('heading', { name: 'Applications' })).toBeVisible()
+    await expect(artistPage.getByRole('heading', { name: 'Applications', exact: true })).toBeVisible()
 
     // Find the festival in the "Open festivals" list and click Apply
     await expect(artistPage.getByText(`Flow Fest ${suffix}`)).toBeVisible({ timeout: 10_000 })
-    await artistPage.getByRole('link', { name: 'Apply' }).click()
+    await artistPage.getByRole('listitem').filter({ hasText: `Flow Fest ${suffix}` }).getByRole('link', { name: 'Apply' }).click()
 
     // Fill the application form
     await expect(artistPage.getByRole('form', { name: 'Application form' })).toBeVisible()
@@ -68,7 +68,7 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
     // Artist applications list shows submitted status
     await artistPage.goto('/applications')
-    await expect(artistPage.getByText('submitted')).toBeVisible()
+    await expect(artistPage.getByText('submitted', { exact: true })).toBeVisible()
   } finally {
     // Don't close yet — we need to check again later
   }
@@ -83,7 +83,7 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
   try {
     await organiserPage.goto(`/organiser/festivals/${festivalId}/applications`)
-    await expect(organiserPage.getByText('submitted')).toBeVisible({ timeout: 10_000 })
+    await expect(organiserPage.getByText('submitted', { exact: true })).toBeVisible({ timeout: 10_000 })
 
     await organiserPage.getByRole('button', { name: 'Accept' }).click()
     await expect(organiserPage.getByText('accepted')).toBeVisible()

@@ -140,6 +140,18 @@ export default async function FestivalPage({ params }: Props) {
           </div>
         )}
 
+        {/* Map link */}
+        {festival.status === 'live' && (
+          <div className="mb-10">
+            <Link
+              href={`/festivals/${id}/map`}
+              className="inline-block font-sans font-semibold text-ink bg-amber px-6 py-3 rounded hover:bg-amber/90 transition-colors"
+            >
+              View map
+            </Link>
+          </div>
+        )}
+
         {/* Accepted Artists */}
         <div className="border-t border-light pt-8">
           <h2 className="font-serif text-2xl text-ink mb-6">Accepted Artists</h2>

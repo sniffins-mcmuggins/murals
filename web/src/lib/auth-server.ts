@@ -30,7 +30,7 @@ export async function getSessionUser(): Promise<User | null> {
   // We pass a no-op getToken so the middleware chain is set up, then add
   // a second middleware that sets the Cookie header directly.
   const authedClient = createApiClient({
-    baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
+    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
   })
 
   // openapi-fetch clients expose .use(middleware) — add cookie injection.

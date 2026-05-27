@@ -2,6 +2,7 @@ package image
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -30,6 +31,8 @@ var contentTypeExts = map[string]string{
 
 // PresignHandler handles POST /images/presign.
 // Requires auth. Returns a presigned MinIO PUT URL valid for 15 minutes and the s3Key to pass to /images/confirm.
+// mc must be initialised with the publicly-reachable endpoint so the URL signature matches the Host header
+// the browser will send (e.g. localhost:9000 in dev rather than the internal minio:9000 hostname).
 func PresignHandler(mc *minio.Client, bucket string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := auth.User(r.Context()); err != nil {
@@ -53,6 +56,7 @@ func PresignHandler(mc *minio.Client, bucket string) http.HandlerFunc {
 
 		presignedURL, err := mc.PresignedPutObject(r.Context(), bucket, s3Key, 15*time.Minute)
 		if err != nil {
+			slog.Error("presign failed", "err", err, "bucket", bucket, "key", s3Key)
 			httperr.InternalServerError(w)
 			return
 		}

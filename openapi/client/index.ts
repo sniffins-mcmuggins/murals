@@ -28,7 +28,7 @@ interface ApiClientOptions {
 }
 
 export function createApiClient({ baseUrl, getToken }: ApiClientOptions) {
-  const client = createClient<paths>({ baseUrl })
+  const client = createClient<paths>({ baseUrl, credentials: 'include' })
 
   if (getToken) {
     const middleware: Middleware = {

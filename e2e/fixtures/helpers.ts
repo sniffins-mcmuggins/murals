@@ -2,18 +2,20 @@ import * as http from 'node:http'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 
-// node:http PUT — used for MinIO presigned URLs where we must override the Host
-// header to match the HMAC signature (fetch() treats Host as a forbidden header)
+// node:http PUT — used for MinIO presigned URLs because fetch() treats Host as a
+// forbidden header, preventing us from setting it explicitly. node:http lets us
+// control all headers. Host is derived from the URL so it matches the HMAC signature.
 async function s3Put(url: string, body: Buffer, contentType: string): Promise<{ ok: boolean; status: number }> {
   return new Promise((resolve) => {
     const { hostname, port, pathname, search } = new URL(url)
+    const hostHeader = port ? `${hostname}:${port}` : hostname
     const req = http.request(
       {
         hostname,
         port: port ? parseInt(port, 10) : 80,
         path: pathname + search,
         method: 'PUT',
-        headers: { 'content-type': contentType, 'host': 'minio:9000', 'content-length': body.length },
+        headers: { 'content-type': contentType, 'host': hostHeader, 'content-length': body.length },
       },
       (res) => { resolve({ ok: (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0 }); res.resume() },
     )
@@ -146,12 +148,8 @@ export async function uploadImage(
   if (!presignRes.ok) throw new Error(`Presign failed: ${presignRes.status}`)
   const { uploadUrl, s3Key } = await presignRes.json()
 
-  // 2. Rewrite internal Docker URL to host-accessible URL
-  const hostUploadUrl = (uploadUrl as string).replace('http://minio:9000', 'http://localhost:9000')
-
-  // 3. PUT to MinIO — uses node:http so we can set Host: minio:9000 to match
-  //    the HMAC signature (fetch() silently drops Host as a forbidden header)
-  const putRes = await s3Put(hostUploadUrl, MINIMAL_JPEG, 'image/jpeg')
+  // 3. PUT to MinIO — uses node:http so we can control the Host header
+  const putRes = await s3Put(uploadUrl as string, MINIMAL_JPEG, 'image/jpeg')
   if (!putRes.ok) throw new Error(`MinIO PUT failed: ${putRes.status}`)
 
   // 4. Confirm
