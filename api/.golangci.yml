@@ -11,6 +11,10 @@ linters:
     - bodyclose
     - noctx
     - sqlclosecheck
+  exclusions:
+    rules:
+      - path: internal/openapi/api\.gen\.go
+        linters: [errcheck, govet, staticcheck, unused, ineffassign, misspell, bodyclose, noctx, sqlclosecheck]
 
 formatters:
   enable:
@@ -20,9 +24,3 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/sniffins-mcmuggins/render
-
-issues:
-  exclude-rules:
-    # generated file
-    - path: internal/openapi/api\.gen\.go
-      linters: [all]
