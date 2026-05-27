@@ -186,6 +186,15 @@ func main() {
 	// gating Pro-only routes. Wire it on the consumer endpoint when one lands
 	// (e.g. a Pro-only feature flag check), not here — gating policy is a
 	// product decision separate from the payments plumbing.
+	//
+	// Test-only probe: exercises RequirePlan from the routing layer so e2e tests
+	// can verify the no-sub / basic / pro decision tree end-to-end. The handler
+	// returns 200 if and only if the middleware lets the request through. Path
+	// is namespaced under /_test/ and exposes no real functionality; keep it as
+	// the smallest possible probe until a real Pro-only endpoint replaces it.
+	r.With(billing.RequirePlan(pool, "artist_pro")).Get("/_test/billing/pro-only", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
