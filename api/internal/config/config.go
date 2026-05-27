@@ -44,7 +44,7 @@ func Load() Config {
 		JWTSecret:           env("JWT_SECRET", "dev-jwt-secret-change-in-prod"),
 		LogLevel:            env("LOG_LEVEL", "info"),
 		AWSRegion:           env("AWS_REGION", "eu-west-2"),
-		SESFromEmail:        env("SES_FROM_EMAIL", "noreply@renderltd.com"),
+		SESFromEmail:        env("SES_FROM_EMAIL", ""),
 		GoogleClientID:      env("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:  env("GOOGLE_CLIENT_SECRET", ""),
 		OAuthRedirectBase:   env("OAUTH_REDIRECT_BASE", "http://localhost:3000"),
