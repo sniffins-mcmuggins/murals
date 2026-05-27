@@ -34,7 +34,7 @@ export interface ArtistSetup {
   password: string
 }
 
-export async function createArtist(suffix = Date.now()): Promise<ArtistSetup> {
+export async function createArtist(suffix: string | number = Date.now()): Promise<ArtistSetup> {
   const email = `artist-${suffix}@e2e.test`
   const password = 'testpass123'
 
@@ -63,7 +63,7 @@ export interface OrganiserSetup {
   password: string
 }
 
-export async function createOrganiser(suffix = Date.now()): Promise<OrganiserSetup> {
+export async function createOrganiser(suffix: string | number = Date.now()): Promise<OrganiserSetup> {
   const email = `organiser-${suffix}@e2e.test`
   const password = 'testpass123'
 
