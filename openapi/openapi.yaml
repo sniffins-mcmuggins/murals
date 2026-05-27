@@ -607,6 +607,54 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      summary: Request password reset email
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "202":
+          description: Reset email sent (returned regardless of whether email exists).
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      summary: Reset password using token from email
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: Password updated.
+        "400":
+          description: Invalid or expired token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
   /me:
     get:
       operationId: getMe
