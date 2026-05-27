@@ -41,6 +41,12 @@ tasks:
     desc: "Run all code generators (openapi + sqlc)"
     deps: [openapi:gen, db:generate]
 
+  e2e:api:
+    desc: "Run API e2e tests — no browser, fast (requires stack to be up)"
+    cmd: npx vitest run --config vitest.e2e.config.ts
+
   e2e:
-    desc: "Run end-to-end tests (requires stack to be up)"
-    cmd: npx playwright test
+    desc: "Run all e2e tests — API gate first, then browser (requires stack to be up)"
+    cmds:
+      - task: e2e:api
+      - cmd: npx playwright test

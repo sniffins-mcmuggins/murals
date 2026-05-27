@@ -169,6 +169,15 @@ func (e ListPublicFestivalsParamsStatus) Valid() bool {
 	}
 }
 
+// AcceptedArtist defines model for AcceptedArtist.
+type AcceptedArtist struct {
+	ArtistId *openapi_types.UUID `json:"artist_id,omitempty"`
+	Name     *string             `json:"name,omitempty"`
+	PinLat   *float32            `json:"pin_lat,omitempty"`
+	PinLng   *float32            `json:"pin_lng,omitempty"`
+	W3w      *string             `json:"w3w,omitempty"`
+}
+
 // Application defines model for Application.
 type Application struct {
 	Answers   *map[string]interface{} `json:"answers,omitempty"`
@@ -441,16 +450,25 @@ type PostFestivalsJSONBody struct {
 
 // PatchFestivalsFestivalIDJSONBody defines parameters for PatchFestivalsFestivalID.
 type PatchFestivalsFestivalIDJSONBody struct {
-	Description   *string         `json:"description,omitempty"`
-	LocationLabel *string         `json:"locationLabel,omitempty"`
-	Name          *string         `json:"name,omitempty"`
-	Slug          *string         `json:"slug,omitempty"`
-	Status        *FestivalStatus `json:"status,omitempty"`
+	Description   *string             `json:"description,omitempty"`
+	EndDate       *openapi_types.Date `json:"endDate,omitempty"`
+	LocationLabel *string             `json:"locationLabel,omitempty"`
+	Name          *string             `json:"name,omitempty"`
+	Slug          *string             `json:"slug,omitempty"`
+	StartDate     *openapi_types.Date `json:"startDate,omitempty"`
+	Status        *FestivalStatus     `json:"status,omitempty"`
 }
 
 // PostFestivalsFestivalIDApplyJSONBody defines parameters for PostFestivalsFestivalIDApply.
 type PostFestivalsFestivalIDApplyJSONBody struct {
 	Answers map[string]interface{} `json:"answers"`
+}
+
+// SetArtistPinJSONBody defines parameters for SetArtistPin.
+type SetArtistPinJSONBody struct {
+	Lat float32 `json:"lat"`
+	Lng float32 `json:"lng"`
+	W3w *string `json:"w3w,omitempty"`
 }
 
 // PutFestivalsFestivalIDFormJSONBody defines parameters for PutFestivalsFestivalIDForm.
@@ -502,6 +520,9 @@ type PatchFestivalsFestivalIDJSONRequestBody PatchFestivalsFestivalIDJSONBody
 // PostFestivalsFestivalIDApplyJSONRequestBody defines body for PostFestivalsFestivalIDApply for application/json ContentType.
 type PostFestivalsFestivalIDApplyJSONRequestBody PostFestivalsFestivalIDApplyJSONBody
 
+// SetArtistPinJSONRequestBody defines body for SetArtistPin for application/json ContentType.
+type SetArtistPinJSONRequestBody SetArtistPinJSONBody
+
 // PutFestivalsFestivalIDFormJSONRequestBody defines body for PutFestivalsFestivalIDForm for application/json ContentType.
 type PutFestivalsFestivalIDFormJSONRequestBody PutFestivalsFestivalIDFormJSONBody
 
@@ -537,6 +558,9 @@ type ServerInterface interface {
 	// Update a collection
 	// (PATCH /collections/{collectionID})
 	PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
+	// List images in a collection
+	// (GET /collections/{collectionID}/images)
+	ListCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
 	// Attach an uploaded image to a collection
 	// (POST /collections/{collectionID}/images)
 	AttachCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
@@ -576,6 +600,12 @@ type ServerInterface interface {
 	// Submit an application
 	// (POST /festivals/{festivalID}/apply)
 	PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// List accepted artists for a festival (map editor)
+	// (GET /festivals/{festivalID}/artists/accepted)
+	GetAcceptedArtists(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Set or update a pin location for an accepted artist
+	// (PATCH /festivals/{festivalID}/artists/{artistID}/pin)
+	SetArtistPin(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, artistID openapi_types.UUID)
 	// Get application form
 	// (GET /festivals/{festivalID}/form)
 	GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
@@ -594,6 +624,9 @@ type ServerInterface interface {
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// List the authenticated artist's applications
+	// (GET /me/applications)
+	GetMyApplications(w http.ResponseWriter, r *http.Request)
 	// Create artist profile
 	// (POST /profiles)
 	PostProfiles(w http.ResponseWriter, r *http.Request)
@@ -654,6 +687,12 @@ func (_ Unimplemented) GetCollection(w http.ResponseWriter, r *http.Request, col
 // Update a collection
 // (PATCH /collections/{collectionID})
 func (_ Unimplemented) PatchCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List images in a collection
+// (GET /collections/{collectionID}/images)
+func (_ Unimplemented) ListCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -735,6 +774,18 @@ func (_ Unimplemented) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *ht
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// List accepted artists for a festival (map editor)
+// (GET /festivals/{festivalID}/artists/accepted)
+func (_ Unimplemented) GetAcceptedArtists(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Set or update a pin location for an accepted artist
+// (PATCH /festivals/{festivalID}/artists/{artistID}/pin)
+func (_ Unimplemented) SetArtistPin(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, artistID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Get application form
 // (GET /festivals/{festivalID}/form)
 func (_ Unimplemented) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
@@ -768,6 +819,12 @@ func (_ Unimplemented) PostImagesPresign(w http.ResponseWriter, r *http.Request)
 // Return the authenticated user
 // (GET /me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List the authenticated artist's applications
+// (GET /me/applications)
+func (_ Unimplemented) GetMyApplications(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -957,6 +1014,32 @@ func (siw *ServerInterfaceWrapper) PatchCollection(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PatchCollection(w, r, collectionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCollectionImages operation middleware
+func (siw *ServerInterfaceWrapper) ListCollectionImages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionID" -------------
+	var collectionID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionID", chi.URLParam(r, "collectionID"), &collectionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCollectionImages(w, r, collectionID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1379,6 +1462,83 @@ func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDApply(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
+// GetAcceptedArtists operation middleware
+func (siw *ServerInterfaceWrapper) GetAcceptedArtists(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAcceptedArtists(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetArtistPin operation middleware
+func (siw *ServerInterfaceWrapper) SetArtistPin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "artistID" -------------
+	var artistID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "artistID", chi.URLParam(r, "artistID"), &artistID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "artistID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetArtistPin(w, r, festivalID, artistID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetFestivalsFestivalIDForm operation middleware
 func (siw *ServerInterfaceWrapper) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request) {
 
@@ -1508,6 +1668,28 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMyApplications operation middleware
+func (siw *ServerInterfaceWrapper) GetMyApplications(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyApplications(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1846,6 +2028,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/collections/{collectionID}", wrapper.PatchCollection)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/collections/{collectionID}/images", wrapper.ListCollectionImages)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/collections/{collectionID}/images", wrapper.AttachCollectionImage)
 	})
 	r.Group(func(r chi.Router) {
@@ -1885,6 +2070,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/festivals/{festivalID}/apply", wrapper.PostFestivalsFestivalIDApply)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/{festivalID}/artists/accepted", wrapper.GetAcceptedArtists)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/festivals/{festivalID}/artists/{artistID}/pin", wrapper.SetArtistPin)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/festivals/{festivalID}/form", wrapper.GetFestivalsFestivalIDForm)
 	})
 	r.Group(func(r chi.Router) {
@@ -1901,6 +2092,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/applications", wrapper.GetMyApplications)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/profiles", wrapper.PostProfiles)
@@ -2245,6 +2439,44 @@ type PatchCollection404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response PatchCollection404ApplicationProblemPlusJSONResponse) VisitPatchCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionImagesRequestObject struct {
+	CollectionID openapi_types.UUID `json:"collectionID"`
+}
+
+type ListCollectionImagesResponseObject interface {
+	VisitListCollectionImagesResponse(w http.ResponseWriter) error
+}
+
+type ListCollectionImages200JSONResponse []CollectionImage
+
+func (response ListCollectionImages200JSONResponse) VisitListCollectionImagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionImages404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCollectionImages404ApplicationProblemPlusJSONResponse) VisitListCollectionImagesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -3096,6 +3328,148 @@ func (response PostFestivalsFestivalIDApply422ApplicationProblemPlusJSONResponse
 	return err
 }
 
+type GetAcceptedArtistsRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type GetAcceptedArtistsResponseObject interface {
+	VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error
+}
+
+type GetAcceptedArtists200JSONResponse []AcceptedArtist
+
+func (response GetAcceptedArtists200JSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAcceptedArtists401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAcceptedArtists401ApplicationProblemPlusJSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAcceptedArtists403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAcceptedArtists403ApplicationProblemPlusJSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAcceptedArtists404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAcceptedArtists404ApplicationProblemPlusJSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPinRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+	ArtistID   openapi_types.UUID `json:"artistID"`
+	Body       *SetArtistPinJSONRequestBody
+}
+
+type SetArtistPinResponseObject interface {
+	VisitSetArtistPinResponse(w http.ResponseWriter) error
+}
+
+type SetArtistPin200JSONResponse AcceptedArtist
+
+func (response SetArtistPin200JSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPin401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SetArtistPin401ApplicationProblemPlusJSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPin403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetArtistPin403ApplicationProblemPlusJSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPin404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetArtistPin404ApplicationProblemPlusJSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetFestivalsFestivalIDFormRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 }
@@ -3392,6 +3766,43 @@ type GetMe401ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetMe401ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyApplicationsRequestObject struct {
+}
+
+type GetMyApplicationsResponseObject interface {
+	VisitGetMyApplicationsResponse(w http.ResponseWriter) error
+}
+
+type GetMyApplications200JSONResponse []Application
+
+func (response GetMyApplications200JSONResponse) VisitGetMyApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyApplications401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyApplications401ApplicationProblemPlusJSONResponse) VisitGetMyApplicationsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -3720,6 +4131,9 @@ type StrictServerInterface interface {
 	// Update a collection
 	// (PATCH /collections/{collectionID})
 	PatchCollection(ctx context.Context, request PatchCollectionRequestObject) (PatchCollectionResponseObject, error)
+	// List images in a collection
+	// (GET /collections/{collectionID}/images)
+	ListCollectionImages(ctx context.Context, request ListCollectionImagesRequestObject) (ListCollectionImagesResponseObject, error)
 	// Attach an uploaded image to a collection
 	// (POST /collections/{collectionID}/images)
 	AttachCollectionImage(ctx context.Context, request AttachCollectionImageRequestObject) (AttachCollectionImageResponseObject, error)
@@ -3759,6 +4173,12 @@ type StrictServerInterface interface {
 	// Submit an application
 	// (POST /festivals/{festivalID}/apply)
 	PostFestivalsFestivalIDApply(ctx context.Context, request PostFestivalsFestivalIDApplyRequestObject) (PostFestivalsFestivalIDApplyResponseObject, error)
+	// List accepted artists for a festival (map editor)
+	// (GET /festivals/{festivalID}/artists/accepted)
+	GetAcceptedArtists(ctx context.Context, request GetAcceptedArtistsRequestObject) (GetAcceptedArtistsResponseObject, error)
+	// Set or update a pin location for an accepted artist
+	// (PATCH /festivals/{festivalID}/artists/{artistID}/pin)
+	SetArtistPin(ctx context.Context, request SetArtistPinRequestObject) (SetArtistPinResponseObject, error)
 	// Get application form
 	// (GET /festivals/{festivalID}/form)
 	GetFestivalsFestivalIDForm(ctx context.Context, request GetFestivalsFestivalIDFormRequestObject) (GetFestivalsFestivalIDFormResponseObject, error)
@@ -3777,6 +4197,9 @@ type StrictServerInterface interface {
 	// Return the authenticated user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// List the authenticated artist's applications
+	// (GET /me/applications)
+	GetMyApplications(ctx context.Context, request GetMyApplicationsRequestObject) (GetMyApplicationsResponseObject, error)
 	// Create artist profile
 	// (POST /profiles)
 	PostProfiles(ctx context.Context, request PostProfilesRequestObject) (PostProfilesResponseObject, error)
@@ -4000,6 +4423,32 @@ func (sh *strictHandler) PatchCollection(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PatchCollectionResponseObject); ok {
 		if err := validResponse.VisitPatchCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCollectionImages operation middleware
+func (sh *strictHandler) ListCollectionImages(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID) {
+	var request ListCollectionImagesRequestObject
+
+	request.CollectionID = collectionID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCollectionImages(ctx, request.(ListCollectionImagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCollectionImages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCollectionImagesResponseObject); ok {
+		if err := validResponse.VisitListCollectionImagesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4379,6 +4828,66 @@ func (sh *strictHandler) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *
 	}
 }
 
+// GetAcceptedArtists operation middleware
+func (sh *strictHandler) GetAcceptedArtists(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request GetAcceptedArtistsRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAcceptedArtists(ctx, request.(GetAcceptedArtistsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAcceptedArtists")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAcceptedArtistsResponseObject); ok {
+		if err := validResponse.VisitGetAcceptedArtistsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetArtistPin operation middleware
+func (sh *strictHandler) SetArtistPin(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, artistID openapi_types.UUID) {
+	var request SetArtistPinRequestObject
+
+	request.FestivalID = festivalID
+	request.ArtistID = artistID
+
+	var body SetArtistPinJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetArtistPin(ctx, request.(SetArtistPinRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetArtistPin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetArtistPinResponseObject); ok {
+		if err := validResponse.VisitSetArtistPinResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetFestivalsFestivalIDForm operation middleware
 func (sh *strictHandler) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
 	var request GetFestivalsFestivalIDFormRequestObject
@@ -4541,6 +5050,30 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyApplications operation middleware
+func (sh *strictHandler) GetMyApplications(w http.ResponseWriter, r *http.Request) {
+	var request GetMyApplicationsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyApplications(ctx, request.(GetMyApplicationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyApplications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyApplicationsResponseObject); ok {
+		if err := validResponse.VisitGetMyApplicationsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

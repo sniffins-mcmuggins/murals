@@ -463,6 +463,26 @@ components:
           type: integer
           description: Number of profiles per page.
 
+    AcceptedArtist:
+      type: object
+      properties:
+        artist_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        pin_lat:
+          type: number
+          format: float
+          nullable: true
+        pin_lng:
+          type: number
+          format: float
+          nullable: true
+        w3w:
+          type: string
+          nullable: true
+
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -890,6 +910,29 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   /collections/{collectionID}/images:
+    get:
+      operationId: listCollectionImages
+      summary: List images in a collection
+      tags: [artist]
+      security: []
+      parameters:
+        - name: collectionID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of collection images ordered by display_order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CollectionImage"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       operationId: attachCollectionImage
       summary: Attach an uploaded image to a collection
@@ -997,6 +1040,26 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /me/applications:
+    get:
+      operationId: getMyApplications
+      tags: [festival]
+      summary: List the authenticated artist's applications
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of applications submitted by the authenticated artist, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /festivals:
     post:
@@ -1175,6 +1238,14 @@ paths:
                   type: string
                 locationLabel:
                   type: string
+                startDate:
+                  type: string
+                  format: date
+                  nullable: true
+                endDate:
+                  type: string
+                  format: date
+                  nullable: true
                 status:
                   $ref: "#/components/schemas/FestivalStatus"
       responses:
@@ -1385,6 +1456,89 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/artists/accepted:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAcceptedArtists
+      tags: [festival]
+      summary: List accepted artists for a festival (map editor)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Accepted artists with optional pin locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AcceptedArtist"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/artists/{artistID}/pin:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: artistID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: setArtistPin
+      tags: [festival]
+      summary: Set or update a pin location for an accepted artist
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat:
+                  type: number
+                  format: float
+                lng:
+                  type: number
+                  format: float
+                w3w:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Updated accepted artist entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedArtist"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

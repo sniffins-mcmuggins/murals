@@ -4,7 +4,8 @@ tasks:
   gen:
     desc: "Generate Go server interfaces + TS client from openapi/openapi.yaml"
     cmds:
-      - go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest -config oapi-codegen.yaml openapi.yaml
+      # oapi-codegen is pinned via api/go.mod's tool directive — uses the cached binary.
+      - go -C ../api tool oapi-codegen -config ../openapi/oapi-codegen.yaml ../openapi/openapi.yaml
       - npx openapi-typescript openapi.yaml -o generated/client.ts
 
   diff:

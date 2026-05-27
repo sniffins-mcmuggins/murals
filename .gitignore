@@ -24,3 +24,7 @@ mobile/android/app/.cxx/
 
 # Generated (committed — see openapi:gen)
 # openapi/generated/ is intentionally NOT ignored
+
+# Claude Code — commit shared rules, ignore per-user state
+.claude/settings.local.json
+.claude/worktrees/

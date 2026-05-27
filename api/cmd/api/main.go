@@ -48,7 +48,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Public-facing client: presigned URLs are signed with the public endpoint so
+	// browsers can PUT directly without a Host header mismatch invalidating the signature.
+	// Region is set to skip the GetBucketLocation network call, which fails when the public
+	// endpoint is not reachable from inside the container (e.g. localhost:9000 in Docker).
+	mcPublic, err := minio.New(cfg.MinioPublicEndpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
+		Secure: cfg.MinioUseSSL,
+		Region: "us-east-1",
+	})
+	if err != nil {
+		slog.Error("minio public client init failed", "err", err)
+		os.Exit(1)
+	}
+
 	r := chi.NewRouter()
+	r.Use(corsMiddleware)
 	r.Use(chiMiddleware.RealIP)
 	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Recover)
@@ -60,7 +75,7 @@ func main() {
 	r.Post("/auth/signup", auth.SignupHandler(pool))
 	r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
 	r.Get("/me", auth.MeHandler(pool))
-	r.Post("/images/presign", image.PresignHandler(mc, cfg.MinioBucket))
+	r.Post("/images/presign", image.PresignHandler(mcPublic, cfg.MinioBucket))
 	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
 
 	// Artist profiles
@@ -75,6 +90,7 @@ func main() {
 	r.Get("/collections/{collectionID}", artist.GetCollectionHandler(pool))
 	r.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(pool))
 	r.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(pool))
+	r.Get("/collections/{collectionID}/images", artist.ListCollectionImagesHandler(pool))
 	r.Post("/collections/{collectionID}/images", artist.AttachImageHandler(pool))
 	r.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(pool))
 	r.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(pool))
@@ -94,12 +110,17 @@ func main() {
 	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(pool))
 
 	// Applications
+	r.Get("/me/applications", festival.GetMyApplicationsHandler(pool))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(pool))
 
 	// Review
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool))
+
+	// Map editor
+	r.Get("/festivals/{festivalID}/artists/accepted", festival.GetAcceptedArtistsHandler(pool))
+	r.Patch("/festivals/{festivalID}/artists/{artistID}/pin", festival.SetArtistPinHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -127,6 +148,26 @@ func main() {
 	if err := srv.Shutdown(shutCtx); err != nil {
 		slog.Error("shutdown error", "err", err)
 	}
+}
+
+// corsMiddleware reflects the Origin header with credentials support.
+// Required for browser-to-API requests when web and API run on different ports.
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Add("Vary", "Origin")
+		}
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func newLogger(level string) *slog.Logger {

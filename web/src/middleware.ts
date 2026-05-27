@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
  * Protected paths — requests to these routes require an active session cookie.
  * The matcher config below restricts which requests this middleware runs on.
  */
-const PROTECTED_PATHS = ['/dashboard', '/profile']
+const PROTECTED_PATHS = ['/dashboard', '/profile', '/collections', '/applications', '/organiser']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl

@@ -240,7 +240,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List images in a collection */
+        get: operations["listCollectionImages"];
         put?: never;
         /**
          * Attach an uploaded image to a collection
@@ -287,6 +288,23 @@ export interface paths {
         post?: never;
         /** Remove an image from a collection */
         delete: operations["deleteCollectionImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated artist's applications */
+        get: operations["getMyApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -521,6 +539,10 @@ export interface paths {
                         slug?: string;
                         description?: string;
                         locationLabel?: string;
+                        /** Format: date */
+                        startDate?: string | null;
+                        /** Format: date */
+                        endDate?: string | null;
                         status?: components["schemas"]["FestivalStatus"];
                     };
                 };
@@ -798,6 +820,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/festivals/{festivalID}/artists/accepted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        /** List accepted artists for a festival (map editor) */
+        get: operations["getAcceptedArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/artists/{artistID}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                artistID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set or update a pin location for an accepted artist */
+        patch: operations["setArtistPin"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1065,6 +1126,16 @@ export interface components {
             page: number;
             /** @description Number of profiles per page. */
             per_page: number;
+        };
+        AcceptedArtist: {
+            /** Format: uuid */
+            artist_id?: string;
+            name?: string;
+            /** Format: float */
+            pin_lat?: number | null;
+            /** Format: float */
+            pin_lng?: number | null;
+            w3w?: string | null;
         };
     };
     responses: {
@@ -1519,6 +1590,29 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listCollectionImages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of collection images ordered by display_order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionImage"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
     attachCollectionImage: {
         parameters: {
             query?: never;
@@ -1601,6 +1695,27 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getMyApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of applications submitted by the authenticated artist, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listPublicFestivals: {
         parameters: {
             query?: {
@@ -1645,6 +1760,67 @@ export interface operations {
                     "application/json": components["schemas"]["ProfileListResponse"];
                 };
             };
+        };
+    };
+    getAcceptedArtists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted artists with optional pin locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedArtist"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setArtistPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                artistID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: float */
+                    lat: number;
+                    /** Format: float */
+                    lng: number;
+                    w3w?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated accepted artist entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedArtist"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

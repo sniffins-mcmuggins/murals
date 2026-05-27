@@ -82,6 +82,38 @@ func (q *Queries) GetApplicationByID(ctx context.Context, id pgtype.UUID) (Appli
 	return i, err
 }
 
+const listApplicationsByArtist = `-- name: ListApplicationsByArtist :many
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at FROM applications WHERE artist_id = $1 ORDER BY created_at DESC
+`
+
+func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.UUID) ([]Application, error) {
+	rows, err := q.db.Query(ctx, listApplicationsByArtist, artistID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.FormID,
+			&i.ArtistID,
+			&i.Status,
+			&i.Answers,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listApplicationsByForm = `-- name: ListApplicationsByForm :many
 SELECT id, form_id, artist_id, status, answers, created_at, updated_at FROM applications WHERE form_id = $1 ORDER BY created_at ASC
 `

@@ -13,7 +13,7 @@ export function FestivalCard({ festival, onPress }: Props) {
   const dateRange =
     festival.start_date && festival.end_date
       ? `${festival.start_date} – ${festival.end_date}`
-      : festival.start_date ?? ''
+      : (festival.start_date ?? '')
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
