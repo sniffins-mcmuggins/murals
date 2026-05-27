@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -51,14 +53,30 @@ func (l *ipLimiter) get(ip string) *rate.Limiter {
 	return e.limiter
 }
 
+// clientIP returns the best-effort client identifier for rate-limit keying.
+// Prefers the first X-Forwarded-For entry (set by trusted ALB/proxy), falling
+// back to the request's remote address with port stripped.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// XFF is "client, proxy1, proxy2" — first entry is the original client
+		if comma := strings.IndexByte(xff, ','); comma >= 0 {
+			return strings.TrimSpace(xff[:comma])
+		}
+		return strings.TrimSpace(xff)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// RemoteAddr without port (rare — fall through to raw value)
+		return r.RemoteAddr
+	}
+	return host
+}
+
 // RateLimitMiddleware limits requests to 5/min per IP on the wrapped handler.
 // Note: per-process — with multiple ECS tasks, upgrade to go-redis/redis_rate.
 func RateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := r.RemoteAddr
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			ip = xff
-		}
+		ip := clientIP(r)
 		if !globalLimiter.get(ip).Allow() {
 			w.Header().Set("Retry-After", "60")
 			httperr.Write(w, http.StatusTooManyRequests, "Too Many Requests", "rate limit exceeded")
