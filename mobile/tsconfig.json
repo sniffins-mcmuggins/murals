@@ -5,7 +5,8 @@
     "exactOptionalPropertyTypes": true,
     "baseUrl": ".",
     "paths": {
-      "@render/api-client": ["../openapi/client/index.ts"]
+      "@render/api-client": ["../openapi/client/index.ts"],
+      "openapi-fetch": ["./node_modules/openapi-fetch"]
     }
   },
   "include": ["src", "App.tsx", "index.js"]

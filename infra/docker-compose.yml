@@ -11,6 +11,7 @@ services:
       PORT: "8080"
       DATABASE_URL: "postgres://render:render@db:5432/render?sslmode=disable"
       MINIO_ENDPOINT: "minio:9000"
+      MINIO_PUBLIC_ENDPOINT: "localhost:9000"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-renderdev}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-renderdev123}"
       MINIO_BUCKET: "${MINIO_BUCKET:-render-images}"
