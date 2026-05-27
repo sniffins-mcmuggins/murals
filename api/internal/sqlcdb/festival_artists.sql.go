@@ -60,9 +60,18 @@ type GetAcceptedArtistForFestivalParams struct {
 	ArtistID   pgtype.UUID `db:"artist_id" json:"artist_id"`
 }
 
-func (q *Queries) GetAcceptedArtistForFestival(ctx context.Context, arg GetAcceptedArtistForFestivalParams) (GetAcceptedArtistsForFestivalRow, error) {
+type GetAcceptedArtistForFestivalRow struct {
+	FestivalID  pgtype.UUID    `db:"festival_id" json:"festival_id"`
+	ArtistID    pgtype.UUID    `db:"artist_id" json:"artist_id"`
+	PinLat      pgtype.Numeric `db:"pin_lat" json:"pin_lat"`
+	PinLng      pgtype.Numeric `db:"pin_lng" json:"pin_lng"`
+	W3w         *string        `db:"w3w" json:"w3w"`
+	DisplayName string         `db:"display_name" json:"display_name"`
+}
+
+func (q *Queries) GetAcceptedArtistForFestival(ctx context.Context, arg GetAcceptedArtistForFestivalParams) (GetAcceptedArtistForFestivalRow, error) {
 	row := q.db.QueryRow(ctx, getAcceptedArtistForFestival, arg.FestivalID, arg.ArtistID)
-	var i GetAcceptedArtistsForFestivalRow
+	var i GetAcceptedArtistForFestivalRow
 	err := row.Scan(
 		&i.FestivalID,
 		&i.ArtistID,

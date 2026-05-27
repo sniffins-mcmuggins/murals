@@ -52,7 +52,7 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, pric
 		}
 
 		// Must not already be activated for this festival.
-		activated, err := q.HasActiveFestivalMonth(r.Context(), sqlcdb.HasActiveFestivalMonthParams{
+		activated, err := q.HasActiveFestivalActivation(r.Context(), sqlcdb.HasActiveFestivalActivationParams{
 			UserID:     userUUID,
 			FestivalID: festivalUUID,
 		})
@@ -77,7 +77,7 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, pric
 			Customer: stripe.String(stripeCustomerID),
 			Mode:     stripe.String(string(stripe.CheckoutSessionModePayment)),
 			LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
-				{Price: stripe.String(prices.FestivalMonth), Quantity: stripe.Int64(1)},
+				{Price: stripe.String(prices.FestivalActivation), Quantity: stripe.Int64(1)},
 			},
 			SuccessURL: stripe.String(siteBase + "/organiser/festivals/" + festivalIDStr + "?activated=true"),
 			CancelURL:  stripe.String(siteBase + "/organiser/festivals/" + festivalIDStr),
@@ -85,7 +85,7 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, pric
 		params.Metadata = map[string]string{
 			"user_id":     principal.UserID,
 			"festival_id": festivalIDStr,
-			"charge_type": "festival_month",
+			"charge_type": "festival_activation",
 		}
 
 		sess, err := sc.V1CheckoutSessions.Create(r.Context(), params)
@@ -100,7 +100,7 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, pric
 			UserID:                  userUUID,
 			FestivalID:              festivalUUID,
 			StripeCheckoutSessionID: &sid,
-			ChargeType:              "festival_month",
+			ChargeType:              "festival_activation",
 			AmountPence:             9900,
 		}); err != nil {
 			slog.Error("create festival payment record", "err", err, "session_id", sess.ID, "user_id", principal.UserID)

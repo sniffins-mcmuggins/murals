@@ -29,10 +29,15 @@ const PLANS = {
 export default function ArtistBillingPage() {
   const [billingInterval, setBillingInterval] = useState<'year' | 'month'>('year')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleUpgrade(priceId: string) {
-    if (!priceId) return
+    if (!priceId) {
+      setError('Plan is not configured. Please contact support.')
+      return
+    }
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch(`${API_URL}/billing/artist/checkout`, {
         method: 'POST',
@@ -41,31 +46,49 @@ export default function ArtistBillingPage() {
         body: JSON.stringify({ price_id: priceId }),
       })
       if (!res.ok) {
-        setLoading(false)
+        setError(
+          res.status === 401
+            ? 'Please log in again to subscribe.'
+            : 'Could not start checkout. Please try again.',
+        )
         return
       }
-      const data = await res.json() as { checkout_url?: string }
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url
+      const data = (await res.json()) as { checkout_url?: string }
+      if (!data.checkout_url) {
+        setError('Stripe did not return a checkout URL. Please try again.')
+        return
       }
+      window.location.href = data.checkout_url
     } catch {
+      setError('Network error. Please check your connection and try again.')
+    } finally {
       setLoading(false)
     }
   }
 
   async function handleManage() {
+    setError(null)
     try {
       const res = await fetch(`${API_URL}/billing/portal`, {
         method: 'POST',
         credentials: 'include',
       })
-      if (!res.ok) return
-      const data = await res.json() as { portal_url?: string }
-      if (data.portal_url) {
-        window.location.href = data.portal_url
+      if (!res.ok) {
+        setError(
+          res.status === 404
+            ? 'No active subscription to manage. Choose a plan above to get started.'
+            : 'Could not open the billing portal. Please try again.',
+        )
+        return
       }
+      const data = (await res.json()) as { portal_url?: string }
+      if (!data.portal_url) {
+        setError('Stripe did not return a portal URL. Please try again.')
+        return
+      }
+      window.location.href = data.portal_url
     } catch {
-      // noop
+      setError('Network error. Please check your connection and try again.')
     }
   }
 
@@ -75,6 +98,15 @@ export default function ArtistBillingPage() {
       <p className="font-sans text-mid mb-8">
         All plans include a public profile and festival applications. Upgrade for more collections.
       </p>
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 rounded-md border border-clay bg-clay/10 px-4 py-3 text-clay font-medium"
+        >
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-8">
         {(['year', 'month'] as const).map((i) => (

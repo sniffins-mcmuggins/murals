@@ -1,39 +1,85 @@
 'use client'
 
+import { useState } from 'react'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
-async function handleSetup() {
-  try {
-    const res = await fetch(`${API_URL}/billing/organiser/setup-checkout`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-    if (!res.ok) return
-    const data = (await res.json()) as { checkout_url?: string }
-    if (data.checkout_url) window.location.href = data.checkout_url
-  } catch {
-    // noop
-  }
-}
-
-async function handleManage() {
-  try {
-    const res = await fetch(`${API_URL}/billing/portal`, {
-      method: 'POST',
-      credentials: 'include',
-    })
-    if (!res.ok) return
-    const data = (await res.json()) as { portal_url?: string }
-    if (data.portal_url) window.location.href = data.portal_url
-  } catch {
-    // noop
-  }
-}
-
 export default function OrgBillingPage() {
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState<'setup' | 'manage' | null>(null)
+
+  async function handleSetup() {
+    setError(null)
+    setLoading('setup')
+    try {
+      const res = await fetch(`${API_URL}/billing/organiser/setup-checkout`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        if (res.status === 409) {
+          setError('Setup fee has already been paid for this account.')
+        } else if (res.status === 401 || res.status === 403) {
+          setError('Please log in with your organiser account to pay the setup fee.')
+        } else {
+          setError('Could not start checkout. Please try again.')
+        }
+        return
+      }
+      const data = (await res.json()) as { checkout_url?: string }
+      if (!data.checkout_url) {
+        setError('Stripe did not return a checkout URL. Please try again.')
+        return
+      }
+      window.location.href = data.checkout_url
+    } catch {
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function handleManage() {
+    setError(null)
+    setLoading('manage')
+    try {
+      const res = await fetch(`${API_URL}/billing/portal`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        setError(
+          res.status === 404
+            ? 'No billing account yet. Pay the setup fee above to get started.'
+            : 'Could not open the billing portal. Please try again.',
+        )
+        return
+      }
+      const data = (await res.json()) as { portal_url?: string }
+      if (!data.portal_url) {
+        setError('Stripe did not return a portal URL. Please try again.')
+        return
+      }
+      window.location.href = data.portal_url
+    } catch {
+      setError('Network error. Please check your connection and try again.')
+    } finally {
+      setLoading(null)
+    }
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="font-serif text-4xl text-ink mb-8">Organiser billing</h1>
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 rounded-md border border-clay bg-clay/10 px-4 py-3 text-clay font-medium"
+        >
+          {error}
+        </div>
+      )}
 
       <div className="flex flex-col gap-6">
         <div className="border border-light rounded-xl p-8">
@@ -44,9 +90,10 @@ export default function OrgBillingPage() {
           <button
             type="button"
             onClick={handleSetup}
-            className="bg-amber text-ink font-semibold border-none rounded-md px-6 py-3 cursor-pointer"
+            disabled={loading === 'setup'}
+            className="bg-amber text-ink font-semibold border-none rounded-md px-6 py-3 cursor-pointer disabled:opacity-50"
           >
-            Pay setup fee — £35
+            {loading === 'setup' ? 'Loading…' : 'Pay setup fee — £35'}
           </button>
         </div>
 
@@ -66,9 +113,10 @@ export default function OrgBillingPage() {
           <button
             type="button"
             onClick={handleManage}
-            className="text-amber font-semibold bg-transparent border-none cursor-pointer p-0"
+            disabled={loading === 'manage'}
+            className="text-amber font-semibold bg-transparent border-none cursor-pointer p-0 disabled:opacity-50"
           >
-            Manage billing &amp; payment methods →
+            {loading === 'manage' ? 'Loading…' : 'Manage billing & payment methods →'}
           </button>
         </div>
       </div>

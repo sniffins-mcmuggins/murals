@@ -65,14 +65,15 @@ func main() {
 
 	stripeClient := billing.NewStripeClient(cfg.StripeSecretKey)
 	billingPrices := billing.Prices{
-		ArtistBasicAnnual: cfg.StripeArtistBasicAnnualPrice,
-		ArtistBasicMonth:  cfg.StripeArtistBasicMonthPrice,
-		ArtistProAnnual:   cfg.StripeArtistProAnnualPrice,
-		ArtistProMonth:    cfg.StripeArtistProMonthPrice,
-		OrgSetup:          cfg.StripeOrgSetupPrice,
-		FestivalMonth:     cfg.StripeFestivalMonthPrice,
-		FestivalAnnual:    cfg.StripeFestivalAnnualPrice,
+		ArtistBasicAnnual:  cfg.StripeArtistBasicAnnualPrice,
+		ArtistBasicMonth:   cfg.StripeArtistBasicMonthPrice,
+		ArtistProAnnual:    cfg.StripeArtistProAnnualPrice,
+		ArtistProMonth:     cfg.StripeArtistProMonthPrice,
+		OrgSetup:           cfg.StripeOrgSetupPrice,
+		FestivalActivation: cfg.StripeFestivalActivationPrice,
+		FestivalAnnual:     cfg.StripeFestivalAnnualPrice,
 	}
+	warnIfStripeMisconfigured(cfg)
 
 	r := chi.NewRouter()
 	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
@@ -134,12 +135,20 @@ func main() {
 	r.Get("/festivals/{festivalID}/artists/accepted", festival.GetAcceptedArtistsHandler(pool))
 	r.Patch("/festivals/{festivalID}/artists/{artistID}/pin", festival.SetArtistPinHandler(pool))
 
-	// Billing — webhook first (no auth required; Stripe POSTs directly)
+	// Billing — webhook first (no auth required; Stripe POSTs directly).
+	// CSRF posture: the session cookie is SameSite=Lax (api/internal/auth/login.go),
+	// which blocks cross-site form POSTs to these endpoints. The Authorization
+	// header path is unaffected by SameSite. Do not relax to SameSiteNoneMode
+	// without adding a CSRF token.
 	r.Method(http.MethodPost, "/billing/webhook", billing.WebhookHandler(pool, stripeClient, cfg.StripeWebhookSecret, billingPrices))
 	r.Post("/billing/artist/checkout", billing.ArtistCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
 	r.Post("/billing/organiser/setup-checkout", billing.OrgSetupCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
 	r.Post("/billing/festival/{festivalID}/activate-checkout", billing.FestivalActivateCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
 	r.Post("/billing/portal", billing.CustomerPortalHandler(pool, stripeClient, cfg.SiteBase))
+	// billing.RequirePlan(pool, "artist_pro") is available as middleware for
+	// gating Pro-only routes. Wire it on the consumer endpoint when one lands
+	// (e.g. a Pro-only feature flag check), not here — gating policy is a
+	// product decision separate from the payments plumbing.
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -195,6 +204,36 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			}
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+// warnIfStripeMisconfigured emits a startup warning when Stripe is partially
+// configured (some env vars set, others empty). Fully empty is OK for local
+// dev; fully populated is OK; mixed means a deploy-time misconfiguration that
+// will surface as opaque runtime failures.
+func warnIfStripeMisconfigured(cfg config.Config) {
+	envs := map[string]string{
+		"STRIPE_SECRET_KEY":                   cfg.StripeSecretKey,
+		"STRIPE_WEBHOOK_SECRET":               cfg.StripeWebhookSecret,
+		"STRIPE_ARTIST_BASIC_ANNUAL_PRICE_ID": cfg.StripeArtistBasicAnnualPrice,
+		"STRIPE_ARTIST_BASIC_MONTH_PRICE_ID":  cfg.StripeArtistBasicMonthPrice,
+		"STRIPE_ARTIST_PRO_ANNUAL_PRICE_ID":   cfg.StripeArtistProAnnualPrice,
+		"STRIPE_ARTIST_PRO_MONTH_PRICE_ID":    cfg.StripeArtistProMonthPrice,
+		"STRIPE_ORG_SETUP_PRICE_ID":           cfg.StripeOrgSetupPrice,
+		"STRIPE_FESTIVAL_ACTIVATION_PRICE_ID": cfg.StripeFestivalActivationPrice,
+		"STRIPE_FESTIVAL_ANNUAL_PRICE_ID":     cfg.StripeFestivalAnnualPrice,
+	}
+	set, missing := 0, []string{}
+	for name, v := range envs {
+		if v == "" {
+			missing = append(missing, name)
+		} else {
+			set++
+		}
+	}
+	if set > 0 && len(missing) > 0 {
+		slog.Warn("stripe partially configured — billing endpoints may fail at runtime",
+			"missing", missing, "set_count", set)
 	}
 }
 

@@ -8,13 +8,13 @@ import (
 
 // Prices holds the Stripe Price IDs loaded from config.
 type Prices struct {
-	ArtistBasicAnnual string
-	ArtistBasicMonth  string
-	ArtistProAnnual   string
-	ArtistProMonth    string
-	OrgSetup          string
-	FestivalMonth     string
-	FestivalAnnual    string
+	ArtistBasicAnnual  string
+	ArtistBasicMonth   string
+	ArtistProAnnual    string
+	ArtistProMonth     string
+	OrgSetup           string
+	FestivalActivation string // £99 one-off charge per festival
+	FestivalAnnual     string // £49/yr recurring listing fee
 }
 
 // NewStripeClient initialises the Stripe API client with the given secret key.

@@ -81,6 +81,19 @@ func (q *Queries) GetActiveSubscription(ctx context.Context, arg GetActiveSubscr
 	return i, err
 }
 
+const getFestivalEndDate = `-- name: GetFestivalEndDate :one
+SELECT end_date FROM festivals
+WHERE id = $1 AND deleted_at IS NULL
+LIMIT 1
+`
+
+func (q *Queries) GetFestivalEndDate(ctx context.Context, id pgtype.UUID) (pgtype.Date, error) {
+	row := q.db.QueryRow(ctx, getFestivalEndDate, id)
+	var end_date pgtype.Date
+	err := row.Scan(&end_date)
+	return end_date, err
+}
+
 const getOrgPaymentBySession = `-- name: GetOrgPaymentBySession :one
 SELECT id, user_id, festival_id, stripe_checkout_session_id, stripe_payment_intent_id, charge_type, amount_pence, status, paid_at, created_at FROM organiser_payments
 WHERE stripe_checkout_session_id = $1
@@ -141,20 +154,20 @@ func (q *Queries) GetUserStripeCustomerID(ctx context.Context, id pgtype.UUID) (
 	return stripe_customer_id, err
 }
 
-const hasActiveFestivalMonth = `-- name: HasActiveFestivalMonth :one
+const hasActiveFestivalActivation = `-- name: HasActiveFestivalActivation :one
 SELECT EXISTS (
   SELECT 1 FROM organiser_payments
-  WHERE user_id = $1 AND festival_id = $2 AND charge_type = 'festival_month' AND status = 'paid'
+  WHERE user_id = $1 AND festival_id = $2 AND charge_type = 'festival_activation' AND status = 'paid'
 ) AS paid
 `
 
-type HasActiveFestivalMonthParams struct {
+type HasActiveFestivalActivationParams struct {
 	UserID     pgtype.UUID `db:"user_id" json:"user_id"`
 	FestivalID pgtype.UUID `db:"festival_id" json:"festival_id"`
 }
 
-func (q *Queries) HasActiveFestivalMonth(ctx context.Context, arg HasActiveFestivalMonthParams) (bool, error) {
-	row := q.db.QueryRow(ctx, hasActiveFestivalMonth, arg.UserID, arg.FestivalID)
+func (q *Queries) HasActiveFestivalActivation(ctx context.Context, arg HasActiveFestivalActivationParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasActiveFestivalActivation, arg.UserID, arg.FestivalID)
 	var paid bool
 	err := row.Scan(&paid)
 	return paid, err
@@ -174,20 +187,23 @@ func (q *Queries) HasPaidSetupFee(ctx context.Context, userID pgtype.UUID) (bool
 	return paid, err
 }
 
-const markOrgPaymentPaid = `-- name: MarkOrgPaymentPaid :one
+const markOrgPaymentPaidIfPending = `-- name: MarkOrgPaymentPaidIfPending :one
 UPDATE organiser_payments
 SET status = 'paid', stripe_payment_intent_id = $2, paid_at = now()
-WHERE stripe_checkout_session_id = $1
+WHERE stripe_checkout_session_id = $1 AND status = 'pending'
 RETURNING id, user_id, festival_id, stripe_checkout_session_id, stripe_payment_intent_id, charge_type, amount_pence, status, paid_at, created_at
 `
 
-type MarkOrgPaymentPaidParams struct {
+type MarkOrgPaymentPaidIfPendingParams struct {
 	StripeCheckoutSessionID *string `db:"stripe_checkout_session_id" json:"stripe_checkout_session_id"`
 	StripePaymentIntentID   *string `db:"stripe_payment_intent_id" json:"stripe_payment_intent_id"`
 }
 
-func (q *Queries) MarkOrgPaymentPaid(ctx context.Context, arg MarkOrgPaymentPaidParams) (OrganiserPayment, error) {
-	row := q.db.QueryRow(ctx, markOrgPaymentPaid, arg.StripeCheckoutSessionID, arg.StripePaymentIntentID)
+// Idempotent paid transition: only updates rows in 'pending' state. Returns
+// the updated row, or pgx.ErrNoRows if the row was already paid (Stripe retry)
+// or no row matches the session id.
+func (q *Queries) MarkOrgPaymentPaidIfPending(ctx context.Context, arg MarkOrgPaymentPaidIfPendingParams) (OrganiserPayment, error) {
+	row := q.db.QueryRow(ctx, markOrgPaymentPaidIfPending, arg.StripeCheckoutSessionID, arg.StripePaymentIntentID)
 	var i OrganiserPayment
 	err := row.Scan(
 		&i.ID,
@@ -202,6 +218,22 @@ func (q *Queries) MarkOrgPaymentPaid(ctx context.Context, arg MarkOrgPaymentPaid
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const setSubscriptionStatus = `-- name: SetSubscriptionStatus :exec
+UPDATE subscriptions
+SET status = $2, updated_at = now()
+WHERE stripe_subscription_id = $1
+`
+
+type SetSubscriptionStatusParams struct {
+	StripeSubscriptionID *string `db:"stripe_subscription_id" json:"stripe_subscription_id"`
+	Status               string  `db:"status" json:"status"`
+}
+
+func (q *Queries) SetSubscriptionStatus(ctx context.Context, arg SetSubscriptionStatusParams) error {
+	_, err := q.db.Exec(ctx, setSubscriptionStatus, arg.StripeSubscriptionID, arg.Status)
+	return err
 }
 
 const setUserStripeCustomerID = `-- name: SetUserStripeCustomerID :exec

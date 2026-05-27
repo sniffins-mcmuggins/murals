@@ -47,23 +47,11 @@ func WebhookHandler(pool *pgxpool.Pool, sc *stripe.Client, webhookSecret string,
 		case "invoice.payment_failed":
 			handlePaymentFailed(ctx, pool, event)
 		default:
-			slog.Debug("stripe webhook: unhandled event type", "type", event.Type)
+			slog.Debug("stripe webhook: unhandled event type", "type", event.Type, "event_id", event.ID)
 		}
 
 		w.WriteHeader(http.StatusOK)
 	})
-}
-
-// pgUUIDFromMeta parses metadata UUID, returns invalid UUID on failure or empty.
-func pgUUIDFromMeta(s string) pgtype.UUID {
-	if s == "" {
-		return pgtype.UUID{}
-	}
-	v, err := pgUUIDFromString(s)
-	if err != nil {
-		return pgtype.UUID{}
-	}
-	return v
 }
 
 // pgTimestampFromUnix converts Unix timestamp to pgtype.Timestamptz.
@@ -77,12 +65,12 @@ func pgTimestampFromUnix(unix int64) pgtype.Timestamptz {
 func handleSubscriptionUpsert(ctx context.Context, pool *pgxpool.Pool, event stripe.Event, prices Prices) {
 	var sub stripe.Subscription
 	if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
-		slog.Error("stripe webhook: failed to unmarshal subscription", "err", err)
+		slog.Error("stripe webhook: failed to unmarshal subscription", "err", err, "event_id", event.ID)
 		return
 	}
 
 	if sub.Items == nil || len(sub.Items.Data) == 0 {
-		slog.Error("stripe webhook: subscription has no items", "subscription_id", sub.ID)
+		slog.Error("stripe webhook: subscription has no items", "subscription_id", sub.ID, "event_id", event.ID)
 		return
 	}
 
@@ -92,16 +80,32 @@ func handleSubscriptionUpsert(ctx context.Context, pool *pgxpool.Pool, event str
 		priceID = item.Price.ID
 	}
 
+	// user_id metadata is required — without it we cannot associate the
+	// subscription with a user row (FK violation). Log loud and bail; the
+	// operator must repair via the Stripe dashboard (set the metadata then
+	// resend the webhook).
+	userIDRaw := sub.Metadata["user_id"]
+	if userIDRaw == "" {
+		slog.Error("stripe webhook: subscription missing required user_id metadata",
+			"subscription_id", sub.ID, "event_id", event.ID)
+		return
+	}
+	userID, err := pgUUIDFromString(userIDRaw)
+	if err != nil {
+		slog.Error("stripe webhook: subscription user_id metadata is not a valid UUID",
+			"err", err, "subscription_id", sub.ID, "event_id", event.ID, "user_id_raw", userIDRaw)
+		return
+	}
+
+	festivalID := pgUUIDNullable(sub.Metadata["festival_id"])
+
 	plan := PlanFromPriceID(priceID, prices)
 	interval := IntervalFromPriceID(priceID, prices)
 	currentPeriodEnd := pgTimestampFromUnix(item.CurrentPeriodEnd)
 
-	userID := pgUUIDFromMeta(sub.Metadata["user_id"])
-	festivalID := pgUUIDNullable(sub.Metadata["festival_id"])
-
 	subID := sub.ID
 	q := sqlcdb.New(pool)
-	_, err := q.UpsertSubscription(ctx, sqlcdb.UpsertSubscriptionParams{
+	_, err = q.UpsertSubscription(ctx, sqlcdb.UpsertSubscriptionParams{
 		UserID:               userID,
 		FestivalID:           festivalID,
 		StripeSubscriptionID: &subID,
@@ -112,48 +116,33 @@ func handleSubscriptionUpsert(ctx context.Context, pool *pgxpool.Pool, event str
 		CurrentPeriodEnd:     currentPeriodEnd,
 	})
 	if err != nil {
-		slog.Error("stripe webhook: failed to upsert subscription", "err", err, "subscription_id", sub.ID)
+		slog.Error("stripe webhook: failed to upsert subscription",
+			"err", err, "subscription_id", sub.ID, "event_id", event.ID)
 	}
 }
 
 func handleSubscriptionDeleted(ctx context.Context, pool *pgxpool.Pool, event stripe.Event) {
 	var sub stripe.Subscription
 	if err := json.Unmarshal(event.Data.Raw, &sub); err != nil {
-		slog.Error("stripe webhook: failed to unmarshal subscription for deletion", "err", err)
+		slog.Error("stripe webhook: failed to unmarshal subscription for deletion", "err", err, "event_id", event.ID)
 		return
 	}
 
-	q := sqlcdb.New(pool)
 	subID := sub.ID
-	existing, err := q.GetSubscriptionByStripeID(ctx, &subID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		slog.Debug("stripe webhook: subscription not found for deletion", "subscription_id", sub.ID)
-		return
-	}
-	if err != nil {
-		slog.Error("stripe webhook: fetch subscription for deletion", "err", err, "subscription_id", sub.ID)
-		return
-	}
-
-	_, err = q.UpsertSubscription(ctx, sqlcdb.UpsertSubscriptionParams{
-		UserID:               existing.UserID,
-		FestivalID:           existing.FestivalID,
+	q := sqlcdb.New(pool)
+	if err := q.SetSubscriptionStatus(ctx, sqlcdb.SetSubscriptionStatusParams{
 		StripeSubscriptionID: &subID,
-		StripePriceID:        existing.StripePriceID,
-		Plan:                 existing.Plan,
-		BillingInterval:      existing.BillingInterval,
 		Status:               "canceled",
-		CurrentPeriodEnd:     existing.CurrentPeriodEnd,
-	})
-	if err != nil {
-		slog.Error("stripe webhook: failed to mark subscription canceled", "err", err, "subscription_id", sub.ID)
+	}); err != nil {
+		slog.Error("stripe webhook: failed to mark subscription canceled",
+			"err", err, "subscription_id", sub.ID, "event_id", event.ID)
 	}
 }
 
 func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, sc *stripe.Client, event stripe.Event, prices Prices) {
 	var sess stripe.CheckoutSession
 	if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
-		slog.Error("stripe webhook: failed to unmarshal checkout session", "err", err)
+		slog.Error("stripe webhook: failed to unmarshal checkout session", "err", err, "event_id", event.ID)
 		return
 	}
 
@@ -168,27 +157,46 @@ func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, sc *stripe
 	if paymentIntentID != "" {
 		piID = &paymentIntentID
 	}
-	_, err := q.MarkOrgPaymentPaid(ctx, sqlcdb.MarkOrgPaymentPaidParams{
+
+	// MarkOrgPaymentPaidIfPending only updates rows in 'pending' state.
+	// ErrNoRows means either: (a) the row was already paid (retry) or
+	// (b) no matching session id exists (artist sub checkout). Disambiguate
+	// via a follow-up read so we only trigger downstream side-effects
+	// (festival annual sub auto-start) on the first transition.
+	if _, err := q.MarkOrgPaymentPaidIfPending(ctx, sqlcdb.MarkOrgPaymentPaidIfPendingParams{
 		StripeCheckoutSessionID: &sessionID,
 		StripePaymentIntentID:   piID,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		// Not an error — artist subscription checkout with no matching org payment row.
-		slog.Debug("stripe webhook: no org payment row for checkout session", "session_id", sess.ID)
-		return
-	}
-	if err != nil {
-		slog.Error("stripe webhook: failed to mark org payment paid", "err", err, "session_id", sess.ID)
+	}); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			slog.Error("stripe webhook: failed to mark org payment paid",
+				"err", err, "session_id", sess.ID, "event_id", event.ID)
+			return
+		}
+		// ErrNoRows — distinguish retry from artist sub.
+		existing, lookupErr := q.GetOrgPaymentBySession(ctx, &sessionID)
+		if errors.Is(lookupErr, pgx.ErrNoRows) {
+			slog.Debug("stripe webhook: no org payment row for checkout session",
+				"session_id", sess.ID, "event_id", event.ID)
+			return
+		}
+		if lookupErr != nil {
+			slog.Error("stripe webhook: failed to look up org payment after no-op update",
+				"err", lookupErr, "session_id", sess.ID, "event_id", event.ID)
+			return
+		}
+		slog.Info("stripe webhook: checkout.session.completed for already-paid org payment, skipping",
+			"session_id", sess.ID, "event_id", event.ID, "status", existing.Status)
 		return
 	}
 
-	// After a successful festival activation payment, start the annual recurring subscription.
-	if sess.Metadata != nil && sess.Metadata["charge_type"] == "festival_month" {
-		startAnnualFestivalSubscription(ctx, sc, prices, &sess)
+	// First-time transition to 'paid'. After a successful festival activation
+	// payment, start the annual recurring subscription.
+	if sess.Metadata != nil && sess.Metadata["charge_type"] == "festival_activation" {
+		startAnnualFestivalSubscription(ctx, pool, sc, prices, &sess)
 	}
 }
 
-func startAnnualFestivalSubscription(ctx context.Context, sc *stripe.Client, prices Prices, sess *stripe.CheckoutSession) {
+func startAnnualFestivalSubscription(ctx context.Context, pool *pgxpool.Pool, sc *stripe.Client, prices Prices, sess *stripe.CheckoutSession) {
 	if sess.Customer == nil {
 		slog.Error("stripe webhook: festival checkout has no customer", "session_id", sess.ID)
 		return
@@ -198,16 +206,35 @@ func startAnnualFestivalSubscription(ctx context.Context, sc *stripe.Client, pri
 		return
 	}
 
-	// Schedule the annual subscription to start 1 month after activation.
-	// The festival's exact end date isn't on the checkout session so we approximate.
-	annualStart := time.Now().AddDate(0, 1, 0).Unix()
+	// Anchor the annual subscription's first charge to the festival's end_date
+	// (the recurring fee is for keeping the festival page live after the event).
+	// Fall back to now+1mo only if we cannot resolve the festival — the operator
+	// will see the loud log line and should reconcile manually.
+	festivalIDRaw := sess.Metadata["festival_id"]
+	var trialEnd int64
+	if festivalIDRaw != "" {
+		if festivalUUID, err := pgUUIDFromString(festivalIDRaw); err == nil {
+			endDate, err := sqlcdb.New(pool).GetFestivalEndDate(ctx, festivalUUID)
+			if err == nil && endDate.Valid {
+				trialEnd = endDate.Time.Unix()
+			} else if err != nil {
+				slog.Warn("stripe webhook: could not load festival end_date for trial_end",
+					"err", err, "festival_id", festivalIDRaw, "session_id", sess.ID)
+			}
+		}
+	}
+	if trialEnd == 0 {
+		trialEnd = time.Now().AddDate(0, 1, 0).Unix()
+		slog.Warn("stripe webhook: using fallback trial_end (now+1mo); festival end_date unavailable",
+			"festival_id", festivalIDRaw, "session_id", sess.ID)
+	}
 
 	params := &stripe.SubscriptionCreateParams{
 		Customer: stripe.String(sess.Customer.ID),
 		Items: []*stripe.SubscriptionCreateItemParams{
 			{Price: stripe.String(prices.FestivalAnnual)},
 		},
-		TrialEnd: stripe.Int64(annualStart),
+		TrialEnd: stripe.Int64(trialEnd),
 		Metadata: map[string]string{
 			"user_id":     sess.Metadata["user_id"],
 			"festival_id": sess.Metadata["festival_id"],
@@ -221,47 +248,30 @@ func startAnnualFestivalSubscription(ctx context.Context, sc *stripe.Client, pri
 	slog.Info("stripe webhook: festival annual subscription started",
 		"subscription_id", sub.ID,
 		"festival_id", sess.Metadata["festival_id"],
+		"trial_end", trialEnd,
 	)
 }
 
 func handlePaymentFailed(ctx context.Context, pool *pgxpool.Pool, event stripe.Event) {
 	var inv stripe.Invoice
 	if err := json.Unmarshal(event.Data.Raw, &inv); err != nil {
-		slog.Error("stripe webhook: failed to unmarshal invoice", "err", err)
+		slog.Error("stripe webhook: failed to unmarshal invoice", "err", err, "event_id", event.ID)
 		return
 	}
 
 	// Invoice.Parent.SubscriptionDetails.Subscription gives us the subscription.
 	if inv.Parent == nil || inv.Parent.SubscriptionDetails == nil || inv.Parent.SubscriptionDetails.Subscription == nil {
-		slog.Debug("stripe webhook: invoice.payment_failed has no subscription", "invoice_id", inv.ID)
+		slog.Debug("stripe webhook: invoice.payment_failed has no subscription", "invoice_id", inv.ID, "event_id", event.ID)
 		return
 	}
 
-	sub := inv.Parent.SubscriptionDetails.Subscription
-	subID := sub.ID
-
+	subID := inv.Parent.SubscriptionDetails.Subscription.ID
 	q := sqlcdb.New(pool)
-	existing, err := q.GetSubscriptionByStripeID(ctx, &subID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		slog.Debug("stripe webhook: subscription not found for payment_failed", "subscription_id", subID)
-		return
-	}
-	if err != nil {
-		slog.Error("stripe webhook: fetch subscription for payment_failed", "err", err, "subscription_id", subID)
-		return
-	}
-
-	_, err = q.UpsertSubscription(ctx, sqlcdb.UpsertSubscriptionParams{
-		UserID:               existing.UserID,
-		FestivalID:           existing.FestivalID,
+	if err := q.SetSubscriptionStatus(ctx, sqlcdb.SetSubscriptionStatusParams{
 		StripeSubscriptionID: &subID,
-		StripePriceID:        existing.StripePriceID,
-		Plan:                 existing.Plan,
-		BillingInterval:      existing.BillingInterval,
 		Status:               "past_due",
-		CurrentPeriodEnd:     existing.CurrentPeriodEnd,
-	})
-	if err != nil {
-		slog.Error("stripe webhook: failed to mark subscription past_due", "err", err, "subscription_id", subID)
+	}); err != nil {
+		slog.Error("stripe webhook: failed to mark subscription past_due",
+			"err", err, "subscription_id", subID, "event_id", event.ID)
 	}
 }

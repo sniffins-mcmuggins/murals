@@ -2,30 +2,37 @@ package billing
 
 import (
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
 // RequirePlan returns middleware that gates a handler on the user having
 // an active subscription at the given plan level ("artist_basic" or "artist_pro").
-// On failure responds with 403 {code: "upgrade_required", message: ...}.
+// Responds 403 {code: "upgrade_required"} when the user has no qualifying
+// subscription, 401 when unauthenticated, and 500 on transient DB errors —
+// transient errors must not be masked as "upgrade required" or operators
+// won't see the outage.
 func RequirePlan(pool *pgxpool.Pool, requiredPlan string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			principal, err := auth.User(r.Context())
 			if err != nil {
-				writeUpgradeRequired(w, requiredPlan)
+				httperr.Unauthorized(w)
 				return
 			}
 
 			userUUID, err := pgUUIDFromString(principal.UserID)
 			if err != nil {
-				writeUpgradeRequired(w, requiredPlan)
+				httperr.BadRequest(w, "invalid user id")
 				return
 			}
 
@@ -34,8 +41,14 @@ func RequirePlan(pool *pgxpool.Pool, requiredPlan string) func(http.Handler) htt
 				UserID:     userUUID,
 				FestivalID: pgtype.UUID{},
 			})
-			if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
 				writeUpgradeRequired(w, requiredPlan)
+				return
+			}
+			if err != nil {
+				slog.Error("require plan: fetch active subscription",
+					"err", err, "user_id", principal.UserID, "required_plan", requiredPlan)
+				httperr.InternalServerError(w)
 				return
 			}
 
