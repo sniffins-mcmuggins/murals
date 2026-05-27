@@ -17,6 +17,18 @@ type Config struct {
 	CDNBaseURL          string
 	JWTSecret           string
 	LogLevel            string
+	// Stripe billing
+	StripeSecretKey              string
+	StripeWebhookSecret          string
+	StripeArtistBasicAnnualPrice string
+	StripeArtistBasicMonthPrice  string
+	StripeArtistProAnnualPrice   string
+	StripeArtistProMonthPrice    string
+	StripeOrgSetupPrice          string
+	StripeFestivalMonthPrice     string
+	StripeFestivalAnnualPrice    string
+	// Frontend base URL (for Stripe redirect URLs)
+	SiteBase                     string
 }
 
 func Load() Config {
@@ -33,6 +45,16 @@ func Load() Config {
 		CDNBaseURL:          env("CDN_BASE_URL", "http://localhost:9000/render-images"),
 		JWTSecret:           env("JWT_SECRET", "dev-jwt-secret-change-in-prod"),
 		LogLevel:            env("LOG_LEVEL", "info"),
+		StripeSecretKey:              env("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:          env("STRIPE_WEBHOOK_SECRET", ""),
+		StripeArtistBasicAnnualPrice: env("STRIPE_ARTIST_BASIC_ANNUAL_PRICE_ID", ""),
+		StripeArtistBasicMonthPrice:  env("STRIPE_ARTIST_BASIC_MONTH_PRICE_ID", ""),
+		StripeArtistProAnnualPrice:   env("STRIPE_ARTIST_PRO_ANNUAL_PRICE_ID", ""),
+		StripeArtistProMonthPrice:    env("STRIPE_ARTIST_PRO_MONTH_PRICE_ID", ""),
+		StripeOrgSetupPrice:          env("STRIPE_ORG_SETUP_PRICE_ID", ""),
+		StripeFestivalMonthPrice:     env("STRIPE_FESTIVAL_MONTH_PRICE_ID", ""),
+		StripeFestivalAnnualPrice:    env("STRIPE_FESTIVAL_ANNUAL_PRICE_ID", ""),
+		SiteBase:                     env("SITE_BASE_URL", "http://localhost:3000"),
 	}
 }
 
