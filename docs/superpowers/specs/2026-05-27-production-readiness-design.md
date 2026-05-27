@@ -172,13 +172,24 @@ New user hits "Sign in with Google"
 
 ### Pricing
 
-| Audience | Tier | Annual | Monthly | Features |
-|----------|------|--------|---------|----------|
-| Artist | Basic | £15/yr | £2/mo | 1 collection |
-| Artist | Pro | £25/yr | £4/mo | 5 collections |
-| Organiser | — | £35 one-time setup fee | + £19/£49/£99/mo | By festival size |
+**Artist tiers**
+
+| Tier | Annual | Monthly | Features |
+|------|--------|---------|----------|
+| Basic | £15/yr | £2/mo | 1 collection |
+| Pro | £25/yr | £4/mo | 5 collections |
 
 No free tier. Every artist account requires an active subscription. This prevents bot account creation.
+
+**Organiser charges (flat rate, no size tiers)**
+
+| Charge | Amount | Type | When |
+|--------|--------|------|------|
+| Setup fee | £35 | One-time | On account creation |
+| Festival month | £99 | One-time per festival | When organiser publishes/activates a festival |
+| Annual listing | £49/yr | Recurring yearly | Starts after the festival month ends; keeps the festival page and data live |
+
+Rationale: event organisers typically run one or two festivals a year. Predictable one-time costs are easier to get approved by fundraisers and committees than open-ended monthly subscriptions.
 
 ### Sub-issues
 
@@ -186,10 +197,11 @@ No free tier. Every artist account requires an active subscription. This prevent
 |---|-------|-------|
 | 13.1 | Stripe account + webhook endpoint | Stripe account setup. `POST /billing/webhook` with Stripe-Signature header verification (`stripe.ConstructEvent`). Register webhook in Stripe dashboard pointing to production + staging URLs. |
 | 13.2 | Artist products in Stripe | Two Products: `artist_basic`, `artist_pro`. Each with two Prices: annual (£15/£25) and monthly (£2/£4). Price IDs stored in env config, not hardcoded. |
-| 13.3 | Organiser products in Stripe | One-time Price for setup fee (£35). Three recurring monthly Prices for tiers (£19/£49/£99). |
+| 13.3 | Organiser products in Stripe | Three Products: `organiser_setup` (one-time, £35), `festival_month` (one-time, £99), `festival_annual` (recurring yearly, £49). Price IDs stored in env config. |
 | 13.4 | DB schema | `subscriptions` table + `stripe_customer_id` on users. |
 | 13.5 | Artist checkout | `POST /billing/artist/checkout {priceId}` → Stripe Checkout session (subscription mode) → return `{checkoutUrl}`. Success redirects to `/dashboard?billing=success`. |
-| 13.6 | Organiser checkout | `POST /billing/organiser/checkout {tier}` → attempt to bundle setup fee + subscription in a single Checkout session using Stripe's "subscription with one-time add-on" support. Fallback if not supported: two sequential Checkout sessions (setup fee first via `payment` mode, then subscription via `subscription` mode), with the second triggered by the `checkout.session.completed` webhook from the first. |
+| 13.6 | Organiser checkout — setup | `POST /billing/organiser/setup-checkout` → Stripe Checkout session (payment mode, £35) → on `checkout.session.completed` webhook, mark organiser account active. |
+| 13.6b | Organiser checkout — festival activation | `POST /billing/festival/{id}/activate-checkout` → Stripe Checkout session (payment mode, £99) → on `checkout.session.completed`, mark festival as published and start a £49/yr recurring subscription (`festival_annual`) via Stripe Subscription API, beginning after the festival end date. |
 | 13.7 | Webhook handler | `customer.subscription.created` → insert/update `subscriptions`. `customer.subscription.updated` → update plan/status. `customer.subscription.deleted` → mark inactive. `invoice.payment_failed` → mark `past_due`. All idempotent (Stripe may retry). |
 | 13.8 | Customer Portal | `POST /billing/portal` → Stripe Customer Portal session URL → return `{portalUrl}`. User lands on Stripe-hosted page to manage/cancel. No custom billing UI needed. |
 | 13.9 | Tier enforcement middleware | Chi middleware reads `subscriptions` for authenticated user from DB (cached in request context). Attaches `plan` to context. Endpoints/handlers check: Pro feature with Basic plan → `403 {code: "upgrade_required"}`. |
@@ -201,17 +213,33 @@ No free tier. Every artist account requires an active subscription. This prevent
 ```sql
 ALTER TABLE users ADD COLUMN stripe_customer_id text;
 
+-- Recurring subscriptions (artist tiers + festival annual listing)
 CREATE TABLE subscriptions (
   id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                  uuid NOT NULL REFERENCES users(id),
+  festival_id              uuid REFERENCES festivals(id),   -- null for artist subs; set for festival_annual
   stripe_subscription_id   text UNIQUE,
   stripe_price_id          text NOT NULL,
-  plan                     text NOT NULL,   -- 'artist_basic' | 'artist_pro' | 'organiser_s' | 'organiser_m' | 'organiser_l'
+  plan                     text NOT NULL,   -- 'artist_basic' | 'artist_pro' | 'festival_annual'
   billing_interval         text NOT NULL,   -- 'month' | 'year'
   status                   text NOT NULL,   -- 'active' | 'past_due' | 'canceled' | 'incomplete'
   current_period_end       timestamptz,
   created_at               timestamptz NOT NULL DEFAULT now(),
   updated_at               timestamptz NOT NULL DEFAULT now()
+);
+
+-- One-time charges (organiser setup fee + festival month activation fee)
+CREATE TABLE organiser_payments (
+  id                          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                     uuid NOT NULL REFERENCES users(id),
+  festival_id                 uuid REFERENCES festivals(id),   -- null for setup fee
+  stripe_checkout_session_id  text UNIQUE,
+  stripe_payment_intent_id    text,
+  charge_type                 text NOT NULL,   -- 'setup_fee' | 'festival_month'
+  amount_pence                integer NOT NULL,
+  status                      text NOT NULL,   -- 'pending' | 'paid' | 'failed'
+  paid_at                     timestamptz,
+  created_at                  timestamptz NOT NULL DEFAULT now()
 );
 ```
 
