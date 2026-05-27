@@ -20,7 +20,7 @@ func TestRateLimit_AllowsBurst(t *testing.T) {
 
 	// Burst of 5 should all succeed
 	for i := 0; i < 5; i++ {
-		r := httptest.NewRequest(http.MethodPost, "/test", nil)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 		r.RemoteAddr = ip
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
@@ -28,7 +28,7 @@ func TestRateLimit_AllowsBurst(t *testing.T) {
 	}
 
 	// 6th request should be rate-limited
-	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 	r.RemoteAddr = ip
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -43,7 +43,7 @@ func TestRateLimit_DifferentIPsIndependent(t *testing.T) {
 
 	// Exhaust IP A
 	for i := 0; i < 6; i++ {
-		r := httptest.NewRequest(http.MethodPost, "/test", nil)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 		r.RemoteAddr = "10.0.0.200:1"
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
@@ -51,7 +51,7 @@ func TestRateLimit_DifferentIPsIndependent(t *testing.T) {
 	}
 
 	// IP B should still be allowed
-	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 	r.RemoteAddr = "10.0.0.201:1"
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -65,7 +65,7 @@ func TestRateLimit_XForwardedForUsed(t *testing.T) {
 
 	// Exhaust XFF IP
 	for i := 0; i < 6; i++ {
-		r := httptest.NewRequest(http.MethodPost, "/test", nil)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 		r.RemoteAddr = "10.0.0.50:1"
 		r.Header.Set("X-Forwarded-For", "203.0.113.99")
 		w := httptest.NewRecorder()
@@ -74,7 +74,7 @@ func TestRateLimit_XForwardedForUsed(t *testing.T) {
 	}
 
 	// Same XFF should be limited
-	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 	r.RemoteAddr = "10.0.0.50:1"
 	r.Header.Set("X-Forwarded-For", "203.0.113.99")
 	w := httptest.NewRecorder()
@@ -89,7 +89,7 @@ func TestRateLimit_DifferentPortsSameIP(t *testing.T) {
 
 	// 5 requests from same IP with different ports — should count as same bucket
 	for i := 0; i < 5; i++ {
-		r := httptest.NewRequest(http.MethodPost, "/test", nil)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 		r.RemoteAddr = fmt.Sprintf("10.0.0.150:%d", 10000+i)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
@@ -97,7 +97,7 @@ func TestRateLimit_DifferentPortsSameIP(t *testing.T) {
 	}
 
 	// 6th from yet another port should be limited
-	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 	r.RemoteAddr = "10.0.0.150:30000"
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -111,7 +111,7 @@ func TestRateLimit_XForwardedFor_FirstEntryUsed(t *testing.T) {
 
 	// Exhaust by sending requests with XFF chain "203.0.113.10, 10.0.0.1"
 	for i := 0; i < 6; i++ {
-		r := httptest.NewRequest(http.MethodPost, "/test", nil)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 		r.RemoteAddr = "10.0.0.50:1"
 		r.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
 		w := httptest.NewRecorder()
@@ -120,7 +120,7 @@ func TestRateLimit_XForwardedFor_FirstEntryUsed(t *testing.T) {
 	}
 
 	// A request with same first XFF but different chain should still be limited
-	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 	r.RemoteAddr = "10.0.0.50:1"
 	r.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.99")
 	w := httptest.NewRecorder()

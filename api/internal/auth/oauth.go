@@ -137,7 +137,7 @@ func fetchGoogleUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("google userinfo: unexpected status %d", resp.StatusCode)
 	}
@@ -218,7 +218,7 @@ func appleClientSecret(teamID, clientID, keyID, privateKeyPEM string) (string, e
 	}
 	ecKey, ok := key.(*ecdsa.PrivateKey)
 	if !ok {
-		return "", fmt.Errorf("Apple key is not ECDSA")
+		return "", fmt.Errorf("apple key is not ECDSA")
 	}
 
 	now := time.Now()
@@ -352,7 +352,7 @@ func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, apiBas
 	if err != nil {
 		return "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", "", fmt.Errorf("apple token endpoint: unexpected status %d", resp.StatusCode)

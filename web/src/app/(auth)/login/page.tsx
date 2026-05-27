@@ -41,10 +41,13 @@ function LoginForm() {
         return
       }
 
-      const json = await response
-        .clone()
-        .json()
-        .catch(() => null)
+      const json =
+        typeof response.clone === 'function'
+          ? await response
+              .clone()
+              .json()
+              .catch(() => null)
+          : null
       if (
         json &&
         typeof json === 'object' &&
