@@ -185,49 +185,6 @@ func (ns NullFestivalStatus) Value() (driver.Value, error) {
 	return string(ns.FestivalStatus), nil
 }
 
-type UserRole string
-
-const (
-	UserRoleArtist    UserRole = "artist"
-	UserRoleOrganiser UserRole = "organiser"
-	UserRoleAdmin     UserRole = "admin"
-)
-
-func (e *UserRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = UserRole(s)
-	case string:
-		*e = UserRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
-	}
-	return nil
-}
-
-type NullUserRole struct {
-	UserRole UserRole `json:"user_role"`
-	Valid    bool     `json:"valid"` // Valid is true if UserRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullUserRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.UserRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.UserRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullUserRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.UserRole), nil
-}
-
 type Application struct {
 	ID        pgtype.UUID        `db:"id" json:"id"`
 	FormID    pgtype.UUID        `db:"form_id" json:"form_id"`
@@ -354,7 +311,6 @@ type User struct {
 	ID               pgtype.UUID        `db:"id" json:"id"`
 	Email            string             `db:"email" json:"email"`
 	PasswordHash     *string            `db:"password_hash" json:"password_hash"`
-	Role             UserRole           `db:"role" json:"role"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	OauthProvider    *string            `db:"oauth_provider" json:"oauth_provider"`
 	OauthSubject     *string            `db:"oauth_subject" json:"oauth_subject"`
@@ -362,4 +318,5 @@ type User struct {
 	MfaSecret        *string            `db:"mfa_secret" json:"mfa_secret"`
 	SessionVersion   int32              `db:"session_version" json:"session_version"`
 	StripeCustomerID *string            `db:"stripe_customer_id" json:"stripe_customer_id"`
+	IsAdmin          bool               `db:"is_admin" json:"is_admin"`
 }
