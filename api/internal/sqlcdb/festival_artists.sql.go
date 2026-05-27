@@ -41,6 +41,39 @@ func (q *Queries) AddFestivalArtist(ctx context.Context, arg AddFestivalArtistPa
 	return i, err
 }
 
+const getAcceptedArtistForFestival = `-- name: GetAcceptedArtistForFestival :one
+SELECT fa.festival_id,
+       fa.artist_id,
+       fa.pin_lat,
+       fa.pin_lng,
+       fa.w3w,
+       ap.display_name
+FROM festival_artists fa
+JOIN artist_profiles ap ON ap.id = fa.artist_id
+WHERE fa.festival_id = $1
+  AND fa.artist_id = $2
+  AND fa.status = 'accepted'
+`
+
+type GetAcceptedArtistForFestivalParams struct {
+	FestivalID pgtype.UUID `db:"festival_id" json:"festival_id"`
+	ArtistID   pgtype.UUID `db:"artist_id" json:"artist_id"`
+}
+
+func (q *Queries) GetAcceptedArtistForFestival(ctx context.Context, arg GetAcceptedArtistForFestivalParams) (GetAcceptedArtistsForFestivalRow, error) {
+	row := q.db.QueryRow(ctx, getAcceptedArtistForFestival, arg.FestivalID, arg.ArtistID)
+	var i GetAcceptedArtistsForFestivalRow
+	err := row.Scan(
+		&i.FestivalID,
+		&i.ArtistID,
+		&i.PinLat,
+		&i.PinLng,
+		&i.W3w,
+		&i.DisplayName,
+	)
+	return i, err
+}
+
 const getAcceptedArtistsForFestival = `-- name: GetAcceptedArtistsForFestival :many
 SELECT fa.festival_id,
        fa.artist_id,

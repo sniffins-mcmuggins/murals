@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -28,6 +29,10 @@ type Config struct {
 	AppleKeyID          string
 	ApplePrivateKey     string
 	TOTPEncryptionKey   string // base64-encoded 32-byte AES-256-GCM key
+	// CORSAllowedOrigins is the set of origins permitted to make credentialed
+	// cross-origin requests. Set CORS_ALLOWED_ORIGINS to a comma-separated list
+	// in production (e.g. "https://app.example.com,https://www.example.com").
+	CORSAllowedOrigins []string
 }
 
 func Load() Config {
@@ -55,6 +60,7 @@ func Load() Config {
 		AppleKeyID:          env("APPLE_KEY_ID", ""),
 		ApplePrivateKey:     env("APPLE_PRIVATE_KEY", ""),
 		TOTPEncryptionKey:   env("TOTP_ENCRYPTION_KEY", ""),
+		CORSAllowedOrigins:  envStringSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 	}
 }
 
@@ -75,4 +81,19 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return b
+}
+
+func envStringSlice(key string, fallback []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
