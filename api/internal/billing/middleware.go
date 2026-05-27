@@ -42,7 +42,22 @@ func RequirePlan(pool *pgxpool.Pool, requiredPlan string) func(http.Handler) htt
 				FestivalID: pgtype.UUID{},
 			})
 			if errors.Is(err, pgx.ErrNoRows) {
-				writeUpgradeRequired(w, requiredPlan)
+				hasGrant, grantErr := q.HasActiveGrant(r.Context(), sqlcdb.HasActiveGrantParams{
+					UserID:     userUUID,
+					Plan:       requiredPlan,
+					FestivalID: pgtype.UUID{},
+				})
+				if grantErr != nil {
+					slog.Error("require plan: check active grant",
+						"err", grantErr, "user_id", principal.UserID, "required_plan", requiredPlan)
+					httperr.InternalServerError(w)
+					return
+				}
+				if !hasGrant {
+					writeUpgradeRequired(w, requiredPlan)
+					return
+				}
+				next.ServeHTTP(w, r)
 				return
 			}
 			if err != nil {

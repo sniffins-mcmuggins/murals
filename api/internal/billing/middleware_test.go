@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
+	pgtype "github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -138,6 +139,79 @@ func TestRequirePlan_BasicSubFailsWhenProRequired(t *testing.T) {
 
 	r := httptest.NewRequestWithContext(
 		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), user.IsAdmin),
+		http.MethodGet, "/", nil,
+	)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestRequirePlan_ActiveGrant_PassesThrough(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	q := sqlcdb.New(db)
+	ctx := context.Background()
+
+	user, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
+		Email:        "grant-passes-" + uuid.NewString() + "@test",
+		PasswordHash: ptr("x"),
+	})
+	require.NoError(t, err)
+
+	_, err = q.CreateAccessGrant(ctx, sqlcdb.CreateAccessGrantParams{
+		UserID:     user.ID,
+		Plan:       "artist_pro",
+		ValidUntil: pgtype.Timestamptz{Time: time.Now().Add(30 * 24 * time.Hour), Valid: true},
+	})
+	require.NoError(t, err)
+
+	called := false
+	handler := billing.RequirePlan(db, "artist_pro")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	r := httptest.NewRequestWithContext(
+		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), false),
+		http.MethodGet, "/", nil,
+	)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	assert.True(t, called, "active grant must let request through")
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestRequirePlan_RevokedGrant_Returns403(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	q := sqlcdb.New(db)
+	ctx := context.Background()
+
+	user, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
+		Email:        "grant-revoked-" + uuid.NewString() + "@test",
+		PasswordHash: ptr("x"),
+	})
+	require.NoError(t, err)
+
+	grant, err := q.CreateAccessGrant(ctx, sqlcdb.CreateAccessGrantParams{
+		UserID:     user.ID,
+		Plan:       "artist_pro",
+		ValidUntil: pgtype.Timestamptz{Time: time.Now().Add(30 * 24 * time.Hour), Valid: true},
+	})
+	require.NoError(t, err)
+
+	// Revoke it immediately.
+	err = q.RevokeAccessGrant(ctx, grant.ID)
+	require.NoError(t, err)
+
+	handler := billing.RequirePlan(db, "artist_pro")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	r := httptest.NewRequestWithContext(
+		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), false),
 		http.MethodGet, "/", nil,
 	)
 	w := httptest.NewRecorder()
