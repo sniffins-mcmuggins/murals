@@ -99,7 +99,7 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
     await expect(organiserPage.getByRole('heading', { name: 'Place pin' })).toBeVisible()
 
     // Select the accepted artist from the dropdown
-    await organiserPage.selectOption('#artist-select', { label: new RegExp(`E2E Artist ${suffix}`) })
+    await organiserPage.selectOption('#artist-select', { label: `E2E Artist ${suffix}` })
 
     // Fill W3W (optional but we validate the format)
     await organiserPage.fill('#w3w-input', 'three.word.address')
