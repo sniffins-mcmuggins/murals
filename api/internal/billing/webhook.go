@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/client"
 	"github.com/stripe/stripe-go/v82/webhook"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
@@ -21,7 +20,7 @@ import (
 )
 
 // WebhookHandler returns an http.Handler that processes Stripe webhook events.
-func WebhookHandler(pool *pgxpool.Pool, sc *client.API, webhookSecret string, prices Prices) http.Handler {
+func WebhookHandler(pool *pgxpool.Pool, sc *stripe.Client, webhookSecret string, prices Prices) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -151,7 +150,7 @@ func handleSubscriptionDeleted(ctx context.Context, pool *pgxpool.Pool, event st
 	}
 }
 
-func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, sc *client.API, event stripe.Event, prices Prices) {
+func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, sc *stripe.Client, event stripe.Event, prices Prices) {
 	var sess stripe.CheckoutSession
 	if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
 		slog.Error("stripe webhook: failed to unmarshal checkout session", "err", err)
@@ -189,7 +188,7 @@ func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, sc *client
 	}
 }
 
-func startAnnualFestivalSubscription(ctx context.Context, sc *client.API, prices Prices, sess *stripe.CheckoutSession) {
+func startAnnualFestivalSubscription(ctx context.Context, sc *stripe.Client, prices Prices, sess *stripe.CheckoutSession) {
 	if sess.Customer == nil {
 		slog.Error("stripe webhook: festival checkout has no customer", "session_id", sess.ID)
 		return
@@ -203,9 +202,9 @@ func startAnnualFestivalSubscription(ctx context.Context, sc *client.API, prices
 	// The festival's exact end date isn't on the checkout session so we approximate.
 	annualStart := time.Now().AddDate(0, 1, 0).Unix()
 
-	params := &stripe.SubscriptionParams{
+	params := &stripe.SubscriptionCreateParams{
 		Customer: stripe.String(sess.Customer.ID),
-		Items: []*stripe.SubscriptionItemsParams{
+		Items: []*stripe.SubscriptionCreateItemParams{
 			{Price: stripe.String(prices.FestivalAnnual)},
 		},
 		TrialEnd: stripe.Int64(annualStart),
@@ -214,9 +213,7 @@ func startAnnualFestivalSubscription(ctx context.Context, sc *client.API, prices
 			"festival_id": sess.Metadata["festival_id"],
 		},
 	}
-	// Context is not threaded through Stripe client calls; suppress unused ctx lint warning.
-	_ = ctx
-	sub, err := sc.Subscriptions.New(params)
+	sub, err := sc.V1Subscriptions.Create(ctx, params)
 	if err != nil {
 		slog.Error("stripe webhook: create festival annual subscription", "err", err, "session_id", sess.ID)
 		return

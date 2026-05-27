@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/client"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
@@ -17,7 +16,7 @@ import (
 
 // OrgSetupCheckoutHandler handles POST /billing/organiser/setup-checkout.
 // Creates a Stripe Checkout Session for the £35 one-time setup fee.
-func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices Prices, siteBase string) http.HandlerFunc {
+func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, prices Prices, siteBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil || principal.Role != "organiser" {
@@ -50,10 +49,10 @@ func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices Prices, 
 			return
 		}
 
-		params := &stripe.CheckoutSessionParams{
+		params := &stripe.CheckoutSessionCreateParams{
 			Customer: stripe.String(stripeCustomerID),
 			Mode:     stripe.String(string(stripe.CheckoutSessionModePayment)),
-			LineItems: []*stripe.CheckoutSessionLineItemParams{
+			LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 				{Price: stripe.String(prices.OrgSetup), Quantity: stripe.Int64(1)},
 			},
 			SuccessURL: stripe.String(siteBase + "/organiser/dashboard?setup=success"),
@@ -65,7 +64,7 @@ func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices Prices, 
 			"charge_type": "setup_fee",
 		}
 
-		sess, err := sc.CheckoutSessions.New(params)
+		sess, err := sc.V1CheckoutSessions.Create(r.Context(), params)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return

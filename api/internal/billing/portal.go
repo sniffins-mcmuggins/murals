@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/client"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
@@ -19,7 +18,7 @@ import (
 // CustomerPortalHandler handles POST /billing/portal.
 // Returns {portal_url} pointing to the Stripe Customer Portal for self-service
 // cancellation, payment method changes, and invoice history.
-func CustomerPortalHandler(pool *pgxpool.Pool, sc *client.API, siteBase string) http.HandlerFunc {
+func CustomerPortalHandler(pool *pgxpool.Pool, sc *stripe.Client, siteBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
@@ -49,11 +48,11 @@ func CustomerPortalHandler(pool *pgxpool.Pool, sc *client.API, siteBase string) 
 			return
 		}
 
-		params := &stripe.BillingPortalSessionParams{
+		params := &stripe.BillingPortalSessionCreateParams{
 			Customer:  stripe.String(*customerID),
 			ReturnURL: stripe.String(siteBase + "/billing"),
 		}
-		sess, err := sc.BillingPortalSessions.New(params)
+		sess, err := sc.V1BillingPortalSessions.Create(r.Context(), params)
 		if err != nil {
 			slog.Error("create stripe portal session", "err", err, "user_id", principal.UserID)
 			httperr.InternalServerError(w)

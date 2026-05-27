@@ -4,7 +4,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/client"
 )
 
 // Prices holds the Stripe Price IDs loaded from config.
@@ -19,11 +18,8 @@ type Prices struct {
 }
 
 // NewStripeClient initialises the Stripe API client with the given secret key.
-func NewStripeClient(secretKey string) *client.API {
-	stripe.Key = secretKey
-	sc := &client.API{}
-	sc.Init(secretKey, nil)
-	return sc
+func NewStripeClient(secretKey string) *stripe.Client {
+	return stripe.NewClient(secretKey)
 }
 
 // PlanFromPriceID maps a Stripe Price ID to a plan name.

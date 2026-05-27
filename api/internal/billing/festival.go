@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/client"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
@@ -17,7 +16,7 @@ import (
 
 // FestivalActivateCheckoutHandler handles POST /billing/festival/{festivalID}/activate-checkout.
 // Creates a Stripe Checkout for the £99 one-off festival activation fee.
-func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices Prices, siteBase string) http.HandlerFunc {
+func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, prices Prices, siteBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil || principal.Role != "organiser" {
@@ -74,10 +73,10 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices 
 			return
 		}
 
-		params := &stripe.CheckoutSessionParams{
+		params := &stripe.CheckoutSessionCreateParams{
 			Customer: stripe.String(stripeCustomerID),
 			Mode:     stripe.String(string(stripe.CheckoutSessionModePayment)),
-			LineItems: []*stripe.CheckoutSessionLineItemParams{
+			LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 				{Price: stripe.String(prices.FestivalMonth), Quantity: stripe.Int64(1)},
 			},
 			SuccessURL: stripe.String(siteBase + "/organiser/festivals/" + festivalIDStr + "?activated=true"),
@@ -89,7 +88,7 @@ func FestivalActivateCheckoutHandler(pool *pgxpool.Pool, sc *client.API, prices 
 			"charge_type": "festival_month",
 		}
 
-		sess, err := sc.CheckoutSessions.New(params)
+		sess, err := sc.V1CheckoutSessions.Create(r.Context(), params)
 		if err != nil {
 			slog.Error("create festival checkout session", "err", err, "user_id", principal.UserID, "festival_id", festivalIDStr)
 			httperr.InternalServerError(w)
