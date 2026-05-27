@@ -17,6 +17,7 @@ SET revoked_at = now()
 WHERE id = $1 AND revoked_at IS NULL;
 
 -- name: HasActiveGrant :one
+-- $3 (festival_id): pass pgtype.UUID{} for non-festival plans; set for festival_activation checks.
 SELECT EXISTS (
     SELECT 1 FROM access_grants
     WHERE user_id = $1
@@ -50,8 +51,14 @@ UPDATE promo_codes
 SET revoked_at = now()
 WHERE id = $1 AND revoked_at IS NULL;
 
--- name: IncrementPromoUseCount :exec
-UPDATE promo_codes SET use_count = use_count + 1 WHERE id = $1;
+-- name: IncrementPromoUseCount :one
+UPDATE promo_codes
+SET use_count = use_count + 1
+WHERE id = $1
+  AND (max_uses IS NULL OR use_count < max_uses)
+  AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > now())
+RETURNING *;
 
 -- name: HasRedeemedPromo :one
 SELECT EXISTS (

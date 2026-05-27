@@ -154,6 +154,7 @@ type HasActiveGrantParams struct {
 	FestivalID pgtype.UUID `db:"festival_id" json:"festival_id"`
 }
 
+// $3 (festival_id): pass pgtype.UUID{} for non-festival plans; set for festival_activation checks.
 func (q *Queries) HasActiveGrant(ctx context.Context, arg HasActiveGrantParams) (bool, error) {
 	row := q.db.QueryRow(ctx, hasActiveGrant, arg.UserID, arg.Plan, arg.FestivalID)
 	var has_grant bool
@@ -180,13 +181,32 @@ func (q *Queries) HasRedeemedPromo(ctx context.Context, arg HasRedeemedPromoPara
 	return has_redeemed, err
 }
 
-const incrementPromoUseCount = `-- name: IncrementPromoUseCount :exec
-UPDATE promo_codes SET use_count = use_count + 1 WHERE id = $1
+const incrementPromoUseCount = `-- name: IncrementPromoUseCount :one
+UPDATE promo_codes
+SET use_count = use_count + 1
+WHERE id = $1
+  AND (max_uses IS NULL OR use_count < max_uses)
+  AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > now())
+RETURNING id, code, plan, duration_days, max_uses, use_count, expires_at, created_by, revoked_at, created_at
 `
 
-func (q *Queries) IncrementPromoUseCount(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, incrementPromoUseCount, id)
-	return err
+func (q *Queries) IncrementPromoUseCount(ctx context.Context, id pgtype.UUID) (PromoCode, error) {
+	row := q.db.QueryRow(ctx, incrementPromoUseCount, id)
+	var i PromoCode
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.Plan,
+		&i.DurationDays,
+		&i.MaxUses,
+		&i.UseCount,
+		&i.ExpiresAt,
+		&i.CreatedBy,
+		&i.RevokedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const listActiveGrants = `-- name: ListActiveGrants :many
