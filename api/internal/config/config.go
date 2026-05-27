@@ -26,6 +26,7 @@ type Config struct {
 	AppleTeamID         string
 	AppleKeyID          string
 	ApplePrivateKey     string
+	TOTPEncryptionKey   string // base64-encoded 32-byte AES-256-GCM key
 }
 
 func Load() Config {
@@ -51,6 +52,7 @@ func Load() Config {
 		AppleTeamID:         env("APPLE_TEAM_ID", ""),
 		AppleKeyID:          env("APPLE_KEY_ID", ""),
 		ApplePrivateKey:     env("APPLE_PRIVATE_KEY", ""),
+		TOTPEncryptionKey:   env("TOTP_ENCRYPTION_KEY", ""),
 	}
 }
 
