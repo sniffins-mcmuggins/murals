@@ -14,6 +14,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/admin"
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/billing"
@@ -197,6 +198,22 @@ func main() {
 	r.With(billing.RequirePlan(pool, "artist_pro")).Get("/_test/billing/pro-only", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Admin — requires admin role + MFA enrollment.
+	r.Route("/admin", func(r chi.Router) {
+		r.Use(admin.RequireAdmin(pool))
+		r.Get("/users", admin.ListUsersHandler(pool))
+		r.Get("/users/{userID}", admin.GetUserHandler(pool))
+		r.Post("/users/{userID}/password-reset", admin.TriggerPasswordResetHandler(pool, mailer, cfg.WebPublicBase))
+		r.Post("/users/{userID}/grants", admin.CreateGrantHandler(pool))
+		r.Delete("/grants/{grantID}", admin.RevokeGrantHandler(pool))
+		r.Get("/promo-codes", admin.ListPromoCodesHandler(pool))
+		r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
+		r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
+	})
+
+	// User-facing promo redemption (normal auth, no admin role required).
+	r.Post("/promo/redeem", admin.RedeemPromoHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
