@@ -1,4 +1,5 @@
 .DS_Store
+.superpowers/
 output/
 videos/
 node_modules/
