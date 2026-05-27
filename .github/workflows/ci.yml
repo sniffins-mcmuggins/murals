@@ -155,14 +155,10 @@ jobs:
           go-version: "1.25"
           cache-dependency-path: api/go.sum
 
-      - name: Install codegen tools
-        run: |
-          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-          go install github.com/go-task/task/v3/cmd/task@latest
-          npm install -g openapi-typescript
-
       - name: Regenerate
-        run: task openapi:gen
+        # task + oapi-codegen are pinned via api/go.mod's tool directive
+        # (cached by setup-go). openapi-typescript is run via npx.
+        run: go -C api tool task -d "$PWD" openapi:gen
 
       - name: Check for drift
         run: git diff --exit-code openapi/generated/
@@ -183,25 +179,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Go (for task up)
+      - name: Install Go (for task)
         uses: actions/setup-go@v5
         with:
           go-version-file: api/go.mod
-
-      - name: Install Task
-        uses: arduino/setup-task@v2
+          cache-dependency-path: api/go.sum
 
       - name: Start compose stack
-        run: task up
+        # task is pinned via api/go.mod's tool directive (cached by setup-go).
+        run: go -C api tool task -d "$PWD" up
 
       - name: Wait for API healthz
         run: timeout 90 bash -c 'until curl -sf http://localhost:8080/healthz; do sleep 3; done'
 
       - name: Run database migrations
-        run: task db:migrate
+        run: go -C api tool task -d "$PWD" db:migrate
 
       - name: Run API e2e (fast gate)
-        run: task e2e:api
+        run: go -C api tool task -d "$PWD" e2e:api
 
       - name: Wait for web service
         run: timeout 300 bash -c 'until curl -sf http://localhost:3000; do sleep 3; done'
