@@ -44,7 +44,7 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	}
 }
 
-// SubmitApplicationHandler handles POST /festivals/{festivalID}/apply. Requires artist role.
+// SubmitApplicationHandler handles POST /festivals/{festivalID}/apply. Requires the caller to have an artist profile; returns 409 profile_required if not.
 func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())

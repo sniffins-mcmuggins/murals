@@ -66,7 +66,7 @@ func parseDateParam(s string) (pgtype.Date, error) {
 	return pgtype.Date{Time: t, Valid: true}, nil
 }
 
-// CreateHandler handles POST /festivals. Requires organiser role.
+// CreateHandler handles POST /festivals. Any authenticated user becomes the organiser of the festival they create.
 func CreateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())

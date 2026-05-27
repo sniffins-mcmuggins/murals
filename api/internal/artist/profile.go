@@ -65,7 +65,7 @@ func pgUUIDFromString(s string) (pgtype.UUID, error) {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}, nil
 }
 
-// CreateProfileHandler handles POST /profiles. Requires artist role. One profile per user.
+// CreateProfileHandler handles POST /profiles. Any authenticated user can create their artist profile. One profile per user (enforced by unique index).
 func CreateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
