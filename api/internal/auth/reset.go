@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -18,6 +20,11 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
+
+// forgotPasswordWorkTimeout caps the lifetime of the goroutine that creates
+// the reset token and sends the email. Bounded to avoid orphaned work surviving
+// process shutdown (and to fail loudly if SES hangs).
+const forgotPasswordWorkTimeout = 30 * time.Second
 
 // EmailSender is satisfied by email.Sender and by test stubs.
 type EmailSender interface {
@@ -49,38 +56,53 @@ func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, webBase strin
 
 		w.WriteHeader(http.StatusAccepted)
 
-		go func() {
-			ctx := context.Background()
-			q := sqlcdb.New(pool)
-			user, err := q.GetUserByEmail(ctx, email)
-			if err != nil {
-				return
-			}
-			if user.PasswordHash == nil {
-				return // OAuth-only user — password reset not applicable
-			}
+		go forgotPasswordWork(pool, mailer, webBase, email)
+	}
+}
 
-			rawToken := make([]byte, 32)
-			if _, err := rand.Read(rawToken); err != nil {
-				return
-			}
-			rawHex := hex.EncodeToString(rawToken)
-			hash := sha256.Sum256(rawToken)
-			tokenHash := hex.EncodeToString(hash[:])
+// forgotPasswordWork runs the DB write + SES send detached from the HTTP
+// request. Bounded context + error logging so failures are visible.
+func forgotPasswordWork(pool *pgxpool.Pool, mailer EmailSender, webBase, email string) {
+	ctx, cancel := context.WithTimeout(context.Background(), forgotPasswordWorkTimeout)
+	defer cancel()
 
-			_, err = q.CreatePasswordResetToken(ctx, sqlcdb.CreatePasswordResetTokenParams{
-				UserID:    user.ID,
-				TokenHash: tokenHash,
-				ExpiresAt: pgtype_timestamptz(time.Now().Add(time.Hour)),
-			})
-			if err != nil {
-				return
-			}
+	q := sqlcdb.New(pool)
+	user, err := q.GetUserByEmail(ctx, email)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			slog.Error("forgot-password: user lookup failed", "err", err)
+		}
+		return
+	}
+	if user.PasswordHash == nil {
+		// OAuth-only user — password reset doesn't apply. Don't email (would
+		// confuse them) and don't log at error level (this is normal).
+		slog.Debug("forgot-password: oauth-only user skipped", "user_id", user.ID.String())
+		return
+	}
 
-			resetURL := fmt.Sprintf("%s/reset-password?token=%s", webBase, rawHex)
-			body := fmt.Sprintf(`<p>Reset your Render password: <a href="%s">%s</a></p><p>This link expires in 1 hour.</p>`, resetURL, resetURL)
-			_ = mailer.Send(ctx, user.Email, "Reset your Render password", body)
-		}()
+	rawToken := make([]byte, 32)
+	if _, err := rand.Read(rawToken); err != nil {
+		slog.Error("forgot-password: rand.Read failed", "err", err)
+		return
+	}
+	rawHex := hex.EncodeToString(rawToken)
+	hash := sha256.Sum256(rawToken)
+	tokenHash := hex.EncodeToString(hash[:])
+
+	if _, err = q.CreatePasswordResetToken(ctx, sqlcdb.CreatePasswordResetTokenParams{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: pgTimestamptz(time.Now().Add(time.Hour)),
+	}); err != nil {
+		slog.Error("forgot-password: create token failed", "err", err)
+		return
+	}
+
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", webBase, rawHex)
+	body := fmt.Sprintf(`<p>Reset your Render password: <a href="%s">%s</a></p><p>This link expires in 1 hour.</p>`, resetURL, resetURL)
+	if err := mailer.Send(ctx, user.Email, "Reset your Render password", body); err != nil {
+		slog.Error("forgot-password: mailer.Send failed", "err", err, "to", user.Email)
 	}
 }
 
@@ -132,6 +154,17 @@ func ResetPasswordHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			ID:           rec.UserID,
 			PasswordHash: &newHashStr,
 		}); err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		// Invalidate every JWT issued before this reset. The middleware compares
+		// claims.sv to users.session_version; bumping the column here makes
+		// every outstanding token fail that check on the next request. This is
+		// the entire point of resetting a password vs. just changing it — if
+		// the reset was triggered by a compromise, the attacker's session is
+		// dead within seconds rather than living up to tokenTTL (7 days).
+		if _, err = q.IncrementSessionVersion(r.Context(), rec.UserID); err != nil {
 			httperr.InternalServerError(w)
 			return
 		}

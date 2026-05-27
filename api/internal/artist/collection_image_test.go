@@ -23,7 +23,7 @@ func TestAttachImage_Success(t *testing.T) {
 	userID, token := createTestUser(t, db, "img1@example.com", "artist")
 	createTestProfile(t, db, userID, "Hank")
 
-	createColH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"My Work"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -36,7 +36,7 @@ func TestAttachImage_Success(t *testing.T) {
 	collectionID := col["id"].(string)
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Post("/collections/{collectionID}/images", artist.AttachImageHandler(db))
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
@@ -64,7 +64,7 @@ func TestAttachImage_SecondImageOrder(t *testing.T) {
 	userID, token := createTestUser(t, db, "img2@example.com", "artist")
 	createTestProfile(t, db, userID, "Iris")
 
-	createColH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"Seq"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -76,7 +76,7 @@ func TestAttachImage_SecondImageOrder(t *testing.T) {
 	collectionID := col["id"].(string)
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Post("/collections/{collectionID}/images", artist.AttachImageHandler(db))
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
@@ -104,7 +104,7 @@ func TestReorderImages_Success(t *testing.T) {
 	userID, token := createTestUser(t, db, "img3@example.com", "artist")
 	createTestProfile(t, db, userID, "Jake")
 
-	createColH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"Reorder"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -116,7 +116,7 @@ func TestReorderImages_Success(t *testing.T) {
 	collectionID := col["id"].(string)
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Post("/collections/{collectionID}/images", artist.AttachImageHandler(db))
 	router.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(db))
 	srv := httptest.NewServer(router)
@@ -164,7 +164,7 @@ func TestDeleteImage_Success(t *testing.T) {
 	userID, token := createTestUser(t, db, "img4@example.com", "artist")
 	createTestProfile(t, db, userID, "Karen")
 
-	createColH := auth.Middleware(testSecret)(artist.CreateCollectionHandler(db))
+	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
 		bytes.NewBufferString(`{"name":"Del"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -176,7 +176,7 @@ func TestDeleteImage_Success(t *testing.T) {
 	collectionID := col["id"].(string)
 
 	router := chi.NewRouter()
-	router.Use(auth.Middleware(testSecret))
+	router.Use(auth.Middleware(db, testSecret))
 	router.Post("/collections/{collectionID}/images", artist.AttachImageHandler(db))
 	router.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(db))
 	srv := httptest.NewServer(router)

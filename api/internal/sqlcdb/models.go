@@ -324,13 +324,14 @@ type PasswordResetToken struct {
 }
 
 type User struct {
-	ID            pgtype.UUID        `db:"id" json:"id"`
-	Email         string             `db:"email" json:"email"`
-	PasswordHash  *string            `db:"password_hash" json:"password_hash"`
-	Role          UserRole           `db:"role" json:"role"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	OauthProvider *string            `db:"oauth_provider" json:"oauth_provider"`
-	OauthSubject  *string            `db:"oauth_subject" json:"oauth_subject"`
-	MfaEnabled    bool               `db:"mfa_enabled" json:"mfa_enabled"`
-	MfaSecret     *string            `db:"mfa_secret" json:"mfa_secret"`
+	ID             pgtype.UUID        `db:"id" json:"id"`
+	Email          string             `db:"email" json:"email"`
+	PasswordHash   *string            `db:"password_hash" json:"password_hash"`
+	Role           UserRole           `db:"role" json:"role"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	OauthProvider  *string            `db:"oauth_provider" json:"oauth_provider"`
+	OauthSubject   *string            `db:"oauth_subject" json:"oauth_subject"`
+	MfaEnabled     bool               `db:"mfa_enabled" json:"mfa_enabled"`
+	MfaSecret      *string            `db:"mfa_secret" json:"mfa_secret"`
+	SessionVersion int32              `db:"session_version" json:"session_version"`
 }

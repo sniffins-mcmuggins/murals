@@ -100,7 +100,7 @@ func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, apiBase, 
 			return
 		}
 
-		jwtToken, err := IssueToken(user.ID.String(), string(user.Role), jwtSecret)
+		jwtToken, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
@@ -142,7 +142,10 @@ func fetchGoogleUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.
 		return nil, fmt.Errorf("google userinfo: unexpected status %d", resp.StatusCode)
 	}
 	var info googleUserInfo
-	return &info, json.NewDecoder(resp.Body).Decode(&info)
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, fmt.Errorf("decode google userinfo: %w", err)
+	}
+	return &info, nil
 }
 
 // upsertOAuthUser finds or creates a user for the given OAuth provider+subject.
@@ -206,6 +209,11 @@ func randomState() string {
 }
 
 // appleClientSecret generates a short-lived JWT used as the Apple OAuth client secret.
+//
+// privateKeyPEM is the contents of the .p8 key Apple issues. When passed through
+// an env var, real newlines are typically escaped as the literal string `\n`
+// (since env vars are single-line) — we un-escape them back to actual newlines
+// here so pem.Decode succeeds.
 func appleClientSecret(teamID, clientID, keyID, privateKeyPEM string) (string, error) {
 	pemData := strings.ReplaceAll(privateKeyPEM, `\n`, "\n")
 	block, _ := pem.Decode([]byte(pemData))
@@ -292,7 +300,7 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 			return
 		}
 
-		appleEmail, appleSubject, err := exchangeAppleCode(r.Context(), code, clientID, clientSecret, apiBase)
+		appleEmail, appleEmailVerified, appleSubject, err := exchangeAppleCode(r.Context(), code, clientID, clientSecret, apiBase)
 		if err != nil {
 			httperr.Write(w, http.StatusBadGateway, "OAuth Error", "failed to exchange Apple code")
 			return
@@ -303,6 +311,14 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 			httperr.Write(w, http.StatusBadGateway, "OAuth Error", "apple id_token missing subject")
 			return
 		}
+		// First-login responses include email + email_verified. If Apple says the
+		// email isn't verified, refuse — we link OAuth identities to existing
+		// email accounts in upsertOAuthUser, so an unverified email is an account
+		// takeover vector. Returning users have empty email and skip this gate.
+		if appleEmail != "" && !appleEmailVerified {
+			http.Error(w, "apple account email not verified", http.StatusBadRequest)
+			return
+		}
 
 		user, err := upsertOAuthUser(r.Context(), pool, appleEmail, appleSubject, "apple")
 		if err != nil {
@@ -310,7 +326,7 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 			return
 		}
 
-		jwtToken, err := IssueToken(user.ID.String(), string(user.Role), jwtSecret)
+		jwtToken, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
@@ -330,9 +346,13 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 	}
 }
 
-// exchangeAppleCode exchanges an authorization code with Apple and extracts email and subject from the id_token.
+// exchangeAppleCode exchanges an authorization code with Apple and extracts
+// email, email_verified, and subject from the id_token.
 // apiBase is used to rebuild the redirect_uri that must match what was sent at /auth/oauth/apple.
-func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, apiBase string) (email, subject string, err error) {
+//
+// Apple sends email_verified as a stringified bool ("true"/"false") — we
+// normalise to a real bool here.
+func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, apiBase string) (email string, emailVerified bool, subject string, err error) {
 	v := url.Values{}
 	v.Set("client_id", clientID)
 	v.Set("client_secret", clientSecret)
@@ -344,43 +364,47 @@ func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, apiBas
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://appleid.apple.com/auth/token",
 		strings.NewReader(body))
 	if err != nil {
-		return "", "", fmt.Errorf("build apple token request: %w", err)
+		return "", false, "", fmt.Errorf("build apple token request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", false, "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("apple token endpoint: unexpected status %d", resp.StatusCode)
+		return "", false, "", fmt.Errorf("apple token endpoint: unexpected status %d", resp.StatusCode)
 	}
 
 	var result struct {
 		IDToken string `json:"id_token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", err
+		return "", false, "", err
 	}
 
-	// Parse id_token claims with validation. Signature is not verified (TLS to Apple
-	// already authenticates the source), but iss/aud/exp must be valid.
+	// Parse id_token claims. Signature is not verified (TLS to Apple authenticates
+	// the source) — iss/aud/exp must be valid.
 	// TODO: verify signature against Apple JWKS for defense-in-depth.
-	parser := jwt.NewParser(jwt.WithIssuer("https://appleid.apple.com"), jwt.WithAudience(clientID))
+	//
+	// Apple sends email_verified as a JSON string ("true"/"false") rather than a
+	// JSON bool, so we accept it as string and parse manually below.
 	var claims struct {
 		jwt.RegisteredClaims
-		Email string `json:"email"`
+		Email         string `json:"email"`
+		EmailVerified string `json:"email_verified"`
 	}
+	parser := jwt.NewParser(jwt.WithIssuer("https://appleid.apple.com"), jwt.WithAudience(clientID))
 	if _, _, err := parser.ParseUnverified(result.IDToken, &claims); err != nil {
-		return "", "", fmt.Errorf("parse apple id_token: %w", err)
+		return "", false, "", fmt.Errorf("parse apple id_token: %w", err)
 	}
 	// ParseUnverified skips claim validation; run the same checks the Parser would
-	// have run (iss, aud, exp) via a standalone Validator configured identically.
+	// have via a standalone Validator configured identically.
 	validator := jwt.NewValidator(jwt.WithIssuer("https://appleid.apple.com"), jwt.WithAudience(clientID))
 	if err := validator.Validate(&claims); err != nil {
-		return "", "", fmt.Errorf("validate apple id_token claims: %w", err)
+		return "", false, "", fmt.Errorf("validate apple id_token claims: %w", err)
 	}
-	return claims.Email, claims.Subject, nil
+	return claims.Email, claims.EmailVerified == "true", claims.Subject, nil
 }

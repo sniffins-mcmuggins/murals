@@ -3,7 +3,6 @@ package auth
 import (
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -53,17 +52,19 @@ func (l *ipLimiter) get(ip string) *rate.Limiter {
 	return e.limiter
 }
 
-// clientIP returns the best-effort client identifier for rate-limit keying.
-// Prefers the first X-Forwarded-For entry (set by trusted ALB/proxy), falling
-// back to the request's remote address with port stripped.
+// clientIP returns the client identifier for rate-limit keying.
+//
+// We rely on r.RemoteAddr only. The router applies chiMiddleware.RealIP, which
+// rewrites RemoteAddr from X-Forwarded-For / X-Real-IP when those headers are
+// present — so there is exactly one source of truth here, configured once at
+// the router. Parsing XFF a second time in this middleware would either
+// duplicate that logic or, worse, allow an attacker to defeat the limiter by
+// rotating XFF values when no trusted proxy is in front.
+//
+// In deployments without a trusted proxy (local dev, accidental direct
+// exposure), chiMiddleware.RealIP should be removed from the router — at that
+// point RemoteAddr is the raw socket peer and is again the right source.
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// XFF is "client, proxy1, proxy2" — first entry is the original client
-		if comma := strings.IndexByte(xff, ','); comma >= 0 {
-			return strings.TrimSpace(xff[:comma])
-		}
-		return strings.TrimSpace(xff)
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		// RemoteAddr without port (rare — fall through to raw value)

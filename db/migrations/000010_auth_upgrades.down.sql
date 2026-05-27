@@ -3,6 +3,7 @@ DROP INDEX IF EXISTS password_reset_tokens_hash_idx;
 DROP TABLE IF EXISTS password_reset_tokens;
 DROP INDEX IF EXISTS users_oauth_idx;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS oauth_columns_consistent;
+ALTER TABLE users DROP COLUMN IF EXISTS session_version;
 ALTER TABLE users DROP COLUMN IF EXISTS mfa_secret;
 ALTER TABLE users DROP COLUMN IF EXISTS mfa_enabled;
 ALTER TABLE users DROP COLUMN IF EXISTS oauth_subject;

@@ -18,9 +18,10 @@ import (
 
 func TestPresignHandler_Success(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	ms := testutil.NewMinIOServer(t)
-	token := testBearerToken(t)
-	handler := auth.Middleware(testSecret)(imagehandler.PresignHandler(ms.Client, ms.Bucket))
+	token := testBearerToken(t, db)
+	handler := auth.Middleware(db, testSecret)(imagehandler.PresignHandler(ms.Client, ms.Bucket))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/presign",
 		strings.NewReader(`{"contentType":"image/jpeg"}`))
@@ -66,9 +67,10 @@ func TestPresignHandler_Unauthenticated(t *testing.T) {
 
 func TestPresignHandler_UnsupportedContentType(t *testing.T) {
 	t.Parallel()
+	db := testutil.NewDB(t)
 	// MinIO client is never reached — handler returns 422 before calling mc
-	token := testBearerToken(t)
-	handler := auth.Middleware(testSecret)(imagehandler.PresignHandler(nil, "unused-bucket"))
+	token := testBearerToken(t, db)
+	handler := auth.Middleware(db, testSecret)(imagehandler.PresignHandler(nil, "unused-bucket"))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/images/presign",
 		strings.NewReader(`{"contentType":"text/plain"}`))

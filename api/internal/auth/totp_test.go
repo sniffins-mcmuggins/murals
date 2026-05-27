@@ -25,7 +25,7 @@ func TestTOTPEnroll_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	handler := auth.Middleware(testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	handler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll", nil)
 	w := httptest.NewRecorder()
@@ -39,7 +39,7 @@ func TestTOTPEnroll_ReturnsQRAndSecret(t *testing.T) {
 	db := testutil.NewDB(t)
 	_, token := signupAndLogin(t, db, "totp-enroll@example.com", "password123")
 
-	handler := auth.Middleware(testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	handler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll", nil)
 	r.Header.Set("Authorization", "Bearer "+token)
@@ -69,7 +69,7 @@ func TestTOTPConfirm_ValidCode(t *testing.T) {
 	_, token := signupAndLogin(t, db, "totp-confirm@example.com", "password123")
 
 	// Enroll first.
-	enrollHandler := auth.Middleware(testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
 	er := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll", nil)
 	er.Header.Set("Authorization", "Bearer "+token)
 	ew := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestTOTPConfirm_ValidCode(t *testing.T) {
 	require.NoError(t, err)
 
 	// Confirm.
-	confirmHandler := auth.Middleware(testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
+	confirmHandler := auth.Middleware(db, testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
 	body := `{"code":"` + code + `"}`
 	cr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/confirm", strings.NewReader(body))
 	cr.Header.Set("Authorization", "Bearer "+token)
@@ -104,7 +104,7 @@ func TestTOTPConfirm_InvalidCode(t *testing.T) {
 	_, token := signupAndLogin(t, db, "totp-invalid@example.com", "password123")
 
 	// Enroll first.
-	enrollHandler := auth.Middleware(testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
 	er := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll", nil)
 	er.Header.Set("Authorization", "Bearer "+token)
 	ew := httptest.NewRecorder()
@@ -112,7 +112,7 @@ func TestTOTPConfirm_InvalidCode(t *testing.T) {
 	require.Equal(t, http.StatusOK, ew.Code, ew.Body.String())
 
 	// Submit obviously-wrong code.
-	confirmHandler := auth.Middleware(testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
+	confirmHandler := auth.Middleware(db, testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
 	body := `{"code":"000000"}`
 	cr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/confirm", strings.NewReader(body))
 	cr.Header.Set("Authorization", "Bearer "+token)
@@ -126,12 +126,71 @@ func TestTOTPConfirm_InvalidCode(t *testing.T) {
 	assert.False(t, user.MfaEnabled, "mfa_enabled must stay false after invalid code")
 }
 
+// TestTOTPEnroll_RejectsReEnrollWithoutCurrentCode verifies the re-enrol guard:
+// once MFA is enabled, /auth/mfa/enroll must require a valid TOTP code for the
+// EXISTING secret before issuing a new one. Without this, a stolen session
+// token could silently rotate the user's MFA secret.
+func TestTOTPEnroll_RejectsReEnrollWithoutCurrentCode(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, token := signupAndLogin(t, db, "totp-reenroll@example.com", "password123")
+	enrollAndConfirmMFA(t, db, token)
+
+	// Attempt to re-enrol without supplying current_code — must be rejected.
+	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	er := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll",
+		strings.NewReader(`{}`))
+	er.Header.Set("Authorization", "Bearer "+token)
+	er.Header.Set("Content-Type", "application/json")
+	ew := httptest.NewRecorder()
+	enrollHandler.ServeHTTP(ew, er)
+
+	assert.Equal(t, http.StatusUnauthorized, ew.Code, ew.Body.String())
+
+	// The stored secret must not have changed (mfa_enabled still true).
+	user := fetchUser(t, db, "totp-reenroll@example.com")
+	assert.True(t, user.MfaEnabled, "mfa_enabled must remain true after rejected re-enrol")
+}
+
+// TestTOTPEnroll_AllowsReEnrollWithValidCurrentCode verifies the happy path:
+// supplying a valid TOTP for the existing secret unlocks re-enrolment.
+func TestTOTPEnroll_AllowsReEnrollWithValidCurrentCode(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, token := signupAndLogin(t, db, "totp-reenroll-ok@example.com", "password123")
+	oldSecret := enrollAndConfirmMFA(t, db, token)
+
+	code, err := totp.GenerateCode(oldSecret, time.Now())
+	require.NoError(t, err)
+
+	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	body := `{"current_code":"` + code + `"}`
+	er := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll",
+		strings.NewReader(body))
+	er.Header.Set("Authorization", "Bearer "+token)
+	er.Header.Set("Content-Type", "application/json")
+	ew := httptest.NewRecorder()
+	enrollHandler.ServeHTTP(ew, er)
+
+	require.Equal(t, http.StatusOK, ew.Code, ew.Body.String())
+
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(ew.Body).Decode(&resp))
+	newSecret, _ := resp["secret"].(string)
+	assert.NotEmpty(t, newSecret)
+	assert.NotEqual(t, oldSecret, newSecret, "re-enrol must produce a different secret")
+
+	// mfa_enabled must drop back to false until the new secret is confirmed.
+	user := fetchUser(t, db, "totp-reenroll-ok@example.com")
+	assert.False(t, user.MfaEnabled, "re-enrol returns user to un-confirmed state")
+}
+
 func TestTOTPConfirm_NoEnrollment(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	_, token := signupAndLogin(t, db, "totp-noenroll@example.com", "password123")
 
-	confirmHandler := auth.Middleware(testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
+	confirmHandler := auth.Middleware(db, testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
 	body := `{"code":"123456"}`
 	cr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/confirm", strings.NewReader(body))
 	cr.Header.Set("Authorization", "Bearer "+token)
@@ -158,7 +217,7 @@ func fetchUser(t *testing.T, db *pgxpool.Pool, email string) sqlcdb.User {
 func enrollAndConfirmMFA(t *testing.T, db *pgxpool.Pool, token string) string {
 	t.Helper()
 
-	enrollHandler := auth.Middleware(testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
+	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
 	er := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/enroll", nil)
 	er.Header.Set("Authorization", "Bearer "+token)
 	ew := httptest.NewRecorder()
@@ -172,7 +231,7 @@ func enrollAndConfirmMFA(t *testing.T, db *pgxpool.Pool, token string) string {
 	code, err := totp.GenerateCode(secret, time.Now())
 	require.NoError(t, err)
 
-	confirmHandler := auth.Middleware(testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
+	confirmHandler := auth.Middleware(db, testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
 	body := `{"code":"` + code + `"}`
 	cr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/mfa/confirm", strings.NewReader(body))
 	cr.Header.Set("Authorization", "Bearer "+token)

@@ -3,16 +3,23 @@ package auth_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -84,4 +91,66 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 	handler.ServeHTTP(w, r)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// TestResetPassword_InvalidatesOldSessions proves the end-to-end revocation
+// flow: log in (get a JWT), reset password, then attempt to use the JWT — the
+// middleware refuses to attach a Principal because session_version has been
+// bumped on the user row.
+func TestResetPassword_InvalidatesOldSessions(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	_, oldToken := signupAndLogin(t, db, "session-invalidate@example.com", "password123")
+
+	// Build a reset token directly (skipping the email step).
+	q := sqlcdb.New(db)
+	user, err := q.GetUserByEmail(t.Context(), "session-invalidate@example.com")
+	require.NoError(t, err)
+
+	rawToken := make([]byte, 32)
+	_, err = rand.Read(rawToken)
+	require.NoError(t, err)
+	rawHex := hex.EncodeToString(rawToken)
+	hashBytes := sha256.Sum256(rawToken)
+	tokenHash := hex.EncodeToString(hashBytes[:])
+
+	_, err = q.CreatePasswordResetToken(t.Context(), sqlcdb.CreatePasswordResetTokenParams{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true},
+	})
+	require.NoError(t, err)
+
+	// Perform the reset.
+	resetHandler := auth.ResetPasswordHandler(db)
+	bodyJSON, _ := json.Marshal(map[string]string{
+		"token":        rawHex,
+		"new_password": "differentpassword456",
+	})
+	rr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/reset-password",
+		bytes.NewReader(bodyJSON))
+	rr.Header.Set("Content-Type", "application/json")
+	rw := httptest.NewRecorder()
+	resetHandler.ServeHTTP(rw, rr)
+	require.Equal(t, http.StatusOK, rw.Code, rw.Body.String())
+
+	// The old session token must no longer authenticate.
+	called := false
+	guarded := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_, err := auth.User(r.Context())
+		assert.ErrorIs(t, err, auth.ErrUnauthenticated, "old token must not produce a Principal post-reset")
+	}))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
+	req.Header.Set("Authorization", "Bearer "+oldToken)
+	guarded.ServeHTTP(httptest.NewRecorder(), req)
+	require.True(t, called)
+
+	// Logging in with the new password yields a token that DOES authenticate.
+	newLogin := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login",
+		strings.NewReader(`{"email":"session-invalidate@example.com","password":"differentpassword456"}`))
+	newLogin.Header.Set("Content-Type", "application/json")
+	newW := httptest.NewRecorder()
+	auth.LoginHandler(db, testSecret).ServeHTTP(newW, newLogin)
+	require.Equal(t, http.StatusOK, newW.Code, newW.Body.String())
 }

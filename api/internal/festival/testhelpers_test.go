@@ -41,7 +41,7 @@ func createTestUser(t *testing.T, pool *pgxpool.Pool, email, role string) (userI
 		t.Fatalf("create user %s: %v", email, err)
 	}
 	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, role, testSecret)
+	token, err = auth.IssueToken(userID, role, user.SessionVersion, testSecret)
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
 	}

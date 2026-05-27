@@ -59,7 +59,7 @@ func TestListApplications(t *testing.T) {
 	sc := setupReviewScenario(t, db)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -79,7 +79,7 @@ func TestAcceptApplication(t *testing.T) {
 	sc := setupReviewScenario(t, db)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -99,7 +99,7 @@ func TestDeclineApplication(t *testing.T) {
 	sc := setupReviewScenario(t, db)
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db))
 
 	srv := httptest.NewServer(r)
@@ -120,7 +120,7 @@ func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	_, otherToken := createTestUser(t, db, "revother@example.com", "organiser")
 
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(db))
 
 	srv := httptest.NewServer(r)

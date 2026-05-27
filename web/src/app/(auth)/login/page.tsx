@@ -7,6 +7,11 @@ import { apiClient } from '@/lib/api'
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
+type LoginSuccessBody = {
+  mfa_required?: boolean
+  mfa_token?: string
+}
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -41,25 +46,14 @@ function LoginForm() {
         return
       }
 
-      const json =
-        typeof response.clone === 'function'
-          ? await response
-              .clone()
-              .json()
-              .catch(() => null)
-          : null
-      if (
-        json &&
-        typeof json === 'object' &&
-        'mfa_required' in json &&
-        (json as { mfa_required?: unknown }).mfa_required === true
-      ) {
-        const token = (json as { mfa_token?: unknown }).mfa_token
-        if (typeof token === 'string') {
-          setMfaToken(token)
-          setMfaRequired(true)
-          return
-        }
+      // The OpenAPI spec models /auth/login as returning the full session
+      // shape, but the runtime branches between {token, user} and
+      // {mfa_required, mfa_token}. We parse defensively here.
+      const json = (await response.json().catch(() => null)) as LoginSuccessBody | null
+      if (json?.mfa_required && typeof json.mfa_token === 'string') {
+        setMfaToken(json.mfa_token)
+        setMfaRequired(true)
+        return
       }
 
       // HTTP-only session cookie is set by the server automatically.
@@ -82,6 +76,9 @@ function LoginForm() {
 
     setPending(true)
 
+    // /auth/mfa/verify isn't in the OpenAPI spec yet (tracked as a followup),
+    // so we hit it with fetch directly. The bearer token here is the short
+    // mfa_pending token returned by /auth/login above — not a session token.
     try {
       const res = await fetch(`${apiUrl}/auth/mfa/verify`, {
         method: 'POST',

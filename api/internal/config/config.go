@@ -20,15 +20,19 @@ type Config struct {
 	LogLevel            string
 	AWSRegion           string
 	SESFromEmail        string
-	GoogleClientID      string
-	GoogleClientSecret  string
-	APIPublicBase       string // public URL of this API (used for OAuth redirect_uri)
-	WebPublicBase       string // public URL of the web app (post-OAuth redirect + email links)
-	AppleClientID       string
-	AppleTeamID         string
-	AppleKeyID          string
-	ApplePrivateKey     string
-	TOTPEncryptionKey   string // base64-encoded 32-byte AES-256-GCM key
+	// SESRequired makes a missing/broken SES configuration a fatal startup
+	// error. Set in production so we never silently fall back to NoopMailer
+	// and lock users out of password reset.
+	SESRequired        bool
+	GoogleClientID     string
+	GoogleClientSecret string
+	APIPublicBase      string // public URL of this API (used for OAuth redirect_uri)
+	WebPublicBase      string // public URL of the web app (post-OAuth redirect + email links)
+	AppleClientID      string
+	AppleTeamID        string
+	AppleKeyID         string
+	ApplePrivateKey    string
+	TOTPEncryptionKey  string // base64-encoded 32-byte AES-256-GCM key
 	// CORSAllowedOrigins is the set of origins permitted to make credentialed
 	// cross-origin requests. Set CORS_ALLOWED_ORIGINS to a comma-separated list
 	// in production (e.g. "https://app.example.com,https://www.example.com").
@@ -51,6 +55,7 @@ func Load() Config {
 		LogLevel:            env("LOG_LEVEL", "info"),
 		AWSRegion:           env("AWS_REGION", "eu-west-2"),
 		SESFromEmail:        env("SES_FROM_EMAIL", ""),
+		SESRequired:         envBool("SES_REQUIRED", false),
 		GoogleClientID:      env("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:  env("GOOGLE_CLIENT_SECRET", ""),
 		APIPublicBase:       env("API_PUBLIC_BASE", "http://localhost:8080"),

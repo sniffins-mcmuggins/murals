@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -58,30 +59,6 @@ func TestRateLimit_DifferentIPsIndependent(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
-func TestRateLimit_XForwardedForUsed(t *testing.T) {
-	handler := auth.RateLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	// Exhaust XFF IP
-	for i := 0; i < 6; i++ {
-		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
-		r.RemoteAddr = "10.0.0.50:1"
-		r.Header.Set("X-Forwarded-For", "203.0.113.99")
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, r)
-		_ = w
-	}
-
-	// Same XFF should be limited
-	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
-	r.RemoteAddr = "10.0.0.50:1"
-	r.Header.Set("X-Forwarded-For", "203.0.113.99")
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, r)
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
-}
-
 func TestRateLimit_DifferentPortsSameIP(t *testing.T) {
 	handler := auth.RateLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -104,25 +81,30 @@ func TestRateLimit_DifferentPortsSameIP(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
 }
 
-func TestRateLimit_XForwardedFor_FirstEntryUsed(t *testing.T) {
-	handler := auth.RateLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+// TestRateLimit_RealIPRewritesRemoteAddr is the integration test for the
+// production setup: in main.go the router applies chiMiddleware.RealIP before
+// RateLimitMiddleware. RealIP rewrites r.RemoteAddr from X-Forwarded-For; the
+// limiter then keys on the rewritten value. This ensures the two middlewares
+// cooperate correctly (and that we haven't reintroduced double XFF parsing).
+func TestRateLimit_RealIPRewritesRemoteAddr(t *testing.T) {
+	handler := chiMiddleware.RealIP(auth.RateLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	}))
+	})))
 
-	// Exhaust by sending requests with XFF chain "203.0.113.10, 10.0.0.1"
+	// Exhaust: XFF "203.0.113.99" is what RealIP will rewrite RemoteAddr to.
 	for i := 0; i < 6; i++ {
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 		r.RemoteAddr = "10.0.0.50:1"
-		r.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+		r.Header.Set("X-Forwarded-For", "203.0.113.99")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
 		_ = w
 	}
 
-	// A request with same first XFF but different chain should still be limited
+	// Same XFF (via RealIP) should be limited.
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/test", nil)
 	r.RemoteAddr = "10.0.0.50:1"
-	r.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.99")
+	r.Header.Set("X-Forwarded-For", "203.0.113.99")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)

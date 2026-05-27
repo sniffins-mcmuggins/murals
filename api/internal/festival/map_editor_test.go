@@ -52,7 +52,7 @@ func setupMapEditorScenario(t *testing.T, db *pgxpool.Pool) mapEditorScenario {
 
 func newMapEditorServer(db *pgxpool.Pool) *httptest.Server {
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Get("/festivals/{festivalID}/artists/accepted", festival.GetAcceptedArtistsHandler(db))
 	r.Patch("/festivals/{festivalID}/artists/{artistID}/pin", festival.SetArtistPinHandler(db))
 	return httptest.NewServer(r)

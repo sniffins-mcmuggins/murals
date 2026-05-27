@@ -25,7 +25,7 @@ func TestImageUploadRoundTrip(t *testing.T) {
 
 	// Router mirrors production wiring
 	r := chi.NewRouter()
-	r.Use(auth.Middleware(testSecret))
+	r.Use(auth.Middleware(db, testSecret))
 	r.Post("/auth/signup", auth.SignupHandler(db))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Post("/images/presign", imagehandler.PresignHandler(ms.Client, ms.Bucket))

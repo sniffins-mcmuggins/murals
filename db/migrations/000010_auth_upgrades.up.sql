@@ -9,6 +9,12 @@ ALTER TABLE users ADD COLUMN oauth_subject  text;
 ALTER TABLE users ADD COLUMN mfa_enabled boolean NOT NULL DEFAULT false;
 ALTER TABLE users ADD COLUMN mfa_secret  text;       -- AES-256-GCM encrypted, null until enrolled
 
+-- session_version: bumped to invalidate every outstanding JWT for this user.
+-- Used by password reset (and any future "log out everywhere" flow). The JWT
+-- carries this value at issue time; the auth middleware rejects tokens whose
+-- embedded sv doesn't match the current row.
+ALTER TABLE users ADD COLUMN session_version integer NOT NULL DEFAULT 0;
+
 -- Check constraint: oauth_provider and oauth_subject must both be NULL or both non-NULL
 ALTER TABLE users ADD CONSTRAINT oauth_columns_consistent
   CHECK ((oauth_provider IS NULL AND oauth_subject IS NULL)

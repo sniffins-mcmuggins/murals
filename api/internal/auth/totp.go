@@ -24,6 +24,13 @@ import (
 // totpIssuer appears in authenticator apps next to the account name.
 const totpIssuer = "Render"
 
+type totpEnrollRequest struct {
+	// CurrentCode is required if the user already has MFA enabled — proves the
+	// caller controls the existing authenticator before we let them replace it.
+	// For first-time enrolment this field is ignored.
+	CurrentCode string `json:"current_code"`
+}
+
 type totpEnrollResponse struct {
 	QRDataURL string `json:"qr_data_url"`
 	Secret    string `json:"secret"`
@@ -34,13 +41,22 @@ type totpEnrollResponse struct {
 // (with mfa_enabled=false), and returns the QR code + plaintext secret so the
 // client can register the account in an authenticator app.
 //
-// Re-enrolling overwrites any previous (un-confirmed or confirmed) secret.
+// Re-enrolling overwrites any previous secret. To prevent a stolen session
+// token from silently rotating someone's MFA secret, callers re-enrolling an
+// already-enabled secret must supply a valid TOTP code (`current_code`) for the
+// existing secret. First-time enrolments (mfa_enabled=false) skip this check.
 func TOTPEnrollHandler(pool *pgxpool.Pool, encryptionKeyB64 string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
 			return
+		}
+
+		// Body is optional — only matters when re-enrolling an enabled secret.
+		var req totpEnrollRequest
+		if r.ContentLength > 0 {
+			_ = json.NewDecoder(r.Body).Decode(&req)
 		}
 
 		userUUID, err := pgUUIDFromString(principal.UserID)
@@ -58,6 +74,25 @@ func TOTPEnrollHandler(pool *pgxpool.Pool, encryptionKeyB64 string) http.Handler
 			}
 			httperr.InternalServerError(w)
 			return
+		}
+
+		// Re-enrolment guard: if MFA is already enabled, require a valid code
+		// for the EXISTING secret before issuing a new one. This stops a stolen
+		// session token from silently disabling the user's MFA mid-flight.
+		if user.MfaEnabled && user.MfaSecret != nil {
+			if req.CurrentCode == "" {
+				httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "current_code required to re-enrol MFA")
+				return
+			}
+			existingSecret, err := decryptTOTPSecret(*user.MfaSecret, encryptionKeyB64)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			if !totp.Validate(req.CurrentCode, existingSecret) {
+				httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid current TOTP code")
+				return
+			}
 		}
 
 		key, err := totp.Generate(totp.GenerateOpts{
@@ -241,7 +276,7 @@ func TOTPVerifyHandler(pool *pgxpool.Pool, encryptionKeyB64, jwtSecret string) h
 			return
 		}
 
-		token, err := IssueToken(user.ID.String(), string(user.Role), jwtSecret)
+		token, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return

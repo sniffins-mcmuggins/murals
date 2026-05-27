@@ -53,7 +53,7 @@ func TestMeHandler_AuthedCookie(t *testing.T) {
 	db := testutil.NewDB(t)
 	cookie, _ := signupAndLogin(t, db, "frank@example.com", "password123")
 
-	handler := auth.Middleware(testSecret)(auth.MeHandler(db))
+	handler := auth.Middleware(db, testSecret)(auth.MeHandler(db))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	r.AddCookie(cookie)
@@ -72,7 +72,7 @@ func TestMeHandler_AuthedBearer(t *testing.T) {
 	db := testutil.NewDB(t)
 	_, token := signupAndLogin(t, db, "grace@example.com", "password123")
 
-	handler := auth.Middleware(testSecret)(auth.MeHandler(db))
+	handler := auth.Middleware(db, testSecret)(auth.MeHandler(db))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	r.Header.Set("Authorization", "Bearer "+token)
@@ -85,7 +85,7 @@ func TestMeHandler_AuthedBearer(t *testing.T) {
 func TestMeHandler_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	handler := auth.Middleware(testSecret)(auth.MeHandler(db))
+	handler := auth.Middleware(db, testSecret)(auth.MeHandler(db))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	w := httptest.NewRecorder()

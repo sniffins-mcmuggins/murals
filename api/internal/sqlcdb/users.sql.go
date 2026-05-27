@@ -12,9 +12,12 @@ import (
 )
 
 const createOAuthUser = `-- name: CreateOAuthUser :one
+
 INSERT INTO users (email, password_hash, role, oauth_provider, oauth_subject)
 VALUES ($1, NULL, $2, $3, $4)
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+ON CONFLICT (oauth_provider, oauth_subject) WHERE oauth_provider IS NOT NULL
+DO UPDATE SET oauth_provider = EXCLUDED.oauth_provider
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version
 `
 
 type CreateOAuthUserParams struct {
@@ -42,6 +45,7 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
@@ -49,7 +53,7 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, role)
 VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version
 `
 
 type CreateUserParams struct {
@@ -71,6 +75,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
@@ -79,7 +84,7 @@ const disableMFA = `-- name: DisableMFA :one
 UPDATE users
 SET mfa_enabled = false, mfa_secret = NULL
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version
 `
 
 func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -95,12 +100,13 @@ func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) 
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret FROM users WHERE email = $1 LIMIT 1
+SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -116,12 +122,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret FROM users WHERE id = $1 LIMIT 1
+SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -137,12 +144,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
 
 const getUserByOAuth = `-- name: GetUserByOAuth :one
-SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret FROM users
+SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version FROM users
 WHERE oauth_provider = $1 AND oauth_subject = $2
 LIMIT 1
 `
@@ -165,6 +173,33 @@ func (q *Queries) GetUserByOAuth(ctx context.Context, arg GetUserByOAuthParams) 
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
+	)
+	return i, err
+}
+
+const incrementSessionVersion = `-- name: IncrementSessionVersion :one
+
+UPDATE users
+SET session_version = session_version + 1
+WHERE id = $1
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version
+`
+
+func (q *Queries) IncrementSessionVersion(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, incrementSessionVersion, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
@@ -173,7 +208,7 @@ const linkOAuthToUser = `-- name: LinkOAuthToUser :one
 UPDATE users
 SET oauth_provider = $2, oauth_subject = $3
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version
 `
 
 type LinkOAuthToUserParams struct {
@@ -195,6 +230,7 @@ func (q *Queries) LinkOAuthToUser(ctx context.Context, arg LinkOAuthToUserParams
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }
@@ -203,7 +239,7 @@ const setMFAEnabled = `-- name: SetMFAEnabled :one
 UPDATE users
 SET mfa_enabled = $2, mfa_secret = $3
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version
 `
 
 type SetMFAEnabledParams struct {
@@ -225,6 +261,7 @@ func (q *Queries) SetMFAEnabled(ctx context.Context, arg SetMFAEnabledParams) (U
 		&i.OauthSubject,
 		&i.MfaEnabled,
 		&i.MfaSecret,
+		&i.SessionVersion,
 	)
 	return i, err
 }

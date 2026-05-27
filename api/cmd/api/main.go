@@ -63,20 +63,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Email sender: SES in production, no-op locally if SES config is incomplete
-	// or AWS credentials are unavailable.
-	var mailer auth.EmailSender
-	if cfg.SESFromEmail != "" && cfg.AWSRegion != "" {
-		sender, err := email.NewSender(ctx, cfg.AWSRegion, cfg.SESFromEmail)
-		if err != nil {
-			slog.Warn("SES init failed — password reset emails disabled", "err", err)
-			mailer = auth.NoopMailer{}
-		} else {
-			mailer = sender
-		}
-	} else {
-		mailer = auth.NoopMailer{}
-	}
+	// Email sender: SES in production, no-op locally when SES isn't configured.
+	//
+	// In prod set SES_REQUIRED=true so a missing/broken SES config is fatal.
+	// Falling back silently to NoopMailer would mean password reset emails
+	// disappear into the void, leaving users with no recovery path.
+	mailer := buildMailer(ctx, cfg)
 
 	r := chi.NewRouter()
 	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
@@ -84,7 +76,7 @@ func main() {
 	r.Use(middleware.Logger(logger))
 	r.Use(middleware.Recover)
 	r.Use(metrics.Middleware())
-	r.Use(auth.Middleware(cfg.JWTSecret))
+	r.Use(auth.Middleware(pool, cfg.JWTSecret))
 
 	r.Get("/healthz", health.Handler(pool))
 	r.Handle("/metrics", metrics.Handler())
@@ -187,6 +179,30 @@ func main() {
 	if err := srv.Shutdown(shutCtx); err != nil {
 		slog.Error("shutdown error", "err", err)
 	}
+}
+
+// buildMailer wires up SES if configured, otherwise returns NoopMailer for
+// local dev. When SES_REQUIRED=true any error in this chain (missing config,
+// init failure) is fatal — see SESRequired in config.go for the why.
+func buildMailer(ctx context.Context, cfg config.Config) auth.EmailSender {
+	if cfg.SESFromEmail == "" || cfg.AWSRegion == "" {
+		if cfg.SESRequired {
+			slog.Error("SES_REQUIRED=true but SES_FROM_EMAIL or AWS_REGION is missing")
+			os.Exit(1)
+		}
+		slog.Warn("SES not configured — using NoopMailer (password reset emails disabled)")
+		return auth.NoopMailer{}
+	}
+	sender, err := email.NewSender(ctx, cfg.AWSRegion, cfg.SESFromEmail)
+	if err != nil {
+		if cfg.SESRequired {
+			slog.Error("SES init failed and SES_REQUIRED=true", "err", err)
+			os.Exit(1)
+		}
+		slog.Warn("SES init failed — falling back to NoopMailer", "err", err)
+		return auth.NoopMailer{}
+	}
+	return sender
 }
 
 // corsMiddleware sets CORS headers only for origins in the allowlist.

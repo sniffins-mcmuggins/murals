@@ -17,17 +17,28 @@ const mfaPendingTTL = 5 * time.Minute
 const ScopeMFAPending = "mfa_pending"
 
 // Claims are the JWT payload fields this API issues and trusts.
+//
+// SessionVersion is a server-side revocation counter that the auth middleware
+// compares against users.session_version. Password reset bumps the counter,
+// invalidating every JWT previously issued for that user. Without this field
+// an attacker who lifted a session token would keep working until the JWT's
+// natural expiry (7 days).
 type Claims struct {
-	Role  string `json:"role"`
-	Scope string `json:"scope,omitempty"` // "" = full access; "mfa_pending" = awaiting MFA verification
+	Role           string `json:"role"`
+	Scope          string `json:"scope,omitempty"` // "" = full access; "mfa_pending" = awaiting MFA verification
+	SessionVersion int32  `json:"sv,omitempty"`    // server-side revocation counter
 	jwt.RegisteredClaims
 }
 
 // IssueToken mints a signed HS256 JWT for the given user.
-func IssueToken(userID, role, secret string) (string, error) {
+//
+// sessionVersion must come from the user row (users.session_version) so the
+// middleware can detect and reject stale tokens after a password reset.
+func IssueToken(userID, role string, sessionVersion int32, secret string) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		Role: role,
+		Role:           role,
+		SessionVersion: sessionVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -40,6 +51,9 @@ func IssueToken(userID, role, secret string) (string, error) {
 
 // IssueMFAPendingToken mints a short-lived JWT scoped to MFA verification only.
 // Holders cannot access protected resources — only POST /auth/mfa/verify.
+//
+// mfa_pending tokens do NOT carry SessionVersion: they're short-lived (5min)
+// and the verify handler always re-reads the user row anyway.
 func IssueMFAPendingToken(userID, secret string) (string, error) {
 	now := time.Now()
 	claims := Claims{
