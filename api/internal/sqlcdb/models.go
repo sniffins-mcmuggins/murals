@@ -314,10 +314,38 @@ type MigrationsHealth struct {
 	AppliedAt pgtype.Timestamptz `db:"applied_at" json:"applied_at"`
 }
 
+type OrganiserPayment struct {
+	ID                      pgtype.UUID        `db:"id" json:"id"`
+	UserID                  pgtype.UUID        `db:"user_id" json:"user_id"`
+	FestivalID              pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	StripeCheckoutSessionID *string            `db:"stripe_checkout_session_id" json:"stripe_checkout_session_id"`
+	StripePaymentIntentID   *string            `db:"stripe_payment_intent_id" json:"stripe_payment_intent_id"`
+	ChargeType              string             `db:"charge_type" json:"charge_type"`
+	AmountPence             int32              `db:"amount_pence" json:"amount_pence"`
+	Status                  string             `db:"status" json:"status"`
+	PaidAt                  pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Subscription struct {
+	ID                   pgtype.UUID        `db:"id" json:"id"`
+	UserID               pgtype.UUID        `db:"user_id" json:"user_id"`
+	FestivalID           pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	StripeSubscriptionID *string            `db:"stripe_subscription_id" json:"stripe_subscription_id"`
+	StripePriceID        string             `db:"stripe_price_id" json:"stripe_price_id"`
+	Plan                 string             `db:"plan" json:"plan"`
+	BillingInterval      string             `db:"billing_interval" json:"billing_interval"`
+	Status               string             `db:"status" json:"status"`
+	CurrentPeriodEnd     pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type User struct {
-	ID           pgtype.UUID        `db:"id" json:"id"`
-	Email        string             `db:"email" json:"email"`
-	PasswordHash string             `db:"password_hash" json:"password_hash"`
-	Role         UserRole           `db:"role" json:"role"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID               pgtype.UUID        `db:"id" json:"id"`
+	Email            string             `db:"email" json:"email"`
+	PasswordHash     string             `db:"password_hash" json:"password_hash"`
+	Role             UserRole           `db:"role" json:"role"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StripeCustomerID *string            `db:"stripe_customer_id" json:"stripe_customer_id"`
 }
