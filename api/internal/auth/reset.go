@@ -34,7 +34,7 @@ type forgotRequest struct {
 
 // ForgotPasswordHandler handles POST /auth/forgot-password.
 // Always returns 202 to avoid leaking whether an email is registered.
-func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender) http.HandlerFunc {
+func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req forgotRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -72,7 +72,7 @@ func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender) http.HandlerF
 				return
 			}
 
-			resetURL := fmt.Sprintf("https://%s/reset-password?token=%s", r.Host, rawHex)
+			resetURL := fmt.Sprintf("%s/reset-password?token=%s", baseURL, rawHex)
 			body := fmt.Sprintf(`<p>Reset your Render password: <a href="%s">%s</a></p><p>This link expires in 1 hour.</p>`, resetURL, resetURL)
 			_ = mailer.Send(ctx, user.Email, "Reset your Render password", body)
 		}()
