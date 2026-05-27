@@ -29,5 +29,5 @@ CREATE TABLE access_grants (
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX access_grants_user_idx  ON access_grants (user_id);
-CREATE INDEX access_grants_plan_idx  ON access_grants (user_id, plan);
+CREATE INDEX access_grants_plan_idx       ON access_grants (user_id, plan);
+CREATE INDEX access_grants_promo_code_idx ON access_grants (promo_code_id) WHERE promo_code_id IS NOT NULL;
