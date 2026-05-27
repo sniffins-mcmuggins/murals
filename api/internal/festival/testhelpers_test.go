@@ -30,10 +30,11 @@ func createTestUser(t *testing.T, pool *pgxpool.Pool, email, role string) (userI
 	if err != nil {
 		t.Fatalf("bcrypt: %v", err)
 	}
+	hashStr := string(hash)
 	q := sqlcdb.New(pool)
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        email,
-		PasswordHash: string(hash),
+		PasswordHash: &hashStr,
 		Role:         sqlcdb.UserRole(role),
 	})
 	if err != nil {

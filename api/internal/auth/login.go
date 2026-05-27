@@ -42,7 +42,11 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		if user.PasswordHash == nil {
+			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid credentials")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
 			httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid credentials")
 			return
 		}

@@ -11,15 +11,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createOAuthUser = `-- name: CreateOAuthUser :one
+INSERT INTO users (email, password_hash, role, oauth_provider, oauth_subject)
+VALUES ($1, NULL, $2, $3, $4)
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+`
+
+type CreateOAuthUserParams struct {
+	Email         string   `db:"email" json:"email"`
+	Role          UserRole `db:"role" json:"role"`
+	OauthProvider *string  `db:"oauth_provider" json:"oauth_provider"`
+	OauthSubject  *string  `db:"oauth_subject" json:"oauth_subject"`
+}
+
+func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createOAuthUser,
+		arg.Email,
+		arg.Role,
+		arg.OauthProvider,
+		arg.OauthSubject,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, role)
 VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, role, created_at
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
 `
 
 type CreateUserParams struct {
 	Email        string   `db:"email" json:"email"`
-	PasswordHash string   `db:"password_hash" json:"password_hash"`
+	PasswordHash *string  `db:"password_hash" json:"password_hash"`
 	Role         UserRole `db:"role" json:"role"`
 }
 
@@ -32,12 +67,40 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.Role,
 		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+	)
+	return i, err
+}
+
+const disableMFA = `-- name: DisableMFA :one
+UPDATE users
+SET mfa_enabled = false, mfa_secret = NULL
+WHERE id = $1
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+`
+
+func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, disableMFA, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1 LIMIT 1
+SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -49,12 +112,16 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.Role,
 		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1 LIMIT 1
+SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -66,6 +133,98 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.PasswordHash,
 		&i.Role,
 		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+	)
+	return i, err
+}
+
+const getUserByOAuth = `-- name: GetUserByOAuth :one
+SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret FROM users
+WHERE oauth_provider = $1 AND oauth_subject = $2
+LIMIT 1
+`
+
+type GetUserByOAuthParams struct {
+	OauthProvider *string `db:"oauth_provider" json:"oauth_provider"`
+	OauthSubject  *string `db:"oauth_subject" json:"oauth_subject"`
+}
+
+func (q *Queries) GetUserByOAuth(ctx context.Context, arg GetUserByOAuthParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByOAuth, arg.OauthProvider, arg.OauthSubject)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+	)
+	return i, err
+}
+
+const linkOAuthToUser = `-- name: LinkOAuthToUser :one
+UPDATE users
+SET oauth_provider = $2, oauth_subject = $3
+WHERE id = $1
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+`
+
+type LinkOAuthToUserParams struct {
+	ID            pgtype.UUID `db:"id" json:"id"`
+	OauthProvider *string     `db:"oauth_provider" json:"oauth_provider"`
+	OauthSubject  *string     `db:"oauth_subject" json:"oauth_subject"`
+}
+
+func (q *Queries) LinkOAuthToUser(ctx context.Context, arg LinkOAuthToUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, linkOAuthToUser, arg.ID, arg.OauthProvider, arg.OauthSubject)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+	)
+	return i, err
+}
+
+const setMFAEnabled = `-- name: SetMFAEnabled :one
+UPDATE users
+SET mfa_enabled = $2, mfa_secret = $3
+WHERE id = $1
+RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret
+`
+
+type SetMFAEnabledParams struct {
+	ID         pgtype.UUID `db:"id" json:"id"`
+	MfaEnabled bool        `db:"mfa_enabled" json:"mfa_enabled"`
+	MfaSecret  *string     `db:"mfa_secret" json:"mfa_secret"`
+}
+
+func (q *Queries) SetMFAEnabled(ctx context.Context, arg SetMFAEnabledParams) (User, error) {
+	row := q.db.QueryRow(ctx, setMFAEnabled, arg.ID, arg.MfaEnabled, arg.MfaSecret)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
 	)
 	return i, err
 }
