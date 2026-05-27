@@ -18,6 +18,9 @@ services:
       MINIO_USE_SSL: "false"
       CDN_BASE_URL: "http://localhost:9000/render-images"
       JWT_SECRET: "${JWT_SECRET:-dev-jwt-secret-change-in-prod}"
+      # AES-256 key for encrypting TOTP secrets at rest. base64(32 random bytes).
+      # Dev-only default — production must set this from a secret manager.
+      TOTP_ENCRYPTION_KEY: "${TOTP_ENCRYPTION_KEY:-xQzKD06eMmPG/Ck4SkIirc9+gF0s6V3QCIfxuKVTDaU=}"
       LOG_LEVEL: "${LOG_LEVEL:-debug}"
       # Every Playwright worker shares the same source IP from the API's
       # POV, so the prod default of 5/min trips after ~5 logins. Loosen
@@ -26,7 +29,7 @@ services:
       LOGIN_RATE_LIMIT_BURST: "${LOGIN_RATE_LIMIT_BURST:-60}"
       SITE_BASE_URL: "${SITE_BASE_URL:-http://localhost:3000}"
       STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
-      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"
+      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-whsec_test}"
       STRIPE_ARTIST_BASIC_ANNUAL_PRICE_ID: "${STRIPE_ARTIST_BASIC_ANNUAL_PRICE_ID:-}"
       STRIPE_ARTIST_BASIC_MONTH_PRICE_ID: "${STRIPE_ARTIST_BASIC_MONTH_PRICE_ID:-}"
       STRIPE_ARTIST_PRO_ANNUAL_PRICE_ID: "${STRIPE_ARTIST_PRO_ANNUAL_PRICE_ID:-}"
