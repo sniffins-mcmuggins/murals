@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -22,6 +23,10 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
+
+// oauthHTTPClient is used for outbound OAuth HTTP calls (Apple token endpoint, Google userinfo).
+// A bounded timeout prevents handlers from hanging on unresponsive upstream providers.
+var oauthHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
 func googleOAuthConfig(clientID, clientSecret, redirectBase string) *oauth2.Config {
 	return &oauth2.Config{
@@ -117,8 +122,14 @@ func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, redirectB
 }
 
 func fetchGoogleUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.Token) (*googleUserInfo, error) {
+	// Inject our bounded HTTP client so the userinfo call has a timeout.
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, oauthHTTPClient)
 	client := cfg.Client(ctx, token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.googleapis.com/oauth2/v3/userinfo", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build google userinfo request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -131,10 +142,17 @@ func fetchGoogleUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.
 }
 
 // upsertOAuthUser finds or creates a user for the given OAuth provider+subject.
+//
+// Lookup order:
+//  1. By OAuth (provider, subject) — covers returning users, including Apple where
+//     email is only returned on first login.
+//  2. By email — link the OAuth identity to an existing email-based account.
+//  3. Create a new account (artist role by default). Requires a non-empty email.
 func upsertOAuthUser(ctx context.Context, pool *pgxpool.Pool, email, subject, provider string) (sqlcdb.User, error) {
 	q := sqlcdb.New(pool)
 
-	// Check for existing OAuth link
+	// 1. Check for existing OAuth link first — this is what catches returning Apple
+	//    users (Apple only sends email on the very first sign-in).
 	existing, err := q.GetUserByOAuth(ctx, sqlcdb.GetUserByOAuthParams{
 		OauthProvider: &provider,
 		OauthSubject:  &subject,
@@ -146,8 +164,14 @@ func upsertOAuthUser(ctx context.Context, pool *pgxpool.Pool, email, subject, pr
 		return sqlcdb.User{}, err
 	}
 
-	// Check if email already exists (link OAuth to existing account)
+	// 2. From here on we need an email. If the provider didn't give us one and
+	//    the OAuth lookup above didn't find an existing link, we can't proceed.
+	if email == "" {
+		return sqlcdb.User{}, fmt.Errorf("oauth provider returned no email for new user")
+	}
 	emailLower := strings.ToLower(email)
+
+	// 3. Try linking to an existing email account
 	byEmail, err := q.GetUserByEmail(ctx, emailLower)
 	if err == nil {
 		return q.LinkOAuthToUser(ctx, sqlcdb.LinkOAuthToUserParams{
@@ -160,7 +184,7 @@ func upsertOAuthUser(ctx context.Context, pool *pgxpool.Pool, email, subject, pr
 		return sqlcdb.User{}, err
 	}
 
-	// New OAuth user — create account with artist role by default
+	// 4. New OAuth user — create account with artist role by default
 	return q.CreateOAuthUser(ctx, sqlcdb.CreateOAuthUserParams{
 		Email:         emailLower,
 		Role:          sqlcdb.UserRoleArtist,
@@ -218,11 +242,15 @@ func AppleRedirectHandler(clientID, redirectBase string) http.HandlerFunc {
 			MaxAge:   300,
 			Path:     "/",
 		})
-		params := fmt.Sprintf(
-			"https://appleid.apple.com/auth/authorize?client_id=%s&redirect_uri=%s&response_type=code&response_mode=form_post&scope=name%%20email&state=%s",
-			clientID, redirectBase+"/auth/oauth/apple/callback", state,
-		)
-		http.Redirect(w, r, params, http.StatusTemporaryRedirect)
+		params := url.Values{}
+		params.Set("client_id", clientID)
+		params.Set("redirect_uri", redirectBase+"/auth/oauth/apple/callback")
+		params.Set("response_type", "code")
+		params.Set("response_mode", "form_post")
+		params.Set("scope", "name email")
+		params.Set("state", state)
+		authorizeURL := "https://appleid.apple.com/auth/authorize?" + params.Encode()
+		http.Redirect(w, r, authorizeURL, http.StatusTemporaryRedirect)
 	}
 }
 
@@ -249,8 +277,14 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 		}
 
 		appleEmail, appleSubject, err := exchangeAppleCode(r.Context(), code, clientID, clientSecret, redirectBase)
-		if err != nil || appleEmail == "" {
+		if err != nil {
 			httperr.Write(w, http.StatusBadGateway, "OAuth Error", "failed to exchange Apple code")
+			return
+		}
+		// Apple only returns email on first login; returning users will have empty email
+		// but must still have a subject. Subject is the stable user identifier.
+		if appleSubject == "" {
+			httperr.Write(w, http.StatusBadGateway, "OAuth Error", "apple id_token missing subject")
 			return
 		}
 
@@ -280,15 +314,22 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 
 // exchangeAppleCode exchanges an authorization code with Apple and extracts email and subject from the id_token.
 func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, redirectBase string) (email, subject string, err error) {
-	vals := fmt.Sprintf(
-		"client_id=%s&client_secret=%s&code=%s&grant_type=authorization_code&redirect_uri=%s",
-		clientID, clientSecret, code, redirectBase+"/auth/oauth/apple/callback",
-	)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://appleid.apple.com/auth/token",
-		strings.NewReader(vals))
+	v := url.Values{}
+	v.Set("client_id", clientID)
+	v.Set("client_secret", clientSecret)
+	v.Set("code", code)
+	v.Set("grant_type", "authorization_code")
+	v.Set("redirect_uri", redirectBase+"/auth/oauth/apple/callback")
+	body := v.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://appleid.apple.com/auth/token",
+		strings.NewReader(body))
+	if err != nil {
+		return "", "", fmt.Errorf("build apple token request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := oauthHTTPClient.Do(req)
 	if err != nil {
 		return "", "", err
 	}
@@ -305,21 +346,22 @@ func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, redire
 		return "", "", err
 	}
 
-	// Parse id_token payload (unverified — add Apple key verification in production hardening)
-	parts := strings.Split(result.IDToken, ".")
-	if len(parts) != 3 {
-		return "", "", fmt.Errorf("invalid id_token")
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return "", "", err
-	}
+	// Parse id_token claims with validation. Signature is not verified (TLS to Apple
+	// already authenticates the source), but iss/aud/exp must be valid.
+	// TODO: verify signature against Apple JWKS for defense-in-depth.
+	parser := jwt.NewParser(jwt.WithIssuer("https://appleid.apple.com"), jwt.WithAudience(clientID))
 	var claims struct {
-		Sub   string `json:"sub"`
+		jwt.RegisteredClaims
 		Email string `json:"email"`
 	}
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", "", err
+	if _, _, err := parser.ParseUnverified(result.IDToken, &claims); err != nil {
+		return "", "", fmt.Errorf("parse apple id_token: %w", err)
 	}
-	return claims.Email, claims.Sub, nil
+	// ParseUnverified skips claim validation; run the same checks the Parser would
+	// have run (iss, aud, exp) via a standalone Validator configured identically.
+	validator := jwt.NewValidator(jwt.WithIssuer("https://appleid.apple.com"), jwt.WithAudience(clientID))
+	if err := validator.Validate(&claims); err != nil {
+		return "", "", fmt.Errorf("validate apple id_token claims: %w", err)
+	}
+	return claims.Email, claims.Subject, nil
 }
