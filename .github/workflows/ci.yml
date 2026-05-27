@@ -164,10 +164,20 @@ jobs:
         run: git diff --exit-code openapi/generated/
 
   # ── E2E ───────────────────────────────────────────────────────────────────
+  # Final gate: run only after every upstream job either passed or was skipped
+  # (paths-filter). If any of api/web/mobile/openapi fails or is cancelled, skip
+  # e2e — fix the upstream failure first. Requires at least one to have actually
+  # run and passed so we don't e2e on a no-op change.
   e2e:
     name: E2E
-    needs: [api, web]
-    if: always() && (needs.api.result == 'success' || needs.web.result == 'success')
+    needs: [api, web, mobile, openapi]
+    if: >-
+      always()
+      && needs.api.result != 'failure' && needs.api.result != 'cancelled'
+      && needs.web.result != 'failure' && needs.web.result != 'cancelled'
+      && needs.mobile.result != 'failure' && needs.mobile.result != 'cancelled'
+      && needs.openapi.result != 'failure' && needs.openapi.result != 'cancelled'
+      && (needs.api.result == 'success' || needs.web.result == 'success' || needs.mobile.result == 'success' || needs.openapi.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
