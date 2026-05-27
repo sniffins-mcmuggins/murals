@@ -18,7 +18,7 @@ import (
 func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "formorg@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "formorg@example.com")
 	festID := createTestFestival(t, db, orgID, "form-test-fest", "draft")
 
 	r := chi.NewRouter()
@@ -51,8 +51,8 @@ func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "formorg2@example.com", "organiser")
-	_, otherToken := createTestUser(t, db, "formorg3@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "formorg2@example.com")
+	_, otherToken := createTestUser(t, db, "formorg3@example.com")
 	festID := createTestFestival(t, db, orgID, "form-test-fest2", "draft")
 
 	r := chi.NewRouter()
@@ -70,7 +70,7 @@ func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 func TestGetForm_Public(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "formorg4@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "formorg4@example.com")
 	festID := createTestFestival(t, db, orgID, "form-test-fest3", "draft")
 	createTestApplicationForm(t, db, festID)
 
@@ -89,7 +89,7 @@ func TestGetForm_Public(t *testing.T) {
 func TestGetForm_NotFound(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "formorg5@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "formorg5@example.com")
 	festID := createTestFestival(t, db, orgID, "form-no-form", "draft")
 
 	r := chi.NewRouter()

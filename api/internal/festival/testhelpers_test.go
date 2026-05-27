@@ -24,7 +24,7 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
 }
 
-func createTestUser(t *testing.T, pool *pgxpool.Pool, email, role string) (userID string, token string) {
+func createTestUser(t *testing.T, pool *pgxpool.Pool, email string) (userID string, token string) {
 	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
 	if err != nil {
@@ -35,13 +35,12 @@ func createTestUser(t *testing.T, pool *pgxpool.Pool, email, role string) (userI
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        email,
 		PasswordHash: &hashStr,
-		Role:         sqlcdb.UserRole(role),
 	})
 	if err != nil {
 		t.Fatalf("create user %s: %v", email, err)
 	}
 	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, role, user.SessionVersion, testSecret)
+	token, err = auth.IssueToken(userID, user.IsAdmin, user.SessionVersion, testSecret)
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
 	}

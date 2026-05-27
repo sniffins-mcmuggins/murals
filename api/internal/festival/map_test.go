@@ -21,11 +21,11 @@ import (
 func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "maporg@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "maporg@example.com")
 	festID := createTestFestival(t, db, orgID, "map-fest-live", "live")
 
 	// Create artist and accept them with a pin
-	artistUserID, _ := createTestUser(t, db, "mapartist@example.com", "artist")
+	artistUserID, _ := createTestUser(t, db, "mapartist@example.com")
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Map Artist")
 
 	q := sqlcdb.New(db)
@@ -77,7 +77,7 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "maporg2@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "maporg2@example.com")
 	createTestFestival(t, db, orgID, "map-fest-draft", "draft")
 
 	r := chi.NewRouter()
