@@ -100,7 +100,7 @@ func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, apiBase, 
 			return
 		}
 
-		jwtToken, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
+		jwtToken, err := IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
@@ -154,7 +154,7 @@ func fetchGoogleUserInfo(ctx context.Context, cfg *oauth2.Config, token *oauth2.
 //  1. By OAuth (provider, subject) — covers returning users, including Apple where
 //     email is only returned on first login.
 //  2. By email — link the OAuth identity to an existing email-based account.
-//  3. Create a new account (artist role by default). Requires a non-empty email.
+//  3. Create a new account. Requires a non-empty email.
 func upsertOAuthUser(ctx context.Context, pool *pgxpool.Pool, email, subject, provider string) (sqlcdb.User, error) {
 	q := sqlcdb.New(pool)
 
@@ -191,10 +191,9 @@ func upsertOAuthUser(ctx context.Context, pool *pgxpool.Pool, email, subject, pr
 		return sqlcdb.User{}, err
 	}
 
-	// 4. New OAuth user — create account with artist role by default
+	// 4. New OAuth user — create account
 	return q.CreateOAuthUser(ctx, sqlcdb.CreateOAuthUserParams{
 		Email:         emailLower,
-		Role:          sqlcdb.UserRoleArtist,
 		OauthProvider: &provider,
 		OauthSubject:  &subject,
 	})
@@ -326,7 +325,7 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 			return
 		}
 
-		jwtToken, err := IssueToken(user.ID.String(), string(user.Role), user.SessionVersion, jwtSecret)
+		jwtToken, err := IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, jwtSecret)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
