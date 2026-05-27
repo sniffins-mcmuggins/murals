@@ -50,3 +50,7 @@ tasks:
     cmds:
       - task: e2e:api
       - cmd: npx playwright test
+
+  billing:stripe-listen:
+    desc: "Forward Stripe webhooks to local API (requires Stripe CLI installed and logged in)"
+    cmd: stripe listen --forward-to localhost:8080/billing/webhook
