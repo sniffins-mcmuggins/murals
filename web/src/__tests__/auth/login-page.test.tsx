@@ -47,7 +47,7 @@ describe('LoginPage', () => {
     expect(link).toHaveAttribute('href', '/signup')
   })
 
-  it('redirects to / on successful login', async () => {
+  it('redirects to /dashboard on successful login', async () => {
     mockPost.mockResolvedValueOnce({
       data: { token: 'tok', user: fakeUser },
       response: { ok: true, status: 200 },
@@ -63,7 +63,7 @@ describe('LoginPage', () => {
       expect(mockPost).toHaveBeenCalledWith('/auth/login', {
         body: { email: 'alice@example.com', password: 'password123' },
       })
-      expect(mockPush).toHaveBeenCalledWith('/')
+      expect(mockPush).toHaveBeenCalledWith('/dashboard')
     })
   })
 
