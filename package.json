@@ -3,5 +3,9 @@
   "workspaces": [
     "openapi/client",
     "web"
-  ]
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "vitest": "^3.0.0"
+  }
 }
