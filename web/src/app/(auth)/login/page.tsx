@@ -32,7 +32,7 @@ function LoginForm() {
     setPending(true)
 
     try {
-      const { response } = await apiClient.POST('/auth/login', {
+      const { data, response } = await apiClient.POST('/auth/login', {
         body: { email, password },
       })
 
@@ -46,12 +46,14 @@ function LoginForm() {
         return
       }
 
-      // The OpenAPI spec models /auth/login as returning the full session
-      // shape, but the runtime branches between {token, user} and
-      // {mfa_required, mfa_token}. We parse defensively here.
-      const json = (await response.json().catch(() => null)) as LoginSuccessBody | null
-      if (json?.mfa_required && typeof json.mfa_token === 'string') {
-        setMfaToken(json.mfa_token)
+      // The OpenAPI spec models /auth/login as returning {token, user}, but
+      // the runtime also has an MFA branch returning {mfa_required, mfa_token}.
+      // Until the spec catches up (followup in PR #103), we cast `data` —
+      // which openapi-fetch has already parsed from the response body — to
+      // the wider shape and detect the MFA branch by duck-typing.
+      const body = data as LoginSuccessBody | undefined
+      if (body?.mfa_required && typeof body.mfa_token === 'string') {
+        setMfaToken(body.mfa_token)
         setMfaRequired(true)
         return
       }
