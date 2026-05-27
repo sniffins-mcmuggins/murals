@@ -1,0 +1,131 @@
+// Authorization isolation tests (issue #113).
+//
+// Confirms that user A cannot mutate user B's collections, applications,
+// festivals, or read another user's `me/*` resources. Expected status codes
+// reflect what the handlers actually return today (403 vs 404) — read each
+// handler before changing an expectation.
+//
+// Users are created once in beforeAll to keep signup/login traffic under the
+// rate-limit ceiling when this file runs alongside the rest of the e2e suite.
+import { describe, it, expect, beforeAll } from 'vitest'
+import {
+  createArtist,
+  createOrganiser,
+  createProfile,
+  createCollection,
+  createFestival,
+  setFestivalStatus,
+  upsertForm,
+  submitApplication,
+  ArtistSetup,
+  OrganiserSetup,
+} from '../fixtures/helpers.js'
+
+const API = process.env.API_URL ?? 'http://localhost:8080'
+const SUFFIX = `gaps-isol-${Date.now()}`
+
+function auth(token: string) {
+  return { Authorization: `Bearer ${token}` }
+}
+
+describe('authorization isolation', () => {
+  let artistA: ArtistSetup
+  let artistB: ArtistSetup
+  let orgA: OrganiserSetup
+  let orgB: OrganiserSetup
+  let profileAName: string
+  let profileBName: string
+
+  beforeAll(async () => {
+    artistA = await createArtist(`${SUFFIX}-aA`)
+    artistB = await createArtist(`${SUFFIX}-aB`)
+    orgA = await createOrganiser(`${SUFFIX}-oA`)
+    orgB = await createOrganiser(`${SUFFIX}-oB`)
+    profileAName = `A ${SUFFIX}`
+    profileBName = `B ${SUFFIX}`
+    await createProfile(artistA.token, { displayName: profileAName })
+    await createProfile(artistB.token, { displayName: profileBName })
+  })
+
+  it('user A cannot PATCH user B\'s collection (403)', async () => {
+    const { collectionId } = await createCollection(artistB.token, { name: `coll-patch-${SUFFIX}` })
+
+    const res = await fetch(`${API}/collections/${collectionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(artistA.token) },
+      body: JSON.stringify({ name: 'hijacked' }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('user A cannot DELETE user B\'s collection (403)', async () => {
+    const { collectionId } = await createCollection(artistB.token, { name: `coll-del-${SUFFIX}` })
+
+    const res = await fetch(`${API}/collections/${collectionId}`, {
+      method: 'DELETE',
+      headers: auth(artistA.token),
+    })
+    expect(res.status).toBe(403)
+
+    // Still exists: anyone can read it (public GET).
+    const verifyRes = await fetch(`${API}/collections/${collectionId}`)
+    expect(verifyRes.status).toBe(200)
+  })
+
+  it('GET /profiles/me returns own profile, never another user\'s', async () => {
+    const resA = await fetch(`${API}/profiles/me`, { headers: auth(artistA.token) })
+    expect(resA.status).toBe(200)
+    const dataA = await resA.json()
+    expect(dataA.display_name).toBe(profileAName)
+
+    const resB = await fetch(`${API}/profiles/me`, { headers: auth(artistB.token) })
+    expect(resB.status).toBe(200)
+    const dataB = await resB.json()
+    expect(dataB.display_name).toBe(profileBName)
+
+    expect(dataA.id).not.toBe(dataB.id)
+  })
+
+  it('organiser A cannot PATCH organiser B\'s festival (403)', async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Fest',
+      slug: `b-fest-patch-${SUFFIX}`,
+    })
+
+    const res = await fetch(`${API}/festivals/${festivalId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+      body: JSON.stringify({ name: 'hijacked' }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('organiser A cannot accept an application on organiser B\'s festival (403)', async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Fest Accept',
+      slug: `b-fest-acc-${SUFFIX}`,
+    })
+    await upsertForm(orgB.token, festivalId)
+    await setFestivalStatus(orgB.token, festivalId, 'open')
+    const { applicationId } = await submitApplication(artistA.token, festivalId)
+
+    // Organiser A tries to accept on B's festival — 403.
+    const acceptRes = await fetch(
+      `${API}/festivals/${festivalId}/applications/${applicationId}/accept`,
+      { method: 'POST', headers: auth(orgA.token) },
+    )
+    expect(acceptRes.status).toBe(403)
+  })
+
+  it('organiser A cannot list applications on organiser B\'s festival (403)', async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Fest List',
+      slug: `b-fest-list-${SUFFIX}`,
+    })
+
+    const res = await fetch(`${API}/festivals/${festivalId}/applications`, {
+      headers: auth(orgA.token),
+    })
+    expect(res.status).toBe(403)
+  })
+})
