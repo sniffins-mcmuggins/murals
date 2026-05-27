@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/client"
 	"github.com/stripe/stripe-go/v82/webhook"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
@@ -20,7 +21,7 @@ import (
 )
 
 // WebhookHandler returns an http.Handler that processes Stripe webhook events.
-func WebhookHandler(pool *pgxpool.Pool, webhookSecret string, prices Prices) http.Handler {
+func WebhookHandler(pool *pgxpool.Pool, sc *client.API, webhookSecret string, prices Prices) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -43,7 +44,7 @@ func WebhookHandler(pool *pgxpool.Pool, webhookSecret string, prices Prices) htt
 		case "customer.subscription.deleted":
 			handleSubscriptionDeleted(ctx, pool, event)
 		case "checkout.session.completed":
-			handleCheckoutCompleted(ctx, pool, event)
+			handleCheckoutCompleted(ctx, pool, sc, event, prices)
 		case "invoice.payment_failed":
 			handlePaymentFailed(ctx, pool, event)
 		default:
@@ -150,7 +151,7 @@ func handleSubscriptionDeleted(ctx context.Context, pool *pgxpool.Pool, event st
 	}
 }
 
-func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, event stripe.Event) {
+func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, sc *client.API, event stripe.Event, prices Prices) {
 	var sess stripe.CheckoutSession
 	if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
 		slog.Error("stripe webhook: failed to unmarshal checkout session", "err", err)
@@ -179,7 +180,51 @@ func handleCheckoutCompleted(ctx context.Context, pool *pgxpool.Pool, event stri
 	}
 	if err != nil {
 		slog.Error("stripe webhook: failed to mark org payment paid", "err", err, "session_id", sess.ID)
+		return
 	}
+
+	// After a successful festival activation payment, start the annual recurring subscription.
+	if sess.Metadata != nil && sess.Metadata["charge_type"] == "festival_month" {
+		startAnnualFestivalSubscription(ctx, sc, prices, &sess)
+	}
+}
+
+func startAnnualFestivalSubscription(ctx context.Context, sc *client.API, prices Prices, sess *stripe.CheckoutSession) {
+	if sess.Customer == nil {
+		slog.Error("stripe webhook: festival checkout has no customer", "session_id", sess.ID)
+		return
+	}
+	if prices.FestivalAnnual == "" {
+		slog.Warn("stripe webhook: festival annual price not configured; skipping subscription start", "session_id", sess.ID)
+		return
+	}
+
+	// Schedule the annual subscription to start 1 month after activation.
+	// The festival's exact end date isn't on the checkout session so we approximate.
+	annualStart := time.Now().AddDate(0, 1, 0).Unix()
+
+	params := &stripe.SubscriptionParams{
+		Customer: stripe.String(sess.Customer.ID),
+		Items: []*stripe.SubscriptionItemsParams{
+			{Price: stripe.String(prices.FestivalAnnual)},
+		},
+		TrialEnd: stripe.Int64(annualStart),
+		Metadata: map[string]string{
+			"user_id":     sess.Metadata["user_id"],
+			"festival_id": sess.Metadata["festival_id"],
+		},
+	}
+	// Context is not threaded through Stripe client calls; suppress unused ctx lint warning.
+	_ = ctx
+	sub, err := sc.Subscriptions.New(params)
+	if err != nil {
+		slog.Error("stripe webhook: create festival annual subscription", "err", err, "session_id", sess.ID)
+		return
+	}
+	slog.Info("stripe webhook: festival annual subscription started",
+		"subscription_id", sub.ID,
+		"festival_id", sess.Metadata["festival_id"],
+	)
 }
 
 func handlePaymentFailed(ctx context.Context, pool *pgxpool.Pool, event stripe.Event) {

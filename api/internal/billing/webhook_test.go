@@ -31,7 +31,7 @@ func TestWebhookHandler_InvalidSignature(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	prices := billing.Prices{}
-	handler := billing.WebhookHandler(db, "wrong-secret", prices)
+	handler := billing.WebhookHandler(db, nil, "wrong-secret", prices)
 
 	body := []byte(`{"type":"customer.subscription.created"}`)
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/billing/webhook",
@@ -47,7 +47,7 @@ func TestWebhookHandler_ValidSignature_UnknownEvent(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	prices := billing.Prices{}
-	handler := billing.WebhookHandler(db, testWebhookSecret, prices)
+	handler := billing.WebhookHandler(db, nil, testWebhookSecret, prices)
 
 	body := []byte(`{"type":"payment_intent.created","data":{"object":{}}}`)
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/billing/webhook",
