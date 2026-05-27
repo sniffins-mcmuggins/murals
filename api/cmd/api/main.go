@@ -18,6 +18,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
+	"github.com/sniffins-mcmuggins/render/api/internal/email"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
@@ -62,6 +63,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Email sender: SES in production, no-op locally if SES config is incomplete
+	// or AWS credentials are unavailable.
+	var mailer auth.EmailSender
+	if cfg.SESFromEmail != "" && cfg.AWSRegion != "" {
+		sender, err := email.NewSender(ctx, cfg.AWSRegion, cfg.SESFromEmail)
+		if err != nil {
+			slog.Warn("SES init failed — password reset emails disabled", "err", err)
+			mailer = auth.NoopMailer{}
+		} else {
+			mailer = sender
+		}
+	} else {
+		mailer = auth.NoopMailer{}
+	}
+
 	r := chi.NewRouter()
 	r.Use(corsMiddleware)
 	r.Use(chiMiddleware.RealIP)
@@ -73,7 +89,30 @@ func main() {
 	r.Get("/healthz", health.Handler(pool))
 	r.Handle("/metrics", metrics.Handler())
 	r.Post("/auth/signup", auth.SignupHandler(pool))
-	r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
+
+	// Rate-limited auth routes (5/min per IP) — login, password reset, and MFA verify.
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RateLimitMiddleware)
+		r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
+		r.Post("/auth/forgot-password", auth.ForgotPasswordHandler(pool, mailer, cfg.OAuthRedirectBase))
+		r.Post("/auth/reset-password", auth.ResetPasswordHandler(pool))
+		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
+	})
+
+	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
+	r.Post("/auth/mfa/enroll", auth.TOTPEnrollHandler(pool, cfg.TOTPEncryptionKey))
+	r.Post("/auth/mfa/confirm", auth.TOTPConfirmHandler(pool, cfg.TOTPEncryptionKey))
+
+	// OAuth — only register if the provider is configured.
+	if cfg.GoogleClientID != "" {
+		r.Get("/auth/oauth/google", auth.GoogleRedirectHandler(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthRedirectBase))
+		r.Get("/auth/oauth/google/callback", auth.GoogleCallbackHandler(pool, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthRedirectBase, cfg.JWTSecret))
+	}
+	if cfg.AppleClientID != "" {
+		r.Get("/auth/oauth/apple", auth.AppleRedirectHandler(cfg.AppleClientID, cfg.OAuthRedirectBase))
+		r.Post("/auth/oauth/apple/callback", auth.AppleCallbackHandler(pool, cfg.AppleClientID, cfg.AppleTeamID, cfg.AppleKeyID, cfg.ApplePrivateKey, cfg.OAuthRedirectBase, cfg.JWTSecret))
+	}
+
 	r.Get("/me", auth.MeHandler(pool))
 	r.Post("/images/presign", image.PresignHandler(mcPublic, cfg.MinioBucket))
 	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
