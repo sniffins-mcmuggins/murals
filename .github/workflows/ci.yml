@@ -55,7 +55,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
 
       - name: Download modules
@@ -152,7 +152,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
 
       - name: Regenerate
@@ -167,6 +167,7 @@ jobs:
   e2e:
     name: E2E
     needs: [api, web]
+    if: always() && (needs.api.result == 'success' || needs.web.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
