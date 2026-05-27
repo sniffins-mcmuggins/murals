@@ -94,7 +94,7 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RateLimitMiddleware)
 		r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
-		r.Post("/auth/forgot-password", auth.ForgotPasswordHandler(pool, mailer, cfg.OAuthRedirectBase))
+		r.Post("/auth/forgot-password", auth.ForgotPasswordHandler(pool, mailer, cfg.WebPublicBase))
 		r.Post("/auth/reset-password", auth.ResetPasswordHandler(pool))
 		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
 	})
@@ -105,12 +105,12 @@ func main() {
 
 	// OAuth — only register if the provider is configured.
 	if cfg.GoogleClientID != "" {
-		r.Get("/auth/oauth/google", auth.GoogleRedirectHandler(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthRedirectBase))
-		r.Get("/auth/oauth/google/callback", auth.GoogleCallbackHandler(pool, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthRedirectBase, cfg.JWTSecret))
+		r.Get("/auth/oauth/google", auth.GoogleRedirectHandler(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.APIPublicBase))
+		r.Get("/auth/oauth/google/callback", auth.GoogleCallbackHandler(pool, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.APIPublicBase, cfg.WebPublicBase, cfg.JWTSecret))
 	}
 	if cfg.AppleClientID != "" {
-		r.Get("/auth/oauth/apple", auth.AppleRedirectHandler(cfg.AppleClientID, cfg.OAuthRedirectBase))
-		r.Post("/auth/oauth/apple/callback", auth.AppleCallbackHandler(pool, cfg.AppleClientID, cfg.AppleTeamID, cfg.AppleKeyID, cfg.ApplePrivateKey, cfg.OAuthRedirectBase, cfg.JWTSecret))
+		r.Get("/auth/oauth/apple", auth.AppleRedirectHandler(cfg.AppleClientID, cfg.APIPublicBase))
+		r.Post("/auth/oauth/apple/callback", auth.AppleCallbackHandler(pool, cfg.AppleClientID, cfg.AppleTeamID, cfg.AppleKeyID, cfg.ApplePrivateKey, cfg.APIPublicBase, cfg.WebPublicBase, cfg.JWTSecret))
 	}
 
 	r.Get("/me", auth.MeHandler(pool))

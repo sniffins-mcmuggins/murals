@@ -28,19 +28,21 @@ import (
 // A bounded timeout prevents handlers from hanging on unresponsive upstream providers.
 var oauthHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
-func googleOAuthConfig(clientID, clientSecret, redirectBase string) *oauth2.Config {
+func googleOAuthConfig(clientID, clientSecret, apiBase string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		RedirectURL:  redirectBase + "/auth/oauth/google/callback",
+		RedirectURL:  apiBase + "/auth/oauth/google/callback",
 		Scopes:       []string{"openid", "email", "profile"},
 		Endpoint:     google.Endpoint,
 	}
 }
 
 // GoogleRedirectHandler handles GET /auth/oauth/google.
-func GoogleRedirectHandler(clientID, clientSecret, redirectBase string) http.HandlerFunc {
-	cfg := googleOAuthConfig(clientID, clientSecret, redirectBase)
+// apiBase is the public URL of this API — used as the OAuth redirect_uri so Google
+// posts the callback back to /auth/oauth/google/callback on the API (not the web app).
+func GoogleRedirectHandler(clientID, clientSecret, apiBase string) http.HandlerFunc {
+	cfg := googleOAuthConfig(clientID, clientSecret, apiBase)
 	return func(w http.ResponseWriter, r *http.Request) {
 		state := randomState()
 		http.SetCookie(w, &http.Cookie{
@@ -63,8 +65,10 @@ type googleUserInfo struct {
 }
 
 // GoogleCallbackHandler handles GET /auth/oauth/google/callback.
-func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, redirectBase, jwtSecret string) http.HandlerFunc {
-	cfg := googleOAuthConfig(clientID, clientSecret, redirectBase)
+// apiBase is used to build the OAuth redirect_uri (must match what was sent at /auth/oauth/google).
+// webBase is the public URL of the web app — used for the post-success redirect to /dashboard.
+func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, apiBase, webBase, jwtSecret string) http.HandlerFunc {
+	cfg := googleOAuthConfig(clientID, clientSecret, apiBase)
 	return func(w http.ResponseWriter, r *http.Request) {
 		stateCookie, err := r.Cookie("oauth_state")
 		if err != nil || r.URL.Query().Get("state") != stateCookie.Value {
@@ -117,7 +121,7 @@ func GoogleCallbackHandler(pool *pgxpool.Pool, clientID, clientSecret, redirectB
 			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
 		})
-		http.Redirect(w, r, redirectBase+"/dashboard", http.StatusSeeOther)
+		http.Redirect(w, r, webBase+"/dashboard", http.StatusSeeOther)
 	}
 }
 
@@ -231,20 +235,29 @@ func appleClientSecret(teamID, clientID, keyID, privateKeyPEM string) (string, e
 }
 
 // AppleRedirectHandler handles GET /auth/oauth/apple.
-func AppleRedirectHandler(clientID, redirectBase string) http.HandlerFunc {
+// apiBase is the public URL of this API — used as the OAuth redirect_uri so Apple
+// posts the callback back to /auth/oauth/apple/callback on the API (not the web app).
+func AppleRedirectHandler(clientID, apiBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		state := randomState()
+		// Note: Apple uses response_mode=form_post, so the callback is a cross-site POST.
+		// With SameSite=Lax, browsers strip cookies on cross-site POST and state validation
+		// would always fail. SameSite=None is required, which in turn requires Secure=true
+		// per modern browser policy. This means Apple OAuth requires HTTPS in production
+		// (and in local dev, requires a TLS tunnel like ngrok — plain http://localhost
+		// will not receive the cookie).
 		http.SetCookie(w, &http.Cookie{
 			Name:     "oauth_state",
 			Value:    state,
 			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
 			MaxAge:   300,
 			Path:     "/",
 		})
 		params := url.Values{}
 		params.Set("client_id", clientID)
-		params.Set("redirect_uri", redirectBase+"/auth/oauth/apple/callback")
+		params.Set("redirect_uri", apiBase+"/auth/oauth/apple/callback")
 		params.Set("response_type", "code")
 		params.Set("response_mode", "form_post")
 		params.Set("scope", "name email")
@@ -255,7 +268,10 @@ func AppleRedirectHandler(clientID, redirectBase string) http.HandlerFunc {
 }
 
 // AppleCallbackHandler handles POST /auth/oauth/apple/callback (Apple uses form_post response mode).
-func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKey, redirectBase, jwtSecret string) http.HandlerFunc {
+// apiBase is used to rebuild the redirect_uri for Apple's token exchange (must match what
+// was sent at /auth/oauth/apple). webBase is the public URL of the web app — used for the
+// post-success redirect to /dashboard.
+func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKey, apiBase, webBase, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			httperr.BadRequest(w, "invalid form")
@@ -276,7 +292,7 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 			return
 		}
 
-		appleEmail, appleSubject, err := exchangeAppleCode(r.Context(), code, clientID, clientSecret, redirectBase)
+		appleEmail, appleSubject, err := exchangeAppleCode(r.Context(), code, clientID, clientSecret, apiBase)
 		if err != nil {
 			httperr.Write(w, http.StatusBadGateway, "OAuth Error", "failed to exchange Apple code")
 			return
@@ -304,22 +320,25 @@ func AppleCallbackHandler(pool *pgxpool.Pool, clientID, teamID, keyID, privateKe
 			Name: "session", Value: jwtToken, HttpOnly: true,
 			SameSite: http.SameSiteLaxMode, Path: "/", MaxAge: int(tokenTTL.Seconds()),
 		})
+		// Clear cookie must match the original attributes (SameSite=None+Secure) or
+		// browsers may refuse to overwrite it.
 		http.SetCookie(w, &http.Cookie{
 			Name: "oauth_state", MaxAge: -1, Path: "/",
-			HttpOnly: true, SameSite: http.SameSiteLaxMode,
+			HttpOnly: true, SameSite: http.SameSiteNoneMode, Secure: true,
 		})
-		http.Redirect(w, r, redirectBase+"/dashboard", http.StatusSeeOther)
+		http.Redirect(w, r, webBase+"/dashboard", http.StatusSeeOther)
 	}
 }
 
 // exchangeAppleCode exchanges an authorization code with Apple and extracts email and subject from the id_token.
-func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, redirectBase string) (email, subject string, err error) {
+// apiBase is used to rebuild the redirect_uri that must match what was sent at /auth/oauth/apple.
+func exchangeAppleCode(ctx context.Context, code, clientID, clientSecret, apiBase string) (email, subject string, err error) {
 	v := url.Values{}
 	v.Set("client_id", clientID)
 	v.Set("client_secret", clientSecret)
 	v.Set("code", code)
 	v.Set("grant_type", "authorization_code")
-	v.Set("redirect_uri", redirectBase+"/auth/oauth/apple/callback")
+	v.Set("redirect_uri", apiBase+"/auth/oauth/apple/callback")
 	body := v.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://appleid.apple.com/auth/token",

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -34,7 +35,8 @@ type forgotRequest struct {
 
 // ForgotPasswordHandler handles POST /auth/forgot-password.
 // Always returns 202 to avoid leaking whether an email is registered.
-func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, baseURL string) http.HandlerFunc {
+// webBase is the public URL of the web app — reset links point at /reset-password there.
+func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, webBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req forgotRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -42,12 +44,15 @@ func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, baseURL strin
 			return
 		}
 
+		// Normalize email to match signup-time storage (lowercased + trimmed).
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+
 		w.WriteHeader(http.StatusAccepted)
 
 		go func() {
 			ctx := context.Background()
 			q := sqlcdb.New(pool)
-			user, err := q.GetUserByEmail(ctx, req.Email)
+			user, err := q.GetUserByEmail(ctx, email)
 			if err != nil {
 				return
 			}
@@ -72,7 +77,7 @@ func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, baseURL strin
 				return
 			}
 
-			resetURL := fmt.Sprintf("%s/reset-password?token=%s", baseURL, rawHex)
+			resetURL := fmt.Sprintf("%s/reset-password?token=%s", webBase, rawHex)
 			body := fmt.Sprintf(`<p>Reset your Render password: <a href="%s">%s</a></p><p>This link expires in 1 hour.</p>`, resetURL, resetURL)
 			_ = mailer.Send(ctx, user.Email, "Reset your Render password", body)
 		}()

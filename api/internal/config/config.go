@@ -21,7 +21,8 @@ type Config struct {
 	SESFromEmail        string
 	GoogleClientID      string
 	GoogleClientSecret  string
-	OAuthRedirectBase   string
+	APIPublicBase       string // public URL of this API (used for OAuth redirect_uri)
+	WebPublicBase       string // public URL of the web app (post-OAuth redirect + email links)
 	AppleClientID       string
 	AppleTeamID         string
 	AppleKeyID          string
@@ -47,7 +48,8 @@ func Load() Config {
 		SESFromEmail:        env("SES_FROM_EMAIL", ""),
 		GoogleClientID:      env("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:  env("GOOGLE_CLIENT_SECRET", ""),
-		OAuthRedirectBase:   env("OAUTH_REDIRECT_BASE", "http://localhost:3000"),
+		APIPublicBase:       env("API_PUBLIC_BASE", "http://localhost:8080"),
+		WebPublicBase:       env("WEB_PUBLIC_BASE", "http://localhost:3000"),
 		AppleClientID:       env("APPLE_CLIENT_ID", ""),
 		AppleTeamID:         env("APPLE_TEAM_ID", ""),
 		AppleKeyID:          env("APPLE_KEY_ID", ""),

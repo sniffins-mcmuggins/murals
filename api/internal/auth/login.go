@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,7 +33,9 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 		}
 
 		q := sqlcdb.New(pool)
-		user, err := q.GetUserByEmail(r.Context(), req.Email)
+		// Normalize email to match signup-time storage (lowercased + trimmed).
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		user, err := q.GetUserByEmail(r.Context(), email)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				httperr.Write(w, http.StatusUnauthorized, "Unauthorized", "invalid credentials")
