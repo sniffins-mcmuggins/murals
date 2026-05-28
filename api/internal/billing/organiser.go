@@ -38,6 +38,21 @@ func OrgSetupCheckoutHandler(pool *pgxpool.Pool, sc *stripe.Client, prices Price
 			httperr.InternalServerError(w)
 			return
 		}
+		if !paid {
+			hasGrant, grantErr := q.HasActiveGrant(r.Context(), sqlcdb.HasActiveGrantParams{
+				UserID:     userUUID,
+				Plan:       "organiser_setup",
+				FestivalID: pgtype.UUID{},
+			})
+			if grantErr != nil {
+				slog.Error("check organiser_setup grant", "err", grantErr, "user_id", principal.UserID)
+				httperr.InternalServerError(w)
+				return
+			}
+			if hasGrant {
+				paid = true
+			}
+		}
 		if paid {
 			httperr.Write(w, http.StatusConflict, "Conflict", "setup fee already paid")
 			return

@@ -185,6 +185,20 @@ func (ns NullFestivalStatus) Value() (driver.Value, error) {
 	return string(ns.FestivalStatus), nil
 }
 
+type AccessGrant struct {
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	UserID      pgtype.UUID        `db:"user_id" json:"user_id"`
+	Plan        string             `db:"plan" json:"plan"`
+	FestivalID  pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	ValidUntil  pgtype.Timestamptz `db:"valid_until" json:"valid_until"`
+	GrantedBy   pgtype.UUID        `db:"granted_by" json:"granted_by"`
+	PromoCodeID pgtype.UUID        `db:"promo_code_id" json:"promo_code_id"`
+	Note        *string            `db:"note" json:"note"`
+	RevokedAt   pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+
 type Application struct {
 	ID        pgtype.UUID        `db:"id" json:"id"`
 	FormID    pgtype.UUID        `db:"form_id" json:"form_id"`
@@ -291,6 +305,19 @@ type PasswordResetToken struct {
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type PromoCode struct {
+	ID           pgtype.UUID        `db:"id" json:"id"`
+	Code         string             `db:"code" json:"code"`
+	Plan         string             `db:"plan" json:"plan"`
+	DurationDays int32              `db:"duration_days" json:"duration_days"`
+	MaxUses      *int32             `db:"max_uses" json:"max_uses"`
+	UseCount     int32              `db:"use_count" json:"use_count"`
+	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedBy    pgtype.UUID        `db:"created_by" json:"created_by"`
+	RevokedAt    pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Subscription struct {
