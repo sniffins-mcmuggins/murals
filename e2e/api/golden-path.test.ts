@@ -202,25 +202,37 @@ describe('golden path', () => {
     expect(data.status).toBe('accepted')
   })
 
-  it('16. accepted artist appears in festival roster', async () => {
-    const res = await fetch(`${API}/festivals/${festivalId}/artists/accepted`, {
+  it('16. accepted artist appears in festival roster (via spots endpoint)', async () => {
+    const res = await fetch(`${API}/festivals/${festivalId}/spots`, {
       headers: auth(organiserToken),
     })
     expect(res.status).toBe(200)
-    const artists = await res.json()
-    expect(Array.isArray(artists)).toBe(true)
-    expect(artists.length).toBe(1)
-    artistId = artists[0].artist_id
+    const body = await res.json()
+    expect(Array.isArray(body.unassigned_artists)).toBe(true)
+    expect(body.unassigned_artists.length).toBe(1)
+    artistId = body.unassigned_artists[0].artist_id
     expect(typeof artistId).toBe('string')
   })
 
-  it('17. organiser sets artist pin', async () => {
-    const res = await fetch(`${API}/festivals/${festivalId}/artists/${artistId}/pin`, {
-      method: 'PATCH',
+  it('17. organiser creates a spot and assigns the artist', async () => {
+    // Create a spot
+    const createRes = await fetch(`${API}/festivals/${festivalId}/spots`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth(organiserToken) },
-      body: JSON.stringify({ lat: 51.9, lng: -2.07, w3w: 'three.word.address' }),
+      body: JSON.stringify({ lat: 51.9, lng: -2.07 }),
     })
-    expect(res.status).toBe(200)
+    expect(createRes.status).toBe(201)
+    const spot = await json(createRes)
+    const spotId: string = spot.id
+    expect(typeof spotId).toBe('string')
+
+    // Assign the artist to the spot
+    const assignRes = await fetch(`${API}/festivals/${festivalId}/spots/${spotId}/artist`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...auth(organiserToken) },
+      body: JSON.stringify({ artist_id: artistId }),
+    })
+    expect(assignRes.status).toBe(200)
   })
 
   it('18. set festival to live', async () => {

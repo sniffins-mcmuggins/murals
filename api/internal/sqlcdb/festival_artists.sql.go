@@ -16,7 +16,7 @@ INSERT INTO festival_artists (festival_id, artist_id, status)
 VALUES ($1, $2, $3)
 ON CONFLICT (festival_id, artist_id) DO UPDATE
     SET status = EXCLUDED.status, updated_at = now()
-RETURNING festival_id, artist_id, status, pin_lat, pin_lng, w3w, created_at, updated_at
+RETURNING festival_id, artist_id, status, created_at, updated_at
 `
 
 type AddFestivalArtistParams struct {
@@ -32,9 +32,6 @@ func (q *Queries) AddFestivalArtist(ctx context.Context, arg AddFestivalArtistPa
 		&i.FestivalID,
 		&i.ArtistID,
 		&i.Status,
-		&i.PinLat,
-		&i.PinLng,
-		&i.W3w,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -44,9 +41,6 @@ func (q *Queries) AddFestivalArtist(ctx context.Context, arg AddFestivalArtistPa
 const getAcceptedArtistForFestival = `-- name: GetAcceptedArtistForFestival :one
 SELECT fa.festival_id,
        fa.artist_id,
-       fa.pin_lat,
-       fa.pin_lng,
-       fa.w3w,
        ap.display_name
 FROM festival_artists fa
 JOIN artist_profiles ap ON ap.id = fa.artist_id
@@ -61,164 +55,14 @@ type GetAcceptedArtistForFestivalParams struct {
 }
 
 type GetAcceptedArtistForFestivalRow struct {
-	FestivalID  pgtype.UUID    `db:"festival_id" json:"festival_id"`
-	ArtistID    pgtype.UUID    `db:"artist_id" json:"artist_id"`
-	PinLat      pgtype.Numeric `db:"pin_lat" json:"pin_lat"`
-	PinLng      pgtype.Numeric `db:"pin_lng" json:"pin_lng"`
-	W3w         *string        `db:"w3w" json:"w3w"`
-	DisplayName string         `db:"display_name" json:"display_name"`
+	FestivalID  pgtype.UUID `db:"festival_id" json:"festival_id"`
+	ArtistID    pgtype.UUID `db:"artist_id" json:"artist_id"`
+	DisplayName string      `db:"display_name" json:"display_name"`
 }
 
 func (q *Queries) GetAcceptedArtistForFestival(ctx context.Context, arg GetAcceptedArtistForFestivalParams) (GetAcceptedArtistForFestivalRow, error) {
 	row := q.db.QueryRow(ctx, getAcceptedArtistForFestival, arg.FestivalID, arg.ArtistID)
 	var i GetAcceptedArtistForFestivalRow
-	err := row.Scan(
-		&i.FestivalID,
-		&i.ArtistID,
-		&i.PinLat,
-		&i.PinLng,
-		&i.W3w,
-		&i.DisplayName,
-	)
-	return i, err
-}
-
-const getAcceptedArtistsForFestival = `-- name: GetAcceptedArtistsForFestival :many
-SELECT fa.festival_id,
-       fa.artist_id,
-       fa.pin_lat,
-       fa.pin_lng,
-       fa.w3w,
-       ap.display_name
-FROM festival_artists fa
-JOIN artist_profiles ap ON ap.id = fa.artist_id
-WHERE fa.festival_id = $1
-  AND fa.status = 'accepted'
-`
-
-type GetAcceptedArtistsForFestivalRow struct {
-	FestivalID  pgtype.UUID    `db:"festival_id" json:"festival_id"`
-	ArtistID    pgtype.UUID    `db:"artist_id" json:"artist_id"`
-	PinLat      pgtype.Numeric `db:"pin_lat" json:"pin_lat"`
-	PinLng      pgtype.Numeric `db:"pin_lng" json:"pin_lng"`
-	W3w         *string        `db:"w3w" json:"w3w"`
-	DisplayName string         `db:"display_name" json:"display_name"`
-}
-
-func (q *Queries) GetAcceptedArtistsForFestival(ctx context.Context, festivalID pgtype.UUID) ([]GetAcceptedArtistsForFestivalRow, error) {
-	rows, err := q.db.Query(ctx, getAcceptedArtistsForFestival, festivalID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAcceptedArtistsForFestivalRow
-	for rows.Next() {
-		var i GetAcceptedArtistsForFestivalRow
-		if err := rows.Scan(
-			&i.FestivalID,
-			&i.ArtistID,
-			&i.PinLat,
-			&i.PinLng,
-			&i.W3w,
-			&i.DisplayName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getFestivalMapPins = `-- name: GetFestivalMapPins :many
-SELECT fa.festival_id,
-       fa.artist_id,
-       fa.pin_lat,
-       fa.pin_lng,
-       fa.w3w,
-       ap.display_name
-FROM festival_artists fa
-JOIN artist_profiles ap ON ap.id = fa.artist_id
-WHERE fa.festival_id = $1
-  AND fa.status = 'accepted'
-  AND fa.pin_lat IS NOT NULL
-  AND fa.pin_lng IS NOT NULL
-`
-
-type GetFestivalMapPinsRow struct {
-	FestivalID  pgtype.UUID    `db:"festival_id" json:"festival_id"`
-	ArtistID    pgtype.UUID    `db:"artist_id" json:"artist_id"`
-	PinLat      pgtype.Numeric `db:"pin_lat" json:"pin_lat"`
-	PinLng      pgtype.Numeric `db:"pin_lng" json:"pin_lng"`
-	W3w         *string        `db:"w3w" json:"w3w"`
-	DisplayName string         `db:"display_name" json:"display_name"`
-}
-
-func (q *Queries) GetFestivalMapPins(ctx context.Context, festivalID pgtype.UUID) ([]GetFestivalMapPinsRow, error) {
-	rows, err := q.db.Query(ctx, getFestivalMapPins, festivalID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetFestivalMapPinsRow
-	for rows.Next() {
-		var i GetFestivalMapPinsRow
-		if err := rows.Scan(
-			&i.FestivalID,
-			&i.ArtistID,
-			&i.PinLat,
-			&i.PinLng,
-			&i.W3w,
-			&i.DisplayName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const setFestivalArtistPin = `-- name: SetFestivalArtistPin :one
-UPDATE festival_artists
-SET pin_lat    = $3,
-    pin_lng    = $4,
-    w3w        = $5,
-    updated_at = now()
-WHERE festival_id = $1 AND artist_id = $2
-RETURNING festival_id, artist_id, status, pin_lat, pin_lng, w3w, created_at, updated_at
-`
-
-type SetFestivalArtistPinParams struct {
-	FestivalID pgtype.UUID    `db:"festival_id" json:"festival_id"`
-	ArtistID   pgtype.UUID    `db:"artist_id" json:"artist_id"`
-	PinLat     pgtype.Numeric `db:"pin_lat" json:"pin_lat"`
-	PinLng     pgtype.Numeric `db:"pin_lng" json:"pin_lng"`
-	W3w        *string        `db:"w3w" json:"w3w"`
-}
-
-func (q *Queries) SetFestivalArtistPin(ctx context.Context, arg SetFestivalArtistPinParams) (FestivalArtist, error) {
-	row := q.db.QueryRow(ctx, setFestivalArtistPin,
-		arg.FestivalID,
-		arg.ArtistID,
-		arg.PinLat,
-		arg.PinLng,
-		arg.W3w,
-	)
-	var i FestivalArtist
-	err := row.Scan(
-		&i.FestivalID,
-		&i.ArtistID,
-		&i.Status,
-		&i.PinLat,
-		&i.PinLng,
-		&i.W3w,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
+	err := row.Scan(&i.FestivalID, &i.ArtistID, &i.DisplayName)
 	return i, err
 }

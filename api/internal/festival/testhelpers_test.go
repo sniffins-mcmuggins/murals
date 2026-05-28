@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -101,4 +102,20 @@ func createTestApplicationFormWithFields(t *testing.T, pool *pgxpool.Pool, festi
 		t.Fatalf("create application form with fields for festival %s: %v", festivalID, err)
 	}
 	return form.ID.String()
+}
+
+func createTestApplicationInFestival(t *testing.T, pool *pgxpool.Pool, festivalID, userID string) string {
+	t.Helper()
+	q := sqlcdb.New(pool)
+	form, err := q.GetApplicationFormByFestivalID(context.Background(), pgUUID(t, festivalID))
+	require.NoError(t, err)
+	profile, err := q.GetArtistProfileByUserID(context.Background(), pgUUID(t, userID))
+	require.NoError(t, err)
+	app, err := q.CreateApplication(context.Background(), sqlcdb.CreateApplicationParams{
+		FormID:   form.ID,
+		ArtistID: profile.ID,
+		Answers:  []byte(`{}`),
+	})
+	require.NoError(t, err)
+	return app.ID.String()
 }

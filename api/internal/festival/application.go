@@ -23,24 +23,30 @@ type formField struct {
 }
 
 type applicationResponse struct {
-	ID        string          `json:"id"`
-	FormID    string          `json:"form_id"`
-	ArtistID  string          `json:"artist_id"`
-	Status    string          `json:"status"`
-	Answers   json.RawMessage `json:"answers"`
-	CreatedAt string          `json:"created_at"`
-	UpdatedAt string          `json:"updated_at"`
+	ID          string          `json:"id"`
+	FormID      string          `json:"form_id"`
+	ArtistID    string          `json:"artist_id"`
+	Status      string          `json:"status"`
+	Rank        int32           `json:"rank"`
+	Shortlisted bool            `json:"shortlisted"`
+	ReviewFlag  bool            `json:"review_flag"`
+	Answers     json.RawMessage `json:"answers"`
+	CreatedAt   string          `json:"created_at"`
+	UpdatedAt   string          `json:"updated_at"`
 }
 
 func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	return applicationResponse{
-		ID:        a.ID.String(),
-		FormID:    a.FormID.String(),
-		ArtistID:  a.ArtistID.String(),
-		Status:    string(a.Status),
-		Answers:   a.Answers,
-		CreatedAt: a.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt: a.UpdatedAt.Time.Format(time.RFC3339),
+		ID:          a.ID.String(),
+		FormID:      a.FormID.String(),
+		ArtistID:    a.ArtistID.String(),
+		Status:      string(a.Status),
+		Rank:        a.Rank,
+		Shortlisted: a.Shortlisted,
+		ReviewFlag:  a.ReviewFlag,
+		Answers:     a.Answers,
+		CreatedAt:   a.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   a.UpdatedAt.Time.Format(time.RFC3339),
 	}
 }
 

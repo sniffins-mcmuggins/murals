@@ -6,7 +6,6 @@ import {
   createFestival,
   setFestivalStatus,
   upsertForm,
-  setPin,
 } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
@@ -88,25 +87,26 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
     await organiserPage.getByRole('button', { name: 'Accept' }).click()
     await expect(organiserPage.getByText('accepted')).toBeVisible()
 
-    // ── Map editor: place pin ─────────────────────────────────────────────────────
+    // ── Map editor: create spot and assign artist ────────────────────────────────
     await organiserPage.goto(`/organiser/festivals/${festivalId}/map`)
     await expect(organiserPage.locator('.leaflet-container')).toBeVisible({ timeout: 10_000 })
 
-    // Click roughly in the center of the map
+    // Enter placement mode
+    await organiserPage.getByTestId('add-spot-btn').click()
+    await expect(organiserPage.getByTestId('add-spot-btn')).toHaveText('Click map to place…')
+
+    // Click the map to create a spot
     await organiserPage.locator('.leaflet-container').click({ position: { x: 400, y: 300 } })
 
-    // PlacePinPanel appears
-    await expect(organiserPage.getByRole('heading', { name: 'Place pin' })).toBeVisible()
+    // Spot panel opens
+    await expect(organiserPage.getByTestId('spot-panel')).toBeVisible({ timeout: 5_000 })
 
-    // Select the accepted artist from the dropdown
-    await organiserPage.selectOption('#artist-select', { label: `E2E Artist ${suffix}` })
+    // Select the accepted artist from the dropdown in the panel
+    await organiserPage.locator('[data-testid="spot-panel"] select').selectOption({ label: `E2E Artist ${suffix}` })
 
-    // Fill W3W (optional but we validate the format)
-    await organiserPage.fill('#w3w-input', 'three.word.address')
-
-    // Save the pin
-    await organiserPage.getByRole('button', { name: 'Save pin' }).click()
-    await expect(organiserPage.getByRole('button', { name: 'Save pin' })).not.toBeVisible({ timeout: 5_000 })
+    // Save
+    await organiserPage.getByRole('button', { name: 'Save' }).click()
+    await expect(organiserPage.getByRole('button', { name: 'Save' })).toBeEnabled({ timeout: 5_000 })
 
     // ── Assert: map data API returns the pin ───────────────────────────────────────
     // Set festival to live (UI only supports draft/open; use API directly)

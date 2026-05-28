@@ -216,9 +216,9 @@ Audit: `lib/auth-server.ts`, any `page.tsx` doing `fetch()`. Client components k
 
 `web/src/components/DynamicForm.tsx` must key answers by `field.id` (with `field.label` as fallback). The API validates `answers[field.id]`. If you ever see a form submission "succeed" client-side but `submit application` 422s with missing required fields, the form is keying by `label`.
 
-### Map test can't find the pin popup
+### Map test can't find the spot panel
 
-`FestivalMap.tsx` doesn't use Leaflet's built-in `Popup` — it renders a custom side panel. The selector is `[data-testid="map-pin-panel"]`, never `.leaflet-popup`.
+`MapEditorClient.tsx` (organiser map editor) renders a custom side panel with `[data-testid="spot-panel"]`, never `.leaflet-popup`. Markers do use Leaflet `<Popup>` for a brief hover tooltip, but the full edit panel is `spot-panel`.
 
 ## Test data conventions
 

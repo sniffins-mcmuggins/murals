@@ -173,9 +173,13 @@ func main() {
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool))
 
-	// Map editor
-	r.Get("/festivals/{festivalID}/artists/accepted", festival.GetAcceptedArtistsHandler(pool))
-	r.Patch("/festivals/{festivalID}/artists/{artistID}/pin", festival.SetArtistPinHandler(pool))
+	// Spots (map editor)
+	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(pool))
+	r.Patch("/festivals/{festivalID}/spots/{spotID}", festival.UpdateSpotHandler(pool))
+	r.Delete("/festivals/{festivalID}/spots/{spotID}", festival.DeleteSpotHandler(pool))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(pool))
+	r.Delete("/festivals/{festivalID}/spots/{spotID}/artist", festival.ClearSpotArtistHandler(pool))
 
 	// Billing — webhook first (no auth required; Stripe POSTs directly).
 	// CSRF posture: the session cookie is SameSite=Lax (api/internal/auth/login.go),

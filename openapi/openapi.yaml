@@ -439,6 +439,66 @@ components:
           items:
             $ref: "#/components/schemas/MapPin"
 
+    FestivalSpot:
+      type: object
+      required: [id, number, lat, lng]
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: integer
+        lat:
+          type: number
+          format: float
+        lng:
+          type: number
+          format: float
+        w3w:
+          type: string
+          nullable: true
+        width_m:
+          type: number
+          format: float
+          nullable: true
+        height_m:
+          type: number
+          format: float
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        artist_id:
+          type: string
+          format: uuid
+          nullable: true
+        artist_name:
+          type: string
+          nullable: true
+
+    UnassignedArtist:
+      type: object
+      required: [artist_id, name]
+      properties:
+        artist_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+
+    FestivalSpotsResponse:
+      type: object
+      required: [spots, unassigned_artists]
+      properties:
+        spots:
+          type: array
+          items:
+            $ref: "#/components/schemas/FestivalSpot"
+        unassigned_artists:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnassignedArtist"
+
     ProfileListResponse:
       type: object
       required: [profiles, total, page, per_page]
@@ -456,26 +516,6 @@ components:
         per_page:
           type: integer
           description: Number of profiles per page.
-
-    AcceptedArtist:
-      type: object
-      properties:
-        artist_id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        pin_lat:
-          type: number
-          format: float
-          nullable: true
-        pin_lng:
-          type: number
-          format: float
-          nullable: true
-        w3w:
-          type: string
-          nullable: true
 
   securitySchemes:
     cookieAuth:
@@ -1505,7 +1545,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /festivals/{festivalID}/artists/accepted:
+  /festivals/{festivalID}/spots:
     parameters:
       - name: festivalID
         in: path
@@ -1514,46 +1554,29 @@ paths:
           type: string
           format: uuid
     get:
-      operationId: getAcceptedArtists
+      operationId: getFestivalSpots
       tags: [festival]
-      summary: List accepted artists for a festival (map editor)
+      summary: List spots with assignment status (map editor)
       security:
         - cookieAuth: []
         - bearerAuth: []
       responses:
         "200":
-          description: Accepted artists with optional pin locations
+          description: All spots and unassigned accepted artists
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AcceptedArtist"
+                $ref: "#/components/schemas/FestivalSpotsResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
-
-  /festivals/{festivalID}/artists/{artistID}/pin:
-    parameters:
-      - name: festivalID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: artistID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    patch:
-      operationId: setArtistPin
+    post:
+      operationId: createFestivalSpot
       tags: [festival]
-      summary: Set or update a pin location for an accepted artist
+      summary: Create a new spot
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1574,13 +1597,173 @@ paths:
                 w3w:
                   type: string
                   nullable: true
+                width_m:
+                  type: number
+                  format: float
+                  nullable: true
+                height_m:
+                  type: number
+                  format: float
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
       responses:
-        "200":
-          description: Updated accepted artist entry
+        "201":
+          description: Created spot
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcceptedArtist"
+                $ref: "#/components/schemas/FestivalSpot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /festivals/{festivalID}/spots/{spotID}:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: spotID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateFestivalSpot
+      tags: [festival]
+      summary: Update spot details
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat:
+                  type: number
+                  format: float
+                lng:
+                  type: number
+                  format: float
+                w3w:
+                  type: string
+                  nullable: true
+                width_m:
+                  type: number
+                  format: float
+                  nullable: true
+                height_m:
+                  type: number
+                  format: float
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Updated spot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FestivalSpot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteFestivalSpot
+      tags: [festival]
+      summary: Delete a spot (idempotent — always 204 whether spot existed or not)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted (or was already absent)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /festivals/{festivalID}/spots/{spotID}/artist:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: spotID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: setSpotArtist
+      tags: [festival]
+      summary: Assign an accepted artist to a spot
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [artist_id]
+              properties:
+                artist_id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Updated spot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FestivalSpot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    delete:
+      operationId: clearSpotArtist
+      tags: [festival]
+      summary: Unassign the artist from a spot
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated spot with artist cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FestivalSpot"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

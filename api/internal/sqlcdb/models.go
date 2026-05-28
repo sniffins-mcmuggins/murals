@@ -15,9 +15,10 @@ import (
 type ApplicationStatus string
 
 const (
-	ApplicationStatusSubmitted ApplicationStatus = "submitted"
-	ApplicationStatusAccepted  ApplicationStatus = "accepted"
-	ApplicationStatusDeclined  ApplicationStatus = "declined"
+	ApplicationStatusSubmitted  ApplicationStatus = "submitted"
+	ApplicationStatusAccepted   ApplicationStatus = "accepted"
+	ApplicationStatusDeclined   ApplicationStatus = "declined"
+	ApplicationStatusWaitlisted ApplicationStatus = "waitlisted"
 )
 
 func (e *ApplicationStatus) Scan(src interface{}) error {
@@ -198,15 +199,17 @@ type AccessGrant struct {
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-
 type Application struct {
-	ID        pgtype.UUID        `db:"id" json:"id"`
-	FormID    pgtype.UUID        `db:"form_id" json:"form_id"`
-	ArtistID  pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	Status    ApplicationStatus  `db:"status" json:"status"`
-	Answers   json.RawMessage    `db:"answers" json:"answers"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	FormID      pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID    pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status      ApplicationStatus  `db:"status" json:"status"`
+	Answers     json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Rank        int32              `db:"rank" json:"rank"`
+	Shortlisted bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag  bool               `db:"review_flag" json:"review_flag"`
 }
 
 type ApplicationForm struct {
@@ -218,6 +221,13 @@ type ApplicationForm struct {
 	MaxApplications *int32             `db:"max_applications" json:"max_applications"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type ApplicationNote struct {
+	ID            pgtype.UUID        `db:"id" json:"id"`
+	ApplicationID pgtype.UUID        `db:"application_id" json:"application_id"`
+	Content       string             `db:"content" json:"content"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type ArtistProfile struct {
@@ -274,11 +284,23 @@ type FestivalArtist struct {
 	FestivalID pgtype.UUID          `db:"festival_id" json:"festival_id"`
 	ArtistID   pgtype.UUID          `db:"artist_id" json:"artist_id"`
 	Status     FestivalArtistStatus `db:"status" json:"status"`
-	PinLat     pgtype.Numeric       `db:"pin_lat" json:"pin_lat"`
-	PinLng     pgtype.Numeric       `db:"pin_lng" json:"pin_lng"`
-	W3w        *string              `db:"w3w" json:"w3w"`
 	CreatedAt  pgtype.Timestamptz   `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz   `db:"updated_at" json:"updated_at"`
+}
+
+type FestivalSpot struct {
+	ID         pgtype.UUID        `db:"id" json:"id"`
+	FestivalID pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Number     int32              `db:"number" json:"number"`
+	Lat        pgtype.Numeric     `db:"lat" json:"lat"`
+	Lng        pgtype.Numeric     `db:"lng" json:"lng"`
+	W3w        *string            `db:"w3w" json:"w3w"`
+	WidthM     pgtype.Numeric     `db:"width_m" json:"width_m"`
+	HeightM    pgtype.Numeric     `db:"height_m" json:"height_m"`
+	Notes      *string            `db:"notes" json:"notes"`
+	ArtistID   pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type MigrationsHealth struct {
