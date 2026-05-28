@@ -80,7 +80,8 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
     setHeightM(spot.height_m != null ? String(spot.height_m) : '')
     setNotes(spot.notes ?? '')
     setArtistId(spot.artist_id ?? '')
-  }, [spot.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spot])
 
   const artistOptions: UnassignedArtist[] = spot.artist_id
     ? [{ artist_id: spot.artist_id, name: spot.artist_name ?? spot.artist_id }, ...unassignedArtists]
@@ -135,23 +136,28 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
 
   async function handleDelete() {
     setSaving(true)
-    const res = await apiClient.DELETE('/festivals/{festivalID}/spots/{spotID}', {
-      params: { path: { festivalID: festivalId, spotID: spot.id! } },
-    })
-    setSaving(false)
-    if (res.error) {
+    try {
+      const res = await apiClient.DELETE('/festivals/{festivalID}/spots/{spotID}', {
+        params: { path: { festivalID: festivalId, spotID: spot.id! } },
+      })
+      if (res.error) {
+        setSaveError('Failed to delete spot')
+        return
+      }
+      onMutated()
+      onClose()
+    } catch {
       setSaveError('Failed to delete spot')
-      return
+    } finally {
+      setSaving(false)
     }
-    onMutated()
-    onClose()
   }
 
   return (
     <div className="mt-4 p-5 bg-warm border border-light rounded-lg" data-testid="spot-panel">
       <div className="flex justify-between items-start mb-3">
         <h2 className="font-serif text-xl text-ink">Spot {spot.number}</h2>
-        <button onClick={onClose} className="font-sans text-xs text-mid hover:text-ink">✕</button>
+        <button onClick={onClose} aria-label="Close" className="font-sans text-xs text-mid hover:text-ink">✕</button>
       </div>
 
       <div className="space-y-3 max-w-sm">
@@ -401,8 +407,11 @@ type Props = { params: Promise<{ id: string }> }
 export default function OrgFestivalMapPage({ params }: Props) {
   const [festivalId, setFestivalId] = useState<string | null>(null)
 
-  if (!festivalId) {
+  useEffect(() => {
     params.then(p => setFestivalId(p.id))
+  }, [params])
+
+  if (!festivalId) {
     return <div className="font-sans text-mid text-sm p-8">Loading…</div>
   }
 

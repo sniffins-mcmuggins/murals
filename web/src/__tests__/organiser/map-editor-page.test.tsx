@@ -100,4 +100,50 @@ describe('OrgFestivalMapPage', () => {
 
     expect(screen.getByTestId('spot-panel')).toBeInTheDocument()
   })
+
+  it('clicking Save in the spot panel calls PATCH with updated notes', async () => {
+    mockUseQuery.mockReturnValue({ data: spotsData, isLoading: false, isError: false } as ReturnType<typeof useQuery>)
+    const { apiClient } = await import('@/lib/api')
+    const mockPatch = vi.mocked(apiClient.PATCH)
+    mockPatch.mockResolvedValue({ data: spotsData.spots[0] as never, error: undefined, response: new Response(null, { status: 200 }) })
+
+    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    await waitFor(() => expect(screen.getByTestId('spots-list')).toBeInTheDocument())
+
+    // Open the spot panel (scope to sidebar list to avoid map popup duplicate)
+    const spotsList = screen.getByTestId('spots-list')
+    await userEvent.click(spotsList.querySelectorAll('button')[0])
+    expect(screen.getByTestId('spot-panel')).toBeInTheDocument()
+
+    // Edit the notes field
+    const notesField = screen.getByPlaceholderText('e.g. needs cherry picker')
+    await userEvent.clear(notesField)
+    await userEvent.type(notesField, 'needs scaffold')
+
+    // Click Save
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/festivals/{festivalID}/spots/{spotID}',
+      expect.objectContaining({
+        params: { path: { festivalID: 'fest-abc123', spotID: 'spot-1' } },
+      })
+    )
+  })
+
+  it('clicking Add spot button toggles placement mode label', async () => {
+    mockUseQuery.mockReturnValue({ data: spotsData, isLoading: false, isError: false } as ReturnType<typeof useQuery>)
+    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+
+    await waitFor(() => expect(screen.getByTestId('add-spot-btn')).toBeInTheDocument())
+
+    const addBtn = screen.getByTestId('add-spot-btn')
+    expect(addBtn).toHaveTextContent('+ Add spot')
+
+    await userEvent.click(addBtn)
+    expect(addBtn).toHaveTextContent('Click map to place…')
+
+    await userEvent.click(addBtn)
+    expect(addBtn).toHaveTextContent('+ Add spot')
+  })
 })
