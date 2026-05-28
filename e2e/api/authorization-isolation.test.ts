@@ -128,4 +128,82 @@ describe('authorization isolation', () => {
     })
     expect(res.status).toBe(403)
   })
+
+  // ── IDOR: new review endpoints (issue #141) ─────────────────────────────────
+
+  it("organiser A cannot waitlist an application on organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Waitlist Fest',
+      slug: `b-wl-${SUFFIX}`,
+    })
+    await upsertForm(orgB.token, festivalId)
+    await setFestivalStatus(orgB.token, festivalId, 'open')
+    const { applicationId } = await submitApplication(artistA.token, festivalId)
+
+    const res = await fetch(
+      `${API}/festivals/${festivalId}/applications/${applicationId}/waitlist`,
+      { method: 'POST', headers: auth(orgA.token) },
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot patch flags on an application in organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Patch Fest',
+      slug: `b-patch-${SUFFIX}`,
+    })
+    await upsertForm(orgB.token, festivalId)
+    await setFestivalStatus(orgB.token, festivalId, 'open')
+    const { applicationId } = await submitApplication(artistA.token, festivalId)
+
+    const res = await fetch(
+      `${API}/festivals/${festivalId}/applications/${applicationId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+        body: JSON.stringify({ shortlisted: true, review_flag: false }),
+      },
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot add notes to an application in organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Notes Fest',
+      slug: `b-notes-${SUFFIX}`,
+    })
+    await upsertForm(orgB.token, festivalId)
+    await setFestivalStatus(orgB.token, festivalId, 'open')
+    const { applicationId } = await submitApplication(artistA.token, festivalId)
+
+    const res = await fetch(
+      `${API}/festivals/${festivalId}/applications/${applicationId}/notes`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+        body: JSON.stringify({ content: 'sneaky note' }),
+      },
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot reorder applications in organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Reorder Fest',
+      slug: `b-reorder-${SUFFIX}`,
+    })
+    await upsertForm(orgB.token, festivalId)
+    await setFestivalStatus(orgB.token, festivalId, 'open')
+    const { applicationId } = await submitApplication(artistA.token, festivalId)
+
+    const res = await fetch(
+      `${API}/festivals/${festivalId}/applications/reorder`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+        body: JSON.stringify({ status: 'submitted', ids: [applicationId] }),
+      },
+    )
+    expect(res.status).toBe(403)
+  })
 })
