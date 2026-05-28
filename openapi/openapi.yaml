@@ -148,7 +148,7 @@ components:
 
     ArtistProfile:
       type: object
-      required: [id, user_id, display_name, bio, medium_tags, social_links, created_at, updated_at]
+      required: [id, user_id, display_name, bio, medium_tags, social_links, headline_image_urls, created_at, updated_at]
       properties:
         id:
           type: string
@@ -177,6 +177,11 @@ components:
         avatar_s3_key:
           type: string
           nullable: true
+        headline_image_urls:
+          type: array
+          items:
+            type: string
+          description: Ordered list of S3 public URLs for the artist's headline photos.
         created_at:
           type: string
           format: date-time

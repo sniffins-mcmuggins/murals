@@ -16,9 +16,10 @@ SET display_name   = $2,
     location_label = $4,
     show_location  = $5,
     medium_tags    = $6,
-    social_links   = $7,
-    avatar_s3_key  = $8,
-    updated_at     = now()
+    social_links          = $7,
+    avatar_s3_key         = $8,
+    headline_image_urls   = $9,
+    updated_at            = now()
 WHERE id = $1
 RETURNING *;
 

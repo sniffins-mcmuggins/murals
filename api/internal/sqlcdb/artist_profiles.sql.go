@@ -26,7 +26,7 @@ func (q *Queries) CountPublicProfiles(ctx context.Context) (int64, error) {
 const createArtistProfile = `-- name: CreateArtistProfile :one
 INSERT INTO artist_profiles (user_id, display_name)
 VALUES ($1, $2)
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, headline_image_urls, created_at, updated_at
 `
 
 type CreateArtistProfileParams struct {
@@ -47,6 +47,7 @@ func (q *Queries) CreateArtistProfile(ctx context.Context, arg CreateArtistProfi
 		&i.MediumTags,
 		&i.SocialLinks,
 		&i.AvatarS3Key,
+		&i.HeadlineImageUrls,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -54,7 +55,7 @@ func (q *Queries) CreateArtistProfile(ctx context.Context, arg CreateArtistProfi
 }
 
 const getArtistProfileByID = `-- name: GetArtistProfileByID :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at FROM artist_profiles WHERE id = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, headline_image_urls, created_at, updated_at FROM artist_profiles WHERE id = $1
 `
 
 func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (ArtistProfile, error) {
@@ -70,6 +71,7 @@ func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (Art
 		&i.MediumTags,
 		&i.SocialLinks,
 		&i.AvatarS3Key,
+		&i.HeadlineImageUrls,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -77,7 +79,7 @@ func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (Art
 }
 
 const getArtistProfileByUserID = `-- name: GetArtistProfileByUserID :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at FROM artist_profiles WHERE user_id = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, headline_image_urls, created_at, updated_at FROM artist_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UUID) (ArtistProfile, error) {
@@ -93,6 +95,7 @@ func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UU
 		&i.MediumTags,
 		&i.SocialLinks,
 		&i.AvatarS3Key,
+		&i.HeadlineImageUrls,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -100,7 +103,7 @@ func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UU
 }
 
 const listPublicProfiles = `-- name: ListPublicProfiles :many
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at FROM artist_profiles
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, headline_image_urls, created_at, updated_at FROM artist_profiles
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -129,6 +132,7 @@ func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfiles
 			&i.MediumTags,
 			&i.SocialLinks,
 			&i.AvatarS3Key,
+			&i.HeadlineImageUrls,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -144,27 +148,29 @@ func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfiles
 
 const updateArtistProfile = `-- name: UpdateArtistProfile :one
 UPDATE artist_profiles
-SET display_name   = $2,
-    bio            = $3,
-    location_label = $4,
-    show_location  = $5,
-    medium_tags    = $6,
-    social_links   = $7,
-    avatar_s3_key  = $8,
-    updated_at     = now()
+SET display_name        = $2,
+    bio                 = $3,
+    location_label      = $4,
+    show_location       = $5,
+    medium_tags         = $6,
+    social_links        = $7,
+    avatar_s3_key       = $8,
+    headline_image_urls = $9,
+    updated_at          = now()
 WHERE id = $1
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, headline_image_urls, created_at, updated_at
 `
 
 type UpdateArtistProfileParams struct {
-	ID            pgtype.UUID     `db:"id" json:"id"`
-	DisplayName   string          `db:"display_name" json:"display_name"`
-	Bio           string          `db:"bio" json:"bio"`
-	LocationLabel *string         `db:"location_label" json:"location_label"`
-	ShowLocation  bool            `db:"show_location" json:"show_location"`
-	MediumTags    []string        `db:"medium_tags" json:"medium_tags"`
-	SocialLinks   json.RawMessage `db:"social_links" json:"social_links"`
-	AvatarS3Key   *string         `db:"avatar_s3_key" json:"avatar_s3_key"`
+	ID                 pgtype.UUID     `db:"id" json:"id"`
+	DisplayName        string          `db:"display_name" json:"display_name"`
+	Bio                string          `db:"bio" json:"bio"`
+	LocationLabel      *string         `db:"location_label" json:"location_label"`
+	ShowLocation       bool            `db:"show_location" json:"show_location"`
+	MediumTags         []string        `db:"medium_tags" json:"medium_tags"`
+	SocialLinks        json.RawMessage `db:"social_links" json:"social_links"`
+	AvatarS3Key        *string         `db:"avatar_s3_key" json:"avatar_s3_key"`
+	HeadlineImageUrls  []string        `db:"headline_image_urls" json:"headline_image_urls"`
 }
 
 func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfileParams) (ArtistProfile, error) {
@@ -177,6 +183,7 @@ func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfi
 		arg.MediumTags,
 		arg.SocialLinks,
 		arg.AvatarS3Key,
+		arg.HeadlineImageUrls,
 	)
 	var i ArtistProfile
 	err := row.Scan(
@@ -189,6 +196,7 @@ func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfi
 		&i.MediumTags,
 		&i.SocialLinks,
 		&i.AvatarS3Key,
+		&i.HeadlineImageUrls,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

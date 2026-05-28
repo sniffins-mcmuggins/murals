@@ -151,6 +151,15 @@ func (e ListPublicFestivalsParamsStatus) Valid() bool {
 	}
 }
 
+// AcceptedArtist defines model for AcceptedArtist.
+type AcceptedArtist struct {
+	ArtistId *openapi_types.UUID `json:"artist_id,omitempty"`
+	Name     *string             `json:"name,omitempty"`
+	PinLat   *float32            `json:"pin_lat,omitempty"`
+	PinLng   *float32            `json:"pin_lng,omitempty"`
+	W3w      *string             `json:"w3w,omitempty"`
+}
+
 // Application defines model for Application.
 type Application struct {
 	Answers     *map[string]interface{} `json:"answers,omitempty"`
@@ -199,11 +208,14 @@ type ApplicationStatus string
 
 // ArtistProfile defines model for ArtistProfile.
 type ArtistProfile struct {
-	AvatarS3Key *string            `json:"avatar_s3_key,omitempty"`
-	Bio         string             `json:"bio"`
-	CreatedAt   time.Time          `json:"created_at"`
-	DisplayName string             `json:"display_name"`
-	Id          openapi_types.UUID `json:"id"`
+	AvatarS3Key *string   `json:"avatar_s3_key,omitempty"`
+	Bio         string    `json:"bio"`
+	CreatedAt   time.Time `json:"created_at"`
+	DisplayName string    `json:"display_name"`
+
+	// HeadlineImageUrls Ordered list of S3 public URLs for the artist's headline photos.
+	HeadlineImageUrls []string           `json:"headline_image_urls"`
+	Id                openapi_types.UUID `json:"id"`
 
 	// LocationLabel City/region. Only present if show_location is true (public response).
 	LocationLabel *string            `json:"location_label,omitempty"`
@@ -507,6 +519,13 @@ type PostFestivalsFestivalIDApplyJSONBody struct {
 	Answers map[string]interface{} `json:"answers"`
 }
 
+// SetArtistPinJSONBody defines parameters for SetArtistPin.
+type SetArtistPinJSONBody struct {
+	Lat float32 `json:"lat"`
+	Lng float32 `json:"lng"`
+	W3w *string `json:"w3w,omitempty"`
+}
+
 // PutFestivalsFestivalIDFormJSONBody defines parameters for PutFestivalsFestivalIDForm.
 type PutFestivalsFestivalIDFormJSONBody struct {
 	Fields *[]map[string]interface{} `json:"fields,omitempty"`
@@ -595,6 +614,9 @@ type PostFestivalsFestivalIDApplicationsApplicationIDNotesJSONRequestBody PostFe
 
 // PostFestivalsFestivalIDApplyJSONRequestBody defines body for PostFestivalsFestivalIDApply for application/json ContentType.
 type PostFestivalsFestivalIDApplyJSONRequestBody PostFestivalsFestivalIDApplyJSONBody
+
+// SetArtistPinJSONRequestBody defines body for SetArtistPin for application/json ContentType.
+type SetArtistPinJSONRequestBody SetArtistPinJSONBody
 
 // PutFestivalsFestivalIDFormJSONRequestBody defines body for PutFestivalsFestivalIDForm for application/json ContentType.
 type PutFestivalsFestivalIDFormJSONRequestBody PutFestivalsFestivalIDFormJSONBody
@@ -700,6 +722,12 @@ type ServerInterface interface {
 	// Submit an application
 	// (POST /festivals/{festivalID}/apply)
 	PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// List accepted artists for a festival (map editor)
+	// (GET /festivals/{festivalID}/artists/accepted)
+	GetAcceptedArtists(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Set or update a pin location for an accepted artist
+	// (PATCH /festivals/{festivalID}/artists/{artistID}/pin)
+	SetArtistPin(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, artistID openapi_types.UUID)
 	// Get application form
 	// (GET /festivals/{festivalID}/form)
 	GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
@@ -919,6 +947,18 @@ func (_ Unimplemented) PostFestivalsFestivalIDApplicationsApplicationIDWaitlist(
 // Submit an application
 // (POST /festivals/{festivalID}/apply)
 func (_ Unimplemented) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List accepted artists for a festival (map editor)
+// (GET /festivals/{festivalID}/artists/accepted)
+func (_ Unimplemented) GetAcceptedArtists(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Set or update a pin location for an accepted artist
+// (PATCH /festivals/{festivalID}/artists/{artistID}/pin)
+func (_ Unimplemented) SetArtistPin(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, artistID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1817,6 +1857,83 @@ func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDApply(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
+// GetAcceptedArtists operation middleware
+func (siw *ServerInterfaceWrapper) GetAcceptedArtists(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAcceptedArtists(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetArtistPin operation middleware
+func (siw *ServerInterfaceWrapper) SetArtistPin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "artistID" -------------
+	var artistID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "artistID", chi.URLParam(r, "artistID"), &artistID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "artistID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetArtistPin(w, r, festivalID, artistID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetFestivalsFestivalIDForm operation middleware
 func (siw *ServerInterfaceWrapper) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request) {
 
@@ -2604,6 +2721,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/festivals/{festivalID}/apply", wrapper.PostFestivalsFestivalIDApply)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/{festivalID}/artists/accepted", wrapper.GetAcceptedArtists)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/festivals/{festivalID}/artists/{artistID}/pin", wrapper.SetArtistPin)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/festivals/{festivalID}/form", wrapper.GetFestivalsFestivalIDForm)
@@ -4010,6 +4133,148 @@ func (response PostFestivalsFestivalIDApply422ApplicationProblemPlusJSONResponse
 	return err
 }
 
+type GetAcceptedArtistsRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type GetAcceptedArtistsResponseObject interface {
+	VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error
+}
+
+type GetAcceptedArtists200JSONResponse []AcceptedArtist
+
+func (response GetAcceptedArtists200JSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAcceptedArtists401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAcceptedArtists401ApplicationProblemPlusJSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAcceptedArtists403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAcceptedArtists403ApplicationProblemPlusJSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAcceptedArtists404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetAcceptedArtists404ApplicationProblemPlusJSONResponse) VisitGetAcceptedArtistsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPinRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+	ArtistID   openapi_types.UUID `json:"artistID"`
+	Body       *SetArtistPinJSONRequestBody
+}
+
+type SetArtistPinResponseObject interface {
+	VisitSetArtistPinResponse(w http.ResponseWriter) error
+}
+
+type SetArtistPin200JSONResponse AcceptedArtist
+
+func (response SetArtistPin200JSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPin401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SetArtistPin401ApplicationProblemPlusJSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPin403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetArtistPin403ApplicationProblemPlusJSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetArtistPin404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetArtistPin404ApplicationProblemPlusJSONResponse) VisitSetArtistPinResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetFestivalsFestivalIDFormRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 }
@@ -5184,6 +5449,12 @@ type StrictServerInterface interface {
 	// Submit an application
 	// (POST /festivals/{festivalID}/apply)
 	PostFestivalsFestivalIDApply(ctx context.Context, request PostFestivalsFestivalIDApplyRequestObject) (PostFestivalsFestivalIDApplyResponseObject, error)
+	// List accepted artists for a festival (map editor)
+	// (GET /festivals/{festivalID}/artists/accepted)
+	GetAcceptedArtists(ctx context.Context, request GetAcceptedArtistsRequestObject) (GetAcceptedArtistsResponseObject, error)
+	// Set or update a pin location for an accepted artist
+	// (PATCH /festivals/{festivalID}/artists/{artistID}/pin)
+	SetArtistPin(ctx context.Context, request SetArtistPinRequestObject) (SetArtistPinResponseObject, error)
 	// Get application form
 	// (GET /festivals/{festivalID}/form)
 	GetFestivalsFestivalIDForm(ctx context.Context, request GetFestivalsFestivalIDFormRequestObject) (GetFestivalsFestivalIDFormResponseObject, error)
@@ -6034,6 +6305,66 @@ func (sh *strictHandler) PostFestivalsFestivalIDApply(w http.ResponseWriter, r *
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostFestivalsFestivalIDApplyResponseObject); ok {
 		if err := validResponse.VisitPostFestivalsFestivalIDApplyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAcceptedArtists operation middleware
+func (sh *strictHandler) GetAcceptedArtists(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request GetAcceptedArtistsRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAcceptedArtists(ctx, request.(GetAcceptedArtistsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAcceptedArtists")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAcceptedArtistsResponseObject); ok {
+		if err := validResponse.VisitGetAcceptedArtistsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetArtistPin operation middleware
+func (sh *strictHandler) SetArtistPin(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, artistID openapi_types.UUID) {
+	var request SetArtistPinRequestObject
+
+	request.FestivalID = festivalID
+	request.ArtistID = artistID
+
+	var body SetArtistPinJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetArtistPin(ctx, request.(SetArtistPinRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetArtistPin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetArtistPinResponseObject); ok {
+		if err := validResponse.VisitSetArtistPinResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

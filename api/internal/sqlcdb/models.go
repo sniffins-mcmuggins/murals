@@ -239,9 +239,10 @@ type ArtistProfile struct {
 	ShowLocation  bool               `db:"show_location" json:"show_location"`
 	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
 	SocialLinks   json.RawMessage    `db:"social_links" json:"social_links"`
-	AvatarS3Key   *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	AvatarS3Key         *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	HeadlineImageUrls   []string           `db:"headline_image_urls" json:"headline_image_urls"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Collection struct {
