@@ -127,7 +127,10 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 			return
 		}
 
-		app, err := q.GetApplicationByID(r.Context(), appUUID)
+		updated, err := q.UpdateApplicationStatus(r.Context(), sqlcdb.UpdateApplicationStatusParams{
+			ID:     appUUID,
+			Status: sqlcdb.ApplicationStatusAccepted,
+		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.NotFound(w)
@@ -137,19 +140,10 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 			return
 		}
 
-		updated, err := q.UpdateApplicationStatus(r.Context(), sqlcdb.UpdateApplicationStatusParams{
-			ID:     appUUID,
-			Status: sqlcdb.ApplicationStatusAccepted,
-		})
-		if err != nil {
-			httperr.InternalServerError(w)
-			return
-		}
-
 		// Upsert festival_artist
 		_, err = q.AddFestivalArtist(r.Context(), sqlcdb.AddFestivalArtistParams{
 			FestivalID: festUUID,
-			ArtistID:   app.ArtistID,
+			ArtistID:   updated.ArtistID,
 			Status:     sqlcdb.FestivalArtistStatusAccepted,
 		})
 		if err != nil {
@@ -157,7 +151,7 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 			return
 		}
 
-		sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, "accepted")
+		sendApplicationNotification(pool, mailer, updated.ArtistID, fest.Name, "accepted")
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toApplicationResponse(updated))
