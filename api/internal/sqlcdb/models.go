@@ -199,8 +199,6 @@ type AccessGrant struct {
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-
-
 type Application struct {
 	ID          pgtype.UUID        `db:"id" json:"id"`
 	FormID      pgtype.UUID        `db:"form_id" json:"form_id"`

@@ -854,7 +854,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/festivals/{festivalID}/artists/accepted": {
+    "/festivals/{festivalID}/spots": {
         parameters: {
             query?: never;
             header?: never;
@@ -863,34 +863,57 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** List accepted artists for a festival (map editor) */
-        get: operations["getAcceptedArtists"];
+        /** List spots with assignment status (map editor) */
+        get: operations["getFestivalSpots"];
         put?: never;
-        post?: never;
+        /** Create a new spot */
+        post: operations["createFestivalSpot"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/festivals/{festivalID}/artists/{artistID}/pin": {
+    "/festivals/{festivalID}/spots/{spotID}": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 festivalID: string;
-                artistID: string;
+                spotID: string;
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete a spot (unassigns any assigned artist first) */
+        delete: operations["deleteFestivalSpot"];
         options?: never;
         head?: never;
-        /** Set or update a pin location for an accepted artist */
-        patch: operations["setArtistPin"];
+        /** Update spot details */
+        patch: operations["updateFestivalSpot"];
+        trace?: never;
+    };
+    "/festivals/{festivalID}/spots/{spotID}/artist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                spotID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign an accepted artist to a spot */
+        put: operations["setSpotArtist"];
+        post?: never;
+        /** Unassign the artist from a spot */
+        delete: operations["clearSpotArtist"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -1149,6 +1172,33 @@ export interface components {
         MapData: {
             pins?: components["schemas"]["MapPin"][];
         };
+        FestivalSpot: {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            /** Format: float */
+            lat: number;
+            /** Format: float */
+            lng: number;
+            w3w?: string | null;
+            /** Format: float */
+            width_m?: number | null;
+            /** Format: float */
+            height_m?: number | null;
+            notes?: string | null;
+            /** Format: uuid */
+            artist_id?: string | null;
+            artist_name?: string | null;
+        };
+        UnassignedArtist: {
+            /** Format: uuid */
+            artist_id: string;
+            name: string;
+        };
+        FestivalSpotsResponse: {
+            spots: components["schemas"]["FestivalSpot"][];
+            unassigned_artists: components["schemas"]["UnassignedArtist"][];
+        };
         ProfileListResponse: {
             profiles: components["schemas"]["ArtistProfile"][];
             /** @description Total number of profiles. */
@@ -1157,16 +1207,6 @@ export interface components {
             page: number;
             /** @description Number of profiles per page. */
             per_page: number;
-        };
-        AcceptedArtist: {
-            /** Format: uuid */
-            artist_id?: string;
-            name?: string;
-            /** Format: float */
-            pin_lat?: number | null;
-            /** Format: float */
-            pin_lng?: number | null;
-            w3w?: string | null;
         };
     };
     responses: {
@@ -1852,7 +1892,7 @@ export interface operations {
             };
         };
     };
-    getAcceptedArtists: {
+    getFestivalSpots: {
         parameters: {
             query?: never;
             header?: never;
@@ -1863,13 +1903,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Accepted artists with optional pin locations */
+            /** @description All spots and unassigned accepted artists */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AcceptedArtist"][];
+                    "application/json": components["schemas"]["FestivalSpotsResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -1877,13 +1917,12 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    setArtistPin: {
+    createFestivalSpot: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 festivalID: string;
-                artistID: string;
             };
             cookie?: never;
         };
@@ -1895,17 +1934,148 @@ export interface operations {
                     /** Format: float */
                     lng: number;
                     w3w?: string | null;
+                    /** Format: float */
+                    width_m?: number | null;
+                    /** Format: float */
+                    height_m?: number | null;
+                    notes?: string | null;
                 };
             };
         };
         responses: {
-            /** @description Updated accepted artist entry */
+            /** @description Created spot */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FestivalSpot"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteFestivalSpot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                spotID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateFestivalSpot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                spotID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: float */
+                    lat: number;
+                    /** Format: float */
+                    lng: number;
+                    w3w?: string | null;
+                    /** Format: float */
+                    width_m?: number | null;
+                    /** Format: float */
+                    height_m?: number | null;
+                    notes?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated spot */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AcceptedArtist"];
+                    "application/json": components["schemas"]["FestivalSpot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setSpotArtist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                spotID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    artist_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated spot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FestivalSpot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    clearSpotArtist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                spotID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated spot with artist cleared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FestivalSpot"];
                 };
             };
             401: components["responses"]["Unauthorized"];
