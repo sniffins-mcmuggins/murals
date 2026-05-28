@@ -69,7 +69,7 @@ func (q *Queries) MarkResetTokenUsed(ctx context.Context, id pgtype.UUID) error 
 }
 
 const updateUserPassword = `-- name: UpdateUserPassword :one
-UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 type UpdateUserPasswordParams struct {
@@ -84,7 +84,6 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -92,6 +91,7 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }

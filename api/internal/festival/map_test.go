@@ -21,16 +21,16 @@ import (
 func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "maporg@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "maporg@example.com")
 	festID := createTestFestival(t, db, orgID, "map-fest-live", "live")
 
-	// Create artist and accept them with a pin
-	artistUserID, _ := createTestUser(t, db, "mapartist@example.com", "artist")
+	// Create artist and accept them
+	artistUserID, _ := createTestUser(t, db, "mapartist@example.com")
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Map Artist")
 
 	q := sqlcdb.New(db)
 
-	// First add the artist with accepted status
+	// Accept the artist into the festival
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, festID),
 		ArtistID:   pgUUID(t, artistProfileID),
@@ -38,20 +38,27 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	})
 	require.NoError(t, err, "add festival artist")
 
-	// Then set the pin
+	// Create a spot with lat/lng
 	lat := pgtype.Numeric{}
 	require.NoError(t, lat.Scan("51.900740"))
 	lng := pgtype.Numeric{}
 	require.NoError(t, lng.Scan("-2.074060"))
 	w3w := "filled.count.soap"
-	_, err = q.SetFestivalArtistPin(context.Background(), sqlcdb.SetFestivalArtistPinParams{
+	spot, err := q.CreateFestivalSpot(context.Background(), sqlcdb.CreateFestivalSpotParams{
 		FestivalID: pgUUID(t, festID),
-		ArtistID:   pgUUID(t, artistProfileID),
-		PinLat:     lat,
-		PinLng:     lng,
+		Lat:        lat,
+		Lng:        lng,
 		W3w:        &w3w,
 	})
-	require.NoError(t, err, "set festival artist pin")
+	require.NoError(t, err, "create festival spot")
+
+	// Assign the accepted artist to the spot
+	_, err = q.SetFestivalSpotArtist(context.Background(), sqlcdb.SetFestivalSpotArtistParams{
+		ID:         spot.ID,
+		FestivalID: pgUUID(t, festID),
+		ArtistID:   pgUUID(t, artistProfileID),
+	})
+	require.NoError(t, err, "set festival spot artist")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -77,7 +84,7 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "maporg2@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "maporg2@example.com")
 	createTestFestival(t, db, orgID, "map-fest-draft", "draft")
 
 	r := chi.NewRouter()

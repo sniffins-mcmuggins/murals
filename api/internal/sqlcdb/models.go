@@ -15,9 +15,10 @@ import (
 type ApplicationStatus string
 
 const (
-	ApplicationStatusSubmitted ApplicationStatus = "submitted"
-	ApplicationStatusAccepted  ApplicationStatus = "accepted"
-	ApplicationStatusDeclined  ApplicationStatus = "declined"
+	ApplicationStatusSubmitted  ApplicationStatus = "submitted"
+	ApplicationStatusAccepted   ApplicationStatus = "accepted"
+	ApplicationStatusDeclined   ApplicationStatus = "declined"
+	ApplicationStatusWaitlisted ApplicationStatus = "waitlisted"
 )
 
 func (e *ApplicationStatus) Scan(src interface{}) error {
@@ -185,57 +186,30 @@ func (ns NullFestivalStatus) Value() (driver.Value, error) {
 	return string(ns.FestivalStatus), nil
 }
 
-type UserRole string
-
-const (
-	UserRoleArtist    UserRole = "artist"
-	UserRoleOrganiser UserRole = "organiser"
-	UserRoleAdmin     UserRole = "admin"
-)
-
-func (e *UserRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = UserRole(s)
-	case string:
-		*e = UserRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
-	}
-	return nil
-}
-
-type NullUserRole struct {
-	UserRole UserRole `json:"user_role"`
-	Valid    bool     `json:"valid"` // Valid is true if UserRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullUserRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.UserRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.UserRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullUserRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.UserRole), nil
+type AccessGrant struct {
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	UserID      pgtype.UUID        `db:"user_id" json:"user_id"`
+	Plan        string             `db:"plan" json:"plan"`
+	FestivalID  pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	ValidUntil  pgtype.Timestamptz `db:"valid_until" json:"valid_until"`
+	GrantedBy   pgtype.UUID        `db:"granted_by" json:"granted_by"`
+	PromoCodeID pgtype.UUID        `db:"promo_code_id" json:"promo_code_id"`
+	Note        *string            `db:"note" json:"note"`
+	RevokedAt   pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Application struct {
-	ID        pgtype.UUID        `db:"id" json:"id"`
-	FormID    pgtype.UUID        `db:"form_id" json:"form_id"`
-	ArtistID  pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	Status    ApplicationStatus  `db:"status" json:"status"`
-	Answers   json.RawMessage    `db:"answers" json:"answers"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	FormID      pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID    pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status      ApplicationStatus  `db:"status" json:"status"`
+	Answers     json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Rank        int32              `db:"rank" json:"rank"`
+	Shortlisted bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag  bool               `db:"review_flag" json:"review_flag"`
 }
 
 type ApplicationForm struct {
@@ -247,6 +221,13 @@ type ApplicationForm struct {
 	MaxApplications *int32             `db:"max_applications" json:"max_applications"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type ApplicationNote struct {
+	ID            pgtype.UUID        `db:"id" json:"id"`
+	ApplicationID pgtype.UUID        `db:"application_id" json:"application_id"`
+	Content       string             `db:"content" json:"content"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type ArtistProfile struct {
@@ -303,11 +284,23 @@ type FestivalArtist struct {
 	FestivalID pgtype.UUID          `db:"festival_id" json:"festival_id"`
 	ArtistID   pgtype.UUID          `db:"artist_id" json:"artist_id"`
 	Status     FestivalArtistStatus `db:"status" json:"status"`
-	PinLat     pgtype.Numeric       `db:"pin_lat" json:"pin_lat"`
-	PinLng     pgtype.Numeric       `db:"pin_lng" json:"pin_lng"`
-	W3w        *string              `db:"w3w" json:"w3w"`
 	CreatedAt  pgtype.Timestamptz   `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz   `db:"updated_at" json:"updated_at"`
+}
+
+type FestivalSpot struct {
+	ID         pgtype.UUID        `db:"id" json:"id"`
+	FestivalID pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Number     int32              `db:"number" json:"number"`
+	Lat        pgtype.Numeric     `db:"lat" json:"lat"`
+	Lng        pgtype.Numeric     `db:"lng" json:"lng"`
+	W3w        *string            `db:"w3w" json:"w3w"`
+	WidthM     pgtype.Numeric     `db:"width_m" json:"width_m"`
+	HeightM    pgtype.Numeric     `db:"height_m" json:"height_m"`
+	Notes      *string            `db:"notes" json:"notes"`
+	ArtistID   pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type MigrationsHealth struct {
@@ -336,6 +329,19 @@ type PasswordResetToken struct {
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type PromoCode struct {
+	ID           pgtype.UUID        `db:"id" json:"id"`
+	Code         string             `db:"code" json:"code"`
+	Plan         string             `db:"plan" json:"plan"`
+	DurationDays int32              `db:"duration_days" json:"duration_days"`
+	MaxUses      *int32             `db:"max_uses" json:"max_uses"`
+	UseCount     int32              `db:"use_count" json:"use_count"`
+	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedBy    pgtype.UUID        `db:"created_by" json:"created_by"`
+	RevokedAt    pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type Subscription struct {
 	ID                   pgtype.UUID        `db:"id" json:"id"`
 	UserID               pgtype.UUID        `db:"user_id" json:"user_id"`
@@ -354,7 +360,6 @@ type User struct {
 	ID               pgtype.UUID        `db:"id" json:"id"`
 	Email            string             `db:"email" json:"email"`
 	PasswordHash     *string            `db:"password_hash" json:"password_hash"`
-	Role             UserRole           `db:"role" json:"role"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	OauthProvider    *string            `db:"oauth_provider" json:"oauth_provider"`
 	OauthSubject     *string            `db:"oauth_subject" json:"oauth_subject"`
@@ -362,4 +367,5 @@ type User struct {
 	MfaSecret        *string            `db:"mfa_secret" json:"mfa_secret"`
 	SessionVersion   int32              `db:"session_version" json:"session_version"`
 	StripeCustomerID *string            `db:"stripe_customer_id" json:"stripe_customer_id"`
+	IsAdmin          bool               `db:"is_admin" json:"is_admin"`
 }

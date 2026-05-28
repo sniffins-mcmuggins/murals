@@ -12,18 +12,17 @@ import (
 )
 
 const createOAuthUser = `-- name: CreateOAuthUser :one
-INSERT INTO users (email, password_hash, role, oauth_provider, oauth_subject)
-VALUES ($1, NULL, $2, $3, $4)
+INSERT INTO users (email, password_hash, oauth_provider, oauth_subject)
+VALUES ($1, NULL, $2, $3)
 ON CONFLICT (oauth_provider, oauth_subject) WHERE oauth_provider IS NOT NULL
 DO UPDATE SET oauth_provider = EXCLUDED.oauth_provider
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 type CreateOAuthUserParams struct {
-	Email         string   `db:"email" json:"email"`
-	Role          UserRole `db:"role" json:"role"`
-	OauthProvider *string  `db:"oauth_provider" json:"oauth_provider"`
-	OauthSubject  *string  `db:"oauth_subject" json:"oauth_subject"`
+	Email         string  `db:"email" json:"email"`
+	OauthProvider *string `db:"oauth_provider" json:"oauth_provider"`
+	OauthSubject  *string `db:"oauth_subject" json:"oauth_subject"`
 }
 
 // Idempotent upsert keyed on (oauth_provider, oauth_subject). Two concurrent
@@ -31,18 +30,12 @@ type CreateOAuthUserParams struct {
 // second one returns the row inserted by the first (no unique-violation 500).
 // The DO UPDATE clause is a no-op write to make RETURNING * return a row.
 func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createOAuthUser,
-		arg.Email,
-		arg.Role,
-		arg.OauthProvider,
-		arg.OauthSubject,
-	)
+	row := q.db.QueryRow(ctx, createOAuthUser, arg.Email, arg.OauthProvider, arg.OauthSubject)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -50,30 +43,29 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash, role)
-VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+INSERT INTO users (email, password_hash)
+VALUES ($1, $2)
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 type CreateUserParams struct {
-	Email        string   `db:"email" json:"email"`
-	PasswordHash *string  `db:"password_hash" json:"password_hash"`
-	Role         UserRole `db:"role" json:"role"`
+	Email        string  `db:"email" json:"email"`
+	PasswordHash *string `db:"password_hash" json:"password_hash"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash, arg.Role)
+	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -81,6 +73,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -89,7 +82,7 @@ const disableMFA = `-- name: DisableMFA :one
 UPDATE users
 SET mfa_enabled = false, mfa_secret = NULL
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -99,7 +92,6 @@ func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) 
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -107,12 +99,13 @@ func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) 
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id FROM users WHERE email = $1 LIMIT 1
+SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -122,7 +115,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -130,12 +122,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id FROM users WHERE id = $1 LIMIT 1
+SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -145,7 +138,6 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -153,12 +145,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByOAuth = `-- name: GetUserByOAuth :one
-SELECT id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id FROM users
+SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin FROM users
 WHERE oauth_provider = $1 AND oauth_subject = $2
 LIMIT 1
 `
@@ -175,7 +168,6 @@ func (q *Queries) GetUserByOAuth(ctx context.Context, arg GetUserByOAuthParams) 
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -183,6 +175,7 @@ func (q *Queries) GetUserByOAuth(ctx context.Context, arg GetUserByOAuthParams) 
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -191,7 +184,7 @@ const incrementSessionVersion = `-- name: IncrementSessionVersion :one
 UPDATE users
 SET session_version = session_version + 1
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 // Invalidates all outstanding JWTs for this user by bumping session_version.
@@ -204,7 +197,6 @@ func (q *Queries) IncrementSessionVersion(ctx context.Context, id pgtype.UUID) (
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -212,6 +204,7 @@ func (q *Queries) IncrementSessionVersion(ctx context.Context, id pgtype.UUID) (
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -220,7 +213,7 @@ const linkOAuthToUser = `-- name: LinkOAuthToUser :one
 UPDATE users
 SET oauth_provider = $2, oauth_subject = $3
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 type LinkOAuthToUserParams struct {
@@ -236,7 +229,6 @@ func (q *Queries) LinkOAuthToUser(ctx context.Context, arg LinkOAuthToUserParams
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -244,6 +236,7 @@ func (q *Queries) LinkOAuthToUser(ctx context.Context, arg LinkOAuthToUserParams
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -252,7 +245,7 @@ const setMFAEnabled = `-- name: SetMFAEnabled :one
 UPDATE users
 SET mfa_enabled = $2, mfa_secret = $3
 WHERE id = $1
-RETURNING id, email, password_hash, role, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
 `
 
 type SetMFAEnabledParams struct {
@@ -268,7 +261,6 @@ func (q *Queries) SetMFAEnabled(ctx context.Context, arg SetMFAEnabledParams) (U
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.Role,
 		&i.CreatedAt,
 		&i.OauthProvider,
 		&i.OauthSubject,
@@ -276,6 +268,7 @@ func (q *Queries) SetMFAEnabled(ctx context.Context, arg SetMFAEnabledParams) (U
 		&i.MfaSecret,
 		&i.SessionVersion,
 		&i.StripeCustomerID,
+		&i.IsAdmin,
 	)
 	return i, err
 }

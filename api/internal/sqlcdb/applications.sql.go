@@ -15,7 +15,7 @@ import (
 const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (form_id, artist_id, answers)
 VALUES ($1, $2, $3)
-RETURNING id, form_id, artist_id, status, answers, created_at, updated_at
+RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag
 `
 
 type CreateApplicationParams struct {
@@ -35,12 +35,15 @@ func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationPa
 		&i.Answers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Rank,
+		&i.Shortlisted,
+		&i.ReviewFlag,
 	)
 	return i, err
 }
 
 const getApplicationByFormAndArtist = `-- name: GetApplicationByFormAndArtist :one
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at FROM applications WHERE form_id = $1 AND artist_id = $2
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE form_id = $1 AND artist_id = $2
 `
 
 type GetApplicationByFormAndArtistParams struct {
@@ -59,12 +62,15 @@ func (q *Queries) GetApplicationByFormAndArtist(ctx context.Context, arg GetAppl
 		&i.Answers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Rank,
+		&i.Shortlisted,
+		&i.ReviewFlag,
 	)
 	return i, err
 }
 
 const getApplicationByID = `-- name: GetApplicationByID :one
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at FROM applications WHERE id = $1
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE id = $1
 `
 
 func (q *Queries) GetApplicationByID(ctx context.Context, id pgtype.UUID) (Application, error) {
@@ -78,12 +84,15 @@ func (q *Queries) GetApplicationByID(ctx context.Context, id pgtype.UUID) (Appli
 		&i.Answers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Rank,
+		&i.Shortlisted,
+		&i.ReviewFlag,
 	)
 	return i, err
 }
 
 const listApplicationsByArtist = `-- name: ListApplicationsByArtist :many
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at FROM applications WHERE artist_id = $1 ORDER BY created_at DESC
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE artist_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.UUID) ([]Application, error) {
@@ -103,6 +112,9 @@ func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.
 			&i.Answers,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Rank,
+			&i.Shortlisted,
+			&i.ReviewFlag,
 		); err != nil {
 			return nil, err
 		}
@@ -115,7 +127,7 @@ func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.
 }
 
 const listApplicationsByForm = `-- name: ListApplicationsByForm :many
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at FROM applications WHERE form_id = $1 ORDER BY created_at ASC
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE form_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListApplicationsByForm(ctx context.Context, formID pgtype.UUID) ([]Application, error) {
@@ -135,6 +147,9 @@ func (q *Queries) ListApplicationsByForm(ctx context.Context, formID pgtype.UUID
 			&i.Answers,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Rank,
+			&i.Shortlisted,
+			&i.ReviewFlag,
 		); err != nil {
 			return nil, err
 		}
@@ -146,8 +161,127 @@ func (q *Queries) ListApplicationsByForm(ctx context.Context, formID pgtype.UUID
 	return items, nil
 }
 
+const listApplicationsByFormWithArtist = `-- name: ListApplicationsByFormWithArtist :many
+SELECT
+  a.id,
+  a.form_id,
+  a.artist_id,
+  a.status,
+  a.rank,
+  a.shortlisted,
+  a.review_flag,
+  a.answers,
+  a.created_at,
+  a.updated_at,
+  ap.display_name,
+  ap.avatar_s3_key,
+  ap.medium_tags,
+  ap.location_label
+FROM applications a
+JOIN artist_profiles ap ON ap.id = a.artist_id
+WHERE a.form_id = $1
+ORDER BY a.rank ASC, a.created_at ASC
+`
+
+type ListApplicationsByFormWithArtistRow struct {
+	ID            pgtype.UUID        `db:"id" json:"id"`
+	FormID        pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID      pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status        ApplicationStatus  `db:"status" json:"status"`
+	Rank          int32              `db:"rank" json:"rank"`
+	Shortlisted   bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag    bool               `db:"review_flag" json:"review_flag"`
+	Answers       json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisplayName   string             `db:"display_name" json:"display_name"`
+	AvatarS3Key   *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
+	LocationLabel *string            `db:"location_label" json:"location_label"`
+}
+
+func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID pgtype.UUID) ([]ListApplicationsByFormWithArtistRow, error) {
+	rows, err := q.db.Query(ctx, listApplicationsByFormWithArtist, formID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApplicationsByFormWithArtistRow
+	for rows.Next() {
+		var i ListApplicationsByFormWithArtistRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FormID,
+			&i.ArtistID,
+			&i.Status,
+			&i.Rank,
+			&i.Shortlisted,
+			&i.ReviewFlag,
+			&i.Answers,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DisplayName,
+			&i.AvatarS3Key,
+			&i.MediumTags,
+			&i.LocationLabel,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateApplicationFlags = `-- name: UpdateApplicationFlags :one
+UPDATE applications
+SET shortlisted = $2, review_flag = $3, updated_at = now()
+WHERE id = $1
+RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag
+`
+
+type UpdateApplicationFlagsParams struct {
+	ID          pgtype.UUID `db:"id" json:"id"`
+	Shortlisted bool        `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag  bool        `db:"review_flag" json:"review_flag"`
+}
+
+func (q *Queries) UpdateApplicationFlags(ctx context.Context, arg UpdateApplicationFlagsParams) (Application, error) {
+	row := q.db.QueryRow(ctx, updateApplicationFlags, arg.ID, arg.Shortlisted, arg.ReviewFlag)
+	var i Application
+	err := row.Scan(
+		&i.ID,
+		&i.FormID,
+		&i.ArtistID,
+		&i.Status,
+		&i.Answers,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Rank,
+		&i.Shortlisted,
+		&i.ReviewFlag,
+	)
+	return i, err
+}
+
+const updateApplicationRank = `-- name: UpdateApplicationRank :exec
+UPDATE applications SET rank = $1, updated_at = now() WHERE id = $2
+`
+
+type UpdateApplicationRankParams struct {
+	Rank int32       `db:"rank" json:"rank"`
+	ID   pgtype.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateApplicationRank(ctx context.Context, arg UpdateApplicationRankParams) error {
+	_, err := q.db.Exec(ctx, updateApplicationRank, arg.Rank, arg.ID)
+	return err
+}
+
 const updateApplicationStatus = `-- name: UpdateApplicationStatus :one
-UPDATE applications SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, form_id, artist_id, status, answers, created_at, updated_at
+UPDATE applications SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag
 `
 
 type UpdateApplicationStatusParams struct {
@@ -166,6 +300,9 @@ func (q *Queries) UpdateApplicationStatus(ctx context.Context, arg UpdateApplica
 		&i.Answers,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Rank,
+		&i.Shortlisted,
+		&i.ReviewFlag,
 	)
 	return i, err
 }
