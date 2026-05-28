@@ -47,6 +47,8 @@ const mockCollection: components['schemas']['Collection'] = {
   cover_s3_key: null,
   status: 'active',
   display_order: 0,
+  cover_focal_x: 50,
+  cover_focal_y: 50,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

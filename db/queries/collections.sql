@@ -13,11 +13,13 @@ ORDER BY display_order, created_at;
 
 -- name: UpdateCollection :one
 UPDATE collections
-SET name         = $2,
-    description  = $3,
-    cover_s3_key = $4,
-    status       = $5,
-    updated_at   = now()
+SET name           = $2,
+    description    = $3,
+    cover_s3_key   = $4,
+    status         = $5,
+    cover_focal_x  = $6,
+    cover_focal_y  = $7,
+    updated_at     = now()
 WHERE id = $1
 RETURNING *;
 

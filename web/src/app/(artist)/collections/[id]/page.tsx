@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import {
@@ -23,6 +23,7 @@ import { useUploadImage } from '@/hooks/useUploadImage'
 import type { components } from '@render/api-client'
 
 type CollectionImage = components['schemas']['CollectionImage']
+type Collection = components['schemas']['Collection']
 
 function SortableImageCard({
   img,
@@ -68,6 +69,101 @@ function SortableImageCard({
   )
 }
 
+function FocalPointEditor({
+  collection,
+  onSave,
+  onClose,
+}: {
+  collection: Collection
+  onSave: (x: number, y: number) => void
+  onClose: () => void
+}) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [focalX, setFocalX] = useState(collection.cover_focal_x ?? 50)
+  const [focalY, setFocalY] = useState(collection.cover_focal_y ?? 50)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragStart = useRef({ x: 0, y: 0 })
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Debounced auto-save on focal point change
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => onSave(focalX, focalY), 400)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [focalX, focalY, onSave])
+
+  function handlePointerDown(e: React.PointerEvent) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setIsDragging(true)
+    dragStart.current = { x: e.clientX, y: e.clientY }
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    if (!isDragging || !frameRef.current) return
+    const frame = frameRef.current.getBoundingClientRect()
+    const dx = e.clientX - dragStart.current.x
+    const dy = e.clientY - dragStart.current.y
+    dragStart.current = { x: e.clientX, y: e.clientY }
+    // Dragging left → reveals more of the right → focalX increases (inverted)
+    setFocalX(prev => Math.max(0, Math.min(100, prev - (dx / frame.width) * 100)))
+    setFocalY(prev => Math.max(0, Math.min(100, prev - (dy / frame.height) * 100)))
+  }
+
+  function handlePointerUp() {
+    setIsDragging(false)
+  }
+
+  function handleReset() {
+    setFocalX(50)
+    setFocalY(50)
+  }
+
+  return (
+    <div className="mb-6 border border-amber rounded-lg overflow-hidden" data-testid="focal-editor">
+      <div
+        ref={frameRef}
+        className={`relative h-48 overflow-hidden select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
+        <img
+          src={collection.cover_s3_key!}
+          alt="Cover"
+          className="w-full h-full object-cover pointer-events-none"
+          style={{ objectPosition: `${focalX}% ${focalY}%` }}
+          draggable={false}
+        />
+        {/* Crosshair at focal point */}
+        <div
+          className="absolute w-4 h-4 pointer-events-none"
+          style={{ left: `${focalX}%`, top: `${focalY}%`, transform: 'translate(-50%, -50%)' }}
+        >
+          <div className="w-full h-0.5 bg-white/80 absolute top-1/2 -translate-y-1/2 shadow-sm" />
+          <div className="h-full w-0.5 bg-white/80 absolute left-1/2 -translate-x-1/2 shadow-sm" />
+        </div>
+        <div className="absolute inset-0 border-2 border-amber pointer-events-none" />
+      </div>
+      <div className="flex items-center gap-3 p-3 bg-warm">
+        <p className="font-sans text-xs text-mid flex-1">Drag to reposition the crop focus</p>
+        <button
+          onClick={handleReset}
+          className="font-sans text-xs text-mid hover:text-ink transition-colors"
+        >
+          Reset to centre
+        </button>
+        <button
+          onClick={onClose}
+          className="font-sans text-sm bg-amber text-ink font-medium px-4 py-1.5 rounded-lg hover:opacity-90"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+
 type Props = { params: Promise<{ id: string }> }
 
 export default function CollectionDetailPage({ params }: Props) {
@@ -86,6 +182,7 @@ export default function CollectionDetailPage({ params }: Props) {
 function CollectionDetail({ collectionId, queryClient }: { collectionId: string; queryClient: ReturnType<typeof useQueryClient> }) {
   const { upload, isUploading, error: uploadError } = useUploadImage(collectionId)
   const [dragOver, setDragOver] = useState(false)
+  const [isEditingFocus, setIsEditingFocus] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor))
 
   const collectionQuery = useQuery({
@@ -128,6 +225,25 @@ function CollectionDetail({ collectionId, queryClient }: { collectionId: string;
       if (res.error) throw new Error('Failed to save order')
     },
   })
+
+  const focalPointMutation = useMutation({
+    mutationFn: async ({ x, y }: { x: number; y: number }) => {
+      const res = await apiClient.PATCH('/collections/{collectionID}', {
+        params: { path: { collectionID: collectionId } },
+        body: { coverFocalX: x, coverFocalY: y },
+      })
+      if (res.error) throw new Error('Failed to save focal point')
+      return res.data
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['collection', collectionId], data)
+    },
+  })
+
+  const handleSaveFocal = useCallback(
+    (x: number, y: number) => focalPointMutation.mutate({ x, y }),
+    [focalPointMutation],
+  )
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -183,6 +299,42 @@ function CollectionDetail({ collectionId, queryClient }: { collectionId: string;
 
       <h1 className="font-serif text-4xl text-ink mb-1">{collection.name}</h1>
       {collection.description && <p className="font-sans text-mid mb-6">{collection.description}</p>}
+
+      {/* Cover focal point editor */}
+      {collection.cover_s3_key && (
+        <div className="mb-6">
+          {isEditingFocus ? (
+            <FocalPointEditor
+              collection={collection}
+              onSave={handleSaveFocal}
+              onClose={() => setIsEditingFocus(false)}
+            />
+          ) : (
+            <div className="flex items-center gap-3">
+              <div
+                className="w-16 h-16 rounded-lg overflow-hidden border border-light shrink-0"
+                style={{ backgroundImage: `url(${collection.cover_s3_key})` }}
+              >
+                <img
+                  src={collection.cover_s3_key}
+                  alt="Cover"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: `${collection.cover_focal_x ?? 50}% ${collection.cover_focal_y ?? 50}%` }}
+                />
+              </div>
+              <div>
+                <p className="font-sans text-xs text-mid mb-1">Cover image</p>
+                <button
+                  onClick={() => setIsEditingFocus(true)}
+                  className="font-sans text-xs text-amber hover:opacity-80 transition-opacity"
+                >
+                  Adjust cover focus
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Upload zone — uses native HTML drag events, separate from dnd-kit pointer events */}
       <div

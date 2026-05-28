@@ -1297,6 +1297,16 @@ export interface components {
             cover_s3_key?: string | null;
             status: components["schemas"]["CollectionStatus"];
             display_order: number;
+            /**
+             * Format: float
+             * @description Horizontal focal point percentage (0–100). 50 = centre.
+             */
+            cover_focal_x: number;
+            /**
+             * Format: float
+             * @description Vertical focal point percentage (0–100). 50 = centre.
+             */
+            cover_focal_y: number;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -1312,6 +1322,16 @@ export interface components {
             description?: string;
             coverS3Key?: string | null;
             status?: components["schemas"]["CollectionStatus"];
+            /**
+             * Format: float
+             * @description Horizontal focal point (0–100). Clamped server-side.
+             */
+            coverFocalX?: number;
+            /**
+             * Format: float
+             * @description Vertical focal point (0–100). Clamped server-side.
+             */
+            coverFocalY?: number;
         };
         CollectionImage: {
             /** Format: uuid */

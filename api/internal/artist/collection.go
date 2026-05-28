@@ -15,6 +15,16 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
+func clampFocal(v float32) float32 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
+}
+
 type collectionResponse struct {
 	ID              string  `json:"id"`
 	ArtistProfileID string  `json:"artist_profile_id"`
@@ -23,6 +33,8 @@ type collectionResponse struct {
 	CoverS3Key      *string `json:"cover_s3_key,omitempty"`
 	Status          string  `json:"status"`
 	DisplayOrder    int32   `json:"display_order"`
+	CoverFocalX     float32 `json:"cover_focal_x"`
+	CoverFocalY     float32 `json:"cover_focal_y"`
 	CreatedAt       string  `json:"created_at"`
 	UpdatedAt       string  `json:"updated_at"`
 }
@@ -36,6 +48,8 @@ func toCollectionResponse(c sqlcdb.Collection) collectionResponse {
 		CoverS3Key:      c.CoverS3Key,
 		Status:          string(c.Status),
 		DisplayOrder:    c.DisplayOrder,
+		CoverFocalX:     c.CoverFocalX,
+		CoverFocalY:     c.CoverFocalY,
 		CreatedAt:       c.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:       c.UpdatedAt.Time.Format(time.RFC3339),
 	}
@@ -158,10 +172,12 @@ func UpdateCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var req struct {
-			Name        string  `json:"name"`
-			Description string  `json:"description"`
-			CoverS3Key  *string `json:"coverS3Key"`
-			Status      string  `json:"status"`
+			Name        string   `json:"name"`
+			Description string   `json:"description"`
+			CoverS3Key  *string  `json:"coverS3Key"`
+			Status      string   `json:"status"`
+			CoverFocalX *float32 `json:"coverFocalX"`
+			CoverFocalY *float32 `json:"coverFocalY"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -209,6 +225,14 @@ func UpdateCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if req.Status != "" {
 			status = sqlcdb.CollectionStatus(req.Status)
 		}
+		coverFocalX := collection.CoverFocalX
+		if req.CoverFocalX != nil {
+			coverFocalX = clampFocal(*req.CoverFocalX)
+		}
+		coverFocalY := collection.CoverFocalY
+		if req.CoverFocalY != nil {
+			coverFocalY = clampFocal(*req.CoverFocalY)
+		}
 
 		updated, err := q.UpdateCollection(r.Context(), sqlcdb.UpdateCollectionParams{
 			ID:          collection.ID,
@@ -216,6 +240,8 @@ func UpdateCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Description: description,
 			CoverS3Key:  coverS3Key,
 			Status:      status,
+			CoverFocalX: coverFocalX,
+			CoverFocalY: coverFocalY,
 		})
 		if err != nil {
 			httperr.InternalServerError(w)
