@@ -82,10 +82,12 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
   try {
     await organiserPage.goto(`/organiser/festivals/${festivalId}/applications`)
-    await expect(organiserPage.getByText('submitted', { exact: true })).toBeVisible({ timeout: 10_000 })
+    // Pending tab is active by default — wait for the Accept action button to appear
+    await expect(organiserPage.getByRole('button', { name: 'Accept' })).toBeVisible({ timeout: 10_000 })
 
     await organiserPage.getByRole('button', { name: 'Accept' }).click()
-    await expect(organiserPage.getByText('accepted')).toBeVisible()
+    // After accepting, the application leaves Pending — tab shows empty state
+    await expect(organiserPage.getByText('No applications here.')).toBeVisible({ timeout: 10_000 })
 
     // ── Map editor: create spot and assign artist ────────────────────────────────
     await organiserPage.goto(`/organiser/festivals/${festivalId}/map`)

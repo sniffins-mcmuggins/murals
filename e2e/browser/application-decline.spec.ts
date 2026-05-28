@@ -49,14 +49,16 @@ test('organiser declines an application via the UI', async ({ browser }) => {
   const { ctx, page } = await loginAs(browser, organiser.email, organiser.password, baseURL)
   try {
     await page.goto(`/organiser/festivals/${festivalId}/applications`)
-    await expect(page.getByText('submitted', { exact: true })).toBeVisible({ timeout: 10_000 })
+    // Pending tab is active by default — wait for the Decline action button to appear
+    await expect(page.getByRole('button', { name: 'Decline' })).toBeVisible({ timeout: 10_000 })
 
     await page.getByRole('button', { name: 'Decline' }).click()
 
-    // After clicking decline, the application status flips to "declined".
-    await expect(page.getByText('declined', { exact: true })).toBeVisible({ timeout: 10_000 })
-    // ...and is no longer in "submitted" state.
-    await expect(page.getByText('submitted', { exact: true })).toHaveCount(0)
+    // After declining, the application leaves the Pending tab
+    await expect(page.getByText('No applications here.')).toBeVisible({ timeout: 10_000 })
+    // Switch to the Declined tab and confirm the application landed there
+    await page.getByRole('button', { name: /^Declined/ }).click()
+    await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible({ timeout: 5_000 })
   } finally {
     await ctx.close()
   }
