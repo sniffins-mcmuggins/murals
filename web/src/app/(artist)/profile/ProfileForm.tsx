@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
+import { SocialIcon, SOCIAL_PLATFORMS } from '@/components/SocialIcon'
 
 type ArtistProfile = components['schemas']['ArtistProfile']
 
@@ -12,28 +13,56 @@ type Props = {
   userId: string
 }
 
+function initSocialLinks(profile: ArtistProfile | null): Record<string, string> {
+  const links: Record<string, string> = {}
+  for (const { key } of SOCIAL_PLATFORMS) {
+    links[key] = profile?.social_links?.[key] ?? ''
+  }
+  return links
+}
+
 export default function ProfileForm({ profile, userId }: Props) {
   const queryClient = useQueryClient()
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
   const [bio, setBio] = useState(profile?.bio ?? '')
   const [location, setLocation] = useState(profile?.location_label ?? '')
   const [mediumTags, setMediumTags] = useState((profile?.medium_tags ?? []).join(', '))
+  const [socialLinks, setSocialLinks] = useState<Record<string, string>>(() => initSocialLinks(profile))
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const mutation = useMutation({
-    mutationFn: async (data: { displayName: string; bio: string; locationLabel: string; mediumTags: string[] }) => {
+    mutationFn: async (data: {
+      displayName: string
+      bio: string
+      locationLabel: string
+      mediumTags: string[]
+      socialLinks: Record<string, string>
+    }) => {
+      const filteredLinks = Object.fromEntries(
+        Object.entries(data.socialLinks).filter(([, v]) => v.trim() !== '')
+      )
       if (!profile) {
         const res = await apiClient.POST('/profiles', { body: { displayName: data.displayName } })
         if (res.error) throw new Error('Failed to create profile')
-        // After create, patch with remaining fields
         await apiClient.PATCH('/profiles/me', {
-          body: { bio: data.bio, locationLabel: data.locationLabel, mediumTags: data.mediumTags },
+          body: {
+            bio: data.bio,
+            locationLabel: data.locationLabel,
+            mediumTags: data.mediumTags,
+            socialLinks: filteredLinks,
+          },
         })
         return res.data
       } else {
         const res = await apiClient.PATCH('/profiles/me', {
-          body: { displayName: data.displayName, bio: data.bio, locationLabel: data.locationLabel, mediumTags: data.mediumTags },
+          body: {
+            displayName: data.displayName,
+            bio: data.bio,
+            locationLabel: data.locationLabel,
+            mediumTags: data.mediumTags,
+            socialLinks: filteredLinks,
+          },
         })
         if (res.error) throw new Error('Failed to update profile')
         return res.data
@@ -55,6 +84,7 @@ export default function ProfileForm({ profile, userId }: Props) {
       bio,
       locationLabel: location,
       mediumTags: mediumTags.split(',').map(t => t.trim()).filter(Boolean),
+      socialLinks,
     })
   }
 
@@ -104,6 +134,27 @@ export default function ProfileForm({ profile, userId }: Props) {
         />
         <p className="mt-1 font-sans text-xs text-mid">Comma-separated list of mediums.</p>
       </div>
+
+      <fieldset>
+        <legend className="block font-sans text-sm text-ink mb-3">Social links</legend>
+        <div className="space-y-2">
+          {SOCIAL_PLATFORMS.map(({ key, label, placeholder }) => (
+            <div key={key} className="flex items-center gap-2">
+              <span className="text-mid shrink-0" aria-label={label}>
+                <SocialIcon platform={key} />
+              </span>
+              <input
+                type="url"
+                aria-label={label}
+                value={socialLinks[key] ?? ''}
+                onChange={e => setSocialLinks(prev => ({ ...prev, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite placeholder:text-mid focus:outline-none focus:border-amber"
+              />
+            </div>
+          ))}
+        </div>
+      </fieldset>
 
       {error && <p role="alert" className="font-sans text-sm text-clay">{error}</p>}
       {success && <p role="status" className="font-sans text-sm text-amber">Saved!</p>}

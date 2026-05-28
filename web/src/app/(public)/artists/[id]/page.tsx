@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { apiClient } from '@/lib/api'
+import { SocialIcon } from '@/components/SocialIcon'
 
 interface ArtistPageProps {
   params: Promise<{ id: string }>
@@ -101,9 +102,10 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-sans text-sm text-amber underline underline-offset-2 hover:text-clay transition-colors capitalize"
+                  aria-label={platform}
+                  className="text-mid hover:text-amber transition-colors"
                 >
-                  {platform}
+                  <SocialIcon platform={platform} className="w-6 h-6" />
                 </a>
               ))}
             </nav>
