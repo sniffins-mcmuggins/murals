@@ -2,6 +2,7 @@ package festival
 
 import (
 	"context"
+	"html"
 	"log/slog"
 	"time"
 
@@ -31,15 +32,16 @@ func sendApplicationNotification(pool *pgxpool.Pool, mailer auth.EmailSender, ar
 			return
 		}
 
+		escapedName := html.EscapeString(festivalName)
 		subject := "Your application to " + festivalName
 		var body string
 		switch status {
 		case "accepted":
-			body = "Congratulations — your application to " + festivalName + " has been accepted."
+			body = "Congratulations — your application to " + escapedName + " has been accepted."
 		case "declined":
-			body = "Thank you for applying to " + festivalName + ". Unfortunately your application was not successful this time."
+			body = "Thank you for applying to " + escapedName + ". Unfortunately your application was not successful this time."
 		case "waitlisted":
-			body = "Thank you for applying to " + festivalName + ". You're on the waitlist — we'll be in touch if a spot opens up."
+			body = "Thank you for applying to " + escapedName + ". You're on the waitlist — we'll be in touch if a spot opens up."
 		default:
 			return
 		}

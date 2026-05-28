@@ -1,5 +1,6 @@
 -- Note: Postgres cannot remove an enum value once added.
 -- 'waitlisted' remains in the application_status enum after rollback.
+DROP INDEX IF EXISTS idx_application_notes_application_id;
 DROP TABLE IF EXISTS application_notes;
 
 ALTER TABLE applications

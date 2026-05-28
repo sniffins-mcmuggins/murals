@@ -127,6 +127,11 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 			return
 		}
 
+		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+		if !ok {
+			return
+		}
+
 		updated, err := q.UpdateApplicationStatus(r.Context(), sqlcdb.UpdateApplicationStatusParams{
 			ID:     appUUID,
 			Status: sqlcdb.ApplicationStatusAccepted,
@@ -143,7 +148,7 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 		// Upsert festival_artist
 		_, err = q.AddFestivalArtist(r.Context(), sqlcdb.AddFestivalArtistParams{
 			FestivalID: festUUID,
-			ArtistID:   updated.ArtistID,
+			ArtistID:   app.ArtistID,
 			Status:     sqlcdb.FestivalArtistStatusAccepted,
 		})
 		if err != nil {
@@ -151,7 +156,7 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 			return
 		}
 
-		sendApplicationNotification(pool, mailer, updated.ArtistID, fest.Name, "accepted")
+		sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, "accepted")
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toApplicationResponse(updated))
@@ -193,6 +198,11 @@ func DeclineApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http
 			return
 		}
 
+		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+		if !ok {
+			return
+		}
+
 		updated, err := q.UpdateApplicationStatus(r.Context(), sqlcdb.UpdateApplicationStatusParams{
 			ID:     appUUID,
 			Status: sqlcdb.ApplicationStatusDeclined,
@@ -206,7 +216,7 @@ func DeclineApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http
 			return
 		}
 
-		sendApplicationNotification(pool, mailer, updated.ArtistID, fest.Name, "declined")
+		sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, "declined")
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toApplicationResponse(updated))
