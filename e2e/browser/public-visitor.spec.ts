@@ -10,7 +10,8 @@ import {
   upsertForm,
   submitApplication,
   acceptArtist,
-  setPin,
+  createSpot,
+  assignArtistToSpot,
 } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
@@ -44,17 +45,18 @@ test.describe('public visitor flow', () => {
     // Artist applies
     const { applicationId } = await submitApplication(artist.token, festivalId)
 
-    // Organiser accepts and gets the artist's ID from the accepted list
+    // Organiser accepts and gets the artist's ID from the spots endpoint (unassigned_artists)
     await acceptArtist(organiser.token, festivalId, applicationId)
-    const acceptedRes = await fetch(`${API}/festivals/${festivalId}/artists/accepted`, {
+    const spotsRes = await fetch(`${API}/festivals/${festivalId}/spots`, {
       headers: { Authorization: `Bearer ${organiser.token}` },
     })
-    if (!acceptedRes.ok) throw new Error(`Get accepted artists failed: ${acceptedRes.status}`)
-    const accepted = await acceptedRes.json()
-    const artistId: string = accepted[0].artist_id
+    if (!spotsRes.ok) throw new Error(`Get spots failed: ${spotsRes.status}`)
+    const { unassigned_artists } = (await spotsRes.json()) as { unassigned_artists: { artist_id: string }[] }
+    const artistId = unassigned_artists[0].artist_id
 
-    // Set pin
-    await setPin(organiser.token, festivalId, artistId, 51.9, -2.07)
+    // Create a spot and assign the accepted artist
+    const { spotId } = await createSpot(organiser.token, festivalId, 51.9, -2.07)
+    await assignArtistToSpot(organiser.token, festivalId, spotId, artistId)
 
     // Set festival to live
     await setFestivalStatus(organiser.token, festivalId, 'live')
