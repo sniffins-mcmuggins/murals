@@ -10,5 +10,8 @@ FROM festival_spots fs
 WHERE fs.festival_id = fa.festival_id
   AND fs.artist_id   = fa.artist_id;
 
+-- NOTE: Only spots migrated from festival_artists pin data (those with an artist_id)
+-- are restored. Spots created by the application after this migration are dropped on
+-- rollback — the old schema has no equivalent column to store them.
 DROP INDEX IF EXISTS festival_spots_artist_idx;
-DROP TABLE festival_spots;
+DROP TABLE IF EXISTS festival_spots;
