@@ -37,10 +37,9 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 import { useQuery } from '@tanstack/react-query'
-import OrgFestivalMapPage from '@/app/organiser/festivals/[id]/map/page'
+import MapEditorClient from '@/app/organiser/festivals/[id]/map/MapEditorClient'
 
 const mockUseQuery = vi.mocked(useQuery)
-const mockParams = Promise.resolve({ id: 'fest-abc123' })
 
 const spotsData = {
   spots: [
@@ -50,18 +49,19 @@ const spotsData = {
   unassigned_artists: [{ artist_id: 'artist-2', name: 'Kai Hollis' }],
 }
 
-describe('OrgFestivalMapPage', () => {
+describe('MapEditorClient', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('shows loading state before params resolve', () => {
+  it('shows loading spinner while spots fetch is pending', () => {
     mockUseQuery.mockReturnValue({ data: undefined, isLoading: true, isError: false } as ReturnType<typeof useQuery>)
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
-    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
+    // Map container is not rendered while loading
+    expect(screen.queryByTestId('map-container')).not.toBeInTheDocument()
   })
 
   it('renders map editor with spots list and Add spot button', async () => {
     mockUseQuery.mockReturnValue({ data: spotsData, isLoading: false, isError: false } as ReturnType<typeof useQuery>)
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
 
     await waitFor(() => expect(screen.getByText('Map editor')).toBeInTheDocument())
 
@@ -76,7 +76,7 @@ describe('OrgFestivalMapPage', () => {
 
   it('renders one marker per spot', async () => {
     mockUseQuery.mockReturnValue({ data: spotsData, isLoading: false, isError: false } as ReturnType<typeof useQuery>)
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
 
     await waitFor(() => expect(screen.getByText('Map editor')).toBeInTheDocument())
     expect(screen.getAllByTestId('map-marker')).toHaveLength(2)
@@ -84,14 +84,14 @@ describe('OrgFestivalMapPage', () => {
 
   it('shows error state when spots fail to load', async () => {
     mockUseQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true } as ReturnType<typeof useQuery>)
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Failed to load spots.'))
   })
 
   it('clicking a spot in the sidebar opens the spot panel', async () => {
     mockUseQuery.mockReturnValue({ data: spotsData, isLoading: false, isError: false } as ReturnType<typeof useQuery>)
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
 
     await waitFor(() => expect(screen.getByTestId('spots-list')).toBeInTheDocument())
     // Click the sidebar button for Spot 1 (scoped to the spots list to avoid the popup duplicate)
@@ -107,7 +107,7 @@ describe('OrgFestivalMapPage', () => {
     const mockPatch = vi.mocked(apiClient.PATCH)
     mockPatch.mockResolvedValue({ data: spotsData.spots[0] as never, error: undefined, response: new Response(null, { status: 200 }) })
 
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
     await waitFor(() => expect(screen.getByTestId('spots-list')).toBeInTheDocument())
 
     // Open the spot panel (scope to sidebar list to avoid map popup duplicate)
@@ -133,7 +133,7 @@ describe('OrgFestivalMapPage', () => {
 
   it('clicking Add spot button toggles placement mode label', async () => {
     mockUseQuery.mockReturnValue({ data: spotsData, isLoading: false, isError: false } as ReturnType<typeof useQuery>)
-    render(React.createElement(OrgFestivalMapPage, { params: mockParams }))
+    render(React.createElement(MapEditorClient, { festivalId: 'fest-abc123' }))
 
     await waitFor(() => expect(screen.getByTestId('add-spot-btn')).toBeInTheDocument())
 
