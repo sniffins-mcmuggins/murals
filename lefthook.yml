@@ -16,6 +16,9 @@ pre-commit:
     mobile-typecheck:
       glob: "mobile/**/*.{ts,tsx}"
       run: cd mobile && npm run typecheck
+    openapi-drift:
+      glob: "openapi/openapi.yaml"
+      run: cd openapi && task diff
 
 pre-push:
   parallel: true
