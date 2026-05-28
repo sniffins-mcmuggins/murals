@@ -167,7 +167,7 @@ export interface paths {
         put?: never;
         /**
          * Create artist profile
-         * @description Creates an artist profile for the authenticated user. One profile per user. Requires role=artist.
+         * @description Creates an artist profile for the authenticated user. One profile per user.
          */
         post: operations["postProfiles"];
         delete?: never;
@@ -913,14 +913,12 @@ export interface components {
             /** Format: uri */
             instance?: string;
         };
-        /** @enum {string} */
-        UserRole: "artist" | "organiser" | "admin";
         User: {
             /** Format: uuid */
             id: string;
             /** Format: email */
             email: string;
-            role: components["schemas"]["UserRole"];
+            is_admin: boolean;
             /** Format: date-time */
             created_at: string;
         };
@@ -932,7 +930,6 @@ export interface components {
             email: string;
             /** @example hunter2hunter */
             password: string;
-            role?: components["schemas"]["UserRole"];
         };
         LoginRequest: {
             /** Format: email */

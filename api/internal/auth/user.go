@@ -14,7 +14,7 @@ import (
 type userResponse struct {
 	ID        string `json:"id"`
 	Email     string `json:"email"`
-	Role      string `json:"role"`
+	IsAdmin   bool   `json:"is_admin"`
 	CreatedAt string `json:"created_at"`
 }
 
@@ -22,7 +22,7 @@ func toUserResponse(u sqlcdb.User) userResponse {
 	return userResponse{
 		ID:        u.ID.String(),
 		Email:     u.Email,
-		Role:      string(u.Role),
+		IsAdmin:   u.IsAdmin,
 		CreatedAt: u.CreatedAt.Time.Format(time.RFC3339),
 	}
 }

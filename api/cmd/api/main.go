@@ -24,6 +24,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
+	"github.com/sniffins-mcmuggins/render/api/internal/me"
 	"github.com/sniffins-mcmuggins/render/api/internal/metrics"
 	"github.com/sniffins-mcmuggins/render/api/internal/middleware"
 )
@@ -128,6 +129,7 @@ func main() {
 	}
 
 	r.Get("/me", auth.MeHandler(pool))
+	r.Get("/me/summary", me.SummaryHandler(pool))
 	r.Post("/images/presign", image.PresignHandler(mcPublic, cfg.MinioBucket))
 	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
 

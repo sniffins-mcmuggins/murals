@@ -21,18 +21,17 @@ const testSecret = "test-secret"
 // (as a string, suitable for JWT subject) plus a valid token bound to that
 // user's current session_version. The auth middleware reads the row from the
 // DB to validate the embedded sv, so the token has to refer to a real user.
-func createUserAndIssueToken(t *testing.T, db *pgxpool.Pool, email, role string) (userID, token string) {
+func createUserAndIssueToken(t *testing.T, db *pgxpool.Pool, email string, isAdmin bool) (userID, token string) {
 	t.Helper()
 	q := sqlcdb.New(db)
 	pwHash := "x"
 	user, err := q.CreateUser(t.Context(), sqlcdb.CreateUserParams{
 		Email:        email,
 		PasswordHash: &pwHash,
-		Role:         sqlcdb.UserRole(role),
 	})
 	require.NoError(t, err)
 	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, role, user.SessionVersion, testSecret)
+	token, err = auth.IssueToken(userID, isAdmin, user.SessionVersion, testSecret)
 	require.NoError(t, err)
 	return userID, token
 }
@@ -40,7 +39,7 @@ func createUserAndIssueToken(t *testing.T, db *pgxpool.Pool, email, role string)
 func TestMiddleware_ValidCookie(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createUserAndIssueToken(t, db, "mw-cookie@example.com", "artist")
+	userID, token := createUserAndIssueToken(t, db, "mw-cookie@example.com", false)
 
 	var capturedPrincipal auth.Principal
 	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -54,13 +53,13 @@ func TestMiddleware_ValidCookie(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), r)
 
 	assert.Equal(t, userID, capturedPrincipal.UserID)
-	assert.Equal(t, "artist", capturedPrincipal.Role)
+	assert.Equal(t, false, capturedPrincipal.IsAdmin)
 }
 
 func TestMiddleware_ValidBearerHeader(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createUserAndIssueToken(t, db, "mw-bearer@example.com", "organiser")
+	userID, token := createUserAndIssueToken(t, db, "mw-bearer@example.com", false)
 
 	var capturedPrincipal auth.Principal
 	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,8 +110,8 @@ func TestMiddleware_InvalidToken_PassesThrough(t *testing.T) {
 func TestMiddleware_CookieTakesPrecedenceOverHeader(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	cookieUserID, cookieToken := createUserAndIssueToken(t, db, "mw-cookie-precedence@example.com", "artist")
-	_, headerToken := createUserAndIssueToken(t, db, "mw-header-precedence@example.com", "organiser")
+	cookieUserID, cookieToken := createUserAndIssueToken(t, db, "mw-cookie-precedence@example.com", false)
+	_, headerToken := createUserAndIssueToken(t, db, "mw-header-precedence@example.com", false)
 
 	var capturedID string
 	handler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +140,7 @@ func TestMiddleware_IgnoresWrongContext(t *testing.T) {
 func TestMiddleware_StaleSessionVersionRejected(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, staleToken := createUserAndIssueToken(t, db, "mw-stale@example.com", "artist")
+	_, staleToken := createUserAndIssueToken(t, db, "mw-stale@example.com", false)
 
 	// Look the user up, bump session_version (simulating a password reset).
 	q := sqlcdb.New(db)
@@ -163,7 +162,7 @@ func TestMiddleware_StaleSessionVersionRejected(t *testing.T) {
 	assert.True(t, called)
 
 	// A fresh token (with the new sv) should still work.
-	freshToken, err := auth.IssueToken(user.ID.String(), "artist", user.SessionVersion+1, testSecret)
+	freshToken, err := auth.IssueToken(user.ID.String(), false, user.SessionVersion+1, testSecret)
 	require.NoError(t, err)
 	freshCalled := false
 	freshHandler := auth.Middleware(db, testSecret)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

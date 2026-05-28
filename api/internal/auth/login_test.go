@@ -28,7 +28,6 @@ func createTestUser(t *testing.T, db *pgxpool.Pool, email, password string) {
 	_, err = q.CreateUser(t.Context(), sqlcdb.CreateUserParams{
 		Email:        email,
 		PasswordHash: &hashStr,
-		Role:         sqlcdb.UserRoleArtist,
 	})
 	if err != nil {
 		t.Fatalf("create test user: %v", err)

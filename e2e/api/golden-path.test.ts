@@ -28,7 +28,7 @@ describe('golden path', () => {
     const signupRes = await fetch(`${API}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `artist-${suffix}@golden.test`, password: 'testpass123', role: 'artist' }),
+      body: JSON.stringify({ email: `artist-${suffix}@golden.test`, password: 'testpass123' }),
     })
     expect(signupRes.status).toBe(201)
 
@@ -122,7 +122,7 @@ describe('golden path', () => {
     const signupRes = await fetch(`${API}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `organiser-${suffix}@golden.test`, password: 'testpass123', role: 'organiser' }),
+      body: JSON.stringify({ email: `organiser-${suffix}@golden.test`, password: 'testpass123' }),
     })
     expect(signupRes.status).toBe(201)
 

@@ -66,7 +66,7 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	}
 }
 
-func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 9)
+func toEnrichedResponse( //nolint:unused // used by the enriched list handler in application review
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
 	notes []noteResponse,
 ) applicationResponse {
@@ -95,7 +95,7 @@ func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 
 	}
 }
 
-func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse { //nolint:unused // used in upcoming notes handler (Task 8)
+func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse { //nolint:unused // used by notes handler in application review
 	return noteResponse{
 		ID:        n.ID.String(),
 		Content:   n.Content,

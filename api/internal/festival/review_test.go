@@ -26,11 +26,11 @@ type reviewScenario struct {
 
 func setupReviewScenario(t *testing.T, db *pgxpool.Pool) reviewScenario {
 	t.Helper()
-	orgID, orgToken := createTestUser(t, db, "revorg@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "revorg@example.com")
 	festID := createTestFestival(t, db, orgID, "review-fest", "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 
-	artistID, _ := createTestUser(t, db, "revartist@example.com", "artist")
+	artistID, _ := createTestUser(t, db, "revartist@example.com")
 	createTestArtistProfile(t, db, artistID, "Review Artist")
 
 	// Insert application directly via sqlc
@@ -117,7 +117,7 @@ func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
-	_, otherToken := createTestUser(t, db, "revother@example.com", "organiser")
+	_, otherToken := createTestUser(t, db, "revother@example.com")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))

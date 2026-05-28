@@ -20,7 +20,7 @@ import (
 func TestCreateFestival(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, orgToken := createTestUser(t, db, "org@example.com", "organiser")
+	_, orgToken := createTestUser(t, db, "org@example.com")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -36,29 +36,10 @@ func TestCreateFestival(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
-func TestCreateFestival_RequiresOrganiser(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-	_, artistToken := createTestUser(t, db, "artist@example.com", "artist")
-
-	r := chi.NewRouter()
-	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/festivals", festival.CreateHandler(db))
-
-	srv := httptest.NewServer(r)
-	t.Cleanup(srv.Close)
-
-	resp := doRequest(t, srv, "POST", "/festivals",
-		`{"name":"X","slug":"x","description":"","locationLabel":""}`,
-		artistToken)
-	require.Equal(t, http.StatusForbidden, resp.StatusCode)
-	_ = resp.Body.Close()
-}
-
 func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org2@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "org2@example.com")
 	festID := createTestFestival(t, db, orgID, "draft-fest", "draft")
 
 	r := chi.NewRouter()
@@ -82,8 +63,8 @@ func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org3@example.com", "organiser")
-	_, otherToken := createTestUser(t, db, "other@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "org3@example.com")
+	_, otherToken := createTestUser(t, db, "other@example.com")
 	festID := createTestFestival(t, db, orgID, "my-fest", "draft")
 
 	r := chi.NewRouter()
@@ -112,7 +93,7 @@ func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 func TestDeleteFestival_SoftDelete(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org4@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "org4@example.com")
 	festID := createTestFestival(t, db, orgID, "to-delete", "draft")
 
 	r := chi.NewRouter()
@@ -136,7 +117,7 @@ func TestDeleteFestival_SoftDelete(t *testing.T) {
 func TestListFestivals(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org5@example.com", "organiser")
+	orgID, orgToken := createTestUser(t, db, "org5@example.com")
 	createTestFestival(t, db, orgID, "fest-a", "draft")
 	createTestFestival(t, db, orgID, "fest-b", "draft")
 

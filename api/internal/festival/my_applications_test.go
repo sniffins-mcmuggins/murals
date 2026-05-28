@@ -21,12 +21,12 @@ func TestGetMyApplications_ReturnsOwnApplications(t *testing.T) {
 	db := testutil.NewDB(t)
 
 	// Set up organiser + festival + form
-	orgID, _ := createTestUser(t, db, "myapps-org@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "myapps-org@example.com")
 	festID := createTestFestival(t, db, orgID, "my-apps-fest", "open")
 	createTestApplicationForm(t, db, festID)
 
 	// Set up artist + profile
-	artistUserID, artistToken := createTestUser(t, db, "myapps-artist@example.com", "artist")
+	artistUserID, artistToken := createTestUser(t, db, "myapps-artist@example.com")
 	createTestArtistProfile(t, db, artistUserID, "My Apps Artist")
 
 	r := chi.NewRouter()
@@ -77,7 +77,7 @@ func TestGetMyApplications_NoProfileReturnsEmptyArray(t *testing.T) {
 	db := testutil.NewDB(t)
 
 	// Artist with no profile
-	_, artistToken := createTestUser(t, db, "myapps-noprofile@example.com", "artist")
+	_, artistToken := createTestUser(t, db, "myapps-noprofile@example.com")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -102,12 +102,12 @@ func TestGetMyApplications_DoesNotReturnOtherArtistsApplications(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	orgID, _ := createTestUser(t, db, "myapps-iso-org@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "myapps-iso-org@example.com")
 	festID := createTestFestival(t, db, orgID, "my-apps-iso-fest", "open")
 	createTestApplicationForm(t, db, festID)
 
 	// Artist A submits
-	artistAID, artistAToken := createTestUser(t, db, "myapps-iso-a@example.com", "artist")
+	artistAID, artistAToken := createTestUser(t, db, "myapps-iso-a@example.com")
 	createTestArtistProfile(t, db, artistAID, "Artist A")
 
 	r := chi.NewRouter()
@@ -123,7 +123,7 @@ func TestGetMyApplications_DoesNotReturnOtherArtistsApplications(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Artist B (no applications) queries /me/applications
-	artistBID, artistBToken := createTestUser(t, db, "myapps-iso-b@example.com", "artist")
+	artistBID, artistBToken := createTestUser(t, db, "myapps-iso-b@example.com")
 	createTestArtistProfile(t, db, artistBID, "Artist B")
 
 	resp = doRequest(t, srv, "GET", "/me/applications", "", artistBToken)

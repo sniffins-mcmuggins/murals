@@ -56,13 +56,13 @@ func ForgotPasswordHandler(pool *pgxpool.Pool, mailer EmailSender, webBase strin
 
 		w.WriteHeader(http.StatusAccepted)
 
-		go forgotPasswordWork(pool, mailer, webBase, email)
+		go ForgotPasswordWork(pool, mailer, webBase, email)
 	}
 }
 
-// forgotPasswordWork runs the DB write + SES send detached from the HTTP
+// ForgotPasswordWork runs the DB write + SES send detached from the HTTP
 // request. Bounded context + error logging so failures are visible.
-func forgotPasswordWork(pool *pgxpool.Pool, mailer EmailSender, webBase, email string) {
+func ForgotPasswordWork(pool *pgxpool.Pool, mailer EmailSender, webBase, email string) {
 	ctx, cancel := context.WithTimeout(context.Background(), forgotPasswordWorkTimeout)
 	defer cancel()
 

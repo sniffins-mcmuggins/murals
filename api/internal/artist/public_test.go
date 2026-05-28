@@ -26,7 +26,6 @@ func createArtistWithProfile(t *testing.T, pool *pgxpool.Pool, email, displayNam
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        email,
 		PasswordHash: &hashStr,
-		Role:         sqlcdb.UserRoleArtist,
 	})
 	require.NoError(t, err)
 	_, err = q.CreateArtistProfile(context.Background(), sqlcdb.CreateArtistProfileParams{

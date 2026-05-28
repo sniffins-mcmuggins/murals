@@ -17,7 +17,7 @@ import (
 func TestListPublicFestivals(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "pub-org@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "pub-org@example.com")
 
 	// Create one live and one draft festival
 	createTestFestival(t, db, orgID, "live-fest-2027", "live")
@@ -42,7 +42,7 @@ func TestListPublicFestivals(t *testing.T) {
 func TestListPublicFestivals_StatusFilter(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "pub-org2@example.com", "organiser")
+	orgID, _ := createTestUser(t, db, "pub-org2@example.com")
 
 	createTestFestival(t, db, orgID, "open-fest-2027", "open")
 	createTestFestival(t, db, orgID, "live-fest2-2027", "live")

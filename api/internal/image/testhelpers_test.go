@@ -29,12 +29,11 @@ func testBearerToken(t *testing.T, db *pgxpool.Pool) string {
 	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
 		Email:        email,
 		PasswordHash: &pwHash,
-		Role:         sqlcdb.UserRoleArtist,
 	})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	token, err := auth.IssueToken(user.ID.String(), "artist", user.SessionVersion, testSecret)
+	token, err := auth.IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, testSecret)
 	if err != nil {
 		t.Fatalf("issue token: %v", err)
 	}

@@ -24,7 +24,7 @@ const ScopeMFAPending = "mfa_pending"
 // an attacker who lifted a session token would keep working until the JWT's
 // natural expiry (7 days).
 type Claims struct {
-	Role           string `json:"role"`
+	IsAdmin        bool   `json:"is_admin,omitempty"`
 	Scope          string `json:"scope,omitempty"` // "" = full access; "mfa_pending" = awaiting MFA verification
 	SessionVersion int32  `json:"sv,omitempty"`    // server-side revocation counter
 	jwt.RegisteredClaims
@@ -34,10 +34,10 @@ type Claims struct {
 //
 // sessionVersion must come from the user row (users.session_version) so the
 // middleware can detect and reject stale tokens after a password reset.
-func IssueToken(userID, role string, sessionVersion int32, secret string) (string, error) {
+func IssueToken(userID string, isAdmin bool, sessionVersion int32, secret string) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		Role:           role,
+		IsAdmin:        isAdmin,
 		SessionVersion: sessionVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
