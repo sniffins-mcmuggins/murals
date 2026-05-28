@@ -70,6 +70,10 @@ func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
 	notes []noteResponse,
 ) applicationResponse {
+	mediumTags := row.MediumTags
+	if mediumTags == nil {
+		mediumTags = []string{}
+	}
 	return applicationResponse{
 		ID:          row.ID.String(),
 		FormID:      row.FormID.String(),
@@ -84,7 +88,7 @@ func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 
 		Artist: &artistSummary{
 			DisplayName:   row.DisplayName,
 			AvatarS3Key:   row.AvatarS3Key,
-			MediumTags:    row.MediumTags,
+			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
 		},
 		Notes: notes,
