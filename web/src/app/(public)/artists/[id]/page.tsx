@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { SocialIcon } from '@/components/SocialIcon'
 
@@ -133,43 +134,38 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
         {/* Collections */}
         {collections.length > 0 && (
           <section aria-label="Collections">
-            <h2 className="font-serif text-3xl text-ink mb-6">Collections</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <h2 className="font-serif text-3xl text-ink mb-4">Collections</h2>
+            <div className="flex gap-4 overflow-x-auto pb-3 -mx-6 px-6 [&::-webkit-scrollbar]:hidden">
               {collections.map((collection) => (
-                <article
+                <Link
                   key={collection.id}
-                  className="bg-warm border border-light rounded overflow-hidden"
+                  href={`/artists/${id}/collections/${collection.id}`}
+                  className="flex-none w-44 group"
                 >
-                  {collection.cover_s3_key ? (
-                    <img
-                      src={collection.cover_s3_key}
-                      alt={collection.name}
-                      className="w-full h-48 object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-48 bg-light flex items-center justify-center">
-                      <span className="font-mono text-xs uppercase tracking-widest text-mid">
-                        No image
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="font-serif text-xl text-ink">{collection.name}</h3>
-                      <span
-                        className={`font-mono text-xs uppercase tracking-widest px-2 py-0.5 rounded shrink-0 ${statusColour[collection.status] ?? 'bg-warm text-mid'}`}
-                      >
-                        {statusLabel[collection.status] ?? collection.status}
-                      </span>
-                    </div>
-                    {collection.description && (
-                      <p className="font-sans text-sm text-mid leading-relaxed">
-                        {collection.description}
-                      </p>
+                  <div className="w-44 h-44 rounded-lg overflow-hidden bg-warm border border-light mb-2">
+                    {collection.cover_s3_key ? (
+                      <img
+                        src={collection.cover_s3_key}
+                        alt={collection.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="font-mono text-xs uppercase tracking-widest text-mid">
+                          No image
+                        </span>
+                      </div>
                     )}
                   </div>
-                </article>
+                  <p className="font-serif text-sm text-ink group-hover:text-amber transition-colors truncate mb-1">
+                    {collection.name}
+                  </p>
+                  <span
+                    className={`font-mono text-xs uppercase tracking-widest px-2 py-0.5 rounded ${statusColour[collection.status] ?? 'bg-warm text-mid'}`}
+                  >
+                    {statusLabel[collection.status] ?? collection.status}
+                  </span>
+                </Link>
               ))}
             </div>
           </section>
