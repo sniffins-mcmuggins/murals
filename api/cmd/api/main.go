@@ -172,6 +172,10 @@ func main() {
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool, mailer))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool, mailer))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/waitlist", festival.WaitlistApplicationHandler(pool, mailer))
+	r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(pool))
+	r.Post("/festivals/{festivalID}/applications/reorder", festival.ReorderApplicationsHandler(pool))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/notes", festival.AddApplicationNoteHandler(pool))
 
 	// Spots (map editor)
 	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))
