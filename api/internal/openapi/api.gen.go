@@ -214,7 +214,7 @@ type ArtistProfile struct {
 	DisplayName string    `json:"display_name"`
 
 	// HeadlineImageUrls Ordered list of S3 public URLs for the artist's headline photos.
-	HeadlineImageUrls *[]string          `json:"headline_image_urls,omitempty"`
+	HeadlineImageUrls []string           `json:"headline_image_urls"`
 	Id                openapi_types.UUID `json:"id"`
 
 	// LocationLabel City/region. Only present if show_location is true (public response).

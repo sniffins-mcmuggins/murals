@@ -18,7 +18,7 @@ pre-commit:
       run: cd mobile && npm run typecheck
     openapi-drift:
       glob: "openapi/openapi.yaml"
-      run: cd openapi && task diff
+      run: cd openapi && task gen && cd .. && git diff --exit-code openapi/generated/ api/internal/openapi/
 
 pre-push:
   parallel: true

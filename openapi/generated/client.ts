@@ -1242,7 +1242,7 @@ export interface components {
             };
             avatar_s3_key?: string | null;
             /** @description Ordered list of S3 public URLs for the artist's headline photos. */
-            headline_image_urls?: string[];
+            headline_image_urls: string[];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
