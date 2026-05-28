@@ -60,3 +60,29 @@ func TestPatchApplicationFlags_ForbiddenForNonOwner(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	_ = resp.Body.Close()
 }
+
+func TestReorderApplications(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupReviewScenario(t, db)
+
+	// Create second artist + application in same festival
+	artistID2, _ := createTestUser(t, db, "reorder-artist2@example.com")
+	createTestArtistProfile(t, db, artistID2, "Reorder Artist 2")
+	appID2 := createTestApplicationInFestival(t, db, sc.festID, artistID2)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/applications/reorder",
+		festival.ReorderApplicationsHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	body := `{"status":"submitted","ids":["` + appID2 + `","` + sc.applicationID + `"]}`
+	resp := doRequest(t, srv, "POST",
+		"/festivals/"+sc.festID+"/applications/reorder",
+		body, sc.orgToken)
+	require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	_ = resp.Body.Close()
+}
