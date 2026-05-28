@@ -230,6 +230,10 @@ func CreateSpotHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Notes:      req.Notes,
 		})
 		if err != nil {
+			if isUniqueViolation(err) {
+				httperr.Write(w, http.StatusConflict, "Conflict", "spot number conflict — please try again")
+				return
+			}
 			httperr.InternalServerError(w)
 			return
 		}
@@ -260,8 +264,8 @@ func UpdateSpotHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var req struct {
-			Lat     float64  `json:"lat"`
-			Lng     float64  `json:"lng"`
+			Lat     *float64 `json:"lat"`
+			Lng     *float64 `json:"lng"`
 			W3W     *string  `json:"w3w"`
 			WidthM  *float64 `json:"width_m"`
 			HeightM *float64 `json:"height_m"`
@@ -271,20 +275,24 @@ func UpdateSpotHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.BadRequest(w, "invalid request body")
 			return
 		}
-		if req.Lat < -90 || req.Lat > 90 {
+		if req.Lat == nil || req.Lng == nil {
+			httperr.BadRequest(w, "lat and lng are required")
+			return
+		}
+		if *req.Lat < -90 || *req.Lat > 90 {
 			httperr.BadRequest(w, "lat must be between -90 and 90")
 			return
 		}
-		if req.Lng < -180 || req.Lng > 180 {
+		if *req.Lng < -180 || *req.Lng > 180 {
 			httperr.BadRequest(w, "lng must be between -180 and 180")
 			return
 		}
-		lat, err := numericFromFloat(req.Lat)
+		lat, err := numericFromFloat(*req.Lat)
 		if err != nil {
 			httperr.BadRequest(w, "invalid lat")
 			return
 		}
-		lng, err := numericFromFloat(req.Lng)
+		lng, err := numericFromFloat(*req.Lng)
 		if err != nil {
 			httperr.BadRequest(w, "invalid lng")
 			return

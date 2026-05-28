@@ -215,6 +215,19 @@ func TestDeleteSpot_Returns204(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
+func TestDeleteSpot_IdempotentOnNonExistentSpotID(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupSpotsScenario(t, db)
+	srv := newSpotsServer(db)
+	t.Cleanup(srv.Close)
+
+	const nonExistentID = "00000000-0000-0000-0000-000000000000"
+	resp := doRequest(t, srv, "DELETE", "/festivals/"+sc.festID+"/spots/"+nonExistentID, "", sc.orgToken)
+	require.Equal(t, http.StatusNoContent, resp.StatusCode, "DELETE is idempotent — 204 even if spot does not exist")
+	_ = resp.Body.Close()
+}
+
 // ─── SetSpotArtist ───────────────────────────────────────────────────────────
 
 func TestSetSpotArtist_AssignsArtist(t *testing.T) {

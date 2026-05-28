@@ -110,7 +110,7 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
           notes: notes.trim() || null,
         },
       })
-      if (patchRes.error) throw new Error('Failed to update spot')
+      if (patchRes.error) throw new Error('Failed to save spot details')
 
       // Handle artist assignment change
       if (artistId && artistId !== spot.artist_id) {
@@ -118,12 +118,12 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
           params: { path: { festivalID: festivalId, spotID: spot.id! } },
           body: { artist_id: artistId },
         })
-        if (putRes.error) throw new Error('Failed to assign artist')
+        if (putRes.error) throw new Error('Details saved — but artist assignment failed. Refresh and try again.')
       } else if (!artistId && spot.artist_id) {
         const delRes = await apiClient.DELETE('/festivals/{festivalID}/spots/{spotID}/artist', {
           params: { path: { festivalID: festivalId, spotID: spot.id! } },
         })
-        if (delRes.error) throw new Error('Failed to unassign artist')
+        if (delRes.error) throw new Error('Details saved — but could not unassign artist. Refresh and try again.')
       }
 
       onMutated()
