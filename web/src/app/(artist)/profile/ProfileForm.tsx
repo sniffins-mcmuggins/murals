@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 import { SocialIcon, SOCIAL_PLATFORMS } from '@/components/SocialIcon'
+import { useProfileImageUpload } from '@/hooks/useProfileImageUpload'
 
 type ArtistProfile = components['schemas']['ArtistProfile']
 
@@ -21,6 +22,58 @@ function initSocialLinks(profile: ArtistProfile | null): Record<string, string> 
   return links
 }
 
+const MAX_HEADLINE = 3
+
+function ImageSlot({
+  url,
+  label,
+  round,
+  onFile,
+  isUploading,
+}: {
+  url: string | null
+  label: string
+  round?: boolean
+  onFile: (file: File) => void
+  isUploading: boolean
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const shape = round ? 'rounded-full' : 'rounded-lg'
+  const size = round ? 'w-24 h-24' : 'w-full h-40'
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={isUploading}
+        className={`${size} ${shape} border-2 border-dashed border-light bg-warm flex items-center justify-center overflow-hidden hover:border-amber transition-colors disabled:opacity-50 relative`}
+        aria-label={`Upload ${label}`}
+      >
+        {url ? (
+          <img src={url} alt={label} className={`${size} ${shape} object-cover`} />
+        ) : (
+          <span className="font-mono text-xs uppercase tracking-widest text-mid">
+            {isUploading ? '…' : '+'}
+          </span>
+        )}
+      </button>
+      <span className="font-sans text-xs text-mid">{label}</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="sr-only"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) onFile(file)
+          e.target.value = ''
+        }}
+      />
+    </div>
+  )
+}
+
 export default function ProfileForm({ profile, userId }: Props) {
   const queryClient = useQueryClient()
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
@@ -28,8 +81,31 @@ export default function ProfileForm({ profile, userId }: Props) {
   const [location, setLocation] = useState(profile?.location_label ?? '')
   const [mediumTags, setMediumTags] = useState((profile?.medium_tags ?? []).join(', '))
   const [socialLinks, setSocialLinks] = useState<Record<string, string>>(() => initSocialLinks(profile))
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_s3_key ?? null)
+  const [headlineUrls, setHeadlineUrls] = useState<(string | null)[]>(() => {
+    const existing = profile?.headline_image_urls ?? []
+    return [existing[0] ?? null, existing[1] ?? null, existing[2] ?? null]
+  })
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const { upload: uploadAvatar, isUploading: avatarUploading } = useProfileImageUpload(
+    url => setAvatarUrl(url)
+  )
+  const { upload: uploadHeadline0, isUploading: headline0Uploading } = useProfileImageUpload(
+    url => setHeadlineUrls(prev => { const n = [...prev]; n[0] = url; return n })
+  )
+  const { upload: uploadHeadline1, isUploading: headline1Uploading } = useProfileImageUpload(
+    url => setHeadlineUrls(prev => { const n = [...prev]; n[1] = url; return n })
+  )
+  const { upload: uploadHeadline2, isUploading: headline2Uploading } = useProfileImageUpload(
+    url => setHeadlineUrls(prev => { const n = [...prev]; n[2] = url; return n })
+  )
+  const headlineSlots = [
+    { url: headlineUrls[0], upload: uploadHeadline0, isUploading: headline0Uploading, label: 'Photo 1' },
+    { url: headlineUrls[1], upload: uploadHeadline1, isUploading: headline1Uploading, label: 'Photo 2' },
+    { url: headlineUrls[2], upload: uploadHeadline2, isUploading: headline2Uploading, label: 'Photo 3' },
+  ]
 
   const mutation = useMutation({
     mutationFn: async (data: {
@@ -38,6 +114,8 @@ export default function ProfileForm({ profile, userId }: Props) {
       locationLabel: string
       mediumTags: string[]
       socialLinks: Record<string, string>
+      avatarS3Key: string | null
+      headlineImageUrls: string[]
     }) => {
       const filteredLinks = Object.fromEntries(
         Object.entries(data.socialLinks).filter(([, v]) => v.trim() !== '')
@@ -51,6 +129,8 @@ export default function ProfileForm({ profile, userId }: Props) {
             locationLabel: data.locationLabel,
             mediumTags: data.mediumTags,
             socialLinks: filteredLinks,
+            avatarS3Key: data.avatarS3Key,
+            headlineImageUrls: data.headlineImageUrls,
           },
         })
         return res.data
@@ -62,6 +142,8 @@ export default function ProfileForm({ profile, userId }: Props) {
             locationLabel: data.locationLabel,
             mediumTags: data.mediumTags,
             socialLinks: filteredLinks,
+            avatarS3Key: data.avatarS3Key,
+            headlineImageUrls: data.headlineImageUrls,
           },
         })
         if (res.error) throw new Error('Failed to update profile')
@@ -85,6 +167,8 @@ export default function ProfileForm({ profile, userId }: Props) {
       locationLabel: location,
       mediumTags: mediumTags.split(',').map(t => t.trim()).filter(Boolean),
       socialLinks,
+      avatarS3Key: avatarUrl,
+      headlineImageUrls: headlineUrls.filter((u): u is string => u !== null),
     })
   }
 
@@ -93,6 +177,36 @@ export default function ProfileForm({ profile, userId }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-lg space-y-5">
+
+      {/* Profile picture + headline photos */}
+      <fieldset>
+        <legend className="block font-sans text-sm text-ink mb-3">Profile photos</legend>
+        <div className="flex items-end gap-4 flex-wrap">
+          <ImageSlot
+            url={avatarUrl}
+            label="Profile pic"
+            round
+            onFile={uploadAvatar}
+            isUploading={avatarUploading}
+          />
+          <div className="flex gap-3 flex-1">
+            {headlineSlots.map(slot => (
+              <div key={slot.label} className="flex-1 min-w-0">
+                <ImageSlot
+                  url={slot.url}
+                  label={slot.label}
+                  onFile={slot.upload}
+                  isUploading={slot.isUploading}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-2 font-sans text-xs text-mid">
+          Profile pic appears as your avatar. Up to {MAX_HEADLINE} headline photos appear at the top of your public profile.
+        </p>
+      </fieldset>
+
       <div>
         <label className="block font-sans text-sm text-ink mb-1">Display name</label>
         <input

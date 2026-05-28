@@ -57,13 +57,31 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   return (
     <main className="min-h-screen bg-offwhite">
       <div className="max-w-4xl mx-auto px-6 py-12">
+        {/* Headline photos strip */}
+        {profile.headline_image_urls.length > 0 && (
+          <div className={`grid gap-2 mb-10 ${profile.headline_image_urls.length === 1 ? 'grid-cols-1' : profile.headline_image_urls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            {profile.headline_image_urls.map((url, i) => (
+              <div
+                key={i}
+                className={`overflow-hidden rounded-lg ${i === 0 && profile.headline_image_urls.length === 3 ? 'col-span-2 row-span-2' : ''}`}
+              >
+                <img
+                  src={url}
+                  alt={`${profile.display_name} — photo ${i + 1}`}
+                  className="w-full h-64 object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Header */}
         <header className="mb-10">
           {profile.avatar_s3_key && (
             <img
               src={profile.avatar_s3_key}
               alt={profile.display_name}
-              className="w-24 h-24 rounded-full object-cover mb-6 border border-light"
+              className="w-20 h-20 rounded-full object-cover mb-6 border-2 border-light"
             />
           )}
 

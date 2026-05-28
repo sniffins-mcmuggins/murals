@@ -30,6 +30,7 @@ const mockProfile: components['schemas']['ArtistProfile'] = {
   medium_tags: ['mural', 'stencil'],
   social_links: { instagram: 'https://instagram.com/alice' },
   avatar_s3_key: null,
+  headline_image_urls: [],
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }

@@ -19,16 +19,17 @@ import (
 )
 
 type profileResponse struct {
-	ID            string          `json:"id"`
-	UserID        string          `json:"user_id"`
-	DisplayName   string          `json:"display_name"`
-	Bio           string          `json:"bio"`
-	LocationLabel *string         `json:"location_label,omitempty"`
-	MediumTags    []string        `json:"medium_tags"`
-	SocialLinks   json.RawMessage `json:"social_links"`
-	AvatarS3Key   *string         `json:"avatar_s3_key,omitempty"`
-	CreatedAt     string          `json:"created_at"`
-	UpdatedAt     string          `json:"updated_at"`
+	ID                string          `json:"id"`
+	UserID            string          `json:"user_id"`
+	DisplayName       string          `json:"display_name"`
+	Bio               string          `json:"bio"`
+	LocationLabel     *string         `json:"location_label,omitempty"`
+	MediumTags        []string        `json:"medium_tags"`
+	SocialLinks       json.RawMessage `json:"social_links"`
+	AvatarS3Key       *string         `json:"avatar_s3_key,omitempty"`
+	HeadlineImageUrls []string        `json:"headline_image_urls"`
+	CreatedAt         string          `json:"created_at"`
+	UpdatedAt         string          `json:"updated_at"`
 }
 
 type profileListResponse struct {
@@ -39,16 +40,21 @@ type profileListResponse struct {
 }
 
 func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
+	headlineImageUrls := p.HeadlineImageUrls
+	if headlineImageUrls == nil {
+		headlineImageUrls = []string{}
+	}
 	resp := profileResponse{
-		ID:          p.ID.String(),
-		UserID:      p.UserID.String(),
-		DisplayName: p.DisplayName,
-		Bio:         p.Bio,
-		MediumTags:  p.MediumTags,
-		SocialLinks: p.SocialLinks,
-		AvatarS3Key: p.AvatarS3Key,
-		CreatedAt:   p.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:   p.UpdatedAt.Time.Format(time.RFC3339),
+		ID:                p.ID.String(),
+		UserID:            p.UserID.String(),
+		DisplayName:       p.DisplayName,
+		Bio:               p.Bio,
+		MediumTags:        p.MediumTags,
+		SocialLinks:       p.SocialLinks,
+		AvatarS3Key:       p.AvatarS3Key,
+		HeadlineImageUrls: headlineImageUrls,
+		CreatedAt:         p.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:         p.UpdatedAt.Time.Format(time.RFC3339),
 	}
 	if !public || p.ShowLocation {
 		resp.LocationLabel = p.LocationLabel
@@ -175,13 +181,14 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var req struct {
-			DisplayName   string          `json:"displayName"`
-			Bio           string          `json:"bio"`
-			LocationLabel *string         `json:"locationLabel"`
-			ShowLocation  *bool           `json:"showLocation"`
-			MediumTags    []string        `json:"mediumTags"`
-			SocialLinks   json.RawMessage `json:"socialLinks"`
-			AvatarS3Key   *string         `json:"avatarS3Key"`
+			DisplayName       string          `json:"displayName"`
+			Bio               string          `json:"bio"`
+			LocationLabel     *string         `json:"locationLabel"`
+			ShowLocation      *bool           `json:"showLocation"`
+			MediumTags        []string        `json:"mediumTags"`
+			SocialLinks       json.RawMessage `json:"socialLinks"`
+			AvatarS3Key       *string         `json:"avatarS3Key"`
+			HeadlineImageUrls []string        `json:"headlineImageUrls"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -234,16 +241,24 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if req.ShowLocation != nil {
 			showLocation = *req.ShowLocation
 		}
+		headlineImageUrls := existing.HeadlineImageUrls
+		if req.HeadlineImageUrls != nil {
+			headlineImageUrls = req.HeadlineImageUrls
+		}
+		if headlineImageUrls == nil {
+			headlineImageUrls = []string{}
+		}
 
 		updated, err := q.UpdateArtistProfile(r.Context(), sqlcdb.UpdateArtistProfileParams{
-			ID:            existing.ID,
-			DisplayName:   displayName,
-			Bio:           bio,
-			LocationLabel: locationLabel,
-			ShowLocation:  showLocation,
-			MediumTags:    mediumTags,
-			SocialLinks:   socialLinks,
-			AvatarS3Key:   avatarS3Key,
+			ID:                existing.ID,
+			DisplayName:       displayName,
+			Bio:               bio,
+			LocationLabel:     locationLabel,
+			ShowLocation:      showLocation,
+			MediumTags:        mediumTags,
+			SocialLinks:       socialLinks,
+			AvatarS3Key:       avatarS3Key,
+			HeadlineImageUrls: headlineImageUrls,
 		})
 		if err != nil {
 			httperr.InternalServerError(w)

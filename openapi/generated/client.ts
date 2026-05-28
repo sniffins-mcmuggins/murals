@@ -1241,6 +1241,7 @@ export interface components {
                 [key: string]: string;
             };
             avatar_s3_key?: string | null;
+            headline_image_urls: string[];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -1261,6 +1262,7 @@ export interface components {
                 [key: string]: string;
             };
             avatarS3Key?: string | null;
+            headlineImageUrls?: string[];
         };
         /** @enum {string} */
         CollectionStatus: "active" | "archived" | "ongoing";
