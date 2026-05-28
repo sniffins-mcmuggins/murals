@@ -45,6 +45,12 @@ func RequireAdmin(pool *pgxpool.Pool) func(http.Handler) http.Handler {
 				httperr.InternalServerError(w)
 				return
 			}
+			// Re-read is_admin from the DB — the JWT claim could be stale if the
+			// user was demoted after their token was issued (TTL up to 7 days).
+			if !user.IsAdmin {
+				httperr.Forbidden(w)
+				return
+			}
 			if !user.MfaEnabled {
 				httperr.Write(w, http.StatusForbidden, "Forbidden", "admin account must have MFA enrolled")
 				return

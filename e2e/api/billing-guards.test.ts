@@ -13,10 +13,22 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client } from 'pg'
+import { createHmac } from 'node:crypto'
 import { createArtist, createOrganiser, createFestival } from '../fixtures/helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-jwt-secret-change-in-prod'
+
+function base64url(buf: Buffer | string): string {
+  return Buffer.from(buf).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
+function signHS256(payload: Record<string, unknown>, secret: string): string {
+  const h = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const p = base64url(JSON.stringify(payload))
+  const sig = base64url(createHmac('sha256', secret).update(`${h}.${p}`).digest())
+  return `${h}.${p}.${sig}`
+}
 
 function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` }
@@ -144,6 +156,63 @@ describe('billing guards (B1-B6)', () => {
         headers: authHeader(artist.token),
       })
       expect(res.status).toBe(200)
+    })
+  })
+
+  // ── B7: access_grant as RequirePlan fallback (issue #131) ───────────────────
+  // RequirePlan falls back to HasActiveGrant when there is no subscription row
+  // (or the subscription's plan is insufficient). PR #122 wired this path but
+  // it has never been tested at the integration layer.
+
+  // B7 uses signup+signHS256 (no /auth/login) to stay under the rate limit.
+  describe('B7: RequirePlan passes with active access_grant (no subscription)', () => {
+    async function signupAndMint(sfx: string): Promise<{ userId: string; token: string }> {
+      const email = `bg7-${sfx}@e2e.test`
+      await fetch(`${API}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: 'testpass123' }),
+      })
+      const { rows } = await db.query<{ id: string; session_version: number }>(
+        'SELECT id, session_version FROM users WHERE email = $1',
+        [email],
+      )
+      const { id: userId, session_version: sv } = rows[0]
+      const now = Math.floor(Date.now() / 1000)
+      const token = signHS256({ sub: userId, sv, iat: now, exp: now + 3600 }, JWT_SECRET)
+      return { userId, token }
+    }
+
+    it('active artist_pro grant → /_test/billing/pro-only returns 200', async () => {
+      const { userId, token } = await signupAndMint(`${suffix}-b7active`)
+      await db.query(
+        `INSERT INTO access_grants (user_id, plan, valid_until, granted_by)
+         VALUES ($1, 'artist_pro', NOW() + interval '30 days', $1)`,
+        [userId],
+      )
+      expect((await fetch(`${API}/_test/billing/pro-only`, { headers: authHeader(token) })).status).toBe(200)
+    })
+
+    it('expired artist_pro grant → 403 upgrade_required', async () => {
+      const { userId, token } = await signupAndMint(`${suffix}-b7expired`)
+      await db.query(
+        `INSERT INTO access_grants (user_id, plan, valid_until, granted_by)
+         VALUES ($1, 'artist_pro', NOW() - interval '1 day', $1)`,
+        [userId],
+      )
+      const res = await fetch(`${API}/_test/billing/pro-only`, { headers: authHeader(token) })
+      expect(res.status).toBe(403)
+      expect(await bodyText(res)).toContain('upgrade_required')
+    })
+
+    it('artist_basic grant → 403 when artist_pro is required', async () => {
+      const { userId, token } = await signupAndMint(`${suffix}-b7basic`)
+      await db.query(
+        `INSERT INTO access_grants (user_id, plan, valid_until, granted_by)
+         VALUES ($1, 'artist_basic', NOW() + interval '30 days', $1)`,
+        [userId],
+      )
+      expect((await fetch(`${API}/_test/billing/pro-only`, { headers: authHeader(token) })).status).toBe(403)
     })
   })
 })
