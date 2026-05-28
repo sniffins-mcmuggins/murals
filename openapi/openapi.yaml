@@ -177,6 +177,11 @@ components:
         avatar_s3_key:
           type: string
           nullable: true
+        headline_image_urls:
+          type: array
+          items:
+            type: string
+          description: Ordered list of S3 public URLs for the artist's headline photos.
         created_at:
           type: string
           format: date-time
