@@ -22,6 +22,19 @@ type formField struct {
 	Required bool   `json:"required"`
 }
 
+type artistSummary struct {
+	DisplayName   string   `json:"display_name"`
+	AvatarS3Key   *string  `json:"avatar_s3_key"`
+	MediumTags    []string `json:"medium_tags"`
+	LocationLabel *string  `json:"location_label"`
+}
+
+type noteResponse struct {
+	ID        string `json:"id"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
+}
+
 type applicationResponse struct {
 	ID          string          `json:"id"`
 	FormID      string          `json:"form_id"`
@@ -33,6 +46,8 @@ type applicationResponse struct {
 	Answers     json.RawMessage `json:"answers"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
+	Artist      *artistSummary  `json:"artist,omitempty"`
+	Notes       []noteResponse  `json:"notes"`
 }
 
 func toApplicationResponse(a sqlcdb.Application) applicationResponse {
@@ -47,6 +62,44 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 		Answers:     a.Answers,
 		CreatedAt:   a.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:   a.UpdatedAt.Time.Format(time.RFC3339),
+		Notes:       []noteResponse{},
+	}
+}
+
+func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 9)
+	row sqlcdb.ListApplicationsByFormWithArtistRow,
+	notes []noteResponse,
+) applicationResponse {
+	mediumTags := row.MediumTags
+	if mediumTags == nil {
+		mediumTags = []string{}
+	}
+	return applicationResponse{
+		ID:          row.ID.String(),
+		FormID:      row.FormID.String(),
+		ArtistID:    row.ArtistID.String(),
+		Status:      string(row.Status),
+		Rank:        row.Rank,
+		Shortlisted: row.Shortlisted,
+		ReviewFlag:  row.ReviewFlag,
+		Answers:     row.Answers,
+		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
+		Artist: &artistSummary{
+			DisplayName:   row.DisplayName,
+			AvatarS3Key:   row.AvatarS3Key,
+			MediumTags:    mediumTags,
+			LocationLabel: row.LocationLabel,
+		},
+		Notes: notes,
+	}
+}
+
+func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse { //nolint:unused // used in upcoming notes handler (Task 8)
+	return noteResponse{
+		ID:        n.ID.String(),
+		Content:   n.Content,
+		CreatedAt: n.CreatedAt.Time.Format(time.RFC3339),
 	}
 }
 
