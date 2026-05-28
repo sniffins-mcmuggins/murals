@@ -292,6 +292,68 @@ If `task db:generate` isn't available (worktree, no sqlc binary), hand-edit ever
 
 **Canary:** write an e2e test that asserts the new field appears in the API response with a non-zero value after inserting a non-zero value. Unit tests with pre-seeded state won't catch this — they never scan the column.
 
+### Endpoint returns 500 with `duration_ms:0` — missing DB migration on dev stack
+
+Symptom: a specific endpoint (e.g. `POST /collections`) returns 500 with `duration_ms:0` in the API logs immediately after a migration was merged. Other endpoints on the same table may work fine; only calls that touch the new columns fail.
+
+Root cause: the sqlc-generated queries reference columns that don't exist in the running DB because the migration hasn't been applied since the last `task up`. The query fails at the Postgres layer before any handler logic runs, hence 0ms.
+
+Diagnose:
+
+```bash
+docker compose -f infra/docker-compose.yml exec db psql -U render -d render \
+  -c "SELECT version, dirty FROM schema_migrations ORDER BY version DESC LIMIT 5;"
+```
+
+If the latest version is lower than the highest-numbered migration file in `db/migrations/`, the migration is missing. Run `task db:migrate`.
+
+If `task db:migrate` reports "no change" but the 500 persists, the column may literally be absent — verify:
+
+```bash
+docker compose -f infra/docker-compose.yml exec db psql -U render -d render \
+  -c "\d <table_name>" | grep <column_name>
+```
+
+### `task db:migrate` fails with "column already exists" — dirty migration state
+
+Symptom: `task db:migrate` errors with `column "X" of relation "Y" already exists` but `SELECT * FROM schema_migrations` shows an earlier version (or dirty=true).
+
+Root cause: a previous migration run applied the `ALTER TABLE` but crashed before updating the tracking row, leaving the row as `dirty=true`. The column now exists in the DB but the tracker thinks the migration needs to re-run — and re-running the same `ALTER TABLE` fails.
+
+Fix — three steps:
+
+1. Verify the column actually exists: `\d <table>` in psql.
+2. If it does, mark the migration clean: `UPDATE schema_migrations SET dirty = false WHERE version = N;`
+3. Re-run: `task db:migrate` — it will skip the now-clean migration and apply anything higher.
+
+If the column is missing (genuinely partial failure), drop the partial state manually and re-run the migration from scratch.
+
+### Order-dependent tests fail intermittently in the parallel suite — same-millisecond `created_at`
+
+Symptom: a test that asserts a specific sort order (e.g. "collection A comes before collection B") passes consistently in isolation but fails occasionally when the full suite runs 20 files in parallel.
+
+Root cause: rows with the same default `display_order = 0` are ordered by `(display_order, created_at)`. Under parallel load the two rows can land in the same millisecond, making the tiebreaker non-deterministic.
+
+Fix: never assert the *default* creation order in a test that depends on it. Instead, explicitly set the desired order via the reorder endpoint first, confirm it, then assert:
+
+```typescript
+// BAD — assumes creation order; flaky under parallel load
+const { collectionId: idA } = await createCollection(token, { name: 'A' })
+const { collectionId: idB } = await createCollection(token, { name: 'B' })
+const before = await getCollections(profileId)
+expect(before[0].id).toBe(idA) // may fail if A and B share the same created_at ms
+
+// GOOD — set known state first, then flip it
+await reorderCollections(token, [idA, idB])  // known state
+const before = await getCollections(profileId)
+expect(before[0].id).toBe(idA)
+await reorderCollections(token, [idB, idA])  // flip
+const after = await getCollections(profileId)
+expect(after[0].id).toBe(idB)
+```
+
+This applies to any endpoint that orders by a default-zero column combined with `created_at`.
+
 ## Test data conventions
 
 - **Unique suffixes.** Every spec generates `const suffix = Date.now()` and uses it in emails (`artist-${suffix}@e2e.test`), slugs, names. Don't ever hardcode — the DB persists across runs, so reruns must not collide.
