@@ -200,3 +200,88 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
+
+func TestReorderCollections_Success(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "reorder1@example.com")
+	createTestProfile(t, db, userID, "Reorder Artist")
+
+	// Create two collections via the handler
+	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
+	makeCollection := func(name string) string {
+		body := fmt.Sprintf(`{"name":%q}`, name)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections", bytes.NewBufferString(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		createH.ServeHTTP(w, r)
+		require.Equal(t, http.StatusCreated, w.Code)
+		var resp map[string]any
+		require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+		return resp["id"].(string)
+	}
+	id1 := makeCollection("First")
+	id2 := makeCollection("Second")
+
+	router := chi.NewRouter()
+	router.Use(auth.Middleware(db, testSecret))
+	router.Put("/collections/order", artist.ReorderCollectionsHandler(db))
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	// Reorder: second before first
+	body, _ := json.Marshal(map[string]any{"collectionIds": []string{id2, id1}})
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/collections/order", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+}
+
+func TestReorderCollections_Unauthenticated(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	router := chi.NewRouter()
+	router.Use(auth.Middleware(db, testSecret))
+	router.Put("/collections/order", artist.ReorderCollectionsHandler(db))
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/collections/order",
+		bytes.NewBufferString(`{"collectionIds":[]}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestReorderCollections_UnknownID(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "reorder3@example.com")
+	createTestProfile(t, db, userID, "Reorder3")
+
+	router := chi.NewRouter()
+	router.Use(auth.Middleware(db, testSecret))
+	router.Put("/collections/order", artist.ReorderCollectionsHandler(db))
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	body := `{"collectionIds":["00000000-0000-0000-0000-000000000000"]}`
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/collections/order",
+		bytes.NewBufferString(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+}

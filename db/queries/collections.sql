@@ -21,5 +21,8 @@ SET name         = $2,
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateCollectionOrder :exec
+UPDATE collections SET display_order = $2 WHERE id = $1;
+
 -- name: DeleteCollection :exec
 DELETE FROM collections WHERE id = $1;

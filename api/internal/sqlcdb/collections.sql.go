@@ -147,3 +147,17 @@ func (q *Queries) UpdateCollection(ctx context.Context, arg UpdateCollectionPara
 	)
 	return i, err
 }
+
+const updateCollectionOrder = `-- name: UpdateCollectionOrder :exec
+UPDATE collections SET display_order = $2 WHERE id = $1
+`
+
+type UpdateCollectionOrderParams struct {
+	ID           pgtype.UUID `db:"id" json:"id"`
+	DisplayOrder int32       `db:"display_order" json:"display_order"`
+}
+
+func (q *Queries) UpdateCollectionOrder(ctx context.Context, arg UpdateCollectionOrderParams) error {
+	_, err := q.db.Exec(ctx, updateCollectionOrder, arg.ID, arg.DisplayOrder)
+	return err
+}

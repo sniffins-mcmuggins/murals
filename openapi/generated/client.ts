@@ -248,6 +248,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/collections/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder collections
+         * @description Accepts an ordered array of collection IDs belonging to the authenticated artist.
+         *     Sets display_order by position (0-indexed). Returns 204 on success.
+         */
+        put: operations["reorderCollections"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/collections/{collectionID}": {
         parameters: {
             query?: never;
@@ -1313,6 +1334,10 @@ export interface components {
              */
             cdnUrl: string;
         };
+        ReorderCollectionsRequest: {
+            /** @description Ordered list of collection IDs. display_order is set by position (0-indexed). */
+            collectionIds: string[];
+        };
         ReorderImagesRequest: {
             /** @description Ordered list of image IDs. display_order is set by position (0-indexed). */
             imageIds: string[];
@@ -1885,6 +1910,30 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    reorderCollections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderCollectionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Order saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["UnprocessableEntity"];
         };
     };
     getCollection: {

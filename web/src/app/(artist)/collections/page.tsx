@@ -3,10 +3,85 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 
 type Collection = components['schemas']['Collection']
+
+function SortableCollectionRow({
+  collection,
+  onArchive,
+  archiving,
+}: {
+  collection: Collection
+  onArchive: (id: string) => void
+  archiving: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: collection.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-4 bg-warm border border-light rounded-lg ${isDragging ? 'opacity-50 shadow-lg' : ''}`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-mid hover:text-ink touch-none px-1 shrink-0"
+        aria-label="Drag to reorder"
+        tabIndex={-1}
+      >
+        ⠿
+      </button>
+      <div className="flex-1 min-w-0">
+        <Link
+          href={`/collections/${collection.id}`}
+          className="font-serif text-xl text-ink hover:text-amber transition-colors"
+        >
+          {collection.name}
+        </Link>
+        {collection.description && (
+          <p className="font-sans text-sm text-mid mt-0.5">{collection.description}</p>
+        )}
+        <span className="font-mono text-xs text-mid uppercase tracking-wider mt-1 inline-block">
+          {collection.status}
+        </span>
+      </div>
+      {collection.status !== 'archived' && (
+        <button
+          onClick={() => onArchive(collection.id)}
+          disabled={archiving}
+          className="font-sans text-xs text-mid hover:text-clay transition-colors shrink-0"
+        >
+          Archive
+        </button>
+      )}
+    </li>
+  )
+}
 
 export default function CollectionsPage() {
   const queryClient = useQueryClient()
@@ -14,6 +89,8 @@ export default function CollectionsPage() {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor))
 
   const profileQuery = useQuery({
     queryKey: ['profile'],
@@ -64,7 +141,41 @@ export default function CollectionsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['collections'] }),
   })
 
+  const reorderMutation = useMutation({
+    mutationFn: async (collectionIds: string[]) => {
+      const res = await apiClient.PUT('/collections/order', {
+        body: { collectionIds },
+      })
+      if (res.error) throw new Error('Failed to save order')
+    },
+  })
+
   const collections: Collection[] = (collectionsQuery.data ?? []) as Collection[]
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = collections.findIndex((c) => c.id === active.id)
+    const newIndex = collections.findIndex((c) => c.id === over.id)
+    const reordered = arrayMove(collections, oldIndex, newIndex)
+
+    // Optimistic update
+    queryClient.setQueryData(
+      ['collections', profileQuery.data?.id],
+      reordered,
+    )
+
+    reorderMutation.mutate(
+      reordered.map((c) => c.id),
+      {
+        onError: () => {
+          // Revert on failure
+          queryClient.setQueryData(['collections', profileQuery.data?.id], collections)
+        },
+      },
+    )
+  }
 
   return (
     <div>
@@ -119,28 +230,20 @@ export default function CollectionsPage() {
         <p className="font-sans text-mid">No collections yet. Create one to get started.</p>
       )}
 
-      <ul className="space-y-3">
-        {collections.map((c) => (
-          <li key={c.id} className="flex items-center justify-between p-4 bg-warm border border-light rounded-lg">
-            <div>
-              <Link href={`/collections/${c.id}`} className="font-serif text-xl text-ink hover:text-amber transition-colors">
-                {c.name}
-              </Link>
-              {c.description && <p className="font-sans text-sm text-mid mt-0.5">{c.description}</p>}
-              <span className="font-mono text-xs text-mid uppercase tracking-wider mt-1 inline-block">{c.status}</span>
-            </div>
-            {c.status !== 'archived' && (
-              <button
-                onClick={() => archiveMutation.mutate(c.id)}
-                disabled={archiveMutation.isPending}
-                className="font-sans text-xs text-mid hover:text-clay transition-colors ml-4"
-              >
-                Archive
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={collections.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+          <ul className="space-y-3">
+            {collections.map((c) => (
+              <SortableCollectionRow
+                key={c.id}
+                collection={c}
+                onArchive={(id) => archiveMutation.mutate(id)}
+                archiving={archiveMutation.isPending}
+              />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </div>
   )
 }

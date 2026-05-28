@@ -142,6 +142,7 @@ func main() {
 
 	// Collections
 	r.Post("/collections", artist.CreateCollectionHandler(pool))
+	r.Put("/collections/order", artist.ReorderCollectionsHandler(pool)) // literal before /{collectionID}
 	r.Get("/collections/{collectionID}", artist.GetCollectionHandler(pool))
 	r.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(pool))
 	r.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(pool))
