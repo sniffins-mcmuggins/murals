@@ -19,6 +19,7 @@ const API = process.env.API_URL ?? 'http://localhost:8080'
 test.describe('public visitor flow', () => {
   let festivalId: string
   let profileId: string
+  let collectionId: string
   let artistDisplayName: string
 
   test.beforeAll(async () => {
@@ -29,7 +30,8 @@ test.describe('public visitor flow', () => {
     const artist = await createArtist(suffix)
     const { profileId: pid } = await createProfile(artist.token, { displayName: artistDisplayName })
     profileId = pid
-    const { collectionId } = await createCollection(artist.token, { name: 'Wall Pieces' })
+    const { collectionId: cid } = await createCollection(artist.token, { name: 'Wall Pieces' })
+    collectionId = cid
     await uploadImage(artist.token, collectionId)
 
     // Set up organiser with a live festival with a pinned artist
@@ -89,5 +91,22 @@ test.describe('public visitor flow', () => {
     await expect(page.getByText('Wall Pieces')).toBeVisible()
     // The cover image is set by uploadImage helper (PATCH coverS3Key)
     await expect(page.locator('section[aria-label="Collections"] img').first()).toBeVisible()
+  })
+
+  test('visitor clicks collection card, lands on collection detail page', async ({ page }) => {
+    await page.goto(`/artists/${profileId}`)
+    await expect(page.getByRole('heading', { name: artistDisplayName })).toBeVisible()
+
+    // ── Collection strip is visible ───────────────────────────────────────────────
+    await expect(page.getByText('Wall Pieces')).toBeVisible()
+
+    // ── Click the collection card ─────────────────────────────────────────────────
+    await page.getByText('Wall Pieces').click()
+    await expect(page).toHaveURL(new RegExp(`/artists/${profileId}/collections/${collectionId}`))
+
+    // ── Detail page shows the collection name ─────────────────────────────────────
+    await expect(page.getByRole('heading', { name: 'Wall Pieces' })).toBeVisible()
+    // The image uploaded in beforeAll should appear in the grid
+    await expect(page.locator('img').first()).toBeVisible()
   })
 })
