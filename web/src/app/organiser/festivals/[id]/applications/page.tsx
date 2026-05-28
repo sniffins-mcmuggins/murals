@@ -1,48 +1,73 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { ApplicationCard } from '@/components/ApplicationCard'
+import { ApplicationSlideOver } from '@/components/ApplicationSlideOver'
+import { useApplicationReorder } from '@/hooks/useApplicationReorder'
 import type { components } from '@render/api-client'
 
 type Application = components['schemas']['Application']
 
+interface FormField {
+  id: string
+  label: string
+  type: string
+  required: boolean
+}
+
+type TabKey = 'pending' | 'shortlisted' | 'accepted' | 'waitlisted' | 'declined'
+
+const TAB_LABELS: Record<TabKey, string> = {
+  pending: 'Pending',
+  shortlisted: 'Shortlisted',
+  accepted: 'Accepted',
+  waitlisted: 'Waitlisted',
+  declined: 'Declined',
+}
+
+function filterTab(apps: Application[], tab: TabKey): Application[] {
+  switch (tab) {
+    case 'pending':     return apps.filter(a => a.status === 'submitted' && !a.shortlisted)
+    case 'shortlisted': return apps.filter(a => a.status === 'submitted' && a.shortlisted)
+    case 'accepted':    return apps.filter(a => a.status === 'accepted')
+    case 'waitlisted':  return apps.filter(a => a.status === 'waitlisted')
+    case 'declined':    return apps.filter(a => a.status === 'declined')
+  }
+}
+
 type Props = { params: Promise<{ id: string }> }
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-const STATUS_BADGE: Record<string, string> = {
-  submitted: 'bg-amber/20 text-amber',
-  accepted: 'bg-amber/30 text-ink',
-  declined: 'bg-light text-mid',
-}
 
 export default function ApplicationsReviewPage({ params }: Props) {
   const [festivalId, setFestivalId] = useState<string | null>(null)
-  const queryClient = useQueryClient()
-
   if (!festivalId) {
     params.then(p => setFestivalId(p.id))
     return <div className="font-sans text-mid text-sm p-8">Loading…</div>
   }
-
-  return <ApplicationsList festivalId={festivalId} queryClient={queryClient} />
+  return <ApplicationsView festivalId={festivalId} />
 }
 
-function ApplicationsList({
-  festivalId,
-  queryClient,
-}: {
-  festivalId: string
-  queryClient: ReturnType<typeof useQueryClient>
-}) {
+function ApplicationsView({ festivalId }: { festivalId: string }) {
+  const [activeTab, setActiveTab] = useState<TabKey>('pending')
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null)
+  const [localApps, setLocalApps] = useState<Application[] | null>(null)
+  const queryClient = useQueryClient()
+
   const applicationsQuery = useQuery({
     queryKey: ['festival-applications', festivalId],
     queryFn: async () => {
@@ -54,40 +79,107 @@ function ApplicationsList({
     },
   })
 
+  // Sync local state when fresh data arrives (replaces onSuccess which was removed in TanStack Query v5)
+  useEffect(() => {
+    if (applicationsQuery.data) {
+      setLocalApps(applicationsQuery.data)
+    }
+  }, [applicationsQuery.data])
+
+  const formQuery = useQuery({
+    queryKey: ['festival-form', festivalId],
+    queryFn: async () => {
+      const res = await apiClient.GET('/festivals/{festivalID}/form', {
+        params: { path: { festivalID: festivalId } },
+      })
+      if (res.error) return { fields: [] }
+      return res.data
+    },
+  })
+
+  const allApps = localApps ?? applicationsQuery.data ?? []
+  const tabApps = useMemo(() => filterTab(allApps, activeTab), [allApps, activeTab])
+
+  const setTabApps = (updated: Application[]) => {
+    setLocalApps(prev => {
+      if (!prev) return updated
+      const tabIds = new Set(tabApps.map(a => a.id))
+      const rest = prev.filter(a => !tabIds.has(a.id))
+      return [...rest, ...updated]
+    })
+  }
+
+  const { handleDragEnd } = useApplicationReorder(
+    festivalId,
+    tabApps,
+    activeTab === 'shortlisted' ? 'submitted' : activeTab,
+    setTabApps
+  )
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['festival-applications', festivalId] })
+
   const acceptMutation = useMutation({
     mutationFn: async (applicationId: string) => {
-      const res = await apiClient.POST(
-        '/festivals/{festivalID}/applications/{applicationID}/accept',
-        {
-          params: { path: { festivalID: festivalId, applicationID: applicationId } },
-        }
-      )
-      if (res.error) throw new Error('Failed to accept application')
-      return res.data as Application
+      const res = await apiClient.POST('/festivals/{festivalID}/applications/{applicationID}/accept', {
+        params: { path: { festivalID: festivalId, applicationID: applicationId } },
+      })
+      if (res.error) throw new Error('Accept failed')
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival-applications', festivalId] })
-    },
+    onSuccess: () => { setSelectedApp(null); invalidate() },
   })
 
   const declineMutation = useMutation({
     mutationFn: async (applicationId: string) => {
-      const res = await apiClient.POST(
-        '/festivals/{festivalID}/applications/{applicationID}/decline',
-        {
-          params: { path: { festivalID: festivalId, applicationID: applicationId } },
-        }
-      )
-      if (res.error) throw new Error('Failed to decline application')
-      return res.data as Application
+      const res = await apiClient.POST('/festivals/{festivalID}/applications/{applicationID}/decline', {
+        params: { path: { festivalID: festivalId, applicationID: applicationId } },
+      })
+      if (res.error) throw new Error('Decline failed')
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival-applications', festivalId] })
-    },
+    onSuccess: () => { setSelectedApp(null); invalidate() },
   })
 
-  const applications = applicationsQuery.data ?? []
-  const isLoading = applicationsQuery.isLoading
+  const waitlistMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const res = await apiClient.POST('/festivals/{festivalID}/applications/{applicationID}/waitlist', {
+        params: { path: { festivalID: festivalId, applicationID: applicationId } },
+      })
+      if (res.error) throw new Error('Waitlist failed')
+    },
+    onSuccess: () => { setSelectedApp(null); invalidate() },
+  })
+
+  const patchMutation = useMutation({
+    mutationFn: async ({ id, shortlisted, reviewFlag }: { id: string; shortlisted: boolean; reviewFlag: boolean }) => {
+      const res = await apiClient.PATCH('/festivals/{festivalID}/applications/{applicationID}', {
+        params: { path: { festivalID: festivalId, applicationID: id } },
+        body: { shortlisted, review_flag: reviewFlag },
+      })
+      if (res.error) throw new Error('Patch failed')
+    },
+    onSuccess: invalidate,
+  })
+
+  const isPending =
+    acceptMutation.isPending ||
+    declineMutation.isPending ||
+    waitlistMutation.isPending ||
+    patchMutation.isPending
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  const formFields: FormField[] = (formQuery.data as { fields?: FormField[] })?.fields ?? []
+
+  const counts: Record<TabKey, number> = {
+    pending: filterTab(allApps, 'pending').length,
+    shortlisted: filterTab(allApps, 'shortlisted').length,
+    accepted: filterTab(allApps, 'accepted').length,
+    waitlisted: filterTab(allApps, 'waitlisted').length,
+    declined: filterTab(allApps, 'declined').length,
+  }
 
   return (
     <div>
@@ -100,86 +192,75 @@ function ApplicationsList({
         </Link>
       </div>
 
-      <h1 className="font-serif text-4xl text-ink mb-8">Applications</h1>
+      <h1 className="font-serif text-4xl text-ink mb-6">Applications</h1>
 
-      {isLoading && (
+      {applicationsQuery.isError && (
+        <p role="alert" className="font-sans text-sm text-clay mb-4">Failed to load applications.</p>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-light mb-6 overflow-x-auto">
+        {(Object.keys(TAB_LABELS) as TabKey[]).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`font-sans text-sm px-4 py-2 whitespace-nowrap border-b-2 -mb-px transition-colors ${
+              activeTab === tab
+                ? 'border-amber text-ink font-semibold'
+                : 'border-transparent text-mid hover:text-ink'
+            }`}
+          >
+            {TAB_LABELS[tab]}
+            <span className="ml-1.5 font-mono text-xs">({counts[tab]})</span>
+          </button>
+        ))}
+      </div>
+
+      {applicationsQuery.isLoading && (
         <p className="font-sans text-mid text-sm">Loading…</p>
       )}
 
-      {applicationsQuery.isError && (
-        <p role="alert" className="font-sans text-sm text-clay">Failed to load applications.</p>
+      {!applicationsQuery.isLoading && tabApps.length === 0 && (
+        <p className="font-sans text-mid text-sm">No applications here.</p>
       )}
 
-      {!isLoading && !applicationsQuery.isError && applications.length === 0 && (
-        <p className="font-sans text-mid">No applications yet.</p>
+      {tabApps.length > 0 && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tabApps.map(a => a.id ?? '')} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-3">
+              {tabApps.map(app => (
+                <li key={app.id}>
+                  <ApplicationCard
+                    application={app}
+                    onSelect={setSelectedApp}
+                    onAccept={id => acceptMutation.mutate(id)}
+                    onDecline={id => declineMutation.mutate(id)}
+                    onWaitlist={id => waitlistMutation.mutate(id)}
+                    onToggleShortlist={(id, shortlisted, reviewFlag) =>
+                      patchMutation.mutate({ id, shortlisted: !shortlisted, reviewFlag })
+                    }
+                    onToggleReviewFlag={(id, shortlisted, reviewFlag) =>
+                      patchMutation.mutate({ id, shortlisted, reviewFlag: !reviewFlag })
+                    }
+                    isPending={isPending}
+                  />
+                </li>
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
 
-      {!isLoading && !applicationsQuery.isError && applications.length > 0 && (
-        <ul className="space-y-4">
-          {applications.map(app => {
-            const badgeClass = STATUS_BADGE[app.status ?? ''] ?? 'bg-light text-mid'
-            const displayName = app.artist_id
-              ? `Artist ${app.artist_id.slice(0, 8)}`
-              : 'Applicant'
-            const answersEntries = app.answers
-              ? Object.entries(app.answers as Record<string, unknown>)
-              : []
-
-            return (
-              <li
-                key={app.id}
-                className="p-5 bg-warm border border-light rounded-lg"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-sans text-sm text-ink font-medium">{displayName}</p>
-                    {app.created_at && (
-                      <p className="font-sans text-xs text-mid mt-0.5">
-                        Submitted {formatDate(app.created_at)}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`font-mono text-xs uppercase tracking-wider px-2 py-0.5 rounded ${badgeClass}`}
-                  >
-                    {app.status}
-                  </span>
-                </div>
-
-                {answersEntries.length > 0 && (
-                  <div className="mb-4 space-y-2">
-                    {answersEntries.map(([label, value]) => (
-                      <div key={label}>
-                        <p className="font-sans text-xs text-mid">{label}</p>
-                        <p className="font-sans text-sm text-ink">{String(value)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {app.status === 'submitted' && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => app.id && acceptMutation.mutate(app.id)}
-                      disabled={acceptMutation.isPending || declineMutation.isPending}
-                      className="font-sans text-sm bg-amber text-ink font-medium px-4 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => app.id && declineMutation.mutate(app.id)}
-                      disabled={acceptMutation.isPending || declineMutation.isPending}
-                      className="font-sans text-sm text-clay border border-clay/30 px-4 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-50"
-                    >
-                      Decline
-                    </button>
-                  </div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <ApplicationSlideOver
+        application={selectedApp}
+        formFields={formFields}
+        festivalId={festivalId}
+        onClose={() => setSelectedApp(null)}
+        onAccept={id => acceptMutation.mutate(id)}
+        onDecline={id => declineMutation.mutate(id)}
+        onWaitlist={id => waitlistMutation.mutate(id)}
+        isPending={isPending}
+      />
     </div>
   )
 }
