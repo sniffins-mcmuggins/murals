@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -78,5 +79,56 @@ func TestAddApplicationNote_ForbiddenForNonOwner(t *testing.T) {
 		"/festivals/"+sc.festID+"/applications/"+sc.applicationID+"/notes",
 		`{"content":"sneaky"}`, otherToken)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestAddApplicationNote_CrossFestivalRejected(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	// sc holds a festival owned by sc.orgToken, with one application.
+	sc := setupReviewScenario(t, db)
+
+	// Create a second festival (with its own form) owned by a different organiser.
+	orgID, orgToken := createTestUser(t, db, "notescrossorg@example.com")
+	otherFestID := createTestFestival(t, db, orgID, "notes-other-fest", "open")
+	// Give the second festival its own form so the mismatch check is exercised.
+	createTestApplicationForm(t, db, otherFestID)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/notes",
+		festival.AddApplicationNoteHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Organiser of otherFest tries to post a note on sc's application via their own
+	// festival URL — the application belongs to a different festival, so expect 404.
+	resp := doRequest(t, srv, "POST",
+		"/festivals/"+otherFestID+"/applications/"+sc.applicationID+"/notes",
+		`{"content":"cross-festival sneaky note"}`, orgToken)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestAddApplicationNote_ContentTooLong(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupReviewScenario(t, db)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/notes",
+		festival.AddApplicationNoteHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	longContent := strings.Repeat("a", 5001)
+	resp := doRequest(t, srv, "POST",
+		"/festivals/"+sc.festID+"/applications/"+sc.applicationID+"/notes",
+		`{"content":"`+longContent+`"}`, sc.orgToken)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
 	_ = resp.Body.Close()
 }

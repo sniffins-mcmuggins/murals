@@ -50,6 +50,30 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Verify the application exists and belongs to this festival.
+		app, err := q.GetApplicationByID(r.Context(), appUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+		festForm, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+		if app.FormID != festForm.ID {
+			httperr.NotFound(w)
+			return
+		}
+
 		var req struct {
 			Content string `json:"content"`
 		}
@@ -57,8 +81,13 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.BadRequest(w, "invalid request body")
 			return
 		}
-		if strings.TrimSpace(req.Content) == "" {
+		req.Content = strings.TrimSpace(req.Content)
+		if req.Content == "" {
 			httperr.UnprocessableEntity(w, "content is required")
+			return
+		}
+		if len(req.Content) > 5000 {
+			httperr.UnprocessableEntity(w, "content too long")
 			return
 		}
 
@@ -67,6 +96,10 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Content:       req.Content,
 		})
 		if err != nil {
+			if isFKViolation(err) {
+				httperr.NotFound(w)
+				return
+			}
 			httperr.InternalServerError(w)
 			return
 		}

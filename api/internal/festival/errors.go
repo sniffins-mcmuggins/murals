@@ -14,6 +14,11 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation
 }
 
+func isFKViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation
+}
+
 func pgUUIDFromString(s string) (pgtype.UUID, error) {
 	parsed, err := uuid.Parse(s)
 	if err != nil {
