@@ -252,3 +252,33 @@ export async function setPin(
   })
   if (!res.ok) throw new Error(`Set pin failed: ${res.status}`)
 }
+
+export async function createSpot(
+  token: string,
+  festivalId: string,
+  lat: number,
+  lng: number,
+): Promise<{ spotId: string }> {
+  const res = await fetch(`${API}/festivals/${festivalId}/spots`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ lat, lng }),
+  })
+  if (!res.ok) throw new Error(`createSpot failed: ${res.status} ${await res.text()}`)
+  const data = (await res.json()) as { id: string }
+  return { spotId: data.id }
+}
+
+export async function assignArtistToSpot(
+  token: string,
+  festivalId: string,
+  spotId: string,
+  artistId: string,
+): Promise<void> {
+  const res = await fetch(`${API}/festivals/${festivalId}/spots/${spotId}/artist`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ artist_id: artistId }),
+  })
+  if (!res.ok) throw new Error(`assignArtistToSpot failed: ${res.status} ${await res.text()}`)
+}
