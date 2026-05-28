@@ -2132,6 +2132,67 @@ export interface operations {
             };
         };
     };
+    getAcceptedArtists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted artists with optional pin locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedArtist"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setArtistPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                artistID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: float */
+                    lat: number;
+                    /** Format: float */
+                    lng: number;
+                    w3w?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated accepted artist entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedArtist"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getFestivalSpots: {
         parameters: {
             query?: never;
@@ -2316,67 +2377,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FestivalSpot"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    getAcceptedArtists: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                festivalID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Accepted artists with optional pin locations */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AcceptedArtist"][];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    setArtistPin: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                festivalID: string;
-                artistID: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: float */
-                    lat: number;
-                    /** Format: float */
-                    lng: number;
-                    w3w?: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Updated accepted artist entry */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AcceptedArtist"];
                 };
             };
             401: components["responses"]["Unauthorized"];
