@@ -49,6 +49,11 @@ func WaitlistApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) htt
 			return
 		}
 
+		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+		if !ok {
+			return
+		}
+
 		updated, err := q.UpdateApplicationStatus(r.Context(), sqlcdb.UpdateApplicationStatusParams{
 			ID:     appUUID,
 			Status: sqlcdb.ApplicationStatusWaitlisted,
@@ -62,7 +67,7 @@ func WaitlistApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) htt
 			return
 		}
 
-		sendApplicationNotification(pool, mailer, updated.ArtistID, fest.Name, "waitlisted")
+		sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, "waitlisted")
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toApplicationResponse(updated))

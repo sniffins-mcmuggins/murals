@@ -29,14 +29,18 @@ describe('Organiser ApplicationsReviewPage', () => {
     expect(screen.getByText('Loading…')).toBeInTheDocument()
   })
 
-  it('shows applications list with status badges', async () => {
+  it('shows applications list in tabs with counts', async () => {
     const applications = [
       {
         id: 'app-1',
         form_id: 'form-1',
         artist_id: 'aabbccdd-1234-5678-abcd-111111111111',
         status: 'submitted',
-        answers: { 'Why do you want to participate?': 'I love murals' },
+        shortlisted: false,
+        review_flag: false,
+        rank: 0,
+        answers: {},
+        notes: [],
         created_at: '2026-03-15T10:00:00Z',
         updated_at: '2026-03-15T10:00:00Z',
       },
@@ -45,7 +49,11 @@ describe('Organiser ApplicationsReviewPage', () => {
         form_id: 'form-1',
         artist_id: 'eeff0011-1234-5678-abcd-222222222222',
         status: 'accepted',
+        shortlisted: false,
+        review_flag: false,
+        rank: 0,
         answers: {},
+        notes: [],
         created_at: '2026-02-01T10:00:00Z',
         updated_at: '2026-02-02T10:00:00Z',
       },
@@ -54,7 +62,11 @@ describe('Organiser ApplicationsReviewPage', () => {
         form_id: 'form-1',
         artist_id: 'gghhiijj-1234-5678-abcd-333333333333',
         status: 'declined',
+        shortlisted: false,
+        review_flag: false,
+        rank: 0,
         answers: {},
+        notes: [],
         created_at: '2026-01-10T10:00:00Z',
         updated_at: '2026-01-11T10:00:00Z',
       },
@@ -63,17 +75,23 @@ describe('Organiser ApplicationsReviewPage', () => {
     render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
 
     await waitFor(() => {
-      expect(screen.getByText('submitted')).toBeInTheDocument()
+      // All five tabs are rendered
+      expect(screen.getByText('Pending')).toBeInTheDocument()
+      expect(screen.getByText('Shortlisted')).toBeInTheDocument()
+      expect(screen.getByText('Accepted')).toBeInTheDocument()
+      expect(screen.getByText('Waitlisted')).toBeInTheDocument()
+      expect(screen.getByText('Declined')).toBeInTheDocument()
     })
-    expect(screen.getByText('accepted')).toBeInTheDocument()
-    expect(screen.getByText('declined')).toBeInTheDocument()
+    // Pending tab is active by default — the submitted+non-shortlisted application is visible
+    expect(screen.getByTitle('Shortlist')).toBeInTheDocument()
+    expect(screen.getByText('Accept')).toBeInTheDocument()
   })
 
   it('shows empty state when no applications', async () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false } as unknown as ReturnType<typeof useQuery>)
     render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
     await waitFor(() => {
-      expect(screen.getByText(/No applications yet/)).toBeInTheDocument()
+      expect(screen.getByText('No applications here.')).toBeInTheDocument()
     })
   })
 })

@@ -854,6 +854,218 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/festivals/{festivalID}/applications/{applicationID}/waitlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Waitlist an application */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                    applicationID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Application waitlisted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Application"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/{applicationID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update application flags (shortlisted, review_flag) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                    applicationID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        shortlisted: boolean;
+                        review_flag: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Flags updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Application"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reorder applications within a status bucket */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        status: string;
+                        ids: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Reordered */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/{applicationID}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a note to an application */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                    applicationID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        content: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Note created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApplicationNote"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/artists/accepted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        /** List accepted artists for a festival (map editor) */
+        get: operations["getAcceptedArtists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/artists/{artistID}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                artistID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set or update a pin location for an accepted artist */
+        patch: operations["setArtistPin"];
+        trace?: never;
+    };
     "/festivals/{festivalID}/spots": {
         parameters: {
             query?: never;
@@ -1141,7 +1353,7 @@ export interface components {
             updated_at?: string;
         };
         /** @enum {string} */
-        ApplicationStatus: "submitted" | "accepted" | "declined";
+        ApplicationStatus: "submitted" | "accepted" | "declined" | "waitlisted";
         Application: {
             /** Format: uuid */
             id?: string;
@@ -1150,11 +1362,29 @@ export interface components {
             /** Format: uuid */
             artist_id?: string;
             status?: components["schemas"]["ApplicationStatus"];
+            rank?: number;
+            shortlisted?: boolean;
+            review_flag?: boolean;
             answers?: Record<string, never>;
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+            artist?: components["schemas"]["ApplicationArtist"];
+            notes?: components["schemas"]["ApplicationNote"][];
+        };
+        ApplicationArtist: {
+            display_name?: string;
+            avatar_s3_key?: string | null;
+            medium_tags?: string[];
+            location_label?: string | null;
+        };
+        ApplicationNote: {
+            /** Format: uuid */
+            id?: string;
+            content?: string;
+            /** Format: date-time */
+            created_at?: string;
         };
         MapPin: {
             /**
@@ -1198,6 +1428,16 @@ export interface components {
         FestivalSpotsResponse: {
             spots: components["schemas"]["FestivalSpot"][];
             unassigned_artists: components["schemas"]["UnassignedArtist"][];
+        };
+        AcceptedArtist: {
+            /** Format: uuid */
+            artist_id?: string;
+            name?: string;
+            /** Format: float */
+            pin_lat?: number | null;
+            /** Format: float */
+            pin_lng?: number | null;
+            w3w?: string | null;
         };
         ProfileListResponse: {
             profiles: components["schemas"]["ArtistProfile"][];
@@ -1890,6 +2130,67 @@ export interface operations {
                     "application/json": components["schemas"]["ProfileListResponse"];
                 };
             };
+        };
+    };
+    getAcceptedArtists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted artists with optional pin locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedArtist"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setArtistPin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                artistID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: float */
+                    lat: number;
+                    /** Format: float */
+                    lng: number;
+                    w3w?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated accepted artist entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedArtist"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getFestivalSpots: {

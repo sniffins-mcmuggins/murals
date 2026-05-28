@@ -50,6 +50,10 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if _, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID); !ok {
+			return
+		}
+
 		var req struct {
 			Shortlisted bool `json:"shortlisted"`
 			ReviewFlag  bool `json:"review_flag"`
@@ -121,6 +125,29 @@ func ReorderApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if len(req.IDs) == 0 {
 			w.WriteHeader(http.StatusNoContent)
 			return
+		}
+
+		validStatuses := map[string]bool{"submitted": true, "accepted": true, "waitlisted": true, "declined": true}
+		if !validStatuses[req.Status] {
+			httperr.BadRequest(w, "invalid status")
+			return
+		}
+
+		// Verify each application belongs to this festival and has the expected status.
+		for _, idStr := range req.IDs {
+			appUUID, err := pgUUIDFromString(idStr)
+			if err != nil {
+				httperr.BadRequest(w, "invalid application id: "+idStr)
+				return
+			}
+			app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+			if !ok {
+				return
+			}
+			if string(app.Status) != req.Status {
+				httperr.BadRequest(w, "application status mismatch: "+idStr)
+				return
+			}
 		}
 
 		tx, err := pool.Begin(r.Context())

@@ -70,7 +70,21 @@ func TestListApplications(t *testing.T) {
 	var list []map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
 	_ = resp.Body.Close()
-	assert.Len(t, list, 1)
+	require.Len(t, list, 1)
+
+	app := list[0]
+	assert.Equal(t, sc.applicationID, app["id"])
+	// Artist summary is present
+	artist, ok := app["artist"].(map[string]any)
+	require.True(t, ok, "artist field missing or wrong type")
+	assert.Equal(t, "Review Artist", artist["display_name"])
+	// Notes array is present and empty initially
+	notes, ok := app["notes"].([]any)
+	require.True(t, ok, "notes field missing or wrong type")
+	assert.Empty(t, notes)
+	// New fields present
+	assert.Equal(t, false, app["shortlisted"])
+	assert.Equal(t, false, app["review_flag"])
 }
 
 func TestAcceptApplication(t *testing.T) {
@@ -80,7 +94,7 @@ func TestAcceptApplication(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db, auth.NoopMailer{}))
 
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
@@ -100,7 +114,7 @@ func TestDeclineApplication(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db, auth.NoopMailer{}))
 
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)

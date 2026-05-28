@@ -1,4 +1,6 @@
-ALTER TYPE application_status ADD VALUE 'waitlisted';
+-- ALTER TYPE ADD VALUE is safe in a transaction on Postgres 12+ when the new value
+-- is not used within the same transaction. This migration only declares the value.
+ALTER TYPE application_status ADD VALUE IF NOT EXISTS 'waitlisted';
 
 ALTER TABLE applications
   ADD COLUMN rank        int  NOT NULL DEFAULT 0,
@@ -11,3 +13,5 @@ CREATE TABLE application_notes (
   content        text        NOT NULL,
   created_at     timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_application_notes_application_id ON application_notes (application_id);

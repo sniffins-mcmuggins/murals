@@ -47,8 +47,8 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 
 	// Review
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(db))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db, auth.NoopMailer{}))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db, auth.NoopMailer{}))
 
 	// Map
 	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(db))
