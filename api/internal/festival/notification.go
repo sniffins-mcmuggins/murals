@@ -14,7 +14,7 @@ import (
 
 // sendApplicationNotification emails the artist about a status change.
 // Runs in a detached goroutine — errors are logged, never propagated.
-func sendApplicationNotification(pool *pgxpool.Pool, mailer auth.EmailSender, artistID pgtype.UUID, festivalName, status string) { //nolint:unused // called from upcoming status handlers (Tasks 5, 10)
+func sendApplicationNotification(pool *pgxpool.Pool, mailer auth.EmailSender, artistID pgtype.UUID, festivalName, status string) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

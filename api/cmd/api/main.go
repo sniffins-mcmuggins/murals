@@ -170,8 +170,8 @@ func main() {
 
 	// Review
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool, mailer))
+	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool, mailer))
 
 	// Spots (map editor)
 	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))

@@ -93,7 +93,7 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // AcceptApplicationHandler handles POST /festivals/{festivalID}/applications/{applicationID}/accept.
 // Updates application status to 'accepted' and upserts a festival_artist record.
-func AcceptApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
+func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
@@ -157,13 +157,15 @@ func AcceptApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, "accepted")
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toApplicationResponse(updated))
 	}
 }
 
 // DeclineApplicationHandler handles POST /festivals/{festivalID}/applications/{applicationID}/decline.
-func DeclineApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
+func DeclineApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
@@ -209,6 +211,8 @@ func DeclineApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.InternalServerError(w)
 			return
 		}
+
+		sendApplicationNotification(pool, mailer, updated.ArtistID, fest.Name, "declined")
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toApplicationResponse(updated))
