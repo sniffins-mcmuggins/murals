@@ -36,12 +36,23 @@ Read each PR title, body, and changed files list to understand what was added or
 
 Read all e2e test files to map what's already exercised:
 
-- `e2e/api/golden-path.test.ts` — sequential API integration tests (18 `it()` blocks, shared state via top-level `let`)
-- `e2e/browser/application-flow.spec.ts`
-- `e2e/browser/artist-onboarding.spec.ts`
-- `e2e/browser/organiser-setup.spec.ts`
-- `e2e/browser/public-visitor.spec.ts`
-- `e2e/fixtures/helpers.ts` — available test utilities
+**API (Vitest) — read all `e2e/api/*.test.ts` files:**
+```bash
+ls e2e/api/*.test.ts
+```
+Key files and their focus areas:
+- `golden-path.test.ts` — sequential happy-path (18 `it()` blocks, shared state)
+- `authorization-isolation.test.ts` — IDOR and cross-user resource access
+- `admin-auth.test.ts` — RequireAdmin middleware wiring, demoted admin, MFA gate
+- `admin-promo.test.ts` — promo code validation, concurrent redemption race
+- `billing-guards.test.ts` — RequirePlan middleware, access_grant fallback (B7)
+- `application-review.test.ts` — waitlist/patch/reorder/notes workflow
+- `auth-*.test.ts` — login, MFA, password reset, edge cases
+
+**Browser (Playwright) — read all `e2e/browser/*.spec.ts` files:**
+- `application-flow.spec.ts`, `artist-onboarding.spec.ts`, `organiser-setup.spec.ts`, `public-visitor.spec.ts`
+
+**Also read:** `e2e/fixtures/helpers.ts` — available HTTP helpers and `e2e/fixtures/auth-flows.ts` — `injectResetToken`, `resetPassword`, `enrollMFA`.
 
 Note which routes, user roles, and scenarios are already covered. Pay attention to what's tested for *rejection* (403s, 401s, 422s) as well as *acceptance* — negative path coverage is the most common gap.
 
@@ -80,6 +91,8 @@ These don't need full concurrent test infrastructure — two rapid sequential re
 For sensitive endpoints (login, signup, forgot-password, promo redemption, any endpoint that triggers external comms):
 - Is there a test that **exceeds the rate limit threshold** and verifies a 429?
 - Is there a test that confirms the limit resets correctly?
+
+**Feasibility caveat:** The test stack sets `LOGIN_RATE_LIMIT_BURST=200`. A 429 test for a rate-limited endpoint requires firing 200+ requests, which would exhaust the shared IP bucket and cause other parallel tests to fail. If the threshold is >20, flag the gap as a known limitation rather than creating an issue — document it in the test file with a comment (see `admin-promo.test.ts` for the precedent). Only create an issue if there's a practical way to test it in isolation (e.g., a dedicated test-only endpoint with a configurable per-route limit).
 
 ### Lens 5: Input validation edges
 
@@ -216,6 +229,20 @@ EOF
 | Browser test runner | Playwright (Chromium) — `npx playwright test` |
 | Both | `task e2e` (API first, then browser) |
 | Unique data | Always `const suffix = Date.now()` |
-| Helpers | `createArtist(suffix)`, `createOrganiser(suffix)`, `loginAs(browser, email, password, baseURL)`, `uploadImage(token, collectionId)` |
+| HTTP helpers | `createArtist(suffix)`, `createOrganiser(suffix)`, `loginAs(browser, email, password, baseURL)`, `uploadImage(token, collectionId)` |
+| DB access | `import { Client } from 'pg'` — `DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'` |
+| JWT minting | `signHS256(payload, JWT_SECRET)` — defined in `auth-edge-cases.test.ts`, `admin-auth.test.ts`, `admin-promo.test.ts`. Copy the function into any new file that needs it. |
+| Auth fixtures | `injectResetToken(email)`, `resetPassword(token, newPassword)`, `enrollMFA(token)` — from `e2e/fixtures/auth-flows.ts` |
 | API URL in tests | `process.env.API_URL` or `http://localhost:8080` |
 | Stack must be running | `task up` before either runner |
+
+## Rate limit constraint for test sketches
+
+**Do not use `createArtist` in test sketches for auth-rejection or IDOR tests.** `createArtist` calls `/auth/login` which is rate-limited (burst 200 across all parallel workers). With 16+ test files running concurrently, unnecessary login calls exhaust the burst and cause `Login failed: 429` failures in unrelated tests.
+
+**Use `signupAndMint` instead** for any test that just needs a valid token:
+- Auth rejection tests (does this endpoint return 403 for a non-admin?)
+- IDOR tests (does user A get 403 when hitting user B's resource?)
+- Input validation tests (does this endpoint return 422 for bad input?)
+
+`signupAndMint` calls `/auth/signup` (not rate-limited) then mints a JWT via `signHS256` using a DB query. It requires a `pg Client` — see `admin-auth.test.ts` or `billing-guards.test.ts` for the pattern. The only case where you need `createArtist` (real login) is when the test is asserting something about the login flow or session_version revocation.

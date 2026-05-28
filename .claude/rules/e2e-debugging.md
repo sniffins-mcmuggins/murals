@@ -220,6 +220,41 @@ Audit: `lib/auth-server.ts`, any `page.tsx` doing `fetch()`. Client components k
 
 `web/src/components/DynamicForm.tsx` must key answers by `field.id` (with `field.label` as fallback). The API validates `answers[field.id]`. If you ever see a form submission "succeed" client-side but `submit application` 422s with missing required fields, the form is keying by `label`.
 
+### `Login failed: 429` across many tests when running the full suite
+
+Symptom: Many tests in different files fail simultaneously with `Login failed: 429` — the error comes from the `createUser` helper throwing when `/auth/login` returns 429.
+
+Root cause: The test stack's rate limit burst (`LOGIN_RATE_LIMIT_BURST`) is exhausted by too many concurrent `/auth/login` calls across parallel Vitest workers. With 16 files running in parallel, the combined login load can exceed the burst even within a few seconds.
+
+**Step 1 — confirm the running config:**
+```bash
+docker compose -f infra/docker-compose.yml exec api env | grep RATE
+# Should show: LOGIN_RATE_LIMIT_BURST=200, LOGIN_RATE_LIMIT_PER_MIN=300
+# If lower, update docker-compose.yml and recreate the container:
+docker compose -f infra/docker-compose.yml up -d --no-deps api
+```
+
+**Step 2 — check new test files for unnecessary login calls:**
+
+Only call `/auth/login` (via `createArtist` / `createOrganiser`) when you're testing the login flow itself or need a real session token with a known `session_version`. For any other test — IDOR checks, auth rejection, input validation — use `signupAndMint` instead:
+
+```typescript
+// signupAndMint: signup (not rate-limited) + DB query + signHS256
+// Requires a pg Client (copy the pattern from admin-auth.test.ts or billing-guards.test.ts)
+const email = `test-${suffix}@e2e.test`
+await fetch(`${API}/auth/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password: 'testpass123' }) })
+const { rows } = await db.query<{ id: string; session_version: number }>(
+  'SELECT id, session_version FROM users WHERE email = $1', [email])
+const { id: userId, session_version: sv } = rows[0]
+const now = Math.floor(Date.now() / 1000)
+const token = signHS256({ sub: userId, sv, iat: now, exp: now + 3600 }, JWT_SECRET)
+```
+
+`signHS256` is defined identically in `auth-edge-cases.test.ts`, `admin-auth.test.ts`, and `admin-promo.test.ts`. Copy it into any new file that needs it — do not add it to `helpers.ts` since it requires a DB client and `JWT_SECRET` which are file-local concerns.
+
+The `signupAndMint` token is valid for auth middleware (sv matches the DB) and becomes invalid after `resetPassword` (sv is bumped). The only case where you need a real login is when the test is asserting the login flow itself.
+
 ### Map test can't find the spot panel
 
 `MapEditorClient.tsx` (organiser map editor) renders a custom side panel with `[data-testid="spot-panel"]`, never `.leaflet-popup`. Markers do use Leaflet `<Popup>` for a brief hover tooltip, but the full edit panel is `spot-panel`.
