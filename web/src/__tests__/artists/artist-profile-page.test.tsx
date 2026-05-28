@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type React from 'react'
 import type { components } from '@render/api-client'
 
 vi.mock('@/lib/api', () => ({
@@ -12,6 +13,11 @@ vi.mock('next/navigation', () => ({
     throw new Error('NEXT_NOT_FOUND')
   }),
   redirect: vi.fn(),
+}))
+
+vi.mock('next/link', () => ({
+  default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) =>
+    ({ type: 'a', props: { href, className, children } }),
 }))
 
 // Import after mocks are set up
@@ -86,6 +92,31 @@ describe('ArtistPage', () => {
     expect(html).toContain('mural')
     expect(html).toContain('stencil')
     expect(html).toContain('Bristol 2024')
+  })
+
+  it('renders collections as a scroll strip with links to collection detail pages', async () => {
+    mockGet
+      .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
+      .mockResolvedValueOnce(makeOkResponse([mockCollection]) as never)
+
+    const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
+
+    const html = JSON.stringify(result)
+    // Collection detail link uses artist id + collection id
+    expect(html).toContain('/artists/profile-uuid-123/collections/collection-uuid-789')
+    // Status badge
+    expect(html).toContain('Active')
+  })
+
+  it('hides the collections section when the artist has no collections', async () => {
+    mockGet
+      .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never)
+
+    const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
+
+    const html = JSON.stringify(result)
+    expect(html).not.toContain('Collections')
   })
 
   it('does not call notFound() when the profile is found', async () => {
