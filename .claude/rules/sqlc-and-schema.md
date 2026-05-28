@@ -14,6 +14,8 @@ When you add a column to a table (say `users.session_version`), the change rippl
 
 The sqlc generator does (2) and (3) automatically if you run `sqlc generate`. The footgun is hand-editing `*.sql.go` files (which happens when you don't have sqlc locally, or when you're in a worktree). After a hand edit, **grep for every `row.Scan(` in the affected `*.sql.go` file** and verify the field count matches. The compiler won't catch a missing `&i.NewField` — it'll just leave the field at zero value at runtime.
 
+**`task api:test` passing does NOT confirm the column is scanned.** Unit tests seed state through the ORM and then read it back — but if the SELECT column list is wrong, the struct field stays at zero and the test simply asserts that zero is zero. The only test that catches a missing Scan is one that (a) inserts a non-zero value via raw SQL or a PATCH endpoint, and (b) reads it back via the actual API and asserts the non-zero value appears in the JSON. Add this kind of e2e assertion when adding columns that are user-visible in API responses.
+
 Concretely, for a new column `foo` on `users`:
 
 ```bash
@@ -60,4 +62,5 @@ The `.down.sql` must reverse the up exactly. New `DROP COLUMN`s and `DROP TABLE`
 - [ ] Cross-file check: any other `*.sql.go` returning the same table type (e.g. `password_reset.sql.go` returning `users.*`) is also updated.
 - [ ] New unique-constrained INSERT that can race: uses `ON CONFLICT (...) WHERE ... DO UPDATE SET <col> = EXCLUDED.<col> RETURNING *`.
 - [ ] If the unique index is partial: the `ON CONFLICT` includes the same `WHERE` clause.
-- [ ] `task api:test` passes (testcontainers runs the migration and exercises the queries — this is the fast canary).
+- [ ] `task api:test` passes (testcontainers runs the migration and exercises the queries).
+- [ ] If new columns are user-visible in API responses: there is an e2e test that inserts a non-zero value and asserts it appears in the API JSON (not just that the field exists at zero).

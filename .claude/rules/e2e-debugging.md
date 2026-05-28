@@ -8,9 +8,11 @@ Two runners, one Compose stack. Stack must be running first — neither runner m
 
 | Layer | Runner | Files | Command |
 |---|---|---|---|
-| API gate | Vitest | `e2e/api/golden-path.test.ts` (one file, 18 sequential `it(...)`) | `task e2e:api` |
+| API gate | Vitest | `e2e/api/*.test.ts` (multiple files, run in parallel by Vitest) | `task e2e:api` |
 | Browser | Playwright (Chromium only) | `e2e/browser/*.spec.ts` (4 specs, parallel by file) | `npx playwright test` |
 | Both, in order | — | API gate then browser | `task e2e` |
+
+The API gate is not just `golden-path.test.ts`. It runs all `e2e/api/*.test.ts` files, which includes (at time of writing): `golden-path.test.ts`, `authorization-isolation.test.ts`, `billing-guards.test.ts`, `admin-auth.test.ts`, `admin-promo.test.ts`, `application-review.test.ts`. When a file is named in a failure, run only that file.
 
 Stack control: `task up` / `task down`. Reset DB: `task db:migrate`.
 
@@ -44,9 +46,11 @@ npx playwright test --headed                            # show the browser (watc
 npx playwright test --debug                             # step through with the Playwright Inspector
 npx playwright test --ui                                # interactive UI mode (best for selector debugging)
 
-# Single Vitest block (golden-path uses sequential `it()` blocks)
-npx vitest run e2e/api/golden-path.test.ts -t "presign"
-npx vitest run e2e/api/golden-path.test.ts -t "8\\."    # by number prefix
+# Single Vitest file or block
+npx vitest run e2e/api/golden-path.test.ts              # run one test file
+npx vitest run e2e/api/admin-auth.test.ts               # same for any other file
+npx vitest run e2e/api/golden-path.test.ts -t "presign" # filter by test name
+npx vitest run e2e/api/golden-path.test.ts -t "8\\."    # by number prefix (golden-path is sequential)
 
 # After a failure — the report and trace already exist on disk
 npx playwright show-report                              # opens HTML report (last run)
@@ -219,6 +223,39 @@ Audit: `lib/auth-server.ts`, any `page.tsx` doing `fetch()`. Client components k
 ### Map test can't find the spot panel
 
 `MapEditorClient.tsx` (organiser map editor) renders a custom side panel with `[data-testid="spot-panel"]`, never `.leaflet-popup`. Markers do use Leaflet `<Popup>` for a brief hover tooltip, but the full edit panel is `spot-panel`.
+
+### Chi route order: literal segment parsed as UUID parameter → 400
+
+Symptom: `POST /festivals/{id}/applications/reorder` returns 400 with an "invalid UUID" error message.
+
+Root cause: chi matches routes top-to-bottom within a group. If `/applications/{applicationID}` is registered before `/applications/reorder`, chi parses the literal string `"reorder"` as the `{applicationID}` parameter and the handler's UUID parse fails.
+
+Fix: in `api/cmd/api/main.go`, register every literal sub-path **before** the parameterized one:
+
+```go
+r.Post("/applications/reorder", ...)    // must come FIRST
+r.Post("/applications/{applicationID}/waitlist", ...)
+r.Patch("/applications/{applicationID}", ...)
+```
+
+Any time you add a new literal path alongside an existing `{id}` route, check the registration order.
+
+### sqlc scan mismatch: new DB columns silently return zero values
+
+Symptom: a migration added columns (e.g. `rank`, `shortlisted`, `review_flag`) and `task api:test` passes, but the API JSON response shows those fields as `0` / `false` regardless of what's in the DB.
+
+Root cause: the sqlc-generated `*.sql.go` SELECT queries and `row.Scan()` calls were not updated after the migration. The struct has the new fields, but the SELECT doesn't list them and Scan() doesn't fill them — they silently stay at zero values.
+
+Fix: `task db:generate` to regenerate all queries, then grep-verify (per `sqlc-and-schema.md`):
+
+```bash
+# Both counts must equal the number of columns in the table
+grep -c '&i\.' api/internal/sqlcdb/applications.sql.go
+```
+
+If `task db:generate` isn't available (worktree, no sqlc binary), hand-edit every SELECT column list and every `row.Scan()` in every `*.sql.go` that touches the affected table, then run the grep check.
+
+**Canary:** write an e2e test that asserts the new field appears in the API response with a non-zero value after inserting a non-zero value. Unit tests with pre-seeded state won't catch this — they never scan the column.
 
 ## Test data conventions
 

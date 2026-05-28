@@ -53,6 +53,39 @@ Fix: every INSERT keyed on `(oauth_provider, oauth_subject)` uses `ON CONFLICT (
 
 This applies to any future provider — if you add Microsoft, GitHub, etc., the same ON CONFLICT pattern goes on the new INSERT.
 
+## `is_admin` must come from the DB, not the JWT claim
+
+`RequireAdmin` in `api/internal/admin/middleware.go` fetches the user row to check `mfa_enabled`. It must also use that live `user.IsAdmin` value — NOT `principal.IsAdmin` (which comes from the JWT). If `RequireAdmin` checks the JWT claim, a demoted admin's existing token (TTL up to 7 days) still grants full access because the JWT still carries `is_admin: true`.
+
+**The correct guard:**
+```go
+// After DB lookup succeeds:
+if !user.IsAdmin {
+    httperr.Forbidden(w)
+    return
+}
+if !user.MfaEnabled { ... }
+```
+
+**Do not** increment `session_version` on demotion as a workaround — that requires every future demotion path to remember to call it. Read the live value instead.
+
+**Admin-triggered password reset: session revocation is intentionally deferred.** `TriggerPasswordResetHandler` fires a goroutine that creates a reset token but does NOT call `IncrementSessionVersion`. Session revocation only happens when the user clicks the reset link and calls `ResetPasswordHandler`. This is deliberate: revocation proves the user received the email. If you want immediate revocation on admin trigger, add `IncrementSessionVersion` in the handler and document the policy change.
+
+## Route groups with middleware require an e2e probe
+
+Unit tests in `api/internal/admin/*_test.go` inject `auth.WithUserForTest()` directly into the request context, bypassing the JWT middleware and `RequireAdmin`. If `r.Use(admin.RequireAdmin(pool))` were accidentally removed from the route group in `main.go`, every unit test would still pass.
+
+For every new protected route group, the **first** e2e test must be an unauthenticated HTTP request to confirm the middleware is actually wired:
+
+```typescript
+it('GET /admin/users without token → 401', async () => {
+  const res = await fetch(`${API}/admin/users`)
+  expect(res.status).toBe(401)
+})
+```
+
+This test has no DB seeding and catches dropped `r.Use(...)` calls that no unit test would detect.
+
 ## Pre-merge checklist for auth changes
 
 - [ ] If you added a new OAuth provider: `email_verified` (or equivalent) is checked before linking to an existing account.
@@ -61,4 +94,6 @@ This applies to any future provider — if you add Microsoft, GitHub, etc., the 
 - [ ] If you added a flow that should invalidate sessions: it calls `IncrementSessionVersion`.
 - [ ] If you added a rate-limited endpoint: it's in the `r.Use(auth.RateLimitMiddleware)` group, not registered separately.
 - [ ] If you added an INSERT on `users` keyed on `(oauth_provider, oauth_subject)`: it uses `ON CONFLICT`.
+- [ ] If you touched `RequireAdmin`: it reads `user.IsAdmin` from the DB row, not `principal.IsAdmin` from the JWT.
+- [ ] If you added a new protected route group: there is an unauthenticated e2e probe that returns 401.
 - [ ] `task api:test` passes — `TestMiddleware_StaleSessionVersionRejected` and `TestResetPassword_InvalidatesOldSessions` are the canaries for the session_version path.
