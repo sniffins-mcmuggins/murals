@@ -147,6 +147,57 @@ func TestRequirePlan_BasicSubFailsWhenProRequired(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
+func TestRequirePlan_InsufficientTier_WithGrant_PassesThrough(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	q := sqlcdb.New(db)
+	ctx := context.Background()
+
+	user, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
+		Email:        "tier-upgrade-" + uuid.NewString() + "@test",
+		PasswordHash: ptr("x"),
+	})
+	require.NoError(t, err)
+
+	// Give user an artist_basic subscription (lower tier than required).
+	subID := "sub_test_" + uuid.NewString()
+	_, err = q.UpsertSubscription(ctx, sqlcdb.UpsertSubscriptionParams{
+		UserID:               user.ID,
+		FestivalID:           pgtype.UUID{},
+		StripeSubscriptionID: &subID,
+		StripePriceID:        "price_test",
+		Plan:                 "artist_basic",
+		BillingInterval:      "year",
+		Status:               "active",
+		CurrentPeriodEnd:     pgtype.Timestamptz{},
+	})
+	require.NoError(t, err)
+
+	// Also give user an artist_pro grant (higher tier).
+	_, err = q.CreateAccessGrant(ctx, sqlcdb.CreateAccessGrantParams{
+		UserID:     user.ID,
+		Plan:       "artist_pro",
+		ValidUntil: pgtype.Timestamptz{Time: time.Now().Add(30 * 24 * time.Hour), Valid: true},
+	})
+	require.NoError(t, err)
+
+	called := false
+	handler := billing.RequirePlan(db, "artist_pro")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	r := httptest.NewRequestWithContext(
+		auth.WithUserForTest(t.Context(), uuid.UUID(user.ID.Bytes).String(), false),
+		http.MethodGet, "/", nil,
+	)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	assert.True(t, called, "artist_pro grant should pass even with only artist_basic subscription")
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
 func TestRequirePlan_ActiveGrant_PassesThrough(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

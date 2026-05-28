@@ -88,6 +88,37 @@ func TestCreateGrantHandler_InvalidPlan_Returns400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestCreateGrantHandler_FestivalActivation_RequiresFestivalID(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	q := sqlcdb.New(db)
+	ctx := context.Background()
+
+	suffix := uuid.NewString()
+	target, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
+		Email: "grant-festival-" + suffix + "@test", PasswordHash: ptr("x"),
+	})
+	require.NoError(t, err)
+	adminUser, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
+		Email: "admin-festival-" + suffix + "@test", PasswordHash: ptr("x"),
+	})
+	require.NoError(t, err)
+
+	body, _ := json.Marshal(map[string]any{"plan": "festival_activation", "duration_days": 30})
+	r := chi.NewRouter()
+	r.Post("/admin/users/{userID}/grants", admin.CreateGrantHandler(db))
+	req := httptest.NewRequestWithContext(
+		adminCtx(t, adminUser.ID.String()),
+		http.MethodPost, "/admin/users/"+target.ID.String()+"/grants",
+		bytes.NewReader(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestRevokeGrantHandler_Returns204(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

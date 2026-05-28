@@ -84,6 +84,10 @@ func CreatePromoCodeHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.BadRequest(w, "invalid plan: must be artist_basic, artist_pro, organiser_setup, or festival_activation")
 			return
 		}
+		if req.Plan == "festival_activation" {
+			httperr.BadRequest(w, "festival_activation plan is not supported for promo codes; use direct admin grants instead")
+			return
+		}
 		if req.DurationDays <= 0 {
 			httperr.BadRequest(w, "duration_days must be positive")
 			return

@@ -89,7 +89,7 @@ func CreateGrantHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				httperr.NotFound(w)
 				return
 			}
-			slog.Error("admin: create grant: user lookup", "err", err)
+			slog.Error("admin: create grant: user lookup", "err", err, "user_id", userIDStr)
 			httperr.InternalServerError(w)
 			return
 		}
@@ -104,7 +104,7 @@ func CreateGrantHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			Note:        note,
 		})
 		if err != nil {
-			slog.Error("admin: create grant", "err", err)
+			slog.Error("admin: create grant", "err", err, "user_id", userIDStr)
 			httperr.InternalServerError(w)
 			return
 		}

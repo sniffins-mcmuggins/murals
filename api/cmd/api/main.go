@@ -103,13 +103,15 @@ func main() {
 	r.Handle("/metrics", metrics.Handler())
 	r.Post("/auth/signup", auth.SignupHandler(pool))
 
-	// Rate-limited auth routes (5/min per IP) — login, password reset, and MFA verify.
+	// Rate-limited auth routes (5/min per IP) — login, password reset, MFA verify,
+	// and promo redemption (prevents bulk code enumeration).
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RateLimitMiddleware)
 		r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
 		r.Post("/auth/forgot-password", auth.ForgotPasswordHandler(pool, mailer, cfg.WebPublicBase))
 		r.Post("/auth/reset-password", auth.ResetPasswordHandler(pool))
 		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
+		r.Post("/promo/redeem", admin.RedeemPromoHandler(pool))
 	})
 
 	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
@@ -211,9 +213,6 @@ func main() {
 		r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
 		r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
 	})
-
-	// User-facing promo redemption (normal auth, no admin role required).
-	r.Post("/promo/redeem", admin.RedeemPromoHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
