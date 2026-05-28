@@ -651,7 +651,7 @@ type ServerInterface interface {
 	// Create a new spot
 	// (POST /festivals/{festivalID}/spots)
 	CreateFestivalSpot(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
-	// Delete a spot (unassigns any assigned artist first)
+	// Delete a spot (idempotent — always 204 whether spot existed or not)
 	// (DELETE /festivals/{festivalID}/spots/{spotID})
 	DeleteFestivalSpot(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, spotID openapi_types.UUID)
 	// Update spot details
@@ -861,7 +861,7 @@ func (_ Unimplemented) CreateFestivalSpot(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Delete a spot (unassigns any assigned artist first)
+// Delete a spot (idempotent — always 204 whether spot existed or not)
 // (DELETE /festivals/{festivalID}/spots/{spotID})
 func (_ Unimplemented) DeleteFestivalSpot(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, spotID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -3969,22 +3969,6 @@ func (response DeleteFestivalSpot403ApplicationProblemPlusJSONResponse) VisitDel
 	return err
 }
 
-type DeleteFestivalSpot404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteFestivalSpot404ApplicationProblemPlusJSONResponse) VisitDeleteFestivalSpotResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type UpdateFestivalSpotRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 	SpotID     openapi_types.UUID `json:"spotID"`
@@ -4005,6 +3989,22 @@ func (response UpdateFestivalSpot200JSONResponse) VisitUpdateFestivalSpotRespons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFestivalSpot400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFestivalSpot400ApplicationProblemPlusJSONResponse) VisitUpdateFestivalSpotResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -4844,7 +4844,7 @@ type StrictServerInterface interface {
 	// Create a new spot
 	// (POST /festivals/{festivalID}/spots)
 	CreateFestivalSpot(ctx context.Context, request CreateFestivalSpotRequestObject) (CreateFestivalSpotResponseObject, error)
-	// Delete a spot (unassigns any assigned artist first)
+	// Delete a spot (idempotent — always 204 whether spot existed or not)
 	// (DELETE /festivals/{festivalID}/spots/{spotID})
 	DeleteFestivalSpot(ctx context.Context, request DeleteFestivalSpotRequestObject) (DeleteFestivalSpotResponseObject, error)
 	// Update spot details

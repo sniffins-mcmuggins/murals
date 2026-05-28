@@ -887,7 +887,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a spot (unassigns any assigned artist first) */
+        /** Delete a spot (idempotent — always 204 whether spot existed or not) */
         delete: operations["deleteFestivalSpot"];
         options?: never;
         head?: never;
@@ -1969,7 +1969,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Deleted */
+            /** @description Deleted (or was already absent) */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -1978,7 +1978,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     updateFestivalSpot: {
@@ -2017,6 +2016,7 @@ export interface operations {
                     "application/json": components["schemas"]["FestivalSpot"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

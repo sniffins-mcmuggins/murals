@@ -1678,6 +1678,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FestivalSpot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1687,19 +1689,17 @@ paths:
     delete:
       operationId: deleteFestivalSpot
       tags: [festival]
-      summary: Delete a spot (unassigns any assigned artist first)
+      summary: Delete a spot (idempotent — always 204 whether spot existed or not)
       security:
         - cookieAuth: []
         - bearerAuth: []
       responses:
         "204":
-          description: Deleted
+          description: Deleted (or was already absent)
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
 
   /festivals/{festivalID}/spots/{spotID}/artist:
     parameters:
