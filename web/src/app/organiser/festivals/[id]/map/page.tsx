@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -11,7 +11,11 @@ import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 
-// Fix default marker icon broken by webpack
+type FestivalSpot = components['schemas']['FestivalSpot']
+type FestivalSpotsResponse = components['schemas']['FestivalSpotsResponse']
+type UnassignedArtist = components['schemas']['UnassignedArtist']
+
+// Fix default Leaflet icon broken by webpack
 const DefaultIcon = L.icon({
   iconUrl: (icon as { src: string }).src,
   shadowUrl: (iconShadow as { src: string }).src,
@@ -21,108 +25,196 @@ const DefaultIcon = L.icon({
 })
 L.Marker.prototype.options.icon = DefaultIcon
 
-type AcceptedArtist = components['schemas']['AcceptedArtist']
+const AmberIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:18px;height:18px;background:#E8A838;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+})
 
-// ─── Map click handler ────────────────────────────────────────────────────────
+const TerracottaIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:18px;height:18px;background:#C45C3A;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+})
 
-type ClickCoords = { lat: number; lng: number }
+// ─── Map click capture ────────────────────────────────────────────────────────
 
-function MapClickCapture({ onMapClick }: { onMapClick: (coords: ClickCoords) => void }) {
+function MapClickCapture({ active, onMapClick }: { active: boolean; onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
-      onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng })
+      if (active) onMapClick(e.latlng.lat, e.latlng.lng)
     },
   })
   return null
 }
 
-// ─── Place-pin panel ──────────────────────────────────────────────────────────
+// ─── Spot panel ───────────────────────────────────────────────────────────────
 
-type PlacePinPanelProps = {
-  coords: ClickCoords
-  artists: AcceptedArtist[]
-  isPending: boolean
-  error: string | null
-  onSave: (artistId: string, w3w: string) => void
-  onCancel: () => void
+type SpotPanelProps = {
+  spot: FestivalSpot
+  unassignedArtists: UnassignedArtist[]
+  festivalId: string
+  onClose: () => void
+  onMutated: () => void
 }
 
-const W3W_RE = /^[a-z]+\.[a-z]+\.[a-z]+$/
+function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: SpotPanelProps) {
+  const [lat, setLat] = useState(String(spot.lat ?? ''))
+  const [lng, setLng] = useState(String(spot.lng ?? ''))
+  const [w3w, setW3w] = useState(spot.w3w ?? '')
+  const [widthM, setWidthM] = useState(spot.width_m != null ? String(spot.width_m) : '')
+  const [heightM, setHeightM] = useState(spot.height_m != null ? String(spot.height_m) : '')
+  const [notes, setNotes] = useState(spot.notes ?? '')
+  const [artistId, setArtistId] = useState(spot.artist_id ?? '')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
-function PlacePinPanel({ coords, artists, isPending, error, onSave, onCancel }: PlacePinPanelProps) {
-  const [selectedArtistId, setSelectedArtistId] = useState('')
-  const [w3w, setW3w] = useState('')
-  const w3wTrimmed = w3w.trim()
-  const w3wInvalid = w3wTrimmed.length > 0 && !W3W_RE.test(w3wTrimmed)
+  // Rebuild local state when the spot prop changes (e.g. after another save)
+  useEffect(() => {
+    setLat(String(spot.lat ?? ''))
+    setLng(String(spot.lng ?? ''))
+    setW3w(spot.w3w ?? '')
+    setWidthM(spot.width_m != null ? String(spot.width_m) : '')
+    setHeightM(spot.height_m != null ? String(spot.height_m) : '')
+    setNotes(spot.notes ?? '')
+    setArtistId(spot.artist_id ?? '')
+  }, [spot.id])
+
+  const artistOptions: UnassignedArtist[] = spot.artist_id
+    ? [{ artist_id: spot.artist_id, name: spot.artist_name ?? spot.artist_id }, ...unassignedArtists]
+    : unassignedArtists
+
+  async function handleSave() {
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const latNum = parseFloat(lat)
+      const lngNum = parseFloat(lng)
+      if (isNaN(latNum) || isNaN(lngNum)) {
+        setSaveError('Lat/lng must be valid numbers')
+        return
+      }
+
+      // Update spot details
+      const patchRes = await apiClient.PATCH('/festivals/{festivalID}/spots/{spotID}', {
+        params: { path: { festivalID: festivalId, spotID: spot.id! } },
+        body: {
+          lat: latNum,
+          lng: lngNum,
+          w3w: w3w.trim() || null,
+          width_m: widthM ? parseFloat(widthM) : null,
+          height_m: heightM ? parseFloat(heightM) : null,
+          notes: notes.trim() || null,
+        },
+      })
+      if (patchRes.error) throw new Error('Failed to update spot')
+
+      // Handle artist assignment change
+      if (artistId && artistId !== spot.artist_id) {
+        const putRes = await apiClient.PUT('/festivals/{festivalID}/spots/{spotID}/artist', {
+          params: { path: { festivalID: festivalId, spotID: spot.id! } },
+          body: { artist_id: artistId },
+        })
+        if (putRes.error) throw new Error('Failed to assign artist')
+      } else if (!artistId && spot.artist_id) {
+        const delRes = await apiClient.DELETE('/festivals/{festivalID}/spots/{spotID}/artist', {
+          params: { path: { festivalID: festivalId, spotID: spot.id! } },
+        })
+        if (delRes.error) throw new Error('Failed to unassign artist')
+      }
+
+      onMutated()
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setSaving(true)
+    const res = await apiClient.DELETE('/festivals/{festivalID}/spots/{spotID}', {
+      params: { path: { festivalID: festivalId, spotID: spot.id! } },
+    })
+    setSaving(false)
+    if (res.error) {
+      setSaveError('Failed to delete spot')
+      return
+    }
+    onMutated()
+    onClose()
+  }
 
   return (
-    <div className="mt-4 p-5 bg-warm border border-light rounded-lg">
-      <h2 className="font-serif text-xl text-ink mb-1">Place pin</h2>
-      <p className="font-mono text-xs text-mid uppercase tracking-widest mb-4">
-        {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
-      </p>
+    <div className="mt-4 p-5 bg-warm border border-light rounded-lg" data-testid="spot-panel">
+      <div className="flex justify-between items-start mb-3">
+        <h2 className="font-serif text-xl text-ink">Spot {spot.number}</h2>
+        <button onClick={onClose} className="font-sans text-xs text-mid hover:text-ink">✕</button>
+      </div>
 
       <div className="space-y-3 max-w-sm">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="font-sans text-xs text-mid block mb-1">Lat</label>
+            <input value={lat} onChange={e => setLat(e.target.value)}
+              className="w-full border border-light rounded-lg px-3 py-2 font-mono text-sm text-ink bg-offwhite focus:outline-none focus:border-amber" />
+          </div>
+          <div className="flex-1">
+            <label className="font-sans text-xs text-mid block mb-1">Lng</label>
+            <input value={lng} onChange={e => setLng(e.target.value)}
+              className="w-full border border-light rounded-lg px-3 py-2 font-mono text-sm text-ink bg-offwhite focus:outline-none focus:border-amber" />
+          </div>
+        </div>
+
         <div>
-          <label htmlFor="artist-select" className="font-sans text-xs text-mid block mb-1">
-            Artist
-          </label>
-          <select
-            id="artist-select"
-            value={selectedArtistId}
-            onChange={e => setSelectedArtistId(e.target.value)}
-            className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
-          >
-            <option value="">— Select artist —</option>
-            {artists.map(a => (
-              <option key={a.artist_id} value={a.artist_id ?? ''}>
-                {a.name ?? a.artist_id ?? 'Unknown artist'}
-                {a.pin_lat != null ? ' (pin set)' : ''}
-              </option>
+          <label className="font-sans text-xs text-mid block mb-1">What3Words (optional)</label>
+          <input value={w3w} onChange={e => setW3w(e.target.value)} placeholder="e.g. filled.count.soap"
+            className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber" />
+        </div>
+
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="font-sans text-xs text-mid block mb-1">Width (m)</label>
+            <input value={widthM} onChange={e => setWidthM(e.target.value)} placeholder="—"
+              className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber" />
+          </div>
+          <div className="flex-1">
+            <label className="font-sans text-xs text-mid block mb-1">Height (m)</label>
+            <input value={heightM} onChange={e => setHeightM(e.target.value)} placeholder="—"
+              className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber" />
+          </div>
+        </div>
+
+        <div>
+          <label className="font-sans text-xs text-mid block mb-1">Notes (internal)</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+            placeholder="e.g. needs cherry picker"
+            className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber resize-none" />
+        </div>
+
+        <div>
+          <label className="font-sans text-xs text-mid block mb-1">Artist</label>
+          <select value={artistId} onChange={e => setArtistId(e.target.value)}
+            className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber">
+            <option value="">— unassigned —</option>
+            {artistOptions.map(a => (
+              <option key={a.artist_id} value={a.artist_id ?? ''}>{a.name}</option>
             ))}
           </select>
         </div>
 
-        <div>
-          <label htmlFor="w3w-input" className="font-sans text-xs text-mid block mb-1">
-            What3Words (optional)
-          </label>
-          <input
-            id="w3w-input"
-            type="text"
-            placeholder="e.g. filled.count.soap"
-            value={w3w}
-            onChange={e => setW3w(e.target.value)}
-            className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
-          />
-        </div>
+        {saveError && <p role="alert" className="font-sans text-sm text-clay">{saveError}</p>}
 
-        {w3wInvalid && (
-          <p className="font-sans text-xs text-clay">
-            W3W must be three words separated by dots (e.g. filled.count.soap)
-          </p>
-        )}
-
-        {error && (
-          <p role="alert" className="font-sans text-sm text-clay">
-            {error}
-          </p>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => onSave(selectedArtistId, w3w)}
-            disabled={!selectedArtistId || isPending || w3wInvalid}
-            className="font-sans text-sm bg-amber text-ink font-medium px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
-            {isPending ? 'Saving…' : 'Save pin'}
+        <div className="flex gap-3 items-center">
+          <button onClick={handleSave} disabled={saving}
+            className="font-sans text-sm bg-amber text-ink font-medium px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
           </button>
-          <button
-            onClick={onCancel}
-            disabled={isPending}
-            className="font-sans text-sm text-mid hover:text-ink px-4 py-2 transition-colors"
-          >
-            Cancel
+          <button onClick={handleDelete} disabled={saving}
+            className="font-sans text-sm text-clay hover:opacity-80 disabled:opacity-50">
+            Delete spot
           </button>
         </div>
       </div>
@@ -130,194 +222,189 @@ function PlacePinPanel({ coords, artists, isPending, error, onSave, onCancel }: 
   )
 }
 
-// ─── Map editor inner component ───────────────────────────────────────────────
+// ─── Map editor ───────────────────────────────────────────────────────────────
 
-function OrgFestivalMapEditor({
-  festivalId,
-  queryClient,
-}: {
-  festivalId: string
-  queryClient: ReturnType<typeof useQueryClient>
-}) {
-  const [pendingCoords, setPendingCoords] = useState<ClickCoords | null>(null)
-  const [pinError, setPinError] = useState<string | null>(null)
+function OrgFestivalMapEditor({ festivalId }: { festivalId: string }) {
+  const queryClient = useQueryClient()
+  const [placingSpot, setPlacingSpot] = useState(false)
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
+  const [placeError, setPlaceError] = useState<string | null>(null)
 
-  const artistsQuery = useQuery({
-    queryKey: ['accepted-artists', festivalId],
+  const spotsQuery = useQuery({
+    queryKey: ['spots', festivalId],
     queryFn: async () => {
-      const res = await apiClient.GET('/festivals/{festivalID}/artists/accepted', {
+      const res = await apiClient.GET('/festivals/{festivalID}/spots', {
         params: { path: { festivalID: festivalId } },
       })
-      if (res.error) throw new Error('Failed to load accepted artists')
-      return (res.data ?? []) as AcceptedArtist[]
+      if (res.error) throw new Error('Failed to load spots')
+      return res.data as FestivalSpotsResponse
     },
   })
 
-  const pinMutation = useMutation({
-    mutationFn: async ({
-      artistId,
-      lat,
-      lng,
-      w3w,
-    }: {
-      artistId: string
-      lat: number
-      lng: number
-      w3w?: string | null
-    }) => {
-      const res = await apiClient.PATCH('/festivals/{festivalID}/artists/{artistID}/pin', {
-        params: { path: { festivalID: festivalId, artistID: artistId } },
-        body: { lat, lng, ...(w3w ? { w3w } : { w3w: null }) },
+  const createSpotMutation = useMutation({
+    mutationFn: async ({ lat, lng }: { lat: number; lng: number }) => {
+      const res = await apiClient.POST('/festivals/{festivalID}/spots', {
+        params: { path: { festivalID: festivalId } },
+        body: { lat, lng },
       })
-      if (res.error) throw new Error('Failed to save pin')
-      return res.data
+      if (res.error) throw new Error('Failed to create spot')
+      return res.data as FestivalSpot
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accepted-artists', festivalId] })
-      setPendingCoords(null)
-      setPinError(null)
+    onSuccess: (spot) => {
+      queryClient.invalidateQueries({ queryKey: ['spots', festivalId] })
+      setPlacingSpot(false)
+      setSelectedSpotId(spot.id ?? null)
+      setPlaceError(null)
     },
-    onError: (err: Error) => setPinError(err.message),
+    onError: (e: Error) => setPlaceError(e.message),
   })
 
-  const artists = artistsQuery.data ?? []
-  const pinnedArtists = artists.filter(a => a.pin_lat != null && a.pin_lng != null)
+  function handleMapClick(lat: number, lng: number) {
+    if (!placingSpot) return
+    createSpotMutation.mutate({ lat, lng })
+  }
 
-  // Default to UK centre if no pins exist yet
-  const center: [number, number] =
-    pinnedArtists.length > 0
-      ? [
-          pinnedArtists.reduce((sum, a) => sum + (a.pin_lat ?? 0), 0) / pinnedArtists.length,
-          pinnedArtists.reduce((sum, a) => sum + (a.pin_lng ?? 0), 0) / pinnedArtists.length,
-        ]
-      : [52.4, -1.5]
+  function handleMutated() {
+    queryClient.invalidateQueries({ queryKey: ['spots', festivalId] })
+  }
 
-  const zoom = pinnedArtists.length > 0 ? 15 : 6
+  const spots = spotsQuery.data?.spots ?? []
+  const unassignedArtists = spotsQuery.data?.unassigned_artists ?? []
+  const selectedSpot = spots.find(s => s.id === selectedSpotId) ?? null
+  const assignedCount = spots.filter(s => s.artist_id).length
+
+  const center: [number, number] = spots.length > 0
+    ? [spots.reduce((s, p) => s + (p.lat ?? 0), 0) / spots.length,
+       spots.reduce((s, p) => s + (p.lng ?? 0), 0) / spots.length]
+    : [52.4, -1.5]
+  const zoom = spots.length > 0 ? 15 : 6
 
   return (
     <div>
-      {/* Back link */}
       <div className="mb-6">
-        <Link
-          href={`/organiser/festivals/${festivalId}`}
-          className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors"
-        >
+        <Link href={`/organiser/festivals/${festivalId}`}
+          className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors">
           ← Festival
         </Link>
       </div>
 
       <h1 className="font-serif text-4xl text-ink mb-2">Map editor</h1>
-      <p className="font-sans text-sm text-mid mb-6">
-        Click anywhere on the map to place a pin for an accepted artist.
-      </p>
 
-      {/* Error loading artists */}
-      {artistsQuery.isError && (
-        <p role="alert" className="font-sans text-sm text-clay mb-4">
-          Failed to load accepted artists.
-        </p>
-      )}
-
-      {/* Loading */}
-      {artistsQuery.isLoading && (
-        <p className="font-sans text-mid text-sm mb-4">Loading…</p>
-      )}
-
-      {/* Map */}
-      {!artistsQuery.isLoading && (
-        <div className="w-full border border-light rounded-lg overflow-hidden" style={{ height: '500px' }}>
-          <MapContainer
-            center={center}
-            zoom={zoom}
-            className="w-full h-full bg-light"
+      <div className="flex gap-6 items-start mt-4">
+        {/* Sidebar */}
+        <div className="w-56 flex-shrink-0">
+          <button
+            onClick={() => { setPlacingSpot(v => !v); setPlaceError(null) }}
+            className={`w-full font-sans text-sm font-medium px-4 py-2 rounded-lg mb-4 transition-colors ${
+              placingSpot
+                ? 'bg-ink text-offwhite'
+                : 'bg-amber text-ink hover:opacity-90'
+            }`}
+            data-testid="add-spot-btn"
           >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            {placingSpot ? 'Click map to place…' : '+ Add spot'}
+          </button>
+
+          {placeError && (
+            <p role="alert" className="font-sans text-xs text-clay mb-3">{placeError}</p>
+          )}
+
+          {spots.length > 0 && (
+            <ul className="space-y-1" data-testid="spots-list">
+              {spots.map(s => (
+                <li key={s.id}>
+                  <button
+                    onClick={() => setSelectedSpotId(s.id === selectedSpotId ? null : (s.id ?? null))}
+                    className={`w-full text-left rounded-lg px-3 py-2 text-sm transition-colors ${
+                      s.id === selectedSpotId
+                        ? 'bg-amber/20 border border-amber'
+                        : 'bg-warm border border-light hover:border-amber'
+                    }`}
+                  >
+                    <span className="font-sans font-medium text-ink">Spot {s.number}</span>
+                    <span className={`ml-2 font-mono text-xs uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+                      s.artist_id ? 'bg-clay text-offwhite' : 'bg-amber/30 text-ink'
+                    }`}>
+                      {s.artist_id ? 'assigned' : 'empty'}
+                    </span>
+                    {s.artist_id && (
+                      <div className="font-sans text-xs text-mid mt-0.5 truncate">{s.artist_name}</div>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {spots.length === 0 && !spotsQuery.isLoading && (
+            <p className="font-sans text-xs text-mid">No spots yet.</p>
+          )}
+
+          {spots.length > 0 && (
+            <p className="font-mono text-xs text-mid uppercase tracking-widest mt-3">
+              {spots.length} spots · {assignedCount} assigned
+            </p>
+          )}
+        </div>
+
+        {/* Map */}
+        <div className="flex-1">
+          {spotsQuery.isError && (
+            <p role="alert" className="font-sans text-sm text-clay mb-4">Failed to load spots.</p>
+          )}
+
+          {!spotsQuery.isLoading && (
+            <div className="border border-light rounded-lg overflow-hidden" style={{ height: '500px' }}>
+              <MapContainer center={center} zoom={zoom} className="w-full h-full bg-light">
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                />
+                <MapClickCapture active={placingSpot} onMapClick={handleMapClick} />
+                {spots.map(s => (
+                  <Marker
+                    key={s.id}
+                    position={[s.lat ?? 0, s.lng ?? 0]}
+                    icon={s.artist_id ? TerracottaIcon : AmberIcon}
+                    eventHandlers={{ click: () => setSelectedSpotId(s.id === selectedSpotId ? null : (s.id ?? null)) }}
+                  >
+                    <Popup>
+                      <span className="font-sans text-sm">
+                        Spot {s.number}{s.artist_name ? ` — ${s.artist_name}` : ''}
+                      </span>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+            </div>
+          )}
+
+          {selectedSpot && (
+            <SpotPanel
+              spot={selectedSpot}
+              unassignedArtists={unassignedArtists}
+              festivalId={festivalId}
+              onClose={() => setSelectedSpotId(null)}
+              onMutated={handleMutated}
             />
-            <MapClickCapture onMapClick={coords => { setPendingCoords(coords); setPinError(null) }} />
-
-            {/* Existing pins */}
-            {pinnedArtists.map(a => (
-              <Marker
-                key={a.artist_id}
-                position={[a.pin_lat as number, a.pin_lng as number]}
-              >
-                <Popup>
-                  <span className="font-sans text-sm text-ink">
-                    {a.name ?? a.artist_id ?? 'Unknown artist'}
-                  </span>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
+          )}
         </div>
-      )}
-
-      {/* Accepted artists list summary */}
-      {!artistsQuery.isLoading && !artistsQuery.isError && artists.length > 0 && (
-        <div className="mt-4">
-          <p className="font-mono text-xs text-mid uppercase tracking-widest mb-2">
-            Accepted artists ({artists.length})
-          </p>
-          <ul className="space-y-1">
-            {artists.map(a => (
-              <li key={a.artist_id} className="flex items-center gap-3">
-                <span className="font-sans text-sm text-ink">
-                  {a.name ?? a.artist_id ?? 'Unknown artist'}
-                </span>
-                {a.pin_lat != null && a.pin_lng != null ? (
-                  <span className="font-mono text-xs text-mid">
-                    {a.pin_lat.toFixed(4)}, {a.pin_lng.toFixed(4)}
-                    {a.w3w ? ` · ///${a.w3w}` : ''}
-                  </span>
-                ) : (
-                  <span className="font-mono text-xs text-mid">no pin</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {!artistsQuery.isLoading && !artistsQuery.isError && artists.length === 0 && (
-        <p className="font-sans text-mid text-sm mt-4">No accepted artists yet.</p>
-      )}
-
-      {/* Place-pin panel */}
-      {pendingCoords && (
-        <PlacePinPanel
-          coords={pendingCoords}
-          artists={artists}
-          isPending={pinMutation.isPending}
-          error={pinError}
-          onSave={(artistId, w3w) => {
-            pinMutation.mutate({
-              artistId,
-              lat: pendingCoords.lat,
-              lng: pendingCoords.lng,
-              w3w: w3w.trim() || null,
-            })
-          }}
-          onCancel={() => { setPendingCoords(null); setPinError(null) }}
-        />
-      )}
+      </div>
     </div>
   )
 }
 
-// ─── Page shell (resolves async params) ──────────────────────────────────────
+// ─── Page shell ───────────────────────────────────────────────────────────────
 
 type Props = { params: Promise<{ id: string }> }
 
 export default function OrgFestivalMapPage({ params }: Props) {
   const [festivalId, setFestivalId] = useState<string | null>(null)
-  const queryClient = useQueryClient()
 
   if (!festivalId) {
     params.then(p => setFestivalId(p.id))
     return <div className="font-sans text-mid text-sm p-8">Loading…</div>
   }
 
-  return <OrgFestivalMapEditor festivalId={festivalId} queryClient={queryClient} />
+  return <OrgFestivalMapEditor festivalId={festivalId} />
 }
