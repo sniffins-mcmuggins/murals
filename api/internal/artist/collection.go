@@ -227,6 +227,89 @@ func UpdateCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
+// ReorderCollectionsHandler handles PUT /collections/order. Requires auth + owner.
+// Body: {"collectionIds": ["uuid1", "uuid2", ...]} — ordered list; sets display_order by position (0-indexed).
+func ReorderCollectionsHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, err := auth.User(r.Context())
+		if err != nil {
+			httperr.Unauthorized(w)
+			return
+		}
+
+		var req struct {
+			CollectionIDs []string `json:"collectionIds"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httperr.BadRequest(w, "invalid request body")
+			return
+		}
+		if len(req.CollectionIDs) == 0 {
+			httperr.UnprocessableEntity(w, "collectionIds must be a non-empty array")
+			return
+		}
+
+		userUUID, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		profile, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
+		if err != nil {
+			httperr.Forbidden(w)
+			return
+		}
+
+		existing, err := q.ListCollectionsByProfileID(r.Context(), profile.ID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		validIDs := make(map[string]bool, len(existing))
+		for _, c := range existing {
+			validIDs[c.ID.String()] = true
+		}
+		for _, id := range req.CollectionIDs {
+			if !validIDs[id] {
+				httperr.UnprocessableEntity(w, "collection not found: "+id)
+				return
+			}
+		}
+
+		tx, err := pool.BeginTx(r.Context(), pgx.TxOptions{})
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		defer func() { _ = tx.Rollback(r.Context()) }()
+		tq := sqlcdb.New(tx)
+
+		for i, idStr := range req.CollectionIDs {
+			collUUID, err := pgUUIDFromString(idStr)
+			if err != nil {
+				httperr.BadRequest(w, "invalid collection id: "+idStr)
+				return
+			}
+			if err := tq.UpdateCollectionOrder(r.Context(), sqlcdb.UpdateCollectionOrderParams{
+				ID:           collUUID,
+				DisplayOrder: int32(i),
+			}); err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // DeleteCollectionHandler handles DELETE /collections/{collectionID}. Requires owner.
 func DeleteCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -394,6 +394,12 @@ type ProfileListResponse struct {
 	Total int `json:"total"`
 }
 
+// ReorderCollectionsRequest defines model for ReorderCollectionsRequest.
+type ReorderCollectionsRequest struct {
+	// CollectionIds Ordered list of collection IDs. display_order is set by position (0-indexed).
+	CollectionIds []openapi_types.UUID `json:"collectionIds"`
+}
+
 // ReorderImagesRequest defines model for ReorderImagesRequest.
 type ReorderImagesRequest struct {
 	// ImageIds Ordered list of image IDs. display_order is set by position (0-indexed).
@@ -588,6 +594,9 @@ type PostAuthSignupJSONRequestBody = SignupRequest
 // PostCollectionsJSONRequestBody defines body for PostCollections for application/json ContentType.
 type PostCollectionsJSONRequestBody = CreateCollectionRequest
 
+// ReorderCollectionsJSONRequestBody defines body for ReorderCollections for application/json ContentType.
+type ReorderCollectionsJSONRequestBody = ReorderCollectionsRequest
+
 // PatchCollectionJSONRequestBody defines body for PatchCollection for application/json ContentType.
 type PatchCollectionJSONRequestBody = UpdateCollectionRequest
 
@@ -659,6 +668,9 @@ type ServerInterface interface {
 	// Create a collection
 	// (POST /collections)
 	PostCollections(w http.ResponseWriter, r *http.Request)
+	// Reorder collections
+	// (PUT /collections/order)
+	ReorderCollections(w http.ResponseWriter, r *http.Request)
 	// Delete a collection
 	// (DELETE /collections/{collectionID})
 	DeleteCollection(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID)
@@ -821,6 +833,12 @@ func (_ Unimplemented) PostAuthSignup(w http.ResponseWriter, r *http.Request) {
 // Create a collection
 // (POST /collections)
 func (_ Unimplemented) PostCollections(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reorder collections
+// (PUT /collections/order)
+func (_ Unimplemented) ReorderCollections(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1160,6 +1178,28 @@ func (siw *ServerInterfaceWrapper) PostCollections(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostCollections(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReorderCollections operation middleware
+func (siw *ServerInterfaceWrapper) ReorderCollections(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderCollections(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2660,6 +2700,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/collections", wrapper.PostCollections)
 	})
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/collections/order", wrapper.ReorderCollections)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/collections/{collectionID}", wrapper.DeleteCollection)
 	})
 	r.Group(func(r chi.Router) {
@@ -2990,6 +3033,54 @@ func (response PostCollections404ApplicationProblemPlusJSONResponse) VisitPostCo
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCollectionsRequestObject struct {
+	Body *ReorderCollectionsJSONRequestBody
+}
+
+type ReorderCollectionsResponseObject interface {
+	VisitReorderCollectionsResponse(w http.ResponseWriter) error
+}
+
+type ReorderCollections204Response struct {
+}
+
+func (response ReorderCollections204Response) VisitReorderCollectionsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ReorderCollections401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderCollections401ApplicationProblemPlusJSONResponse) VisitReorderCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCollections422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ReorderCollections422ApplicationProblemPlusJSONResponse) VisitReorderCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5386,6 +5477,9 @@ type StrictServerInterface interface {
 	// Create a collection
 	// (POST /collections)
 	PostCollections(ctx context.Context, request PostCollectionsRequestObject) (PostCollectionsResponseObject, error)
+	// Reorder collections
+	// (PUT /collections/order)
+	ReorderCollections(ctx context.Context, request ReorderCollectionsRequestObject) (ReorderCollectionsResponseObject, error)
 	// Delete a collection
 	// (DELETE /collections/{collectionID})
 	DeleteCollection(ctx context.Context, request DeleteCollectionRequestObject) (DeleteCollectionResponseObject, error)
@@ -5694,6 +5788,37 @@ func (sh *strictHandler) PostCollections(w http.ResponseWriter, r *http.Request)
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostCollectionsResponseObject); ok {
 		if err := validResponse.VisitPostCollectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReorderCollections operation middleware
+func (sh *strictHandler) ReorderCollections(w http.ResponseWriter, r *http.Request) {
+	var request ReorderCollectionsRequestObject
+
+	var body ReorderCollectionsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReorderCollections(ctx, request.(ReorderCollectionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReorderCollections")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReorderCollectionsResponseObject); ok {
+		if err := validResponse.VisitReorderCollectionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

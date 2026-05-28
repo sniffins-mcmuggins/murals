@@ -310,6 +310,17 @@ components:
           format: uri
           description: The cdnUrl returned by POST /images/confirm.
 
+    ReorderCollectionsRequest:
+      type: object
+      required: [collectionIds]
+      properties:
+        collectionIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Ordered list of collection IDs. display_order is set by position (0-indexed).
+
     ReorderImagesRequest:
       type: object
       required: [imageIds]
@@ -977,6 +988,31 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /collections/order:
+    put:
+      operationId: reorderCollections
+      summary: Reorder collections
+      description: |
+        Accepts an ordered array of collection IDs belonging to the authenticated artist.
+        Sets display_order by position (0-indexed). Returns 204 on success.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderCollectionsRequest"
+      responses:
+        "204":
+          description: Order saved.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 
   /collections/{collectionID}:
     get:
