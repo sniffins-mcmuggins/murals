@@ -22,38 +22,89 @@ type formField struct {
 	Required bool   `json:"required"`
 }
 
+type artistSummary struct {
+	DisplayName   string   `json:"display_name"`
+	AvatarS3Key   *string  `json:"avatar_s3_key"`
+	MediumTags    []string `json:"medium_tags"`
+	LocationLabel *string  `json:"location_label"`
+}
+
+type noteResponse struct {
+	ID        string `json:"id"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
+}
+
 type applicationResponse struct {
-	ID        string          `json:"id"`
-	FormID    string          `json:"form_id"`
-	ArtistID  string          `json:"artist_id"`
-	Status    string          `json:"status"`
-	Answers   json.RawMessage `json:"answers"`
-	CreatedAt string          `json:"created_at"`
-	UpdatedAt string          `json:"updated_at"`
+	ID          string          `json:"id"`
+	FormID      string          `json:"form_id"`
+	ArtistID    string          `json:"artist_id"`
+	Status      string          `json:"status"`
+	Rank        int32           `json:"rank"`
+	Shortlisted bool            `json:"shortlisted"`
+	ReviewFlag  bool            `json:"review_flag"`
+	Answers     json.RawMessage `json:"answers"`
+	CreatedAt   string          `json:"created_at"`
+	UpdatedAt   string          `json:"updated_at"`
+	Artist      *artistSummary  `json:"artist,omitempty"`
+	Notes       []noteResponse  `json:"notes"`
 }
 
 func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	return applicationResponse{
-		ID:        a.ID.String(),
-		FormID:    a.FormID.String(),
-		ArtistID:  a.ArtistID.String(),
-		Status:    string(a.Status),
-		Answers:   a.Answers,
-		CreatedAt: a.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt: a.UpdatedAt.Time.Format(time.RFC3339),
+		ID:          a.ID.String(),
+		FormID:      a.FormID.String(),
+		ArtistID:    a.ArtistID.String(),
+		Status:      string(a.Status),
+		Rank:        a.Rank,
+		Shortlisted: a.Shortlisted,
+		ReviewFlag:  a.ReviewFlag,
+		Answers:     a.Answers,
+		CreatedAt:   a.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   a.UpdatedAt.Time.Format(time.RFC3339),
+		Notes:       []noteResponse{},
 	}
 }
 
-// SubmitApplicationHandler handles POST /festivals/{festivalID}/apply. Requires artist role.
+func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 9)
+	row sqlcdb.ListApplicationsByFormWithArtistRow,
+	notes []noteResponse,
+) applicationResponse {
+	return applicationResponse{
+		ID:          row.ID.String(),
+		FormID:      row.FormID.String(),
+		ArtistID:    row.ArtistID.String(),
+		Status:      string(row.Status),
+		Rank:        row.Rank,
+		Shortlisted: row.Shortlisted,
+		ReviewFlag:  row.ReviewFlag,
+		Answers:     row.Answers,
+		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
+		Artist: &artistSummary{
+			DisplayName:   row.DisplayName,
+			AvatarS3Key:   row.AvatarS3Key,
+			MediumTags:    row.MediumTags,
+			LocationLabel: row.LocationLabel,
+		},
+		Notes: notes,
+	}
+}
+
+func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse { //nolint:unused // used in upcoming notes handler (Task 8)
+	return noteResponse{
+		ID:        n.ID.String(),
+		Content:   n.Content,
+		CreatedAt: n.CreatedAt.Time.Format(time.RFC3339),
+	}
+}
+
+// SubmitApplicationHandler handles POST /festivals/{festivalID}/apply. Requires the caller to have an artist profile; returns 409 profile_required if not.
 func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
-			return
-		}
-		if principal.Role != "artist" {
-			httperr.Forbidden(w)
 			return
 		}
 
@@ -120,7 +171,12 @@ func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		profile, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.Write(w, http.StatusUnprocessableEntity, "Unprocessable Entity", "artist profile required to apply")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				_ = json.NewEncoder(w).Encode(map[string]string{
+					"error":   "profile_required",
+					"message": "create an artist profile to apply",
+				})
 				return
 			}
 			httperr.InternalServerError(w)
