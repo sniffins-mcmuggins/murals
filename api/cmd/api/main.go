@@ -14,6 +14,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/admin"
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/billing"
@@ -101,13 +102,15 @@ func main() {
 	r.Handle("/metrics", metrics.Handler())
 	r.Post("/auth/signup", auth.SignupHandler(pool))
 
-	// Rate-limited auth routes (5/min per IP) — login, password reset, and MFA verify.
+	// Rate-limited auth routes (5/min per IP) — login, password reset, MFA verify,
+	// and promo redemption (prevents bulk code enumeration).
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RateLimitMiddleware)
 		r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
 		r.Post("/auth/forgot-password", auth.ForgotPasswordHandler(pool, mailer, cfg.WebPublicBase))
 		r.Post("/auth/reset-password", auth.ResetPasswordHandler(pool))
 		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
+		r.Post("/promo/redeem", admin.RedeemPromoHandler(pool))
 	})
 
 	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
@@ -168,10 +171,6 @@ func main() {
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool))
 
-	// Map editor
-	r.Get("/festivals/{festivalID}/artists/accepted", festival.GetAcceptedArtistsHandler(pool))
-	r.Patch("/festivals/{festivalID}/artists/{artistID}/pin", festival.SetArtistPinHandler(pool))
-
 	// Billing — webhook first (no auth required; Stripe POSTs directly).
 	// CSRF posture: the session cookie is SameSite=Lax (api/internal/auth/login.go),
 	// which blocks cross-site form POSTs to these endpoints. The Authorization
@@ -194,6 +193,19 @@ func main() {
 	// the smallest possible probe until a real Pro-only endpoint replaces it.
 	r.With(billing.RequirePlan(pool, "artist_pro")).Get("/_test/billing/pro-only", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
+	})
+
+	// Admin — requires admin role + MFA enrollment.
+	r.Route("/admin", func(r chi.Router) {
+		r.Use(admin.RequireAdmin(pool))
+		r.Get("/users", admin.ListUsersHandler(pool))
+		r.Get("/users/{userID}", admin.GetUserHandler(pool))
+		r.Post("/users/{userID}/password-reset", admin.TriggerPasswordResetHandler(pool, mailer, cfg.WebPublicBase))
+		r.Post("/users/{userID}/grants", admin.CreateGrantHandler(pool))
+		r.Delete("/grants/{grantID}", admin.RevokeGrantHandler(pool))
+		r.Get("/promo-codes", admin.ListPromoCodesHandler(pool))
+		r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
+		r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
 	})
 
 	srv := &http.Server{

@@ -50,13 +50,9 @@ components:
           type: string
           format: uri
 
-    UserRole:
-      type: string
-      enum: [artist, organiser, admin]
-
     User:
       type: object
-      required: [id, email, role, created_at]
+      required: [id, email, is_admin, created_at]
       properties:
         id:
           type: string
@@ -64,8 +60,8 @@ components:
         email:
           type: string
           format: email
-        role:
-          $ref: "#/components/schemas/UserRole"
+        is_admin:
+          type: boolean
         created_at:
           type: string
           format: date-time
@@ -82,8 +78,6 @@ components:
           type: string
           minLength: 8
           example: hunter2hunter
-        role:
-          $ref: "#/components/schemas/UserRole"
 
     LoginRequest:
       type: object
@@ -463,26 +457,6 @@ components:
           type: integer
           description: Number of profiles per page.
 
-    AcceptedArtist:
-      type: object
-      properties:
-        artist_id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        pin_lat:
-          type: number
-          format: float
-          nullable: true
-        pin_lng:
-          type: number
-          format: float
-          nullable: true
-        w3w:
-          type: string
-          nullable: true
-
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -739,7 +713,7 @@ paths:
     post:
       operationId: postProfiles
       summary: Create artist profile
-      description: Creates an artist profile for the authenticated user. One profile per user. Requires role=artist.
+      description: Creates an artist profile for the authenticated user. One profile per user.
       tags: [artist]
       security:
         - cookieAuth: []
@@ -1504,89 +1478,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Application"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /festivals/{festivalID}/artists/accepted:
-    parameters:
-      - name: festivalID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    get:
-      operationId: getAcceptedArtists
-      tags: [festival]
-      summary: List accepted artists for a festival (map editor)
-      security:
-        - cookieAuth: []
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Accepted artists with optional pin locations
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AcceptedArtist"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /festivals/{festivalID}/artists/{artistID}/pin:
-    parameters:
-      - name: festivalID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: artistID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    patch:
-      operationId: setArtistPin
-      tags: [festival]
-      summary: Set or update a pin location for an accepted artist
-      security:
-        - cookieAuth: []
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [lat, lng]
-              properties:
-                lat:
-                  type: number
-                  format: float
-                lng:
-                  type: number
-                  format: float
-                w3w:
-                  type: string
-                  nullable: true
-      responses:
-        "200":
-          description: Updated accepted artist entry
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AcceptedArtist"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
