@@ -75,12 +75,24 @@ test('organiser views and edits a pre-created spot', async ({ browser }) => {
     await page.getByTestId('spots-list').getByRole('button', { name: /Spot 1/ }).click()
     await expect(page.getByTestId('spot-panel')).toBeVisible()
 
+    // Wait for the panel's query data to be applied to the form inputs
+    await expect(page.locator('[data-testid="spot-panel"] input').first()).not.toBeEmpty({ timeout: 5_000 })
+
     // Update notes and save
     await page.getByPlaceholder('e.g. needs cherry picker').fill('corner of High St')
     await page.getByRole('button', { name: 'Save' }).click()
 
     // Panel stays open; save button returns to non-loading state
     await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled({ timeout: 5_000 })
+
+    // Verify the notes PATCH actually landed on the server
+    const spotsAfterSave = await fetch(`${API}/festivals/${festivalId}/spots`, {
+      headers: { Authorization: `Bearer ${organiser.token}` },
+    })
+    expect(spotsAfterSave.ok).toBe(true)
+    const { spots } = (await spotsAfterSave.json()) as { spots: Array<{ id: string; notes: string | null }> }
+    const savedSpot = spots.find(s => s.id === spotId)
+    expect(savedSpot?.notes).toBe('corner of High St')
 
     // Confirm via public map API that the spot is pinned correctly
     await setFestivalStatus(organiser.token, festivalId, 'live')
