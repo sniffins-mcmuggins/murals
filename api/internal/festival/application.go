@@ -66,7 +66,7 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	}
 }
 
-func toEnrichedResponse( //nolint:unused // used in upcoming list handler (Task 9)
+func toEnrichedResponse(
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
 	notes []noteResponse,
 ) applicationResponse {

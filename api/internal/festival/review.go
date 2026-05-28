@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -14,7 +15,8 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
-// ListApplicationsHandler handles GET /festivals/{festivalID}/applications. Requires auth + ownership.
+// ListApplicationsHandler handles GET /festivals/{festivalID}/applications.
+// Returns applications enriched with artist profile data and notes.
 func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -55,15 +57,34 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		apps, err := q.ListApplicationsByForm(r.Context(), form.ID)
+		rows, err := q.ListApplicationsByFormWithArtist(r.Context(), form.ID)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
 		}
 
-		resp := make([]applicationResponse, len(apps))
-		for i, a := range apps {
-			resp[i] = toApplicationResponse(a)
+		// Batch-fetch notes for all applications
+		notesByApp := map[string][]noteResponse{}
+		if len(rows) > 0 {
+			appIDs := make([]pgtype.UUID, len(rows))
+			for i, row := range rows {
+				appIDs[i] = row.ID
+				notesByApp[row.ID.String()] = []noteResponse{}
+			}
+			allNotes, err := q.ListNotesByApplications(r.Context(), appIDs)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			for _, n := range allNotes {
+				key := n.ApplicationID.String()
+				notesByApp[key] = append(notesByApp[key], toNoteResponse(n))
+			}
+		}
+
+		resp := make([]applicationResponse, len(rows))
+		for i, row := range rows {
+			resp[i] = toEnrichedResponse(row, notesByApp[row.ID.String()])
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
