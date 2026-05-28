@@ -231,18 +231,18 @@ type ApplicationNote struct {
 }
 
 type ArtistProfile struct {
-	ID            pgtype.UUID        `db:"id" json:"id"`
-	UserID        pgtype.UUID        `db:"user_id" json:"user_id"`
-	DisplayName   string             `db:"display_name" json:"display_name"`
-	Bio           string             `db:"bio" json:"bio"`
-	LocationLabel *string            `db:"location_label" json:"location_label"`
-	ShowLocation  bool               `db:"show_location" json:"show_location"`
-	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
-	SocialLinks   json.RawMessage    `db:"social_links" json:"social_links"`
-	AvatarS3Key         *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
-	HeadlineImageUrls   []string           `db:"headline_image_urls" json:"headline_image_urls"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                pgtype.UUID        `db:"id" json:"id"`
+	UserID            pgtype.UUID        `db:"user_id" json:"user_id"`
+	DisplayName       string             `db:"display_name" json:"display_name"`
+	Bio               string             `db:"bio" json:"bio"`
+	LocationLabel     *string            `db:"location_label" json:"location_label"`
+	ShowLocation      bool               `db:"show_location" json:"show_location"`
+	MediumTags        []string           `db:"medium_tags" json:"medium_tags"`
+	SocialLinks       json.RawMessage    `db:"social_links" json:"social_links"`
+	AvatarS3Key       *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	HeadlineImageUrls []string           `db:"headline_image_urls" json:"headline_image_urls"`
 }
 
 type Collection struct {
@@ -255,6 +255,8 @@ type Collection struct {
 	DisplayOrder    int32              `db:"display_order" json:"display_order"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CoverFocalX     float32            `db:"cover_focal_x" json:"cover_focal_x"`
+	CoverFocalY     float32            `db:"cover_focal_y" json:"cover_focal_y"`
 }
 
 type CollectionImage struct {

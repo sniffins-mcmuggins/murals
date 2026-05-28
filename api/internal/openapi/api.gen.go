@@ -237,14 +237,20 @@ type AttachImageRequest struct {
 // Collection defines model for Collection.
 type Collection struct {
 	ArtistProfileId openapi_types.UUID `json:"artist_profile_id"`
-	CoverS3Key      *string            `json:"cover_s3_key,omitempty"`
-	CreatedAt       time.Time          `json:"created_at"`
-	Description     string             `json:"description"`
-	DisplayOrder    int                `json:"display_order"`
-	Id              openapi_types.UUID `json:"id"`
-	Name            string             `json:"name"`
-	Status          CollectionStatus   `json:"status"`
-	UpdatedAt       time.Time          `json:"updated_at"`
+
+	// CoverFocalX Horizontal focal point percentage (0–100). 50 = centre.
+	CoverFocalX float32 `json:"cover_focal_x"`
+
+	// CoverFocalY Vertical focal point percentage (0–100). 50 = centre.
+	CoverFocalY  float32            `json:"cover_focal_y"`
+	CoverS3Key   *string            `json:"cover_s3_key,omitempty"`
+	CreatedAt    time.Time          `json:"created_at"`
+	Description  string             `json:"description"`
+	DisplayOrder int                `json:"display_order"`
+	Id           openapi_types.UUID `json:"id"`
+	Name         string             `json:"name"`
+	Status       CollectionStatus   `json:"status"`
+	UpdatedAt    time.Time          `json:"updated_at"`
 }
 
 // CollectionImage defines model for CollectionImage.
@@ -420,6 +426,11 @@ type UnassignedArtist struct {
 
 // UpdateCollectionRequest defines model for UpdateCollectionRequest.
 type UpdateCollectionRequest struct {
+	// CoverFocalX Horizontal focal point (0–100). Clamped server-side.
+	CoverFocalX *float32 `json:"coverFocalX,omitempty"`
+
+	// CoverFocalY Vertical focal point (0–100). Clamped server-side.
+	CoverFocalY *float32          `json:"coverFocalY,omitempty"`
 	CoverS3Key  *string           `json:"coverS3Key,omitempty"`
 	Description *string           `json:"description,omitempty"`
 	Name        *string           `json:"name,omitempty"`

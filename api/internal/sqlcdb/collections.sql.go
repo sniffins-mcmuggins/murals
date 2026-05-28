@@ -14,7 +14,7 @@ import (
 const createCollection = `-- name: CreateCollection :one
 INSERT INTO collections (artist_profile_id, name, description)
 VALUES ($1, $2, $3)
-RETURNING id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at
+RETURNING id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at, cover_focal_x, cover_focal_y
 `
 
 type CreateCollectionParams struct {
@@ -36,6 +36,8 @@ func (q *Queries) CreateCollection(ctx context.Context, arg CreateCollectionPara
 		&i.DisplayOrder,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoverFocalX,
+		&i.CoverFocalY,
 	)
 	return i, err
 }
@@ -50,7 +52,7 @@ func (q *Queries) DeleteCollection(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getCollectionByID = `-- name: GetCollectionByID :one
-SELECT id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at FROM collections WHERE id = $1
+SELECT id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at, cover_focal_x, cover_focal_y FROM collections WHERE id = $1
 `
 
 func (q *Queries) GetCollectionByID(ctx context.Context, id pgtype.UUID) (Collection, error) {
@@ -66,12 +68,14 @@ func (q *Queries) GetCollectionByID(ctx context.Context, id pgtype.UUID) (Collec
 		&i.DisplayOrder,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoverFocalX,
+		&i.CoverFocalY,
 	)
 	return i, err
 }
 
 const listCollectionsByProfileID = `-- name: ListCollectionsByProfileID :many
-SELECT id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at FROM collections
+SELECT id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at, cover_focal_x, cover_focal_y FROM collections
 WHERE artist_profile_id = $1
 ORDER BY display_order, created_at
 `
@@ -95,6 +99,8 @@ func (q *Queries) ListCollectionsByProfileID(ctx context.Context, artistProfileI
 			&i.DisplayOrder,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CoverFocalX,
+			&i.CoverFocalY,
 		); err != nil {
 			return nil, err
 		}
@@ -108,13 +114,15 @@ func (q *Queries) ListCollectionsByProfileID(ctx context.Context, artistProfileI
 
 const updateCollection = `-- name: UpdateCollection :one
 UPDATE collections
-SET name         = $2,
-    description  = $3,
-    cover_s3_key = $4,
-    status       = $5,
-    updated_at   = now()
+SET name           = $2,
+    description    = $3,
+    cover_s3_key   = $4,
+    status         = $5,
+    cover_focal_x  = $6,
+    cover_focal_y  = $7,
+    updated_at     = now()
 WHERE id = $1
-RETURNING id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at
+RETURNING id, artist_profile_id, name, description, cover_s3_key, status, display_order, created_at, updated_at, cover_focal_x, cover_focal_y
 `
 
 type UpdateCollectionParams struct {
@@ -123,6 +131,8 @@ type UpdateCollectionParams struct {
 	Description string           `db:"description" json:"description"`
 	CoverS3Key  *string          `db:"cover_s3_key" json:"cover_s3_key"`
 	Status      CollectionStatus `db:"status" json:"status"`
+	CoverFocalX float32          `db:"cover_focal_x" json:"cover_focal_x"`
+	CoverFocalY float32          `db:"cover_focal_y" json:"cover_focal_y"`
 }
 
 func (q *Queries) UpdateCollection(ctx context.Context, arg UpdateCollectionParams) (Collection, error) {
@@ -132,6 +142,8 @@ func (q *Queries) UpdateCollection(ctx context.Context, arg UpdateCollectionPara
 		arg.Description,
 		arg.CoverS3Key,
 		arg.Status,
+		arg.CoverFocalX,
+		arg.CoverFocalY,
 	)
 	var i Collection
 	err := row.Scan(
@@ -144,6 +156,8 @@ func (q *Queries) UpdateCollection(ctx context.Context, arg UpdateCollectionPara
 		&i.DisplayOrder,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CoverFocalX,
+		&i.CoverFocalY,
 	)
 	return i, err
 }

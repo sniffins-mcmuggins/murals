@@ -148,6 +148,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                         src={collection.cover_s3_key}
                         alt={collection.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        style={{ objectPosition: `${collection.cover_focal_x ?? 50}% ${collection.cover_focal_y ?? 50}%` }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
