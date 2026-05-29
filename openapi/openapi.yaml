@@ -449,6 +449,15 @@ components:
         updated_at:
           type: string
           format: date-time
+        avg_score:
+          type: number
+          format: float
+          nullable: true
+        score_count:
+          type: integer
+        my_score:
+          type: integer
+          nullable: true
         artist:
           $ref: "#/components/schemas/ApplicationArtist"
         notes:
@@ -480,6 +489,10 @@ components:
           format: uuid
         content:
           type: string
+        author_id:
+          type: string
+          format: uuid
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -608,6 +621,56 @@ components:
         per_page:
           type: integer
           description: Number of profiles per page.
+
+    ReviewerResponse:
+      type: object
+      required: [user_id, email, created_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ScoreRequest:
+      type: object
+      required: [score]
+      properties:
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    ScoreResponse:
+      type: object
+      required: [application_id, score]
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        score:
+          type: integer
+
+    FestivalSummary:
+      type: object
+      required: [id, name, slug, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
 
   securitySchemes:
     cookieAuth:
@@ -1257,6 +1320,26 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/reviewing:
+    get:
+      operationId: getMyReviewing
+      tags: [festival]
+      summary: List festivals the authenticated user is a reviewer for
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of festivals the caller has been invited to review.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FestivalSummary"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -2105,3 +2188,145 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/reviewers:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: inviteReviewer
+      tags: [festival]
+      summary: Invite a reviewer to a festival
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "201":
+          description: Reviewer invited.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      operationId: listReviewers
+      tags: [festival]
+      summary: List reviewers for a festival
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of reviewers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewerResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/reviewers/{userID}:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: removeReviewer
+      tags: [festival]
+      summary: Remove a reviewer from a festival
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Reviewer removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /festivals/{festivalID}/applications/{applicationID}/score:
+    parameters:
+      - name: festivalID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: applicationID
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: upsertScore
+      tags: [festival]
+      summary: Upsert a reviewer score for an application
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoreRequest"
+      responses:
+        "200":
+          description: Score saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoreResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"

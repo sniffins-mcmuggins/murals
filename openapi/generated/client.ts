@@ -365,6 +365,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/reviewing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List festivals the authenticated user is a reviewer for */
+        get: operations["getMyReviewing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/festivals": {
         parameters: {
             query?: never;
@@ -1149,6 +1166,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/festivals/{festivalID}/reviewers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        /** List reviewers for a festival */
+        get: operations["listReviewers"];
+        put?: never;
+        /** Invite a reviewer to a festival */
+        post: operations["inviteReviewer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/reviewers/{userID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                userID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a reviewer from a festival */
+        delete: operations["removeReviewer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/{applicationID}/score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                applicationID: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Upsert a reviewer score for an application */
+        put: operations["upsertScore"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1417,6 +1494,10 @@ export interface components {
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+            /** Format: float */
+            avg_score?: number | null;
+            score_count?: number;
+            my_score?: number | null;
             artist?: components["schemas"]["ApplicationArtist"];
             notes?: components["schemas"]["ApplicationNote"][];
         };
@@ -1430,6 +1511,8 @@ export interface components {
             /** Format: uuid */
             id?: string;
             content?: string;
+            /** Format: uuid */
+            author_id?: string | null;
             /** Format: date-time */
             created_at?: string;
         };
@@ -1494,6 +1577,30 @@ export interface components {
             page: number;
             /** @description Number of profiles per page. */
             per_page: number;
+        };
+        ReviewerResponse: {
+            /** Format: uuid */
+            user_id: string;
+            email: string;
+            /** Format: date-time */
+            accepted_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ScoreRequest: {
+            score: number;
+        };
+        ScoreResponse: {
+            /** Format: uuid */
+            application_id: string;
+            score: number;
+        };
+        FestivalSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            status: string;
         };
     };
     responses: {
@@ -2157,6 +2264,27 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getMyReviewing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of festivals the caller has been invited to review. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FestivalSummary"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     listPublicFestivals: {
         parameters: {
             query?: {
@@ -2453,6 +2581,121 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listReviewers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of reviewers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewerResponse"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    inviteReviewer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reviewer invited. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewerResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    removeReviewer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                userID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reviewer removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    upsertScore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+                applicationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Score saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
         };
     };
 }
