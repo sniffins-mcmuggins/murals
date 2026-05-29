@@ -12,6 +12,59 @@ type Festival = components['schemas']['Festival']
 
 type Props = { params: Promise<{ id: string }> }
 
+function AnonymousReviewSection({ festivalId }: { festivalId: string }) {
+  const queryClient = useQueryClient()
+
+  const formQuery = useQuery({
+    queryKey: ['festival-form', festivalId],
+    queryFn: async () => {
+      const res = await apiClient.GET('/festivals/{festivalID}/form', {
+        params: { path: { festivalID: festivalId } },
+      })
+      if (res.error) return null
+      return res.data ?? null
+    },
+  })
+
+  const patchMutation = useMutation({
+    mutationFn: async (anonymousReview: boolean) => {
+      const res = await apiClient.PATCH('/festivals/{festivalID}/form', {
+        params: { path: { festivalID: festivalId } },
+        body: { anonymous_review: anonymousReview },
+      })
+      if (res.error) throw new Error('Failed to update')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['festival-form', festivalId] }),
+  })
+
+  if (formQuery.isLoading || formQuery.data == null) return null
+
+  return (
+    <div className="p-5 bg-warm border border-light rounded-lg mb-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-serif text-xl text-ink mb-1">Anonymous review</h2>
+          <p className="font-sans text-sm text-mid">
+            Reviewers see only the work and answers. Artist name, avatar, and location are hidden until they&apos;ve scored.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer flex-shrink-0 mt-1">
+          <input
+            type="checkbox"
+            checked={formQuery.data.anonymous_review ?? false}
+            onChange={e => patchMutation.mutate(e.target.checked)}
+            disabled={patchMutation.isPending}
+            className="w-4 h-4 accent-amber"
+          />
+          <span className="font-sans text-sm text-mid">
+            {formQuery.data.anonymous_review ? 'On' : 'Off'}
+          </span>
+        </label>
+      </div>
+    </div>
+  )
+}
+
 export default function FestivalEditPage({ params }: Props) {
   const [festivalId, setFestivalId] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -238,6 +291,9 @@ function FestivalDetail({
           </button>
         )}
       </div>
+
+      {/* Anonymous review */}
+      <AnonymousReviewSection festivalId={festivalId} />
 
       {/* Reviewers */}
       <ReviewersSection festivalId={festivalId} />
