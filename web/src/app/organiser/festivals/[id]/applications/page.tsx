@@ -3,18 +3,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
 } from '@dnd-kit/core'
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { ApplicationCard } from '@/components/ApplicationCard'
@@ -34,11 +25,8 @@ interface FormField {
 type TabKey = 'pending' | 'shortlisted' | 'accepted' | 'waitlisted' | 'declined'
 
 const TAB_LABELS: Record<TabKey, string> = {
-  pending: 'Pending',
-  shortlisted: 'Shortlisted',
-  accepted: 'Accepted',
-  waitlisted: 'Waitlisted',
-  declined: 'Declined',
+  pending: 'Pending', shortlisted: 'Shortlisted', accepted: 'Accepted',
+  waitlisted: 'Waitlisted', declined: 'Declined',
 }
 
 function filterTab(apps: Application[], tab: TabKey): Application[] {
@@ -50,6 +38,9 @@ function filterTab(apps: Application[], tab: TabKey): Application[] {
     case 'declined':    return apps.filter(a => a.status === 'declined')
   }
 }
+
+// Sentinel distinguishes 403 (caller is a reviewer) from 200 with empty list (owner with no reviewers).
+const REVIEWER_SENTINEL = 'REVIEWER' as const
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -79,11 +70,21 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
     },
   })
 
-  // Sync local state when fresh data arrives (replaces onSuccess which was removed in TanStack Query v5)
+  // Detect owner vs reviewer: a 403 on the reviewers endpoint means the caller is a reviewer.
+  const reviewersQuery = useQuery({
+    queryKey: ['festival-reviewers', festivalId],
+    queryFn: async () => {
+      const res = await apiClient.GET('/festivals/{festivalID}/reviewers', {
+        params: { path: { festivalID: festivalId } },
+      })
+      if (res.response.status === 403) return REVIEWER_SENTINEL
+      return res.data ?? []
+    },
+  })
+  const isReviewer = reviewersQuery.data === REVIEWER_SENTINEL
+
   useEffect(() => {
-    if (applicationsQuery.data) {
-      setLocalApps(applicationsQuery.data)
-    }
+    if (applicationsQuery.data) setLocalApps(applicationsQuery.data)
   }, [applicationsQuery.data])
 
   const formQuery = useQuery({
@@ -104,16 +105,14 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
     setLocalApps(prev => {
       if (!prev) return updated
       const tabIds = new Set(tabApps.map(a => a.id))
-      const rest = prev.filter(a => !tabIds.has(a.id))
-      return [...rest, ...updated]
+      return [...prev.filter(a => !tabIds.has(a.id)), ...updated]
     })
   }
 
   const { handleDragEnd } = useApplicationReorder(
-    festivalId,
-    tabApps,
+    festivalId, tabApps,
     activeTab === 'shortlisted' ? 'submitted' : activeTab,
-    setTabApps
+    setTabApps,
   )
 
   const invalidate = () =>
@@ -160,15 +159,37 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
     onSuccess: invalidate,
   })
 
+  const scoreMutation = useMutation({
+    mutationFn: async ({ applicationId, score }: { applicationId: string; score: number }) => {
+      // Optimistic update
+      setLocalApps(prev => prev?.map(a =>
+        a.id === applicationId ? { ...a, my_score: score } : a
+      ) ?? null)
+      const res = await apiClient.PUT('/festivals/{festivalID}/applications/{applicationID}/score', {
+        params: { path: { festivalID: festivalId, applicationID: applicationId } },
+        body: { score },
+      })
+      if (res.error) throw new Error('Score failed')
+    },
+    onSuccess: invalidate,
+    onError: invalidate, // roll back optimistic update
+  })
+
+  const handleScore = (applicationId: string, score: number) => {
+    scoreMutation.mutate({ applicationId, score })
+    // Also update the selected app in the slide-over optimistically
+    if (selectedApp?.id === applicationId) {
+      setSelectedApp(prev => prev ? { ...prev, my_score: score } : null)
+    }
+  }
+
   const isPending =
-    acceptMutation.isPending ||
-    declineMutation.isPending ||
-    waitlistMutation.isPending ||
-    patchMutation.isPending
+    acceptMutation.isPending || declineMutation.isPending ||
+    waitlistMutation.isPending || patchMutation.isPending
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
   const formFields: FormField[] = (formQuery.data as { fields?: FormField[] })?.fields ?? []
@@ -181,13 +202,36 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
     declined: filterTab(allApps, 'declined').length,
   }
 
+  const cardList = (
+    <ul className="space-y-3">
+      {tabApps.map(app => (
+        <li key={app.id}>
+          <ApplicationCard
+            application={app}
+            onSelect={setSelectedApp}
+            onAccept={id => acceptMutation.mutate(id)}
+            onDecline={id => declineMutation.mutate(id)}
+            onWaitlist={id => waitlistMutation.mutate(id)}
+            onToggleShortlist={(id, shortlisted, reviewFlag) =>
+              patchMutation.mutate({ id, shortlisted: !shortlisted, reviewFlag })
+            }
+            onToggleReviewFlag={(id, shortlisted, reviewFlag) =>
+              patchMutation.mutate({ id, shortlisted, reviewFlag: !reviewFlag })
+            }
+            onScore={handleScore}
+            isReviewer={isReviewer}
+            isPending={isPending}
+          />
+        </li>
+      ))}
+    </ul>
+  )
+
   return (
     <div>
       <div className="mb-6">
-        <Link
-          href={`/organiser/festivals/${festivalId}`}
-          className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors"
-        >
+        <Link href={`/organiser/festivals/${festivalId}`}
+          className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors">
           ← Festival
         </Link>
       </div>
@@ -201,13 +245,9 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
       {/* Tabs */}
       <div className="flex gap-0 border-b border-light mb-6 overflow-x-auto">
         {(Object.keys(TAB_LABELS) as TabKey[]).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+          <button key={tab} onClick={() => setActiveTab(tab)}
             className={`font-sans text-sm px-4 py-2 whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              activeTab === tab
-                ? 'border-amber text-ink font-semibold'
-                : 'border-transparent text-mid hover:text-ink'
+              activeTab === tab ? 'border-amber text-ink font-semibold' : 'border-transparent text-mid hover:text-ink'
             }`}
           >
             {TAB_LABELS[tab]}
@@ -216,41 +256,20 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
         ))}
       </div>
 
-      {applicationsQuery.isLoading && (
-        <p className="font-sans text-mid text-sm">Loading…</p>
-      )}
+      {applicationsQuery.isLoading && <p className="font-sans text-mid text-sm">Loading…</p>}
 
       {!applicationsQuery.isLoading && tabApps.length === 0 && (
         <p className="font-sans text-mid text-sm">No applications here.</p>
       )}
 
       {tabApps.length > 0 && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={tabApps.map(a => a.id ?? '')} strategy={verticalListSortingStrategy}>
-            <ul className="space-y-3">
-              {tabApps.map(app => (
-                <li key={app.id}>
-                  <ApplicationCard
-                    application={app}
-                    onSelect={setSelectedApp}
-                    onAccept={id => acceptMutation.mutate(id)}
-                    onDecline={id => declineMutation.mutate(id)}
-                    onWaitlist={id => waitlistMutation.mutate(id)}
-                    onToggleShortlist={(id, shortlisted, reviewFlag) =>
-                      patchMutation.mutate({ id, shortlisted: !shortlisted, reviewFlag })
-                    }
-                    onToggleReviewFlag={(id, shortlisted, reviewFlag) =>
-                      patchMutation.mutate({ id, shortlisted, reviewFlag: !reviewFlag })
-                    }
-                    onScore={() => {}} // TODO(task-3): wire scoreMutation when reviewer detection is added
-                    isReviewer={false} // TODO(task-3): detect owner/reviewer via GET /festivals/{id}/reviewers
-                    isPending={isPending}
-                  />
-                </li>
-              ))}
-            </ul>
-          </SortableContext>
-        </DndContext>
+        isReviewer ? cardList : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={tabApps.map(a => a.id ?? '')} strategy={verticalListSortingStrategy}>
+              {cardList}
+            </SortableContext>
+          </DndContext>
+        )
       )}
 
       <ApplicationSlideOver
@@ -261,6 +280,8 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
         onAccept={id => acceptMutation.mutate(id)}
         onDecline={id => declineMutation.mutate(id)}
         onWaitlist={id => waitlistMutation.mutate(id)}
+        onScore={handleScore}
+        isReviewer={isReviewer}
         isPending={isPending}
       />
     </div>
