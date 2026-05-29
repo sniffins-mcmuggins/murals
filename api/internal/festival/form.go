@@ -135,6 +135,8 @@ func UpsertFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // GetFormHandler handles GET /festivals/{festivalID}/form. Public.
+// Authenticated festival owners receive the full response including anonymous_review;
+// all other callers receive the public response which omits that field.
 func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
@@ -155,6 +157,16 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+
+		// If the caller is the festival organiser, include owner-only fields.
+		if principal, authErr := auth.User(r.Context()); authErr == nil {
+			fest, festErr := q.GetFestivalByID(r.Context(), festUUID)
+			if festErr == nil && fest.OrganiserID.String() == principal.UserID {
+				_ = json.NewEncoder(w).Encode(toFormResponse(form))
+				return
+			}
+		}
+
 		_ = json.NewEncoder(w).Encode(toPublicFormResponse(form))
 	}
 }
