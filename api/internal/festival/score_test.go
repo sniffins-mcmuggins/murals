@@ -1,7 +1,6 @@
 package festival_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
-	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -21,14 +19,6 @@ func newScoreServer(db *pgxpool.Pool) *httptest.Server {
 	r.Use(auth.Middleware(db, testSecret))
 	r.Put("/festivals/{festivalID}/applications/{applicationID}/score", festival.ScoreApplicationHandler(db))
 	return httptest.NewServer(r)
-}
-
-func addReviewer(t *testing.T, db *pgxpool.Pool, festID, userID string) {
-	t.Helper()
-	_, err := sqlcdb.New(db).AddFestivalReviewer(context.Background(), sqlcdb.AddFestivalReviewerParams{
-		FestivalID: pgUUID(t, festID), UserID: pgUUID(t, userID),
-	})
-	require.NoError(t, err)
 }
 
 func TestScore_ReviewerScoresApplication(t *testing.T) {
@@ -82,5 +72,28 @@ func TestScore_ReviewerCannotScoreOwnApplication(t *testing.T) {
 
 	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+ownAppID+"/score", `{"score":5}`, revTok)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestScore_ReviewerCanScoreDifferentApplication(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, _ := createTestUser(t, db, "score-owner-4@test")
+	revID, revTok := createTestUser(t, db, "score-rev-4@test")
+	createTestArtistProfile(t, db, revID, "Reviewer With Profile")
+	artistID, _ := createTestUser(t, db, "score-art-4@test")
+	createTestArtistProfile(t, db, artistID, "Other Artist")
+	festID := createTestFestival(t, db, ownerID, "score-fest-4", "open")
+	createTestApplicationForm(t, db, festID)
+	// reviewer also has an application (their own)
+	createTestApplicationInFestival(t, db, festID, revID)
+	// but we're scoring the OTHER artist's application
+	otherAppID := createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, revID)
+	srv := newScoreServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+otherAppID+"/score", `{"score":3}`, revTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 }

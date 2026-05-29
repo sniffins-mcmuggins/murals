@@ -23,6 +23,12 @@ func ScoreApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Unauthorized(w)
 			return
 		}
+		uid, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
 		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
 		if err != nil {
 			httperr.BadRequest(w, "invalid festivalID")
@@ -54,20 +60,16 @@ func ScoreApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// COI: a reviewer cannot score the application that belongs to their own
-		// artist profile.
-		uid, err := pgUUIDFromString(principal.UserID)
-		if err != nil {
-			httperr.InternalServerError(w)
-			return
-		}
-		profile, err := q.GetArtistProfileByUserID(r.Context(), uid)
-		if err == nil && profile.ID == app.ArtistID {
-			httperr.Forbidden(w)
-			return
-		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			httperr.InternalServerError(w)
-			return
+		// COI: a reviewer cannot score the application belonging to their own artist profile.
+		if role == roleReviewer {
+			profile, err := q.GetArtistProfileByUserID(r.Context(), uid)
+			if err == nil && profile.ID == app.ArtistID {
+				httperr.Forbidden(w)
+				return
+			} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				httperr.InternalServerError(w)
+				return
+			}
 		}
 
 		var req struct {
@@ -92,10 +94,14 @@ func ScoreApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		type scoreResponse struct {
+			ApplicationID string `json:"application_id"`
+			Score         int32  `json:"score"`
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"application_id": score.ApplicationID.String(),
-			"score":          score.Score,
+		_ = json.NewEncoder(w).Encode(scoreResponse{
+			ApplicationID: score.ApplicationID.String(),
+			Score:         score.Score,
 		})
 	}
 }
