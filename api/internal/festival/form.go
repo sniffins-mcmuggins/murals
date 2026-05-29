@@ -48,6 +48,37 @@ func toFormResponse(f sqlcdb.ApplicationForm) formResponse {
 	return resp
 }
 
+type publicFormResponse struct {
+	ID              string          `json:"id"`
+	FestivalID      string          `json:"festival_id"`
+	Fields          json.RawMessage `json:"fields"`
+	OpenAt          *string         `json:"open_at,omitempty"`
+	CloseAt         *string         `json:"close_at,omitempty"`
+	MaxApplications *int32          `json:"max_applications,omitempty"`
+	CreatedAt       string          `json:"created_at"`
+	UpdatedAt       string          `json:"updated_at"`
+}
+
+func toPublicFormResponse(f sqlcdb.ApplicationForm) publicFormResponse {
+	resp := publicFormResponse{
+		ID:              f.ID.String(),
+		FestivalID:      f.FestivalID.String(),
+		Fields:          f.Fields,
+		MaxApplications: f.MaxApplications,
+		CreatedAt:       f.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:       f.UpdatedAt.Time.Format(time.RFC3339),
+	}
+	if f.OpenAt.Valid {
+		s := f.OpenAt.Time.Format(time.RFC3339)
+		resp.OpenAt = &s
+	}
+	if f.CloseAt.Valid {
+		s := f.CloseAt.Time.Format(time.RFC3339)
+		resp.CloseAt = &s
+	}
+	return resp
+}
+
 // UpsertFormHandler handles PUT /festivals/{festivalID}/form. Requires auth + festival ownership.
 func UpsertFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +155,7 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(toFormResponse(form))
+		_ = json.NewEncoder(w).Encode(toPublicFormResponse(form))
 	}
 }
 

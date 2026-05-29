@@ -83,7 +83,11 @@ func TestGetForm_Public(t *testing.T) {
 
 	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/form", "", "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var formData map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&formData))
 	_ = resp.Body.Close()
+	_, hasAnon := formData["anonymous_review"]
+	assert.False(t, hasAnon, "public GET /form must not expose anonymous_review")
 }
 
 func TestGetForm_NotFound(t *testing.T) {
@@ -145,13 +149,14 @@ func TestPatchForm_AnonymousReview_TogglesOn(t *testing.T) {
 	_ = resp.Body.Close()
 	assert.Equal(t, true, form["anonymous_review"])
 
-	// GET reflects the persisted value
+	// GET does not expose anonymous_review to public
 	get := doRequest(t, srv, "GET", "/festivals/"+festID+"/form", "", "")
 	require.Equal(t, http.StatusOK, get.StatusCode)
 	var form2 map[string]any
 	require.NoError(t, json.NewDecoder(get.Body).Decode(&form2))
 	_ = get.Body.Close()
-	assert.Equal(t, true, form2["anonymous_review"])
+	_, hasAnon := form2["anonymous_review"]
+	assert.False(t, hasAnon, "public GET must not expose anonymous_review")
 }
 
 func TestPatchForm_AnonymousReview_404_NoForm(t *testing.T) {
