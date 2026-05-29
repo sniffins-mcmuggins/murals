@@ -242,6 +242,8 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
                     onToggleReviewFlag={(id, shortlisted, reviewFlag) =>
                       patchMutation.mutate({ id, shortlisted, reviewFlag: !reviewFlag })
                     }
+                    onScore={() => {}}
+                    isReviewer={false}
                     isPending={isPending}
                   />
                 </li>
