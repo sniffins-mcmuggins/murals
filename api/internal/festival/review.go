@@ -149,6 +149,7 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Assemble final response.
+		isReviewer := role == roleReviewer
 		resp := make([]applicationResponse, len(items))
 		for i, it := range items {
 			a := it.resp
@@ -161,6 +162,17 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if ms, ok := myScoreByApp[it.id.String()]; ok {
 				m := ms
 				a.MyScore = &m
+			}
+			// Apply anonymous review stripping AFTER my_score is set so the reveal
+			// is driven by whether the reviewer has scored, not the score lookup order.
+			if shouldAnonymise(isReviewer, form.AnonymousReview, a.MyScore) {
+				a.Artist = &artistSummary{
+					DisplayName:   "",
+					AvatarS3Key:   nil,
+					MediumTags:    a.Artist.MediumTags,
+					LocationLabel: nil,
+				}
+				a.IdentityHidden = true
 			}
 			resp[i] = a
 		}

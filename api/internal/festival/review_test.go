@@ -144,3 +144,110 @@ func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	_ = resp.Body.Close()
 }
+
+func newReviewListServer(db *pgxpool.Pool) *httptest.Server {
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(db))
+	r.Put("/festivals/{festivalID}/applications/{applicationID}/score", festival.ScoreApplicationHandler(db))
+	return httptest.NewServer(r)
+}
+
+func TestListApplications_AnonymousReview_StripsIdentityForUnscored(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, _ := createTestUser(t, db, "anon-owner-1@test")
+	revID, revTok := createTestUser(t, db, "anon-rev-1@test")
+	artistID, _ := createTestUser(t, db, "anon-art-1@test")
+	createTestArtistProfile(t, db, artistID, "Real Name")
+
+	festID := createTestFestival(t, db, ownerID, "anon-fest-1", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	setFormAnonymousReview(t, db, festID, true)
+	createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, revID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", revTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	app := list[0]
+	assert.Equal(t, true, app["identity_hidden"], "identity_hidden must be true before scoring")
+	artist := app["artist"].(map[string]any)
+	assert.Equal(t, "", artist["display_name"], "display_name must be empty string")
+	assert.Nil(t, artist["avatar_s3_key"], "avatar_s3_key must be nil")
+	assert.Nil(t, artist["location_label"], "location_label must be nil")
+}
+
+func TestListApplications_AnonymousReview_RevealsAfterScore(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, _ := createTestUser(t, db, "anon-owner-2@test")
+	revID, revTok := createTestUser(t, db, "anon-rev-2@test")
+	artistID, _ := createTestUser(t, db, "anon-art-2@test")
+	createTestArtistProfile(t, db, artistID, "Real Name 2")
+
+	festID := createTestFestival(t, db, ownerID, "anon-fest-2", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	setFormAnonymousReview(t, db, festID, true)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, revID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	// Score the application
+	scoreResp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score", `{"score":3}`, revTok)
+	require.Equal(t, http.StatusOK, scoreResp.StatusCode)
+	_ = scoreResp.Body.Close()
+
+	// Now list — identity must be revealed
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", revTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	app := list[0]
+	assert.Equal(t, false, app["identity_hidden"], "identity_hidden must be false after scoring")
+	artist := app["artist"].(map[string]any)
+	assert.Equal(t, "Real Name 2", artist["display_name"], "real name must be visible after scoring")
+}
+
+func TestListApplications_AnonymousReview_OwnerAlwaysSeesFull(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, ownerTok := createTestUser(t, db, "anon-owner-3@test")
+	artistID, _ := createTestUser(t, db, "anon-art-3@test")
+	createTestArtistProfile(t, db, artistID, "Real Name 3")
+
+	festID := createTestFestival(t, db, ownerID, "anon-fest-3", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	setFormAnonymousReview(t, db, festID, true)
+	createTestApplicationInFestival(t, db, festID, artistID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", ownerTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	app := list[0]
+	assert.Equal(t, false, app["identity_hidden"], "owner must never see identity_hidden=true")
+	artist := app["artist"].(map[string]any)
+	assert.Equal(t, "Real Name 3", artist["display_name"], "owner always sees real name")
+}

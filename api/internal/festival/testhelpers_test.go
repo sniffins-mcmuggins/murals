@@ -127,3 +127,12 @@ func createTestApplicationInFestival(t *testing.T, pool *pgxpool.Pool, festivalI
 	require.NoError(t, err)
 	return app.ID.String()
 }
+
+func setFormAnonymousReview(t *testing.T, pool *pgxpool.Pool, festivalID string, value bool) {
+	t.Helper()
+	_, err := sqlcdb.New(pool).PatchFormAnonymousReview(context.Background(), sqlcdb.PatchFormAnonymousReviewParams{
+		FestivalID:      pgUUID(t, festivalID),
+		AnonymousReview: value,
+	})
+	require.NoError(t, err)
+}

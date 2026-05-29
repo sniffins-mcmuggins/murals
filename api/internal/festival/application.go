@@ -125,6 +125,13 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 	}
 }
 
+// shouldAnonymise returns true when the caller is a reviewer,
+// the form has anonymous_review enabled, and they haven't scored this application yet.
+// Owner view is never anonymised; reveal happens automatically once my_score is set.
+func shouldAnonymise(isReviewer, anonymousReview bool, myScore *int32) bool {
+	return isReviewer && anonymousReview && myScore == nil
+}
+
 func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse {
 	var author *string
 	if n.AuthorID.Valid {
