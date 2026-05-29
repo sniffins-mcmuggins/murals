@@ -167,6 +167,7 @@ func main() {
 
 	// Applications
 	r.Get("/me/applications", festival.GetMyApplicationsHandler(pool))
+	r.Get("/me/reviewing", festival.MyReviewingHandler(pool))
 	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(pool))
 
 	// Review
@@ -177,6 +178,14 @@ func main() {
 	r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/reorder", festival.ReorderApplicationsHandler(pool))
 	r.Post("/festivals/{festivalID}/applications/{applicationID}/notes", festival.AddApplicationNoteHandler(pool))
+
+	// Reviewer management — owner only (handler-level check).
+	r.Post("/festivals/{festivalID}/reviewers", festival.InviteReviewerHandler(pool, mailer, cfg.WebPublicBase))
+	r.Get("/festivals/{festivalID}/reviewers", festival.ListReviewersHandler(pool))
+	r.Delete("/festivals/{festivalID}/reviewers/{userID}", festival.RemoveReviewerHandler(pool))
+
+	// Per-reviewer score — owner or reviewer (handler-level check).
+	r.Put("/festivals/{festivalID}/applications/{applicationID}/score", festival.ScoreApplicationHandler(pool))
 
 	// Spots (map editor)
 	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))
