@@ -162,21 +162,24 @@ type AcceptedArtist struct {
 
 // Application defines model for Application.
 type Application struct {
-	Answers     *map[string]interface{} `json:"answers,omitempty"`
-	Artist      *ApplicationArtist      `json:"artist,omitempty"`
-	ArtistId    *openapi_types.UUID     `json:"artist_id,omitempty"`
-	AvgScore    *float32                `json:"avg_score,omitempty"`
-	CreatedAt   *time.Time              `json:"created_at,omitempty"`
-	FormId      *openapi_types.UUID     `json:"form_id,omitempty"`
-	Id          *openapi_types.UUID     `json:"id,omitempty"`
-	MyScore     *int                    `json:"my_score,omitempty"`
-	Notes       *[]ApplicationNote      `json:"notes,omitempty"`
-	Rank        *int                    `json:"rank,omitempty"`
-	ReviewFlag  *bool                   `json:"review_flag,omitempty"`
-	ScoreCount  *int                    `json:"score_count,omitempty"`
-	Shortlisted *bool                   `json:"shortlisted,omitempty"`
-	Status      *ApplicationStatus      `json:"status,omitempty"`
-	UpdatedAt   *time.Time              `json:"updated_at,omitempty"`
+	Answers   *map[string]interface{} `json:"answers,omitempty"`
+	Artist    *ApplicationArtist      `json:"artist,omitempty"`
+	ArtistId  *openapi_types.UUID     `json:"artist_id,omitempty"`
+	AvgScore  *float32                `json:"avg_score,omitempty"`
+	CreatedAt *time.Time              `json:"created_at,omitempty"`
+	FormId    *openapi_types.UUID     `json:"form_id,omitempty"`
+	Id        *openapi_types.UUID     `json:"id,omitempty"`
+
+	// IdentityHidden True when anonymous_review is on and this reviewer has not yet scored. Always false for owners.
+	IdentityHidden *bool              `json:"identity_hidden,omitempty"`
+	MyScore        *int               `json:"my_score,omitempty"`
+	Notes          *[]ApplicationNote `json:"notes,omitempty"`
+	Rank           *int               `json:"rank,omitempty"`
+	ReviewFlag     *bool              `json:"review_flag,omitempty"`
+	ScoreCount     *int               `json:"score_count,omitempty"`
+	Shortlisted    *bool              `json:"shortlisted,omitempty"`
+	Status         *ApplicationStatus `json:"status,omitempty"`
+	UpdatedAt      *time.Time         `json:"updated_at,omitempty"`
 }
 
 // ApplicationArtist defines model for ApplicationArtist.
@@ -189,6 +192,8 @@ type ApplicationArtist struct {
 
 // ApplicationForm defines model for ApplicationForm.
 type ApplicationForm struct {
+	// AnonymousReview When true, reviewer-scoped responses strip artist identity until the reviewer has scored.
+	AnonymousReview *bool                     `json:"anonymous_review,omitempty"`
 	CloseAt         *time.Time                `json:"close_at,omitempty"`
 	CreatedAt       *time.Time                `json:"created_at,omitempty"`
 	FestivalId      *openapi_types.UUID       `json:"festival_id,omitempty"`
@@ -574,6 +579,11 @@ type SetArtistPinJSONBody struct {
 	W3w *string `json:"w3w,omitempty"`
 }
 
+// PatchFestivalsFestivalIDFormJSONBody defines parameters for PatchFestivalsFestivalIDForm.
+type PatchFestivalsFestivalIDFormJSONBody struct {
+	AnonymousReview *bool `json:"anonymous_review,omitempty"`
+}
+
 // PutFestivalsFestivalIDFormJSONBody defines parameters for PutFestivalsFestivalIDForm.
 type PutFestivalsFestivalIDFormJSONBody struct {
 	Fields *[]map[string]interface{} `json:"fields,omitempty"`
@@ -676,6 +686,9 @@ type PostFestivalsFestivalIDApplyJSONRequestBody PostFestivalsFestivalIDApplyJSO
 
 // SetArtistPinJSONRequestBody defines body for SetArtistPin for application/json ContentType.
 type SetArtistPinJSONRequestBody SetArtistPinJSONBody
+
+// PatchFestivalsFestivalIDFormJSONRequestBody defines body for PatchFestivalsFestivalIDForm for application/json ContentType.
+type PatchFestivalsFestivalIDFormJSONRequestBody PatchFestivalsFestivalIDFormJSONBody
 
 // PutFestivalsFestivalIDFormJSONRequestBody defines body for PutFestivalsFestivalIDForm for application/json ContentType.
 type PutFestivalsFestivalIDFormJSONRequestBody PutFestivalsFestivalIDFormJSONBody
@@ -799,6 +812,9 @@ type ServerInterface interface {
 	// Get application form
 	// (GET /festivals/{festivalID}/form)
 	GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Update form settings
+	// (PATCH /festivals/{festivalID}/form)
+	PatchFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
 	// Upsert application form
 	// (PUT /festivals/{festivalID}/form)
 	PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
@@ -1057,6 +1073,12 @@ func (_ Unimplemented) SetArtistPin(w http.ResponseWriter, r *http.Request, fest
 // Get application form
 // (GET /festivals/{festivalID}/form)
 func (_ Unimplemented) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update form settings
+// (PATCH /festivals/{festivalID}/form)
+func (_ Unimplemented) PatchFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2141,6 +2163,38 @@ func (siw *ServerInterfaceWrapper) GetFestivalsFestivalIDForm(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// PatchFestivalsFestivalIDForm operation middleware
+func (siw *ServerInterfaceWrapper) PatchFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchFestivalsFestivalIDForm(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PutFestivalsFestivalIDForm operation middleware
 func (siw *ServerInterfaceWrapper) PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request) {
 
@@ -3050,6 +3104,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/festivals/{festivalID}/form", wrapper.GetFestivalsFestivalIDForm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/festivals/{festivalID}/form", wrapper.PatchFestivalsFestivalIDForm)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/festivals/{festivalID}/form", wrapper.PutFestivalsFestivalIDForm)
@@ -4797,6 +4854,77 @@ func (response GetFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse) 
 	return err
 }
 
+type PatchFestivalsFestivalIDFormRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+	Body       *PatchFestivalsFestivalIDFormJSONRequestBody
+}
+
+type PatchFestivalsFestivalIDFormResponseObject interface {
+	VisitPatchFestivalsFestivalIDFormResponse(w http.ResponseWriter) error
+}
+
+type PatchFestivalsFestivalIDForm200JSONResponse ApplicationForm
+
+func (response PatchFestivalsFestivalIDForm200JSONResponse) VisitPatchFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalIDForm401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFestivalsFestivalIDForm401ApplicationProblemPlusJSONResponse) VisitPatchFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalIDForm403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFestivalsFestivalIDForm403ApplicationProblemPlusJSONResponse) VisitPatchFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PatchFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PatchFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse) VisitPatchFestivalsFestivalIDFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PutFestivalsFestivalIDFormRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 	Body       *PutFestivalsFestivalIDFormJSONRequestBody
@@ -6223,6 +6351,9 @@ type StrictServerInterface interface {
 	// Get application form
 	// (GET /festivals/{festivalID}/form)
 	GetFestivalsFestivalIDForm(ctx context.Context, request GetFestivalsFestivalIDFormRequestObject) (GetFestivalsFestivalIDFormResponseObject, error)
+	// Update form settings
+	// (PATCH /festivals/{festivalID}/form)
+	PatchFestivalsFestivalIDForm(ctx context.Context, request PatchFestivalsFestivalIDFormRequestObject) (PatchFestivalsFestivalIDFormResponseObject, error)
 	// Upsert application form
 	// (PUT /festivals/{festivalID}/form)
 	PutFestivalsFestivalIDForm(ctx context.Context, request PutFestivalsFestivalIDFormRequestObject) (PutFestivalsFestivalIDFormResponseObject, error)
@@ -7233,6 +7364,39 @@ func (sh *strictHandler) GetFestivalsFestivalIDForm(w http.ResponseWriter, r *ht
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetFestivalsFestivalIDFormResponseObject); ok {
 		if err := validResponse.VisitGetFestivalsFestivalIDFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PatchFestivalsFestivalIDForm operation middleware
+func (sh *strictHandler) PatchFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request PatchFestivalsFestivalIDFormRequestObject
+
+	request.FestivalID = festivalID
+
+	var body PatchFestivalsFestivalIDFormJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchFestivalsFestivalIDForm(ctx, request.(PatchFestivalsFestivalIDFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchFestivalsFestivalIDForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchFestivalsFestivalIDFormResponseObject); ok {
+		if err := validResponse.VisitPatchFestivalsFestivalIDFormResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -705,7 +705,38 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update form settings */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        anonymous_review?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Updated application form */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApplicationForm"];
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+            };
+        };
         trace?: never;
     };
     "/festivals/{festivalID}/apply": {
@@ -1471,6 +1502,8 @@ export interface components {
             /** Format: date-time */
             close_at?: string | null;
             max_applications?: number | null;
+            /** @description When true, reviewer-scoped responses strip artist identity until the reviewer has scored. */
+            anonymous_review?: boolean;
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
@@ -1500,6 +1533,8 @@ export interface components {
             my_score?: number | null;
             artist?: components["schemas"]["ApplicationArtist"];
             notes?: components["schemas"]["ApplicationNote"][];
+            /** @description True when anonymous_review is on and this reviewer has not yet scored. Always false for owners. */
+            identity_hidden?: boolean;
         };
         ApplicationArtist: {
             display_name?: string;

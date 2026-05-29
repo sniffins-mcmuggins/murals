@@ -410,6 +410,9 @@ components:
         max_applications:
           type: integer
           nullable: true
+        anonymous_review:
+          type: boolean
+          description: When true, reviewer-scoped responses strip artist identity until the reviewer has scored.
         created_at:
           type: string
           format: date-time
@@ -464,6 +467,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApplicationNote"
+        identity_hidden:
+          type: boolean
+          description: True when anonymous_review is on and this reviewer has not yet scored. Always false for owners.
 
     ApplicationArtist:
       type: object
@@ -1606,6 +1612,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApplicationForm"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [festival]
+      summary: Update form settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                anonymous_review:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated application form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationForm"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
