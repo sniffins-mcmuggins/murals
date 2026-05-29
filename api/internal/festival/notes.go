@@ -36,7 +36,7 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := sqlcdb.New(pool)
-		fest, err := q.GetFestivalByID(r.Context(), festUUID)
+		role, err := resolveFestivalAccess(r.Context(), q, festUUID, principal.UserID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.NotFound(w)
@@ -45,7 +45,7 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.InternalServerError(w)
 			return
 		}
-		if fest.OrganiserID.String() != principal.UserID {
+		if role == roleNone {
 			httperr.Forbidden(w)
 			return
 		}
@@ -91,9 +91,15 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		authorUUID, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
 		note, err := q.CreateApplicationNote(r.Context(), sqlcdb.CreateApplicationNoteParams{
 			ApplicationID: appUUID,
 			Content:       req.Content,
+			AuthorID:      authorUUID,
 		})
 		if err != nil {
 			if isFKViolation(err) {

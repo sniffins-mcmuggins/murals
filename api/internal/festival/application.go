@@ -30,9 +30,10 @@ type artistSummary struct {
 }
 
 type noteResponse struct {
-	ID        string `json:"id"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
+	ID        string  `json:"id"`
+	Content   string  `json:"content"`
+	AuthorID  *string `json:"author_id"`
+	CreatedAt string  `json:"created_at"`
 }
 
 type applicationResponse struct {
@@ -96,9 +97,15 @@ func toEnrichedResponse(
 }
 
 func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse {
+	var author *string
+	if n.AuthorID.Valid {
+		s := n.AuthorID.String()
+		author = &s
+	}
 	return noteResponse{
 		ID:        n.ID.String(),
 		Content:   n.Content,
+		AuthorID:  author,
 		CreatedAt: n.CreatedAt.Time.Format(time.RFC3339),
 	}
 }
