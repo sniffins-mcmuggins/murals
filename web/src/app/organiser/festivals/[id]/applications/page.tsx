@@ -242,8 +242,8 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
                     onToggleReviewFlag={(id, shortlisted, reviewFlag) =>
                       patchMutation.mutate({ id, shortlisted, reviewFlag: !reviewFlag })
                     }
-                    onScore={() => {}}
-                    isReviewer={false}
+                    onScore={() => {}} // TODO(task-3): wire scoreMutation when reviewer detection is added
+                    isReviewer={false} // TODO(task-3): detect owner/reviewer via GET /festivals/{id}/reviewers
                     isPending={isPending}
                   />
                 </li>

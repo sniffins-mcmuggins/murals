@@ -44,6 +44,7 @@ function StarControl({ appId, myScore, onScore }: { appId: string; myScore: numb
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map(n => (
         <button
+          type="button"
           key={n}
           aria-label={`Score ${n}`}
           onClick={e => { e.stopPropagation(); onScore(appId, n) }}
