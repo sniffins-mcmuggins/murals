@@ -79,7 +79,8 @@ export function ApplicationCard({
   }
 
   const artist = application.artist as ApplicationArtist | undefined
-  const name = artist?.display_name ?? 'Unknown Artist'
+  const isAnonymous = application.identity_hidden === true
+  const name = isAnonymous ? 'Anonymous artist' : (artist?.display_name ?? 'Unknown Artist')
   const tags = artist?.medium_tags ?? []
   const actions = ACTION_TRANSITIONS[application.status ?? ''] ?? []
   const id = application.id ?? ''
@@ -112,7 +113,7 @@ export function ApplicationCard({
         className="w-10 h-10 rounded-full bg-clay flex items-center justify-center text-offwhite font-sans font-bold text-sm flex-shrink-0 cursor-pointer"
         onClick={() => onSelect(application)}
       >
-        {initials(name)}
+        {isAnonymous ? '?' : initials(name)}
       </div>
 
       {/* Main content */}
@@ -122,12 +123,14 @@ export function ApplicationCard({
       >
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="font-sans font-semibold text-ink text-sm">{name}</span>
-          {artist?.location_label && (
+          {!isAnonymous && artist?.location_label && (
             <span className="font-sans text-xs text-mid">{artist.location_label}</span>
           )}
-          <span className="font-sans text-xs text-mid">
-            · Applied {formatDate(application.created_at ?? '')}
-          </span>
+          {isAnonymous ? (
+            <span className="font-sans text-xs text-mid italic">Score to reveal identity</span>
+          ) : (
+            <span className="font-sans text-xs text-mid">· Applied {formatDate(application.created_at ?? '')}</span>
+          )}
         </div>
         {tags.length > 0 && (
           <div className="flex gap-1 flex-wrap mt-1">

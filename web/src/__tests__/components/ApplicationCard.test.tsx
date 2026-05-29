@@ -99,3 +99,34 @@ describe('ApplicationCard — reviewer mode (isReviewer=true)', () => {
     expect(screen.getByText(/★.*4\.0.*·.*1/)).toBeInTheDocument()
   })
 })
+
+describe('ApplicationCard — anonymous mode (identity_hidden=true)', () => {
+  const anonApp = {
+    ...baseApp,
+    identity_hidden: true,
+    artist: { display_name: '', medium_tags: ['spray paint'], avatar_s3_key: null, location_label: null },
+  }
+
+  it('shows "Anonymous artist" placeholder name', () => {
+    render(<ApplicationCard application={anonApp} onSelect={noop} onAccept={noop}
+      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
+      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} />)
+    expect(screen.getByText('Anonymous artist')).toBeInTheDocument()
+  })
+
+  it('shows "Score to reveal identity" hint', () => {
+    render(<ApplicationCard application={anonApp} onSelect={noop} onAccept={noop}
+      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
+      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} />)
+    expect(screen.getByText(/Score to reveal/i)).toBeInTheDocument()
+  })
+
+  it('shows real name when identity_hidden=false', () => {
+    const revealedApp = { ...anonApp, identity_hidden: false, artist: { ...baseApp.artist, display_name: 'Rosa Vane' } }
+    render(<ApplicationCard application={revealedApp} onSelect={noop} onAccept={noop}
+      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
+      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} />)
+    expect(screen.getByText('Rosa Vane')).toBeInTheDocument()
+    expect(screen.queryByText(/Score to reveal/i)).not.toBeInTheDocument()
+  })
+})
