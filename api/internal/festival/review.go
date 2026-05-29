@@ -16,7 +16,8 @@ import (
 )
 
 // ListApplicationsHandler handles GET /festivals/{festivalID}/applications.
-// Returns applications enriched with artist profile data and notes.
+// Returns applications enriched with artist profile data, notes, and score fields.
+// Accessible by the festival owner and invited reviewers.
 func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -24,7 +25,6 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Unauthorized(w)
 			return
 		}
-
 		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
 		if err != nil {
 			httperr.BadRequest(w, "invalid festivalID")
@@ -32,7 +32,7 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := sqlcdb.New(pool)
-		fest, err := q.GetFestivalByID(r.Context(), festUUID)
+		role, err := resolveFestivalAccess(r.Context(), q, festUUID, principal.UserID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.NotFound(w)
@@ -41,7 +41,7 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.InternalServerError(w)
 			return
 		}
-		if fest.OrganiserID.String() != principal.UserID {
+		if role == roleNone {
 			httperr.Forbidden(w)
 			return
 		}
@@ -57,35 +57,101 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		rows, err := q.ListApplicationsByFormWithArtist(r.Context(), form.ID)
-		if err != nil {
-			httperr.InternalServerError(w)
-			return
-		}
+		callerUUID, _ := pgUUIDFromString(principal.UserID)
 
-		// Batch-fetch notes for all applications
-		notesByApp := map[string][]noteResponse{}
-		if len(rows) > 0 {
-			appIDs := make([]pgtype.UUID, len(rows))
-			for i, row := range rows {
-				appIDs[i] = row.ID
-				notesByApp[row.ID.String()] = []noteResponse{}
-			}
-			allNotes, err := q.ListNotesByApplications(r.Context(), appIDs)
+		// Fetch enriched rows. Reviewer path excludes the caller's own application.
+		type item struct {
+			resp applicationResponse
+			id   pgtype.UUID
+		}
+		var items []item
+
+		if role == roleReviewer {
+			rows, err := q.ListApplicationsByFormWithArtistExcludingReviewer(r.Context(), sqlcdb.ListApplicationsByFormWithArtistExcludingReviewerParams{
+				FormID: form.ID,
+				UserID: callerUUID,
+			})
 			if err != nil {
 				httperr.InternalServerError(w)
 				return
 			}
-			for _, n := range allNotes {
-				key := n.ApplicationID.String()
-				notesByApp[key] = append(notesByApp[key], toNoteResponse(n))
+			for _, row := range rows {
+				items = append(items, item{resp: toEnrichedReviewerRow(row), id: row.ID})
+			}
+		} else {
+			rows, err := q.ListApplicationsByFormWithArtist(r.Context(), form.ID)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			for _, row := range rows {
+				items = append(items, item{resp: toEnrichedResponse(row, []noteResponse{}), id: row.ID})
 			}
 		}
 
-		resp := make([]applicationResponse, len(rows))
-		for i, row := range rows {
-			resp[i] = toEnrichedResponse(row, notesByApp[row.ID.String()])
+		if len(items) == 0 {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode([]applicationResponse{})
+			return
 		}
+
+		appIDs := make([]pgtype.UUID, len(items))
+		for i := range items {
+			appIDs[i] = items[i].id
+		}
+
+		// Batch-fetch notes.
+		notesByApp := map[string][]noteResponse{}
+		for _, it := range items {
+			notesByApp[it.id.String()] = []noteResponse{}
+		}
+		allNotes, err := q.ListNotesByApplications(r.Context(), appIDs)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		for _, n := range allNotes {
+			k := n.ApplicationID.String()
+			notesByApp[k] = append(notesByApp[k], toNoteResponse(n))
+		}
+
+		// Batch-fetch score summaries.
+		type scoreSummary struct {
+			avg   float64
+			count int32
+		}
+		summaryByApp := map[string]scoreSummary{}
+		summaries, err := q.ScoreSummaryByApplications(r.Context(), appIDs)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		for _, s := range summaries {
+			summaryByApp[s.ApplicationID.String()] = scoreSummary{avg: s.AvgScore, count: s.ScoreCount}
+		}
+
+		// Assemble final response.
+		resp := make([]applicationResponse, len(items))
+		for i, it := range items {
+			a := it.resp
+			a.Notes = notesByApp[it.id.String()]
+			if sum, ok := summaryByApp[it.id.String()]; ok {
+				avg := sum.avg
+				a.AvgScore = &avg
+				a.ScoreCount = sum.count
+			}
+			myScore, err := q.GetMyScore(r.Context(), sqlcdb.GetMyScoreParams{
+				ApplicationID: it.id,
+				ReviewerID:    callerUUID,
+			})
+			if err == nil {
+				m := myScore
+				a.MyScore = &m
+			}
+			// pgx.ErrNoRows from GetMyScore is a normal miss (no score yet) — leave MyScore nil.
+			resp[i] = a
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}

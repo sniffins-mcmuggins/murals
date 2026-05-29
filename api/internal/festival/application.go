@@ -47,6 +47,9 @@ type applicationResponse struct {
 	Answers     json.RawMessage `json:"answers"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
+	AvgScore    *float64        `json:"avg_score"`
+	ScoreCount  int32           `json:"score_count"`
+	MyScore     *int32          `json:"my_score"`
 	Artist      *artistSummary  `json:"artist,omitempty"`
 	Notes       []noteResponse  `json:"notes"`
 }
@@ -93,6 +96,32 @@ func toEnrichedResponse(
 			LocationLabel: row.LocationLabel,
 		},
 		Notes: notes,
+	}
+}
+
+func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingReviewerRow) applicationResponse {
+	mediumTags := row.MediumTags
+	if mediumTags == nil {
+		mediumTags = []string{}
+	}
+	return applicationResponse{
+		ID:          row.ID.String(),
+		FormID:      row.FormID.String(),
+		ArtistID:    row.ArtistID.String(),
+		Status:      string(row.Status),
+		Rank:        row.Rank,
+		Shortlisted: row.Shortlisted,
+		ReviewFlag:  row.ReviewFlag,
+		Answers:     row.Answers,
+		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
+		Artist: &artistSummary{
+			DisplayName:   row.DisplayName,
+			AvatarS3Key:   row.AvatarS3Key,
+			MediumTags:    mediumTags,
+			LocationLabel: row.LocationLabel,
+		},
+		Notes: []noteResponse{},
 	}
 }
 
