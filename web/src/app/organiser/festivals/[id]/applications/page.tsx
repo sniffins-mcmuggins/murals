@@ -161,18 +161,23 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
 
   const scoreMutation = useMutation({
     mutationFn: async ({ applicationId, score }: { applicationId: string; score: number }) => {
-      // Optimistic update
-      setLocalApps(prev => prev?.map(a =>
-        a.id === applicationId ? { ...a, my_score: score } : a
-      ) ?? null)
       const res = await apiClient.PUT('/festivals/{festivalID}/applications/{applicationID}/score', {
         params: { path: { festivalID: festivalId, applicationID: applicationId } },
         body: { score },
       })
       if (res.error) throw new Error('Score failed')
     },
+    onMutate: ({ applicationId, score }) => {
+      const snapshot = localApps
+      setLocalApps(prev => prev?.map(a =>
+        a.id === applicationId ? { ...a, my_score: score } : a
+      ) ?? null)
+      return { snapshot }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.snapshot !== undefined) setLocalApps(context.snapshot)
+    },
     onSuccess: invalidate,
-    onError: invalidate, // roll back optimistic update
   })
 
   const handleScore = (applicationId: string, score: number) => {
@@ -185,7 +190,7 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
 
   const isPending =
     acceptMutation.isPending || declineMutation.isPending ||
-    waitlistMutation.isPending || patchMutation.isPending
+    waitlistMutation.isPending || patchMutation.isPending || scoreMutation.isPending
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -262,7 +267,7 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
         <p className="font-sans text-mid text-sm">No applications here.</p>
       )}
 
-      {tabApps.length > 0 && (
+      {tabApps.length > 0 && !reviewersQuery.isLoading && (
         isReviewer ? cardList : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={tabApps.map(a => a.id ?? '')} strategy={verticalListSortingStrategy}>
