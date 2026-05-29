@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -15,12 +14,18 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
-// AddApplicationNoteHandler handles POST /festivals/{festivalID}/applications/{applicationID}/notes.
-func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
+// ScoreApplicationHandler handles PUT /festivals/{festivalID}/applications/{applicationID}/score.
+// Owner or reviewer. Reviewers cannot score their own application (COI).
+func ScoreApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
+			return
+		}
+		uid, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
 			return
 		}
 
@@ -50,68 +55,53 @@ func AddApplicationNoteHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		// Verify the application exists and belongs to this festival.
-		app, err := q.GetApplicationByID(r.Context(), appUUID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.NotFound(w)
-				return
-			}
-			httperr.InternalServerError(w)
-			return
-		}
-		festForm, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.NotFound(w)
-				return
-			}
-			httperr.InternalServerError(w)
-			return
-		}
-		if app.FormID != festForm.ID {
-			httperr.NotFound(w)
+		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+		if !ok {
 			return
 		}
 
+		// COI: a reviewer cannot score the application belonging to their own artist profile.
+		if role == roleReviewer {
+			profile, err := q.GetArtistProfileByUserID(r.Context(), uid)
+			if err == nil && profile.ID == app.ArtistID {
+				httperr.Forbidden(w)
+				return
+			} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				httperr.InternalServerError(w)
+				return
+			}
+		}
+
 		var req struct {
-			Content string `json:"content"`
+			Score int32 `json:"score"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
 			return
 		}
-		req.Content = strings.TrimSpace(req.Content)
-		if req.Content == "" {
-			httperr.UnprocessableEntity(w, "content is required")
-			return
-		}
-		if len(req.Content) > 5000 {
-			httperr.UnprocessableEntity(w, "content too long")
+		if req.Score < 1 || req.Score > 5 {
+			httperr.UnprocessableEntity(w, "score must be between 1 and 5")
 			return
 		}
 
-		authorUUID, err := pgUUIDFromString(principal.UserID)
-		if err != nil {
-			httperr.InternalServerError(w)
-			return
-		}
-		note, err := q.CreateApplicationNote(r.Context(), sqlcdb.CreateApplicationNoteParams{
+		score, err := q.UpsertApplicationScore(r.Context(), sqlcdb.UpsertApplicationScoreParams{
 			ApplicationID: appUUID,
-			Content:       req.Content,
-			AuthorID:      authorUUID,
+			ReviewerID:    uid,
+			Score:         req.Score,
 		})
 		if err != nil {
-			if isFKViolation(err) {
-				httperr.NotFound(w)
-				return
-			}
 			httperr.InternalServerError(w)
 			return
 		}
 
+		type scoreResponse struct {
+			ApplicationID string `json:"application_id"`
+			Score         int32  `json:"score"`
+		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(toNoteResponse(note))
+		_ = json.NewEncoder(w).Encode(scoreResponse{
+			ApplicationID: score.ApplicationID.String(),
+			Score:         score.Score,
+		})
 	}
 }

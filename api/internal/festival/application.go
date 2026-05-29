@@ -30,9 +30,10 @@ type artistSummary struct {
 }
 
 type noteResponse struct {
-	ID        string `json:"id"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
+	ID        string  `json:"id"`
+	Content   string  `json:"content"`
+	AuthorID  *string `json:"author_id"`
+	CreatedAt string  `json:"created_at"`
 }
 
 type applicationResponse struct {
@@ -46,6 +47,9 @@ type applicationResponse struct {
 	Answers     json.RawMessage `json:"answers"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
+	AvgScore    *float64        `json:"avg_score"`
+	ScoreCount  int32           `json:"score_count"`
+	MyScore     *int32          `json:"my_score"`
 	Artist      *artistSummary  `json:"artist,omitempty"`
 	Notes       []noteResponse  `json:"notes"`
 }
@@ -68,7 +72,6 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 
 func toEnrichedResponse(
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
-	notes []noteResponse,
 ) applicationResponse {
 	mediumTags := row.MediumTags
 	if mediumTags == nil {
@@ -91,14 +94,46 @@ func toEnrichedResponse(
 			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
 		},
-		Notes: notes,
+		Notes: []noteResponse{},
+	}
+}
+
+func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingReviewerRow) applicationResponse {
+	mediumTags := row.MediumTags
+	if mediumTags == nil {
+		mediumTags = []string{}
+	}
+	return applicationResponse{
+		ID:          row.ID.String(),
+		FormID:      row.FormID.String(),
+		ArtistID:    row.ArtistID.String(),
+		Status:      string(row.Status),
+		Rank:        row.Rank,
+		Shortlisted: row.Shortlisted,
+		ReviewFlag:  row.ReviewFlag,
+		Answers:     row.Answers,
+		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
+		Artist: &artistSummary{
+			DisplayName:   row.DisplayName,
+			AvatarS3Key:   row.AvatarS3Key,
+			MediumTags:    mediumTags,
+			LocationLabel: row.LocationLabel,
+		},
+		Notes: []noteResponse{},
 	}
 }
 
 func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse {
+	var author *string
+	if n.AuthorID.Valid {
+		s := n.AuthorID.String()
+		author = &s
+	}
 	return noteResponse{
 		ID:        n.ID.String(),
 		Content:   n.Content,
+		AuthorID:  author,
 		CreatedAt: n.CreatedAt.Time.Format(time.RFC3339),
 	}
 }

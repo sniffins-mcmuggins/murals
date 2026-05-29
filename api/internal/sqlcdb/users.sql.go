@@ -272,3 +272,31 @@ func (q *Queries) SetMFAEnabled(ctx context.Context, arg SetMFAEnabledParams) (U
 	)
 	return i, err
 }
+
+const upsertUserByEmail = `-- name: UpsertUserByEmail :one
+INSERT INTO users (email)
+VALUES ($1)
+ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin
+`
+
+// Idempotent invite target. New rows are passwordless (valid for invitees /
+// OAuth users). The no-op DO UPDATE makes RETURNING * yield the existing row.
+func (q *Queries) UpsertUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, upsertUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.OauthProvider,
+		&i.OauthSubject,
+		&i.MfaEnabled,
+		&i.MfaSecret,
+		&i.SessionVersion,
+		&i.StripeCustomerID,
+		&i.IsAdmin,
+	)
+	return i, err
+}

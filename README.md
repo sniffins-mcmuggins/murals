@@ -1,7 +1,7 @@
 # [Platform Name] — Project README
 > Working name: **Render** (renderltd.com available) · Previously considered: Gesso · Name TBD  
-> Status: Pre-build · Concept locked · Branding in progress  
-> Last updated: May 2025
+> Status: In build · Concept locked · Branding in progress  
+> Last updated: May 2026
 
 ---
 
@@ -11,16 +11,17 @@
 3. [The Three Products](#the-three-products)
 4. [User Types & Journeys](#user-types--journeys)
 5. [Features by Product](#features-by-product)
-6. [Revenue Model & Pricing](#revenue-model--pricing)
-7. [Market Size & ARR Projections](#market-size--arr-projections)
-8. [Tech Architecture Notes](#tech-architecture-notes)
-9. [Team](#team)
-10. [Launch Strategy](#launch-strategy)
-11. [Pilot Festivals](#pilot-festivals)
-12. [First Steps & Timeline](#first-steps--timeline)
-13. [Key Decisions Log](#key-decisions-log)
-14. [Outstanding Decisions](#outstanding-decisions)
-15. [File Index](#file-index)
+6. [Organiser Review & Selection — Build Plan](#organiser-review--selection--build-plan)
+7. [Revenue Model & Pricing](#revenue-model--pricing)
+8. [Market Size & ARR Projections](#market-size--arr-projections)
+9. [Tech Architecture Notes](#tech-architecture-notes)
+10. [Team](#team)
+11. [Launch Strategy](#launch-strategy)
+12. [Pilot Festivals](#pilot-festivals)
+13. [First Steps & Timeline](#first-steps--timeline)
+14. [Key Decisions Log](#key-decisions-log)
+15. [Outstanding Decisions](#outstanding-decisions)
+16. [File Index](#file-index)
 
 ---
 
@@ -244,6 +245,79 @@ Three modes in one tab:
 
 ### Magazine (Editorial Tool)
 Internal tool for the editorial team to write, schedule, and publish weekly features. Rich text editor, cover image upload, publish scheduling. Not a self-publish interface for artists — all content is commissioned and edited.
+
+---
+
+## Organiser Review & Selection — Build Plan
+
+This is the platform's competitive front line. [Zealous](https://zealous.co) is the incumbent for creative submissions and judging (clients: The Design Museum, Shakespeare's Globe, Island Records) — but it **cedes public discovery and live-festival navigation entirely.** There is no map, no "explore live festivals," no on-the-ground wayfinding. That uncontested space — our public app, festival maps, and the branded QR on every wall — is our moat.
+
+The trap is that an organiser still *compares us to Zealous on the selection tooling*, and that is where they are strong. So our org-facing pitch must lead with **"selection tooling *and* a living public map your visitors actually use on the day"** — and we have to be credible on the selection half. This section maps each Zealous selection capability to what the API already does and what is left to build. It is the primary roadmap for the organiser product.
+
+### Foundational gap: there is no panellist model
+
+Every review handler in `api/internal/festival/` gates on `fest.OrganiserID == principal.UserID` — **only the festival owner can review applications.** Anonymous review, multi-round selection with different panels, and rubric scoring all assume *multiple reviewers per festival*. The prerequisite for three of the four headline features below is therefore a **festival reviewer / panellist role**: an invited user who can score but not edit the festival. Build this first; everything else layers on it.
+
+**What the API already supports (current state):**
+
+| Capability | Where |
+|---|---|
+| Submitted → accepted / declined / waitlisted | `review.go`, `waitlist.go`; `applications.status` enum |
+| Manual drag-rank within a status bucket | `patch.go` `ReorderApplicationsHandler`; `applications.rank` |
+| Shortlist flag + review flag (binary) | `patch.go` `PatchApplicationHandler`; `applications.shortlisted` / `review_flag` |
+| Free-text notes per application | `notes.go`; `application_notes` table |
+| Custom form fields, open/close dates, max cap | `form.go`; `application_forms` (`fields` jsonb, `open_at`, `close_at`, `max_applications`) |
+| Answers keyed by field id | `applications.answers` jsonb |
+| Auto-notify artist on accept/decline | `sendApplicationNotification` |
+
+### Gap map (priority order)
+
+**1. Panellist / reviewer accounts** — *prerequisite, build first* · spec: `docs/superpowers/specs/2026-05-29-panellist-accounts-design.md` · issue [#156](https://github.com/sniffins-mcmuggins/murals/issues/156)
+- **Zealous:** panels of judges, skip conflict-of-interest entries, "pick up where you left off on any device."
+- **Now:** single owner-reviewer only.
+- **Build:** `festival_reviewers` table; email-invite flow (reuses the password-reset token machinery); a `resolveFestivalAccess` helper so review handlers allow "owner OR invited reviewer"; advisory reviewers (score + comment, owner decides); auto-hide a reviewer's own application (COI); per-reviewer 1–5 score surfaced as an avg badge on the board.
+
+**2. Criteria-based scoring rubric** · issue [#157](https://github.com/sniffins-mcmuggins/murals/issues/157) (blocked on #156)
+- **Zealous:** configurable rubric with per-criterion score ranges (they use 1–7); score distributions shown on the dashboard in real time.
+- **Now:** only a binary `review_flag` and manual `rank`. No scores.
+- **Build:** `review_criteria` config on `application_forms` (`[{label, min, max}]`); `application_scores` table (`application_id`, `reviewer_id`, `criterion`, `score`); aggregate to a mean to drive ranking. Per [`sqlc-and-schema.md`](.claude/rules/sqlc-and-schema.md) this is new tables + queries + an e2e canary that scores an application and reads the aggregate back (a unit test asserting zero-is-zero will not catch a missing Scan).
+
+**3. Anonymous review toggle** · issue [#158](https://github.com/sniffins-mcmuggins/murals/issues/158) (blocked on #156)
+- **Zealous:** auto-hides artist name and personal details; identities revealed only after scores are locked. No manual redaction.
+- **Now:** `ListApplicationsByFormWithArtist` always joins and returns the full artist profile.
+- **Build:** `anonymous_review bool` on `application_forms`; when true, `toEnrichedResponse` strips name / avatar / social / profile link and returns only answers + work images; reveal once the reviewer has scored (or on explicit organiser override). Low effort, high-credibility selling point — equitable selection with zero admin.
+
+**4. Multi-round selection** · issue [#159](https://github.com/sniffins-mcmuggins/murals/issues/159) (blocked on #156)
+- **Zealous:** screening → shortlist → final, with different panellists *and* criteria per round.
+- **Now:** the single `shortlisted` bool is a poor-man's two-stage.
+- **Build:** formalise rounds — a `round` concept owning its own criteria set and reviewer set, with applications advancing round-by-round. Largest lift; needed for Upfest-scale volume (250+ artists). Ships after the CPF pilot.
+
+**5. Quick-selection mode** — *mostly already possible*
+- **Zealous:** fast yes/no screening pass before detailed review.
+- **Now:** the shortlist toggle + drag-rank already deliver this; it is a UI affordance, not new API.
+- **Build:** a keyboard-driven "triage" view in the web platform over the existing `PatchApplicationHandler`. Web-only, no schema change.
+
+**6. Trackable submission links**
+- **Zealous:** per-channel links measuring which marketing drove submissions.
+- **Now:** none.
+- **Build:** capture a `source` string on `applications` at submit time; aggregate per festival. Fits the GDPR-aggregate-only analytics stance (no individual tracking).
+
+### Submission richness (artist side — supporting)
+
+- **Media embeds** — Vimeo / YouTube / SoundCloud / **Sketchfab (3D)**. Add an `embed` form-field type in `web/src/components/DynamicForm.tsx`; validates and stores a provider URL in `answers`. Sidesteps image-storage cost and is high-value for mural artists (video walkthroughs, 3D mockups, site plans).
+- **Portfolio reuse** — `SubmitApplicationHandler` already loads the artist profile; extend it to pre-fill answers from existing collections so applying is near one-click. Directly serves "help an artist make a career."
+- **Portfolio-based opportunity matching** — Zealous recommends open calls matching a portfolio. We can do this *better* with festival geography ("open calls near you / in cities you've painted"). Year 2.
+
+### Sequencing
+
+1. **Panellist accounts** — unblocks 2–4.
+2. **Rubric scoring + anonymous toggle** — the two features organisers compare directly against Zealous.
+3. **Quick-select triage UI + trackable links** — cheap wins, no/low schema change.
+4. **Multi-round + opportunity matching** — post-CPF, sized for Upfest scale.
+
+### Pricing tension to resolve
+
+Zealous runs **no setup fee + first 20 submissions free + ~2-minute no-card signup**, billed on submission volume with no annual lock-in (33% off annual from Apr 2026), and paid calls at 2.2% + 20p capped £2. Our model is a **£35 setup fee + monthly subscription from go-live**. Their land-grab is optimised for exactly the "just try it" adoption our setup fee blocks. Not a decision to change pricing — a flag to weigh: the setup fee is friction at precisely the moment an organiser is comparing us to a free trial. See [Outstanding Decisions](#outstanding-decisions).
 
 ---
 
@@ -546,6 +620,8 @@ First Global client should be acquired at discount/free for reference credibilit
 | **Offline map support** | TBD | Would improve festival day experience significantly. |
 | **Enterprise onboarding** | Year 2 | Process design needed when first client approaches. |
 | **API for arts councils** | Year 2+ | Anonymous data for funder reporting. Design TBD. |
+| **Organiser setup fee vs free trial** | Open | Zealous offers no setup fee + first 20 submissions free. Our £35 setup fee is friction at the comparison moment. Consider a free-trial tier (e.g. first festival or first N applications free) without abandoning the fee. See [Organiser Review & Selection — Build Plan](#organiser-review--selection--build-plan). |
+| **Panellist / reviewer accounts** | Specced — issue [#156](https://github.com/sniffins-mcmuggins/murals/issues/156) | Prerequisite for rubric scoring (#157), anonymous review (#158), and multi-round (#159). Currently review is single-owner only. |
 
 ---
 

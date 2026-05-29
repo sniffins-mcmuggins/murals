@@ -104,6 +104,14 @@ func createTestApplicationFormWithFields(t *testing.T, pool *pgxpool.Pool, festi
 	return form.ID.String()
 }
 
+func addReviewer(t *testing.T, db *pgxpool.Pool, festID, userID string) {
+	t.Helper()
+	_, err := sqlcdb.New(db).AddFestivalReviewer(context.Background(), sqlcdb.AddFestivalReviewerParams{
+		FestivalID: pgUUID(t, festID), UserID: pgUUID(t, userID),
+	})
+	require.NoError(t, err)
+}
+
 func createTestApplicationInFestival(t *testing.T, pool *pgxpool.Pool, festivalID, userID string) string {
 	t.Helper()
 	q := sqlcdb.New(pool)

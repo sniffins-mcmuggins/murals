@@ -228,6 +228,14 @@ type ApplicationNote struct {
 	ApplicationID pgtype.UUID        `db:"application_id" json:"application_id"`
 	Content       string             `db:"content" json:"content"`
 	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	AuthorID      pgtype.UUID        `db:"author_id" json:"author_id"`
+}
+
+type ApplicationScore struct {
+	ApplicationID pgtype.UUID        `db:"application_id" json:"application_id"`
+	ReviewerID    pgtype.UUID        `db:"reviewer_id" json:"reviewer_id"`
+	Score         int32              `db:"score" json:"score"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type ArtistProfile struct {
@@ -289,6 +297,13 @@ type FestivalArtist struct {
 	Status     FestivalArtistStatus `db:"status" json:"status"`
 	CreatedAt  pgtype.Timestamptz   `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz   `db:"updated_at" json:"updated_at"`
+}
+
+type FestivalReviewer struct {
+	FestivalID pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	UserID     pgtype.UUID        `db:"user_id" json:"user_id"`
+	AcceptedAt pgtype.Timestamptz `db:"accepted_at" json:"accepted_at"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type FestivalSpot struct {

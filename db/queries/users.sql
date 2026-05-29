@@ -51,3 +51,11 @@ UPDATE users
 SET session_version = session_version + 1
 WHERE id = $1
 RETURNING *;
+
+-- name: UpsertUserByEmail :one
+-- Idempotent invite target. New rows are passwordless (valid for invitees /
+-- OAuth users). The no-op DO UPDATE makes RETURNING * yield the existing row.
+INSERT INTO users (email)
+VALUES ($1)
+ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+RETURNING *;
