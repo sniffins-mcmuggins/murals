@@ -37,21 +37,22 @@ type noteResponse struct {
 }
 
 type applicationResponse struct {
-	ID          string          `json:"id"`
-	FormID      string          `json:"form_id"`
-	ArtistID    string          `json:"artist_id"`
-	Status      string          `json:"status"`
-	Rank        int32           `json:"rank"`
-	Shortlisted bool            `json:"shortlisted"`
-	ReviewFlag  bool            `json:"review_flag"`
-	Answers     json.RawMessage `json:"answers"`
-	CreatedAt   string          `json:"created_at"`
-	UpdatedAt   string          `json:"updated_at"`
-	AvgScore    *float64        `json:"avg_score"`
-	ScoreCount  int32           `json:"score_count"`
-	MyScore     *int32          `json:"my_score"`
-	Artist      *artistSummary  `json:"artist,omitempty"`
-	Notes       []noteResponse  `json:"notes"`
+	ID             string          `json:"id"`
+	FormID         string          `json:"form_id"`
+	ArtistID       string          `json:"artist_id"`
+	Status         string          `json:"status"`
+	Rank           int32           `json:"rank"`
+	Shortlisted    bool            `json:"shortlisted"`
+	ReviewFlag     bool            `json:"review_flag"`
+	Answers        json.RawMessage `json:"answers"`
+	CreatedAt      string          `json:"created_at"`
+	UpdatedAt      string          `json:"updated_at"`
+	AvgScore       *float64        `json:"avg_score"`
+	ScoreCount     int32           `json:"score_count"`
+	MyScore        *int32          `json:"my_score"`
+	Artist         *artistSummary  `json:"artist,omitempty"`
+	Notes          []noteResponse  `json:"notes"`
+	IdentityHidden bool            `json:"identity_hidden"`
 }
 
 func toApplicationResponse(a sqlcdb.Application) applicationResponse {

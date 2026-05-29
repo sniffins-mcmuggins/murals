@@ -164,6 +164,7 @@ func main() {
 	// Application forms
 	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(pool))
 	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(pool))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(pool))
 
 	// Applications
 	r.Get("/me/applications", festival.GetMyApplicationsHandler(pool))

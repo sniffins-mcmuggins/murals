@@ -22,6 +22,7 @@ type formResponse struct {
 	OpenAt          *string         `json:"open_at,omitempty"`
 	CloseAt         *string         `json:"close_at,omitempty"`
 	MaxApplications *int32          `json:"max_applications,omitempty"`
+	AnonymousReview bool            `json:"anonymous_review"`
 	CreatedAt       string          `json:"created_at"`
 	UpdatedAt       string          `json:"updated_at"`
 }
@@ -32,6 +33,7 @@ func toFormResponse(f sqlcdb.ApplicationForm) formResponse {
 		FestivalID:      f.FestivalID.String(),
 		Fields:          f.Fields,
 		MaxApplications: f.MaxApplications,
+		AnonymousReview: f.AnonymousReview,
 		CreatedAt:       f.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:       f.UpdatedAt.Time.Format(time.RFC3339),
 	}
@@ -112,6 +114,79 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		q := sqlcdb.New(pool)
 		form, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(toFormResponse(form))
+	}
+}
+
+// PatchFormHandler handles PATCH /festivals/{festivalID}/form. Owner only.
+// Currently accepts only anonymous_review; extend the request struct for future toggles.
+func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, err := auth.User(r.Context())
+		if err != nil {
+			httperr.Unauthorized(w)
+			return
+		}
+
+		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
+		if err != nil {
+			httperr.BadRequest(w, "invalid festivalID")
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		fest, err := q.GetFestivalByID(r.Context(), festUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+		if fest.OrganiserID.String() != principal.UserID {
+			httperr.Forbidden(w)
+			return
+		}
+
+		var req struct {
+			AnonymousReview *bool `json:"anonymous_review"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httperr.BadRequest(w, "invalid request body")
+			return
+		}
+
+		if req.AnonymousReview == nil {
+			// Nothing to update — return current state.
+			form, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					httperr.NotFound(w)
+					return
+				}
+				httperr.InternalServerError(w)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(toFormResponse(form))
+			return
+		}
+
+		form, err := q.PatchFormAnonymousReview(r.Context(), sqlcdb.PatchFormAnonymousReviewParams{
+			FestivalID:      festUUID,
+			AnonymousReview: *req.AnonymousReview,
+		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.NotFound(w)

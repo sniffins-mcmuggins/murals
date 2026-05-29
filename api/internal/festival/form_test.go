@@ -103,3 +103,71 @@ func TestGetForm_NotFound(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	_ = resp.Body.Close()
 }
+
+func TestPatchForm_AnonymousReview_RequiresOwner(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, _ := createTestUser(t, db, "patchform-org1@test")
+	_, otherTok := createTestUser(t, db, "patchform-other1@test")
+	festID := createTestFestival(t, db, orgID, "patchform-fest1", "draft")
+	createTestApplicationForm(t, db, festID)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"anonymous_review":true}`, otherTok)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestPatchForm_AnonymousReview_TogglesOn(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgTok := createTestUser(t, db, "patchform-org2@test")
+	festID := createTestFestival(t, db, orgID, "patchform-fest2", "draft")
+	createTestApplicationForm(t, db, festID)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
+	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Enable anonymous review
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"anonymous_review":true}`, orgTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var form map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&form))
+	_ = resp.Body.Close()
+	assert.Equal(t, true, form["anonymous_review"])
+
+	// GET reflects the persisted value
+	get := doRequest(t, srv, "GET", "/festivals/"+festID+"/form", "", "")
+	require.Equal(t, http.StatusOK, get.StatusCode)
+	var form2 map[string]any
+	require.NoError(t, json.NewDecoder(get.Body).Decode(&form2))
+	_ = get.Body.Close()
+	assert.Equal(t, true, form2["anonymous_review"])
+}
+
+func TestPatchForm_AnonymousReview_404_NoForm(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgTok := createTestUser(t, db, "patchform-org3@test")
+	festID := createTestFestival(t, db, orgID, "patchform-fest3", "draft")
+	// No form created
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"anonymous_review":true}`, orgTok)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	_ = resp.Body.Close()
+}
