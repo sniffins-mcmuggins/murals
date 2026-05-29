@@ -57,7 +57,11 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		callerUUID, _ := pgUUIDFromString(principal.UserID)
+		callerUUID, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
 
 		// Fetch enriched rows. Reviewer path excludes the caller's own application.
 		type item struct {
@@ -85,7 +89,7 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			for _, row := range rows {
-				items = append(items, item{resp: toEnrichedResponse(row, []noteResponse{}), id: row.ID})
+				items = append(items, item{resp: toEnrichedResponse(row), id: row.ID})
 			}
 		}
 
@@ -130,6 +134,20 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			summaryByApp[s.ApplicationID.String()] = scoreSummary{avg: s.AvgScore, count: s.ScoreCount}
 		}
 
+		// Batch-fetch the caller's own scores.
+		myScoreByApp := map[string]int32{}
+		myScores, err := q.GetMyScoresByApplications(r.Context(), sqlcdb.GetMyScoresByApplicationsParams{
+			Column1:    appIDs,
+			ReviewerID: callerUUID,
+		})
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		for _, ms := range myScores {
+			myScoreByApp[ms.ApplicationID.String()] = ms.Score
+		}
+
 		// Assemble final response.
 		resp := make([]applicationResponse, len(items))
 		for i, it := range items {
@@ -140,15 +158,10 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				a.AvgScore = &avg
 				a.ScoreCount = sum.count
 			}
-			myScore, err := q.GetMyScore(r.Context(), sqlcdb.GetMyScoreParams{
-				ApplicationID: it.id,
-				ReviewerID:    callerUUID,
-			})
-			if err == nil {
-				m := myScore
+			if ms, ok := myScoreByApp[it.id.String()]; ok {
+				m := ms
 				a.MyScore = &m
 			}
-			// pgx.ErrNoRows from GetMyScore is a normal miss (no score yet) — leave MyScore nil.
 			resp[i] = a
 		}
 

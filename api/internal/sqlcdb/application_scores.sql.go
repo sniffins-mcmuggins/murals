@@ -27,6 +27,42 @@ func (q *Queries) GetMyScore(ctx context.Context, arg GetMyScoreParams) (int32, 
 	return score, err
 }
 
+const getMyScoresByApplications = `-- name: GetMyScoresByApplications :many
+SELECT application_id, score
+FROM application_scores
+WHERE application_id = ANY($1::uuid[]) AND reviewer_id = $2
+`
+
+type GetMyScoresByApplicationsParams struct {
+	Column1    []pgtype.UUID `db:"column_1" json:"column_1"`
+	ReviewerID pgtype.UUID   `db:"reviewer_id" json:"reviewer_id"`
+}
+
+type GetMyScoresByApplicationsRow struct {
+	ApplicationID pgtype.UUID `db:"application_id" json:"application_id"`
+	Score         int32       `db:"score" json:"score"`
+}
+
+func (q *Queries) GetMyScoresByApplications(ctx context.Context, arg GetMyScoresByApplicationsParams) ([]GetMyScoresByApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, getMyScoresByApplications, arg.Column1, arg.ReviewerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMyScoresByApplicationsRow
+	for rows.Next() {
+		var i GetMyScoresByApplicationsRow
+		if err := rows.Scan(&i.ApplicationID, &i.Score); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const scoreSummaryByApplications = `-- name: ScoreSummaryByApplications :many
 SELECT application_id, AVG(score)::float8 AS avg_score, COUNT(*)::int AS score_count
 FROM application_scores

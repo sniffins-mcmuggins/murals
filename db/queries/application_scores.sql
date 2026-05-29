@@ -13,3 +13,8 @@ GROUP BY application_id;
 
 -- name: GetMyScore :one
 SELECT score FROM application_scores WHERE application_id = $1 AND reviewer_id = $2;
+
+-- name: GetMyScoresByApplications :many
+SELECT application_id, score
+FROM application_scores
+WHERE application_id = ANY($1::uuid[]) AND reviewer_id = $2;

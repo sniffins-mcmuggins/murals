@@ -72,7 +72,6 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 
 func toEnrichedResponse(
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
-	notes []noteResponse,
 ) applicationResponse {
 	mediumTags := row.MediumTags
 	if mediumTags == nil {
@@ -95,7 +94,7 @@ func toEnrichedResponse(
 			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
 		},
-		Notes: notes,
+		Notes: []noteResponse{},
 	}
 }
 
