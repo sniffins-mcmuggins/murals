@@ -251,3 +251,34 @@ func TestListApplications_AnonymousReview_OwnerAlwaysSeesFull(t *testing.T) {
 	artist := app["artist"].(map[string]any)
 	assert.Equal(t, "Real Name 3", artist["display_name"], "owner always sees real name")
 }
+
+func TestListApplications_AnonymousReview_OffShowsFullIdentity(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, _ := createTestUser(t, db, "anon-owner-4@test")
+	revID, revTok := createTestUser(t, db, "anon-rev-4@test")
+	artistID, _ := createTestUser(t, db, "anon-art-4@test")
+	createTestArtistProfile(t, db, artistID, "Real Name 4")
+
+	festID := createTestFestival(t, db, ownerID, "anon-fest-4", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	// anonymous_review is false by default — do NOT call setFormAnonymousReview
+	createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, revID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", revTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	app := list[0]
+	assert.Equal(t, false, app["identity_hidden"], "identity_hidden must be false when anonymous_review is off")
+	artist := app["artist"].(map[string]any)
+	assert.Equal(t, "Real Name 4", artist["display_name"], "full name visible when anonymous_review is off")
+}
