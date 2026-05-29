@@ -10,12 +10,12 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
-type festivalRole int //nolint:unused
+type festivalRole int
 
 const (
-	roleNone     festivalRole = iota //nolint:unused
-	roleReviewer                     //nolint:unused
-	roleOwner                        //nolint:unused
+	roleNone festivalRole = iota
+	roleReviewer
+	roleOwner
 )
 
 // resolveFestivalAccess returns the caller's role for a festival.
@@ -23,7 +23,7 @@ const (
 // reviewer = row in festival_reviewers
 // none     = neither
 // Returns pgx.ErrNoRows only if the festival itself does not exist.
-func resolveFestivalAccess(ctx context.Context, q *sqlcdb.Queries, festUUID pgtype.UUID, userID string) (festivalRole, error) { //nolint:unused
+func resolveFestivalAccess(ctx context.Context, q *sqlcdb.Queries, festUUID pgtype.UUID, userID string) (festivalRole, error) {
 	fest, err := q.GetFestivalByID(ctx, festUUID)
 	if err != nil {
 		return roleNone, err
