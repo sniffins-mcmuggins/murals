@@ -7,6 +7,44 @@ import type { components } from '@render/api-client'
 
 type Reviewer = components['schemas']['ReviewerResponse']
 
+function ReviewerRow({ reviewer, festivalId }: { reviewer: Reviewer; festivalId: string }) {
+  const queryClient = useQueryClient()
+  const [removeError, setRemoveError] = useState<string | null>(null)
+
+  const removeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.DELETE('/festivals/{festivalID}/reviewers/{userID}', {
+        params: { path: { festivalID: festivalId, userID: reviewer.user_id } },
+      })
+      if (res.error) throw new Error('Remove failed')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['festival-reviewers', festivalId] }),
+    onError: () => setRemoveError('Failed to remove reviewer.'),
+  })
+
+  return (
+    <li className="flex items-center gap-3">
+      <span className="font-sans text-sm text-ink flex-1">{reviewer.email}</span>
+      <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${
+        reviewer.accepted_at
+          ? 'text-ink bg-amber/20 border-amber/40'
+          : 'text-mid bg-warm border-light'
+      }`}>
+        {reviewer.accepted_at ? 'accepted' : 'pending'}
+      </span>
+      {removeError && <span className="font-sans text-xs text-clay">{removeError}</span>}
+      <button
+        type="button"
+        onClick={() => removeMutation.mutate()}
+        disabled={removeMutation.isPending}
+        className="font-sans text-xs text-clay hover:opacity-80 disabled:opacity-50"
+      >
+        {removeMutation.isPending ? 'Removing…' : 'Remove'}
+      </button>
+    </li>
+  )
+}
+
 export function ReviewersSection({ festivalId }: { festivalId: string }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -39,16 +77,6 @@ export function ReviewersSection({ festivalId }: { festivalId: string }) {
     onError: () => setInviteError('Failed to send invite. Check the email address.'),
   })
 
-  const removeMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const res = await apiClient.DELETE('/festivals/{festivalID}/reviewers/{userID}', {
-        params: { path: { festivalID: festivalId, userID: userId } },
-      })
-      if (res.error) throw new Error('Remove failed')
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['festival-reviewers', festivalId] }),
-  })
-
   const handleInvite = () => {
     const email = inviteEmail.trim()
     if (!email || !email.includes('@')) return
@@ -62,33 +90,16 @@ export function ReviewersSection({ festivalId }: { festivalId: string }) {
     <div className="p-5 bg-warm border border-light rounded-lg mb-6">
       <h2 className="font-serif text-xl text-ink mb-4">Reviewers</h2>
 
-      {reviewers.length === 0 && (
+      {!reviewersQuery.isLoading && reviewers.length === 0 && (
         <p className="font-sans text-sm text-mid mb-4">
           No reviewers yet. Invite someone by email to score applications.
         </p>
       )}
 
-      {reviewers.length > 0 && (
+      {!reviewersQuery.isLoading && reviewers.length > 0 && (
         <ul className="space-y-2 mb-4">
           {reviewers.map(r => (
-            <li key={r.user_id} className="flex items-center gap-3">
-              <span className="font-sans text-sm text-ink flex-1">{r.email}</span>
-              <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${
-                r.accepted_at
-                  ? 'text-ink bg-warm border-light'
-                  : 'text-mid bg-warm border-light'
-              }`}>
-                {r.accepted_at ? 'accepted' : 'pending'}
-              </span>
-              <button
-                type="button"
-                onClick={() => removeMutation.mutate(r.user_id ?? '')}
-                disabled={removeMutation.isPending}
-                className="font-sans text-xs text-clay hover:opacity-80 disabled:opacity-50"
-              >
-                Remove
-              </button>
-            </li>
+            <ReviewerRow key={r.user_id} reviewer={r} festivalId={festivalId} />
           ))}
         </ul>
       )}
