@@ -25,6 +25,7 @@ type reviewerResponse struct {
 // InviteReviewerHandler handles POST /festivals/{festivalID}/reviewers. Owner only.
 func InviteReviewerHandler(pool *pgxpool.Pool, mailer auth.EmailSender, webBase string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Inline ownership check (not requireFestivalOwner) because we need fest.Name for the invite email.
 		principal, err := auth.User(r.Context())
 		if err != nil {
 			httperr.Unauthorized(w)
@@ -95,28 +96,9 @@ func InviteReviewerHandler(pool *pgxpool.Pool, mailer auth.EmailSender, webBase 
 // ListReviewersHandler handles GET /festivals/{festivalID}/reviewers. Owner only.
 func ListReviewersHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		principal, err := auth.User(r.Context())
-		if err != nil {
-			httperr.Unauthorized(w)
-			return
-		}
-		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
-		if err != nil {
-			httperr.BadRequest(w, "invalid festivalID")
-			return
-		}
 		q := sqlcdb.New(pool)
-		fest, err := q.GetFestivalByID(r.Context(), festUUID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.NotFound(w)
-				return
-			}
-			httperr.InternalServerError(w)
-			return
-		}
-		if fest.OrganiserID.String() != principal.UserID {
-			httperr.Forbidden(w)
+		festUUID, ok := requireFestivalOwner(r, w, q, chi.URLParam(r, "festivalID"))
+		if !ok {
 			return
 		}
 		rows, err := q.ListFestivalReviewers(r.Context(), festUUID)
@@ -146,33 +128,14 @@ func ListReviewersHandler(pool *pgxpool.Pool) http.HandlerFunc {
 // RemoveReviewerHandler handles DELETE /festivals/{festivalID}/reviewers/{userID}. Owner only.
 func RemoveReviewerHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		principal, err := auth.User(r.Context())
-		if err != nil {
-			httperr.Unauthorized(w)
-			return
-		}
-		festUUID, err := pgUUIDFromString(chi.URLParam(r, "festivalID"))
-		if err != nil {
-			httperr.BadRequest(w, "invalid festivalID")
+		q := sqlcdb.New(pool)
+		festUUID, ok := requireFestivalOwner(r, w, q, chi.URLParam(r, "festivalID"))
+		if !ok {
 			return
 		}
 		userUUID, err := pgUUIDFromString(chi.URLParam(r, "userID"))
 		if err != nil {
 			httperr.BadRequest(w, "invalid userID")
-			return
-		}
-		q := sqlcdb.New(pool)
-		fest, err := q.GetFestivalByID(r.Context(), festUUID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.NotFound(w)
-				return
-			}
-			httperr.InternalServerError(w)
-			return
-		}
-		if fest.OrganiserID.String() != principal.UserID {
-			httperr.Forbidden(w)
 			return
 		}
 		if err := q.RemoveFestivalReviewer(r.Context(), sqlcdb.RemoveFestivalReviewerParams{
@@ -182,6 +145,7 @@ func RemoveReviewerHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.InternalServerError(w)
 			return
 		}
+		// 204 even if the row didn't exist — idempotent delete is intentional.
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

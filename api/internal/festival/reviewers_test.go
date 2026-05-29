@@ -63,3 +63,17 @@ func TestInviteReviewer_RequiresAuth(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	_ = resp.Body.Close()
 }
+
+func TestInviteReviewer_OwnerAddsNewEmail(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, ownerTok := createTestUser(t, db, "rev-owner-4@test")
+	festID := createTestFestival(t, db, ownerID, "rev-fest-4", "open")
+	srv := newReviewerServer(db)
+	t.Cleanup(srv.Close)
+
+	// brand-new email — no pre-existing user row
+	resp := doRequest(t, srv, "POST", "/festivals/"+festID+"/reviewers", `{"email":"brand-new-4@test"}`, ownerTok)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	_ = resp.Body.Close()
+}
