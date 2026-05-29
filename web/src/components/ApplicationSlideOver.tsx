@@ -54,7 +54,8 @@ export function ApplicationSlideOver({
   if (!application) return null
 
   const artist = application.artist as ApplicationArtist | undefined
-  const name = artist?.display_name ?? 'Unknown Artist'
+  const isAnonymous = application.identity_hidden === true
+  const name = isAnonymous ? 'Anonymous artist' : (artist?.display_name ?? 'Unknown Artist')
   const answers = (application.answers ?? {}) as Record<string, string>
   const notes = (application.notes ?? []) as ApplicationNote[]
   const actions = ACTION_TRANSITIONS[application.status ?? ''] ?? []
@@ -82,7 +83,7 @@ export function ApplicationSlideOver({
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold">
-                {initials(name)}
+                {isAnonymous ? '?' : initials(name)}
               </div>
               <div>
                 <h2 className="font-serif text-xl text-ink">{name}</h2>
