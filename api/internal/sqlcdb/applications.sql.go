@@ -235,6 +235,73 @@ func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID p
 	return items, nil
 }
 
+const listApplicationsByFormWithArtistExcludingReviewer = `-- name: ListApplicationsByFormWithArtistExcludingReviewer :many
+SELECT a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label
+FROM applications a
+JOIN artist_profiles ap ON ap.id = a.artist_id
+WHERE a.form_id = $1
+  AND ap.user_id IS DISTINCT FROM $2
+ORDER BY a.rank ASC, a.created_at ASC
+`
+
+type ListApplicationsByFormWithArtistExcludingReviewerParams struct {
+	FormID pgtype.UUID `db:"form_id" json:"form_id"`
+	UserID pgtype.UUID `db:"user_id" json:"user_id"`
+}
+
+type ListApplicationsByFormWithArtistExcludingReviewerRow struct {
+	ID            pgtype.UUID        `db:"id" json:"id"`
+	FormID        pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID      pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status        ApplicationStatus  `db:"status" json:"status"`
+	Answers       json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Rank          int32              `db:"rank" json:"rank"`
+	Shortlisted   bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag    bool               `db:"review_flag" json:"review_flag"`
+	DisplayName   string             `db:"display_name" json:"display_name"`
+	AvatarS3Key   *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
+	LocationLabel *string            `db:"location_label" json:"location_label"`
+}
+
+// Reviewer-scoped: hides the application belonging to the reviewer ($2 = user_id).
+func (q *Queries) ListApplicationsByFormWithArtistExcludingReviewer(ctx context.Context, arg ListApplicationsByFormWithArtistExcludingReviewerParams) ([]ListApplicationsByFormWithArtistExcludingReviewerRow, error) {
+	rows, err := q.db.Query(ctx, listApplicationsByFormWithArtistExcludingReviewer, arg.FormID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApplicationsByFormWithArtistExcludingReviewerRow
+	for rows.Next() {
+		var i ListApplicationsByFormWithArtistExcludingReviewerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FormID,
+			&i.ArtistID,
+			&i.Status,
+			&i.Answers,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Rank,
+			&i.Shortlisted,
+			&i.ReviewFlag,
+			&i.DisplayName,
+			&i.AvatarS3Key,
+			&i.MediumTags,
+			&i.LocationLabel,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateApplicationFlags = `-- name: UpdateApplicationFlags :one
 UPDATE applications
 SET shortlisted = $2, review_flag = $3, updated_at = now()

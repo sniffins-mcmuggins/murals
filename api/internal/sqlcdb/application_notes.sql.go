@@ -12,30 +12,31 @@ import (
 )
 
 const createApplicationNote = `-- name: CreateApplicationNote :one
-INSERT INTO application_notes (application_id, content)
-VALUES ($1, $2)
-RETURNING id, application_id, content, created_at
+INSERT INTO application_notes (application_id, content, author_id)
+VALUES ($1, $2, $3) RETURNING id, application_id, content, created_at, author_id
 `
 
 type CreateApplicationNoteParams struct {
 	ApplicationID pgtype.UUID `db:"application_id" json:"application_id"`
 	Content       string      `db:"content" json:"content"`
+	AuthorID      pgtype.UUID `db:"author_id" json:"author_id"`
 }
 
 func (q *Queries) CreateApplicationNote(ctx context.Context, arg CreateApplicationNoteParams) (ApplicationNote, error) {
-	row := q.db.QueryRow(ctx, createApplicationNote, arg.ApplicationID, arg.Content)
+	row := q.db.QueryRow(ctx, createApplicationNote, arg.ApplicationID, arg.Content, arg.AuthorID)
 	var i ApplicationNote
 	err := row.Scan(
 		&i.ID,
 		&i.ApplicationID,
 		&i.Content,
 		&i.CreatedAt,
+		&i.AuthorID,
 	)
 	return i, err
 }
 
 const listNotesByApplications = `-- name: ListNotesByApplications :many
-SELECT id, application_id, content, created_at FROM application_notes
+SELECT id, application_id, content, created_at, author_id FROM application_notes
 WHERE application_id = ANY($1::uuid[])
 ORDER BY application_id, created_at ASC
 `
@@ -54,6 +55,7 @@ func (q *Queries) ListNotesByApplications(ctx context.Context, dollar_1 []pgtype
 			&i.ApplicationID,
 			&i.Content,
 			&i.CreatedAt,
+			&i.AuthorID,
 		); err != nil {
 			return nil, err
 		}
