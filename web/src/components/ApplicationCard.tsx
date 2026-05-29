@@ -15,6 +15,8 @@ interface Props {
   onWaitlist: (id: string) => void
   onToggleShortlist: (id: string, current: boolean, reviewFlag: boolean) => void
   onToggleReviewFlag: (id: string, shortlisted: boolean, current: boolean) => void
+  onScore: (id: string, score: number) => void
+  isReviewer: boolean
   isPending: boolean
 }
 
@@ -37,6 +39,24 @@ const ACTION_TRANSITIONS: Record<string, string[]> = {
   declined: [],
 }
 
+function StarControl({ appId, myScore, onScore }: { appId: string; myScore: number | null | undefined; onScore: (id: string, score: number) => void }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          type="button"
+          key={n}
+          aria-label={`Score ${n}`}
+          onClick={e => { e.stopPropagation(); onScore(appId, n) }}
+          className={`text-lg leading-none ${(myScore ?? 0) >= n ? 'text-amber' : 'text-light hover:text-mid'}`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function ApplicationCard({
   application,
   onSelect,
@@ -45,6 +65,8 @@ export function ApplicationCard({
   onWaitlist,
   onToggleShortlist,
   onToggleReviewFlag,
+  onScore,
+  isReviewer,
   isPending,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -61,6 +83,10 @@ export function ApplicationCard({
   const tags = artist?.medium_tags ?? []
   const actions = ACTION_TRANSITIONS[application.status ?? ''] ?? []
   const id = application.id ?? ''
+  const myScore = application.my_score
+  const avgScore = application.avg_score
+  const scoreCount = application.score_count ?? 0
+  const showAvg = myScore != null && scoreCount > 0
 
   return (
     <div
@@ -68,16 +94,18 @@ export function ApplicationCard({
       style={style}
       className="flex items-start gap-3 p-4 bg-warm border border-light rounded-lg"
     >
-      {/* Drag handle */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="mt-1 cursor-grab text-light hover:text-mid touch-none flex-shrink-0"
-        aria-label="Drag to reorder"
-        tabIndex={-1}
-      >
-        ⠿
-      </button>
+      {/* Drag handle — owner only */}
+      {!isReviewer && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="mt-1 cursor-grab text-light hover:text-mid touch-none flex-shrink-0"
+          aria-label="Drag to reorder"
+          tabIndex={-1}
+        >
+          ⠿
+        </button>
+      )}
 
       {/* Avatar */}
       <div
@@ -118,55 +146,64 @@ export function ApplicationCard({
         )}
       </div>
 
-      {/* Flags + actions */}
+      {/* Right slot: differs by role */}
       <div className="flex flex-col gap-2 items-end flex-shrink-0">
-        <div className="flex gap-1">
-          <button
-            onClick={() => onToggleShortlist(id, application.shortlisted ?? false, application.review_flag ?? false)}
-            disabled={isPending}
-            className={`text-base leading-none ${application.shortlisted ? 'text-amber' : 'text-light hover:text-mid'} disabled:opacity-50`}
-            title={application.shortlisted ? 'Remove shortlist' : 'Shortlist'}
-          >
-            ⭐
-          </button>
-          <button
-            onClick={() => onToggleReviewFlag(id, application.shortlisted ?? false, application.review_flag ?? false)}
-            disabled={isPending}
-            className={`text-base leading-none ${application.review_flag ? 'text-clay' : 'text-light hover:text-mid'} disabled:opacity-50`}
-            title={application.review_flag ? 'Remove review flag' : 'Flag for review'}
-          >
-            🚩
-          </button>
-        </div>
-        <div className="flex gap-1.5">
-          {actions.includes('accept') && (
-            <button
-              onClick={() => onAccept(id)}
-              disabled={isPending}
-              className="font-sans text-xs font-semibold bg-amber text-ink px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
-            >
-              Accept
-            </button>
-          )}
-          {actions.includes('waitlist') && (
-            <button
-              onClick={() => onWaitlist(id)}
-              disabled={isPending}
-              className="font-sans text-xs text-mid border border-light px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-50"
-            >
-              Waitlist
-            </button>
-          )}
-          {actions.includes('decline') && (
-            <button
-              onClick={() => onDecline(id)}
-              disabled={isPending}
-              className="font-sans text-xs text-clay border border-clay/30 px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-50"
-            >
-              Decline
-            </button>
-          )}
-        </div>
+        {isReviewer ? (
+          /* Reviewer: star control + avg once scored */
+          <>
+            {showAvg && (
+              <span className="font-mono text-xs text-mid">★ {avgScore?.toFixed(1)} · {scoreCount}</span>
+            )}
+            <StarControl appId={id} myScore={myScore} onScore={onScore} />
+          </>
+        ) : (
+          /* Owner: flags + actions + avg badge */
+          <>
+            <div className="flex items-center gap-2">
+              {showAvg && (
+                <span className="font-mono text-xs text-mid">★ {avgScore?.toFixed(1)} · {scoreCount}</span>
+              )}
+              <div className="flex gap-1">
+                <button
+                  onClick={() => onToggleShortlist(id, application.shortlisted ?? false, application.review_flag ?? false)}
+                  disabled={isPending}
+                  className={`text-base leading-none ${application.shortlisted ? 'text-amber' : 'text-light hover:text-mid'} disabled:opacity-50`}
+                  title={application.shortlisted ? 'Remove shortlist' : 'Shortlist'}
+                >
+                  ⭐
+                </button>
+                <button
+                  onClick={() => onToggleReviewFlag(id, application.shortlisted ?? false, application.review_flag ?? false)}
+                  disabled={isPending}
+                  className={`text-base leading-none ${application.review_flag ? 'text-clay' : 'text-light hover:text-mid'} disabled:opacity-50`}
+                  title={application.review_flag ? 'Remove review flag' : 'Flag for review'}
+                >
+                  🚩
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-1.5">
+              {actions.includes('accept') && (
+                <button onClick={() => onAccept(id)} disabled={isPending}
+                  className="font-sans text-xs font-semibold bg-amber text-ink px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50">
+                  Accept
+                </button>
+              )}
+              {actions.includes('waitlist') && (
+                <button onClick={() => onWaitlist(id)} disabled={isPending}
+                  className="font-sans text-xs text-mid border border-light px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-50">
+                  Waitlist
+                </button>
+              )}
+              {actions.includes('decline') && (
+                <button onClick={() => onDecline(id)} disabled={isPending}
+                  className="font-sans text-xs text-clay border border-clay/30 px-3 py-1.5 rounded-lg hover:opacity-80 disabled:opacity-50">
+                  Decline
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

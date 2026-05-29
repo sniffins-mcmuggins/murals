@@ -94,4 +94,27 @@ describe('Organiser ApplicationsReviewPage', () => {
       expect(screen.getByText('No applications here.')).toBeInTheDocument()
     })
   })
+
+  it('hides decision controls and shows star control in reviewer mode', async () => {
+    // First useQuery call = applications (200), second = reviewers (403 sentinel)
+    mockUseQuery
+      .mockReturnValueOnce({ data: [{
+        id: 'app-1', form_id: 'form-1', artist_id: 'artist-1',
+        status: 'submitted', shortlisted: false, review_flag: false, rank: 0,
+        answers: {}, notes: [], avg_score: null, score_count: 0, my_score: null,
+        created_at: '2026-05-01T10:00:00Z', updated_at: '2026-05-01T10:00:00Z',
+        artist: { display_name: 'Rosa Vane', medium_tags: [], avatar_s3_key: null, location_label: null },
+      }], isLoading: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: 'REVIEWER', isLoading: false } as unknown as ReturnType<typeof useQuery>)
+      // formQuery
+      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false } as unknown as ReturnType<typeof useQuery>)
+
+    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Accept')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Drag to reorder')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Score 1')).toBeInTheDocument()
+    })
+  })
 })

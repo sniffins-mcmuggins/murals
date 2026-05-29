@@ -23,6 +23,8 @@ interface Props {
   onAccept: (id: string) => void
   onDecline: (id: string) => void
   onWaitlist: (id: string) => void
+  onScore: (id: string, score: number) => void
+  isReviewer: boolean
   isPending: boolean
 }
 
@@ -38,14 +40,8 @@ function initials(name: string): string {
 }
 
 export function ApplicationSlideOver({
-  application,
-  formFields,
-  festivalId,
-  onClose,
-  onAccept,
-  onDecline,
-  onWaitlist,
-  isPending,
+  application, formFields, festivalId, onClose,
+  onAccept, onDecline, onWaitlist, onScore, isReviewer, isPending,
 }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -63,6 +59,10 @@ export function ApplicationSlideOver({
   const notes = (application.notes ?? []) as ApplicationNote[]
   const actions = ACTION_TRANSITIONS[application.status ?? ''] ?? []
   const id = application.id ?? ''
+  const myScore = application.my_score
+  const avgScore = application.avg_score
+  const scoreCount = application.score_count ?? 0
+  const showAvg = myScore != null && scoreCount > 0
 
   const labelFor = (fieldId: string): string =>
     formFields.find(f => f.id === fieldId)?.label ?? fieldId
@@ -105,8 +105,8 @@ export function ApplicationSlideOver({
             </div>
           )}
 
-          {/* Actions */}
-          {actions.length > 0 && (
+          {/* Actions — owner only */}
+          {!isReviewer && actions.length > 0 && (
             <div className="flex gap-2">
               {actions.includes('accept') && (
                 <button onClick={() => onAccept(id)} disabled={isPending}
@@ -126,6 +126,38 @@ export function ApplicationSlideOver({
                   Decline
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Score control */}
+          <div>
+            <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Your Score</h3>
+            <div className="flex gap-1 mb-1">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  type="button"
+                  key={n}
+                  aria-label={`Score ${n}`}
+                  onClick={() => onScore(id, n)}
+                  className={`text-2xl leading-none ${(myScore ?? 0) >= n ? 'text-amber' : 'text-light hover:text-mid'}`}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+            <p className="font-sans text-xs text-mid">
+              {myScore != null ? `${myScore} / 5 · click to change` : 'Not yet scored'}
+            </p>
+          </div>
+
+          {/* Panel average — only shown once scored */}
+          {showAvg && (
+            <div>
+              <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-1">Panel average</h3>
+              <p className="font-sans text-sm text-ink">
+                ★ {avgScore?.toFixed(1)}
+                <span className="text-mid ml-1">from {scoreCount} {scoreCount === 1 ? 'reviewer' : 'reviewers'}</span>
+              </p>
             </div>
           )}
 
