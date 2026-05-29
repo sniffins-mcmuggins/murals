@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
+import { ReviewersSection } from './ReviewersSection'
 import type { components } from '@render/api-client'
 
 type Festival = components['schemas']['Festival']
@@ -237,6 +238,9 @@ function FestivalDetail({
           </button>
         )}
       </div>
+
+      {/* Reviewers */}
+      <ReviewersSection festivalId={festivalId} />
 
       {/* Danger zone */}
       <div className="p-5 border border-light rounded-lg">
