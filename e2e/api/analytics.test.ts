@@ -52,4 +52,20 @@ describe('GET /profiles/me/analytics', () => {
     expect(data.profile_views).toBeGreaterThanOrEqual(1)
     expect(data.window_days).toBe(90)
   })
+
+  it('link_click events appear in the response after POST /profiles/{profileID}/link-click', async () => {
+    const suffix = Date.now() + 2
+    const { token } = await createArtist(suffix)
+    const { profileId } = await createProfile(token, { displayName: `Link Artist ${suffix}` })
+
+    await fetch(`${API}/profiles/${profileId}/link-click`, { method: 'POST' })
+    await fetch(`${API}/profiles/${profileId}/link-click`, { method: 'POST' })
+
+    const res = await fetch(`${API}/profiles/me/analytics`, { headers: auth(token) })
+    expect(res.status).toBe(200)
+
+    const data = await res.json()
+    expect(data.link_clicks).toBeGreaterThanOrEqual(1)
+    expect(data.window_days).toBe(90)
+  })
 })

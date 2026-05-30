@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { href: '/profile', label: 'Profile' },
   { href: '/collections', label: 'Collections' },
   { href: '/applications', label: 'Applications' },
+  { href: '/analytics', label: 'Analytics' },
 ]
 
 export default async function ArtistLayout({ children }: { children: React.ReactNode }) {
