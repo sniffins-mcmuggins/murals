@@ -15,6 +15,13 @@ interface FormField {
   required: boolean
 }
 
+interface ReviewCriterion {
+  id: string
+  label: string
+  min: number
+  max: number
+}
+
 interface Props {
   application: Application | null
   formFields: FormField[]
@@ -23,9 +30,10 @@ interface Props {
   onAccept: (id: string) => void
   onDecline: (id: string) => void
   onWaitlist: (id: string) => void
-  onScore: (id: string, score: number) => void
+  onScore: (id: string, score: number, criterionId?: string) => void
   isReviewer: boolean
   isPending: boolean
+  criteria: ReviewCriterion[]
 }
 
 const ACTION_TRANSITIONS: Record<string, string[]> = {
@@ -41,7 +49,7 @@ function initials(name: string): string {
 
 export function ApplicationSlideOver({
   application, formFields, festivalId, onClose,
-  onAccept, onDecline, onWaitlist, onScore, isReviewer, isPending,
+  onAccept, onDecline, onWaitlist, onScore, isReviewer, isPending, criteria,
 }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -133,32 +141,74 @@ export function ApplicationSlideOver({
           {/* Score control */}
           <div>
             <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Your Score</h3>
-            <div className="flex gap-1 mb-1">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button
-                  type="button"
-                  key={n}
-                  aria-label={`Score ${n}`}
-                  onClick={() => onScore(id, n)}
-                  className={`text-2xl leading-none ${(myScore ?? 0) >= n ? 'text-amber' : 'text-light hover:text-mid'}`}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-            <p className="font-sans text-xs text-mid">
-              {myScore != null ? `${myScore} / 5 · click to change` : 'Not yet scored'}
-            </p>
+            {criteria.length > 0 ? (
+              <div className="space-y-4">
+                {criteria.map(c => {
+                  const cs = (application.criterion_scores ?? []).find(
+                    s => s.criterion_id === c.id
+                  )
+                  const myCs = cs?.my_score ?? null
+                  return (
+                    <div key={c.id}>
+                      <p className="font-sans text-xs text-mid mb-1">{c.label}</p>
+                      <div className="flex gap-1 mb-0.5">
+                        {Array.from({ length: c.max }, (_, i) => i + 1).map(n => (
+                          <button
+                            type="button"
+                            key={n}
+                            aria-label={`Score ${c.label} ${n}`}
+                            onClick={() => onScore(id, n, c.id)}
+                            className={`text-xl leading-none ${(myCs ?? 0) >= n ? 'text-amber' : 'text-light hover:text-mid'}`}
+                          >★</button>
+                        ))}
+                      </div>
+                      <p className="font-sans text-xs text-mid">
+                        {myCs != null ? `${myCs} / ${c.max} · click to change` : 'Not yet scored'}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-1 mb-1">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button
+                      type="button"
+                      key={n}
+                      aria-label={`Score ${n}`}
+                      onClick={() => onScore(id, n)}
+                      className={`text-2xl leading-none ${(myScore ?? 0) >= n ? 'text-amber' : 'text-light hover:text-mid'}`}
+                    >★</button>
+                  ))}
+                </div>
+                <p className="font-sans text-xs text-mid">
+                  {myScore != null ? `${myScore} / 5 · click to change` : 'Not yet scored'}
+                </p>
+              </>
+            )}
           </div>
 
           {/* Panel average — only shown once scored */}
           {showAvg && (
             <div>
               <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-1">Panel average</h3>
-              <p className="font-sans text-sm text-ink">
+              <p className="font-sans text-sm text-ink mb-2">
                 ★ {avgScore?.toFixed(1)}
                 <span className="text-mid ml-1">from {scoreCount} {scoreCount === 1 ? 'reviewer' : 'reviewers'}</span>
               </p>
+              {criteria.length > 0 && (
+                <div className="space-y-1">
+                  {(application.criterion_scores ?? []).map(cs => (
+                    <p key={cs.criterion_id} className="font-sans text-xs text-mid">
+                      {cs.label}
+                      {cs.avg_score != null && (
+                        <span className="ml-2 text-ink">★ {cs.avg_score.toFixed(1)}</span>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

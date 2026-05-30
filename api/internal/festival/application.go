@@ -36,38 +36,50 @@ type noteResponse struct {
 	CreatedAt string  `json:"created_at"`
 }
 
+type criterionScore struct {
+	CriterionID string   `json:"criterion_id"`
+	Label       string   `json:"label"`
+	Min         int      `json:"min"`
+	Max         int      `json:"max"`
+	AvgScore    *float64 `json:"avg_score"`
+	ScoreCount  int      `json:"score_count"`
+	MyScore     *int32   `json:"my_score"`
+}
+
 type applicationResponse struct {
-	ID             string          `json:"id"`
-	FormID         string          `json:"form_id"`
-	ArtistID       string          `json:"artist_id"`
-	Status         string          `json:"status"`
-	Rank           int32           `json:"rank"`
-	Shortlisted    bool            `json:"shortlisted"`
-	ReviewFlag     bool            `json:"review_flag"`
-	Answers        json.RawMessage `json:"answers"`
-	CreatedAt      string          `json:"created_at"`
-	UpdatedAt      string          `json:"updated_at"`
-	AvgScore       *float64        `json:"avg_score"`
-	ScoreCount     int32           `json:"score_count"`
-	MyScore        *int32          `json:"my_score"`
-	Artist         *artistSummary  `json:"artist,omitempty"`
-	Notes          []noteResponse  `json:"notes"`
-	IdentityHidden bool            `json:"identity_hidden"`
+	ID              string           `json:"id"`
+	FormID          string           `json:"form_id"`
+	ArtistID        string           `json:"artist_id"`
+	Status          string           `json:"status"`
+	Rank            int32            `json:"rank"`
+	Shortlisted     bool             `json:"shortlisted"`
+	ReviewFlag      bool             `json:"review_flag"`
+	Answers         json.RawMessage  `json:"answers"`
+	CreatedAt       string           `json:"created_at"`
+	UpdatedAt       string           `json:"updated_at"`
+	AvgScore        *float64         `json:"avg_score"`
+	ScoreCount      int32            `json:"score_count"`
+	MyScore         *int32           `json:"my_score"`
+	Artist          *artistSummary   `json:"artist,omitempty"`
+	Notes           []noteResponse   `json:"notes"`
+	IdentityHidden  bool             `json:"identity_hidden"`
+	CriterionScores []criterionScore `json:"criterion_scores"`
 }
 
 func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	return applicationResponse{
-		ID:          a.ID.String(),
-		FormID:      a.FormID.String(),
-		ArtistID:    a.ArtistID.String(),
-		Status:      string(a.Status),
-		Rank:        a.Rank,
-		Shortlisted: a.Shortlisted,
-		ReviewFlag:  a.ReviewFlag,
-		Answers:     a.Answers,
-		CreatedAt:   a.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:   a.UpdatedAt.Time.Format(time.RFC3339),
-		Notes:       []noteResponse{},
+		ID:              a.ID.String(),
+		FormID:          a.FormID.String(),
+		ArtistID:        a.ArtistID.String(),
+		Status:          string(a.Status),
+		Rank:            a.Rank,
+		Shortlisted:     a.Shortlisted,
+		ReviewFlag:      a.ReviewFlag,
+		Answers:         a.Answers,
+		CreatedAt:       a.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:       a.UpdatedAt.Time.Format(time.RFC3339),
+		Notes:           []noteResponse{},
+		CriterionScores: []criterionScore{},
 	}
 }
 
@@ -95,7 +107,8 @@ func toEnrichedResponse(
 			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
 		},
-		Notes: []noteResponse{},
+		Notes:           []noteResponse{},
+		CriterionScores: []criterionScore{},
 	}
 }
 
@@ -121,7 +134,8 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
 		},
-		Notes: []noteResponse{},
+		Notes:           []noteResponse{},
+		CriterionScores: []criterionScore{},
 	}
 }
 

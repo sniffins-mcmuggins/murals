@@ -222,6 +222,7 @@ type ApplicationForm struct {
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	AnonymousReview bool               `db:"anonymous_review" json:"anonymous_review"`
+	ReviewCriteria  json.RawMessage    `db:"review_criteria" json:"review_criteria"`
 }
 
 type ApplicationNote struct {
@@ -237,6 +238,7 @@ type ApplicationScore struct {
 	ReviewerID    pgtype.UUID        `db:"reviewer_id" json:"reviewer_id"`
 	Score         int32              `db:"score" json:"score"`
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CriterionID   string             `db:"criterion_id" json:"criterion_id"`
 }
 
 type ArtistProfile struct {

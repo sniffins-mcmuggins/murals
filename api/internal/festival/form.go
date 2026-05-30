@@ -3,7 +3,10 @@ package festival
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -15,6 +18,95 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
+// reviewCriterion is a single scoring dimension stored in application_forms.review_criteria.
+type reviewCriterion struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Min   int    `json:"min"`
+	Max   int    `json:"max"`
+}
+
+// criterionInput is what the organiser sends when creating/updating criteria.
+// ID is optional: if non-empty the caller is preserving a known ID; if empty
+// the API generates one from the label.
+type criterionInput struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Min   int    `json:"min"`
+	Max   int    `json:"max"`
+}
+
+var nonAlphanumRe = regexp.MustCompile(`[^a-z0-9]+`)
+
+func slugifyCriterion(label string) string {
+	s := strings.ToLower(strings.TrimSpace(label))
+	s = nonAlphanumRe.ReplaceAllString(s, "-")
+	return strings.Trim(s, "-")
+}
+
+// parseCriteria unmarshals review_criteria JSON from the DB model.
+// Returns nil slice (not error) when the column is the empty-array default.
+func parseCriteria(raw json.RawMessage) ([]reviewCriterion, error) {
+	if len(raw) == 0 || string(raw) == "[]" || string(raw) == "null" {
+		return nil, nil
+	}
+	var out []reviewCriterion
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// buildCriteria validates and assigns stable IDs to a submitted criteria list.
+func buildCriteria(inputs []criterionInput) ([]reviewCriterion, error) {
+	if len(inputs) > 10 {
+		return nil, fmt.Errorf("max 10 criteria allowed")
+	}
+	result := make([]reviewCriterion, len(inputs))
+	slugCount := map[string]int{} // how many times each base slug has been generated
+	seen := map[string]struct{}{} // every ID assigned so far (generated + caller-supplied)
+	for i, inp := range inputs {
+		label := strings.TrimSpace(inp.Label)
+		if label == "" {
+			return nil, fmt.Errorf("criterion label must not be empty")
+		}
+		if len(label) > 80 {
+			return nil, fmt.Errorf("criterion label too long (max 80 chars)")
+		}
+		minV, maxV := inp.Min, inp.Max
+		if minV < 1 {
+			minV = 1
+		}
+		if maxV < minV || maxV > 10 {
+			return nil, fmt.Errorf("criterion max must be between min and 10")
+		}
+
+		var id string
+		if inp.ID != "" {
+			// Preserve a caller-supplied ID (keeps existing scores valid).
+			id = inp.ID
+		} else {
+			base := slugifyCriterion(label)
+			if base == "" {
+				base = fmt.Sprintf("criterion-%d", i+1)
+			}
+			slugCount[base]++
+			if slugCount[base] == 1 {
+				id = base
+			} else {
+				id = fmt.Sprintf("%s-%d", base, slugCount[base])
+			}
+		}
+
+		if _, dup := seen[id]; dup {
+			return nil, fmt.Errorf("duplicate criterion id %q", id)
+		}
+		seen[id] = struct{}{}
+		result[i] = reviewCriterion{ID: id, Label: label, Min: minV, Max: maxV}
+	}
+	return result, nil
+}
+
 type formResponse struct {
 	ID              string          `json:"id"`
 	FestivalID      string          `json:"festival_id"`
@@ -23,17 +115,23 @@ type formResponse struct {
 	CloseAt         *string         `json:"close_at,omitempty"`
 	MaxApplications *int32          `json:"max_applications,omitempty"`
 	AnonymousReview bool            `json:"anonymous_review"`
+	ReviewCriteria  json.RawMessage `json:"review_criteria"`
 	CreatedAt       string          `json:"created_at"`
 	UpdatedAt       string          `json:"updated_at"`
 }
 
 func toFormResponse(f sqlcdb.ApplicationForm) formResponse {
+	criteria := f.ReviewCriteria
+	if len(criteria) == 0 {
+		criteria = json.RawMessage(`[]`)
+	}
 	resp := formResponse{
 		ID:              f.ID.String(),
 		FestivalID:      f.FestivalID.String(),
 		Fields:          f.Fields,
 		MaxApplications: f.MaxApplications,
 		AnonymousReview: f.AnonymousReview,
+		ReviewCriteria:  criteria,
 		CreatedAt:       f.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:       f.UpdatedAt.Time.Format(time.RFC3339),
 	}
@@ -158,10 +256,11 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		// If the caller is the festival organiser, include owner-only fields.
+		// Owners and invited reviewers see panel-internal fields (review_criteria,
+		// anonymous_review). The public/artists get the stripped response.
 		if principal, authErr := auth.User(r.Context()); authErr == nil {
-			fest, festErr := q.GetFestivalByID(r.Context(), festUUID)
-			if festErr == nil && fest.OrganiserID.String() == principal.UserID {
+			role, roleErr := resolveFestivalAccess(r.Context(), q, festUUID, principal.UserID)
+			if roleErr == nil && role != roleNone {
 				_ = json.NewEncoder(w).Encode(toFormResponse(form))
 				return
 			}
@@ -172,7 +271,8 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // PatchFormHandler handles PATCH /festivals/{festivalID}/form. Owner only.
-// Currently accepts only anonymous_review; extend the request struct for future toggles.
+// Accepts any subset of { anonymous_review, review_criteria }; unspecified
+// fields are left unchanged.
 func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -203,16 +303,30 @@ func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var req struct {
-			AnonymousReview *bool `json:"anonymous_review"`
+			AnonymousReview *bool             `json:"anonymous_review"`
+			ReviewCriteria  *[]criterionInput `json:"review_criteria"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
 			return
 		}
 
-		if req.AnonymousReview == nil {
-			// Nothing to update — return current state.
-			form, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
+		// Start from current state so unspecified fields are preserved.
+		form, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		if req.AnonymousReview != nil {
+			form, err = q.PatchFormAnonymousReview(r.Context(), sqlcdb.PatchFormAnonymousReviewParams{
+				FestivalID:      festUUID,
+				AnonymousReview: *req.AnonymousReview,
+			})
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					httperr.NotFound(w)
@@ -221,22 +335,31 @@ func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				httperr.InternalServerError(w)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(toFormResponse(form))
-			return
 		}
 
-		form, err := q.PatchFormAnonymousReview(r.Context(), sqlcdb.PatchFormAnonymousReviewParams{
-			FestivalID:      festUUID,
-			AnonymousReview: *req.AnonymousReview,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httperr.NotFound(w)
+		if req.ReviewCriteria != nil {
+			criteria, buildErr := buildCriteria(*req.ReviewCriteria)
+			if buildErr != nil {
+				httperr.UnprocessableEntity(w, buildErr.Error())
 				return
 			}
-			httperr.InternalServerError(w)
-			return
+			criteriaJSON, marshalErr := json.Marshal(criteria)
+			if marshalErr != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			form, err = q.PatchFormCriteria(r.Context(), sqlcdb.PatchFormCriteriaParams{
+				FestivalID:     festUUID,
+				ReviewCriteria: criteriaJSON,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					httperr.NotFound(w)
+					return
+				}
+				httperr.InternalServerError(w)
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

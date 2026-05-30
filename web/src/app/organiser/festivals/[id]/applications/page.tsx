@@ -22,6 +22,13 @@ interface FormField {
   required: boolean
 }
 
+interface ReviewCriterion {
+  id: string
+  label: string
+  min: number
+  max: number
+}
+
 type TabKey = 'pending' | 'shortlisted' | 'accepted' | 'waitlisted' | 'declined'
 
 const TAB_LABELS: Record<TabKey, string> = {
@@ -85,6 +92,17 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
 
   useEffect(() => {
     if (applicationsQuery.data) setLocalApps(applicationsQuery.data)
+  }, [applicationsQuery.data])
+
+  // Keep an open slide-over in sync with refetched server data (e.g. after scoring,
+  // so score_count/avg_score update and the panel-average section appears).
+  useEffect(() => {
+    if (!applicationsQuery.data) return
+    setSelectedApp(prev => {
+      if (!prev) return prev
+      const fresh = applicationsQuery.data.find((a: Application) => a.id === prev.id)
+      return fresh ?? prev
+    })
   }, [applicationsQuery.data])
 
   const formQuery = useQuery({
@@ -160,18 +178,37 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
   })
 
   const scoreMutation = useMutation({
-    mutationFn: async ({ applicationId, score }: { applicationId: string; score: number }) => {
+    mutationFn: async ({ applicationId, score, criterionId }: {
+      applicationId: string; score: number; criterionId: string
+    }) => {
       const res = await apiClient.PUT('/festivals/{festivalID}/applications/{applicationID}/score', {
         params: { path: { festivalID: festivalId, applicationID: applicationId } },
-        body: { score },
+        body: criterionId === 'overall'
+          ? { score }
+          : { score, criterion_id: criterionId },
       })
       if (res.error) throw new Error('Score failed')
     },
-    onMutate: ({ applicationId, score }) => {
+    onMutate: ({ applicationId, score, criterionId }) => {
       const snapshot = localApps
-      setLocalApps(prev => prev?.map(a =>
-        a.id === applicationId ? { ...a, my_score: score } : a
-      ) ?? null)
+      setLocalApps(prev => prev?.map(a => {
+        if (a.id !== applicationId) return a
+        if (criterionId === 'overall') return { ...a, my_score: score }
+        const criterionScores = (a.criterion_scores ?? []).map(
+          (cs: NonNullable<Application['criterion_scores']>[number]) =>
+            cs.criterion_id === criterionId ? { ...cs, my_score: score } : cs
+        )
+        const scored = criterionScores.filter(
+          (cs: NonNullable<Application['criterion_scores']>[number]) => cs.my_score != null
+        )
+        const mean = scored.length > 0
+          ? Math.round(scored.reduce(
+              (s: number, cs: NonNullable<Application['criterion_scores']>[number]) =>
+                s + (cs.my_score ?? 0), 0
+            ) / scored.length)
+          : a.my_score
+        return { ...a, criterion_scores: criterionScores, my_score: mean }
+      }) ?? null)
       return { snapshot }
     },
     onError: (_err, _vars, context) => {
@@ -180,11 +217,30 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
     onSuccess: invalidate,
   })
 
-  const handleScore = (applicationId: string, score: number) => {
-    scoreMutation.mutate({ applicationId, score })
-    // Also update the selected app in the slide-over optimistically
+  const handleScore = (applicationId: string, score: number, criterionId = 'overall') => {
+    scoreMutation.mutate({ applicationId, score, criterionId })
     if (selectedApp?.id === applicationId) {
-      setSelectedApp(prev => prev ? { ...prev, my_score: score } : null)
+      if (criterionId === 'overall') {
+        setSelectedApp(prev => prev ? { ...prev, my_score: score } : null)
+      } else {
+        setSelectedApp(prev => {
+          if (!prev) return null
+          const criterionScores = (prev.criterion_scores ?? []).map(
+            (cs: NonNullable<Application['criterion_scores']>[number]) =>
+              cs.criterion_id === criterionId ? { ...cs, my_score: score } : cs
+          )
+          const scored = criterionScores.filter(
+            (cs: NonNullable<Application['criterion_scores']>[number]) => cs.my_score != null
+          )
+          const mean = scored.length > 0
+            ? Math.round(scored.reduce(
+                (s: number, cs: NonNullable<Application['criterion_scores']>[number]) =>
+                  s + (cs.my_score ?? 0), 0
+              ) / scored.length)
+            : prev.my_score
+          return { ...prev, criterion_scores: criterionScores, my_score: mean }
+        })
+      }
     }
   }
 
@@ -198,6 +254,7 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
   )
 
   const formFields: FormField[] = (formQuery.data as { fields?: FormField[] })?.fields ?? []
+  const criteria: ReviewCriterion[] = (formQuery.data as { review_criteria?: ReviewCriterion[] })?.review_criteria ?? []
 
   const counts: Record<TabKey, number> = {
     pending: filterTab(allApps, 'pending').length,
@@ -226,6 +283,7 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
             onScore={handleScore}
             isReviewer={isReviewer}
             isPending={isPending}
+            criteria={criteria}
           />
         </li>
       ))}
@@ -288,6 +346,7 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
         onScore={handleScore}
         isReviewer={isReviewer}
         isPending={isPending}
+        criteria={criteria}
       />
     </div>
   )

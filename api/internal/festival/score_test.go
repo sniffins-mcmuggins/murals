@@ -1,12 +1,14 @@
 package festival_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -94,6 +96,102 @@ func TestScore_ReviewerCanScoreDifferentApplication(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+otherAppID+"/score", `{"score":3}`, revTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestScore_WithCriterionID_StoresNamedCriterion(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, ownerTok := createTestUser(t, db, "rub-owner-1@test")
+	artistID, _ := createTestUser(t, db, "rub-art-1@test")
+	createTestArtistProfile(t, db, artistID, "Rub Artist 1")
+	festID := createTestFestival(t, db, ownerID, "rub-fest-1", "open")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	// Configure a criterion so the named score validates.
+	setCriteriaViaPatch(t, db, festID, ownerTok, `[{"label":"Artistic Quality","min":1,"max":5}]`)
+	srv := newScoreServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score",
+		`{"score":3,"criterion_id":"artistic-quality"}`, ownerTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	_ = resp.Body.Close()
+	assert.Equal(t, "artistic-quality", body["criterion_id"])
+	assert.Equal(t, float64(3), body["score"])
+}
+
+func TestScore_NoCriterionDefaultsToOverall(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, ownerTok := createTestUser(t, db, "rub-owner-2@test")
+	artistID, _ := createTestUser(t, db, "rub-art-2@test")
+	createTestArtistProfile(t, db, artistID, "Rub Artist 2")
+	festID := createTestFestival(t, db, ownerID, "rub-fest-2", "open")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	srv := newScoreServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score",
+		`{"score":4}`, ownerTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	_ = resp.Body.Close()
+	assert.Equal(t, "overall", body["criterion_id"])
+}
+
+func TestScore_UnknownCriterion_Rejected(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, ownerTok := createTestUser(t, db, "rub-owner-3@test")
+	artistID, _ := createTestUser(t, db, "rub-art-3@test")
+	createTestArtistProfile(t, db, artistID, "Rub Artist 3")
+	festID := createTestFestival(t, db, ownerID, "rub-fest-3", "open")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	srv := newScoreServer(db)
+	t.Cleanup(srv.Close)
+
+	// criterion_id that is not 'overall' and not in the (empty) form criteria → 422
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score",
+		`{"score":3,"criterion_id":"does-not-exist"}`, ownerTok)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestScore_NamedCriterion_NoForm_Returns422(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, ownerTok := createTestUser(t, db, "rub-owner-noform@test")
+	artistID, _ := createTestUser(t, db, "rub-art-noform@test")
+	createTestArtistProfile(t, db, artistID, "Rub Artist NoForm")
+	festID := createTestFestival(t, db, ownerID, "rub-fest-noform", "open")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	srv := newScoreServer(db)
+	t.Cleanup(srv.Close)
+
+	// Named criterion when form doesn't exist → 422, not 500
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score",
+		`{"score":3,"criterion_id":"some-criterion"}`, ownerTok)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func setCriteriaViaPatch(t *testing.T, db *pgxpool.Pool, festID, ownerTok, criteriaJSON string) {
+	t.Helper()
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+	body := `{"review_criteria":` + criteriaJSON + `}`
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", body, ownerTok)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 }

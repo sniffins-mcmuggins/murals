@@ -756,6 +756,12 @@ export interface paths {
                 content: {
                     "application/json": {
                         anonymous_review?: boolean;
+                        review_criteria?: {
+                            id?: string;
+                            label?: string;
+                            min?: number;
+                            max?: number;
+                        }[];
                     };
                 };
             };
@@ -1556,6 +1562,12 @@ export interface components {
             max_applications?: number | null;
             /** @description When true, reviewer-scoped responses strip artist identity until the reviewer has scored. */
             anonymous_review?: boolean;
+            review_criteria?: {
+                id?: string;
+                label?: string;
+                min?: number;
+                max?: number;
+            }[];
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
@@ -1587,6 +1599,7 @@ export interface components {
             notes?: components["schemas"]["ApplicationNote"][];
             /** @description True when anonymous_review is on and this reviewer has not yet scored. Always false for owners. */
             identity_hidden?: boolean;
+            criterion_scores?: components["schemas"]["CriterionScore"][];
         };
         ApplicationArtist: {
             display_name?: string;
@@ -1602,6 +1615,16 @@ export interface components {
             author_id?: string | null;
             /** Format: date-time */
             created_at?: string;
+        };
+        CriterionScore: {
+            criterion_id?: string;
+            label?: string;
+            min?: number;
+            max?: number;
+            /** Format: float */
+            avg_score?: number | null;
+            score_count?: number;
+            my_score?: number | null;
         };
         MapPin: {
             /**

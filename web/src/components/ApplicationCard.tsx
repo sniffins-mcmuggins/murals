@@ -7,6 +7,13 @@ import type { components } from '@render/api-client'
 type Application = components['schemas']['Application']
 type ApplicationArtist = components['schemas']['ApplicationArtist']
 
+interface ReviewCriterion {
+  id: string
+  label: string
+  min: number
+  max: number
+}
+
 interface Props {
   application: Application
   onSelect: (app: Application) => void
@@ -18,6 +25,7 @@ interface Props {
   onScore: (id: string, score: number) => void
   isReviewer: boolean
   isPending: boolean
+  criteria: ReviewCriterion[]
 }
 
 function initials(name: string): string {
@@ -68,6 +76,7 @@ export function ApplicationCard({
   onScore,
   isReviewer,
   isPending,
+  criteria,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: application.id ?? '' })
@@ -152,12 +161,22 @@ export function ApplicationCard({
       {/* Right slot: differs by role */}
       <div className="flex flex-col gap-2 items-end flex-shrink-0">
         {isReviewer ? (
-          /* Reviewer: star control + avg once scored */
+          /* Reviewer: star control (no rubric) or Score button (rubric) + avg once scored */
           <>
             {showAvg && (
               <span className="font-mono text-xs text-mid">★ {avgScore?.toFixed(1)} · {scoreCount}</span>
             )}
-            <StarControl appId={id} myScore={myScore} onScore={onScore} />
+            {criteria.length > 0 ? (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onSelect(application) }}
+                className="font-sans text-xs text-mid border border-light px-2 py-1 rounded hover:border-amber hover:text-ink transition-colors"
+              >
+                {myScore != null ? 'Edit score' : 'Score →'}
+              </button>
+            ) : (
+              <StarControl appId={id} myScore={myScore} onScore={onScore} />
+            )}
           </>
         ) : (
           /* Owner: flags + actions + avg badge */
