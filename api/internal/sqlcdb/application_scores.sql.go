@@ -11,24 +11,51 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getMyScore = `-- name: GetMyScore :one
-SELECT score FROM application_scores WHERE application_id = $1 AND reviewer_id = $2
+const criterionSummaryByApplications = `-- name: CriterionSummaryByApplications :many
+SELECT
+  application_id,
+  criterion_id,
+  AVG(score)::float8 AS avg_score,
+  COUNT(*)::int AS score_count
+FROM application_scores
+WHERE application_id = ANY($1::uuid[])
+GROUP BY application_id, criterion_id
 `
 
-type GetMyScoreParams struct {
+type CriterionSummaryByApplicationsRow struct {
 	ApplicationID pgtype.UUID `db:"application_id" json:"application_id"`
-	ReviewerID    pgtype.UUID `db:"reviewer_id" json:"reviewer_id"`
+	CriterionID   string      `db:"criterion_id" json:"criterion_id"`
+	AvgScore      float64     `db:"avg_score" json:"avg_score"`
+	ScoreCount    int32       `db:"score_count" json:"score_count"`
 }
 
-func (q *Queries) GetMyScore(ctx context.Context, arg GetMyScoreParams) (int32, error) {
-	row := q.db.QueryRow(ctx, getMyScore, arg.ApplicationID, arg.ReviewerID)
-	var score int32
-	err := row.Scan(&score)
-	return score, err
+func (q *Queries) CriterionSummaryByApplications(ctx context.Context, dollar_1 []pgtype.UUID) ([]CriterionSummaryByApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, criterionSummaryByApplications, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CriterionSummaryByApplicationsRow
+	for rows.Next() {
+		var i CriterionSummaryByApplicationsRow
+		if err := rows.Scan(
+			&i.ApplicationID,
+			&i.CriterionID,
+			&i.AvgScore,
+			&i.ScoreCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getMyScoresByApplications = `-- name: GetMyScoresByApplications :many
-SELECT application_id, score
+SELECT application_id, criterion_id, score
 FROM application_scores
 WHERE application_id = ANY($1::uuid[]) AND reviewer_id = $2
 `
@@ -40,6 +67,7 @@ type GetMyScoresByApplicationsParams struct {
 
 type GetMyScoresByApplicationsRow struct {
 	ApplicationID pgtype.UUID `db:"application_id" json:"application_id"`
+	CriterionID   string      `db:"criterion_id" json:"criterion_id"`
 	Score         int32       `db:"score" json:"score"`
 }
 
@@ -52,7 +80,7 @@ func (q *Queries) GetMyScoresByApplications(ctx context.Context, arg GetMyScores
 	var items []GetMyScoresByApplicationsRow
 	for rows.Next() {
 		var i GetMyScoresByApplicationsRow
-		if err := rows.Scan(&i.ApplicationID, &i.Score); err != nil {
+		if err := rows.Scan(&i.ApplicationID, &i.CriterionID, &i.Score); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -64,7 +92,10 @@ func (q *Queries) GetMyScoresByApplications(ctx context.Context, arg GetMyScores
 }
 
 const scoreSummaryByApplications = `-- name: ScoreSummaryByApplications :many
-SELECT application_id, AVG(score)::float8 AS avg_score, COUNT(*)::int AS score_count
+SELECT
+  application_id,
+  AVG(score)::float8 AS avg_score,
+  COUNT(DISTINCT reviewer_id)::int AS score_count
 FROM application_scores
 WHERE application_id = ANY($1::uuid[])
 GROUP BY application_id
@@ -76,6 +107,7 @@ type ScoreSummaryByApplicationsRow struct {
 	ScoreCount    int32       `db:"score_count" json:"score_count"`
 }
 
+// Overall: count is distinct reviewers who scored at least one criterion.
 func (q *Queries) ScoreSummaryByApplications(ctx context.Context, dollar_1 []pgtype.UUID) ([]ScoreSummaryByApplicationsRow, error) {
 	rows, err := q.db.Query(ctx, scoreSummaryByApplications, dollar_1)
 	if err != nil {
@@ -97,27 +129,34 @@ func (q *Queries) ScoreSummaryByApplications(ctx context.Context, dollar_1 []pgt
 }
 
 const upsertApplicationScore = `-- name: UpsertApplicationScore :one
-INSERT INTO application_scores (application_id, reviewer_id, score)
-VALUES ($1, $2, $3)
-ON CONFLICT (application_id, reviewer_id)
+INSERT INTO application_scores (application_id, reviewer_id, criterion_id, score)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (application_id, reviewer_id, criterion_id)
 DO UPDATE SET score = EXCLUDED.score, updated_at = now()
-RETURNING application_id, reviewer_id, score, updated_at
+RETURNING application_id, reviewer_id, score, updated_at, criterion_id
 `
 
 type UpsertApplicationScoreParams struct {
 	ApplicationID pgtype.UUID `db:"application_id" json:"application_id"`
 	ReviewerID    pgtype.UUID `db:"reviewer_id" json:"reviewer_id"`
+	CriterionID   string      `db:"criterion_id" json:"criterion_id"`
 	Score         int32       `db:"score" json:"score"`
 }
 
 func (q *Queries) UpsertApplicationScore(ctx context.Context, arg UpsertApplicationScoreParams) (ApplicationScore, error) {
-	row := q.db.QueryRow(ctx, upsertApplicationScore, arg.ApplicationID, arg.ReviewerID, arg.Score)
+	row := q.db.QueryRow(ctx, upsertApplicationScore,
+		arg.ApplicationID,
+		arg.ReviewerID,
+		arg.CriterionID,
+		arg.Score,
+	)
 	var i ApplicationScore
 	err := row.Scan(
 		&i.ApplicationID,
 		&i.ReviewerID,
 		&i.Score,
 		&i.UpdatedAt,
+		&i.CriterionID,
 	)
 	return i, err
 }
