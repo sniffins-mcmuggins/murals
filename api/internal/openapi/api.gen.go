@@ -162,13 +162,14 @@ type AcceptedArtist struct {
 
 // Application defines model for Application.
 type Application struct {
-	Answers   *map[string]interface{} `json:"answers,omitempty"`
-	Artist    *ApplicationArtist      `json:"artist,omitempty"`
-	ArtistId  *openapi_types.UUID     `json:"artist_id,omitempty"`
-	AvgScore  *float32                `json:"avg_score,omitempty"`
-	CreatedAt *time.Time              `json:"created_at,omitempty"`
-	FormId    *openapi_types.UUID     `json:"form_id,omitempty"`
-	Id        *openapi_types.UUID     `json:"id,omitempty"`
+	Answers         *map[string]interface{} `json:"answers,omitempty"`
+	Artist          *ApplicationArtist      `json:"artist,omitempty"`
+	ArtistId        *openapi_types.UUID     `json:"artist_id,omitempty"`
+	AvgScore        *float32                `json:"avg_score,omitempty"`
+	CreatedAt       *time.Time              `json:"created_at,omitempty"`
+	CriterionScores *[]CriterionScore       `json:"criterion_scores,omitempty"`
+	FormId          *openapi_types.UUID     `json:"form_id,omitempty"`
+	Id              *openapi_types.UUID     `json:"id,omitempty"`
 
 	// IdentityHidden True when anonymous_review is on and this reviewer has not yet scored. Always false for owners.
 	IdentityHidden *bool              `json:"identity_hidden,omitempty"`
@@ -201,7 +202,13 @@ type ApplicationForm struct {
 	Id              *openapi_types.UUID       `json:"id,omitempty"`
 	MaxApplications *int                      `json:"max_applications,omitempty"`
 	OpenAt          *time.Time                `json:"open_at,omitempty"`
-	UpdatedAt       *time.Time                `json:"updated_at,omitempty"`
+	ReviewCriteria  *[]struct {
+		Id    *string `json:"id,omitempty"`
+		Label *string `json:"label,omitempty"`
+		Max   *int    `json:"max,omitempty"`
+		Min   *int    `json:"min,omitempty"`
+	} `json:"review_criteria,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 // ApplicationNote defines model for ApplicationNote.
@@ -302,6 +309,17 @@ type CreateCollectionRequest struct {
 // CreateProfileRequest defines model for CreateProfileRequest.
 type CreateProfileRequest struct {
 	DisplayName string `json:"displayName"`
+}
+
+// CriterionScore defines model for CriterionScore.
+type CriterionScore struct {
+	AvgScore    *float32 `json:"avg_score,omitempty"`
+	CriterionId *string  `json:"criterion_id,omitempty"`
+	Label       *string  `json:"label,omitempty"`
+	Max         *int     `json:"max,omitempty"`
+	Min         *int     `json:"min,omitempty"`
+	MyScore     *int     `json:"my_score,omitempty"`
+	ScoreCount  *int     `json:"score_count,omitempty"`
 }
 
 // Festival defines model for Festival.
@@ -582,6 +600,12 @@ type SetArtistPinJSONBody struct {
 // PatchFestivalsFestivalIDFormJSONBody defines parameters for PatchFestivalsFestivalIDForm.
 type PatchFestivalsFestivalIDFormJSONBody struct {
 	AnonymousReview *bool `json:"anonymous_review,omitempty"`
+	ReviewCriteria  *[]struct {
+		Id    *string `json:"id,omitempty"`
+		Label *string `json:"label,omitempty"`
+		Max   *int    `json:"max,omitempty"`
+		Min   *int    `json:"min,omitempty"`
+	} `json:"review_criteria,omitempty"`
 }
 
 // PutFestivalsFestivalIDFormJSONBody defines parameters for PutFestivalsFestivalIDForm.
