@@ -68,6 +68,24 @@ func (e CollectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for FestivalAppearanceStatus.
+const (
+	FestivalAppearanceStatusLive FestivalAppearanceStatus = "live"
+	FestivalAppearanceStatusOpen FestivalAppearanceStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the FestivalAppearanceStatus enum.
+func (e FestivalAppearanceStatus) Valid() bool {
+	switch e {
+	case FestivalAppearanceStatusLive:
+		return true
+	case FestivalAppearanceStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FestivalStatus.
 const (
 	FestivalStatusArchived FestivalStatus = "archived"
@@ -133,19 +151,19 @@ func (e GetHealth200JSONResponseBodyStatus) Valid() bool {
 
 // Defines values for ListPublicFestivalsParamsStatus.
 const (
-	Archived ListPublicFestivalsParamsStatus = "archived"
-	Live     ListPublicFestivalsParamsStatus = "live"
-	Open     ListPublicFestivalsParamsStatus = "open"
+	ListPublicFestivalsParamsStatusArchived ListPublicFestivalsParamsStatus = "archived"
+	ListPublicFestivalsParamsStatusLive     ListPublicFestivalsParamsStatus = "live"
+	ListPublicFestivalsParamsStatusOpen     ListPublicFestivalsParamsStatus = "open"
 )
 
 // Valid indicates whether the value is a known member of the ListPublicFestivalsParamsStatus enum.
 func (e ListPublicFestivalsParamsStatus) Valid() bool {
 	switch e {
-	case Archived:
+	case ListPublicFestivalsParamsStatusArchived:
 		return true
-	case Live:
+	case ListPublicFestivalsParamsStatusLive:
 		return true
-	case Open:
+	case ListPublicFestivalsParamsStatusOpen:
 		return true
 	default:
 		return false
@@ -319,6 +337,22 @@ type Festival struct {
 	Status        *FestivalStatus     `json:"status,omitempty"`
 	UpdatedAt     *time.Time          `json:"updated_at,omitempty"`
 }
+
+// FestivalAppearance A publicly-visible festival an artist is appearing at.
+type FestivalAppearance struct {
+	EndDate *openapi_types.Date `json:"end_date,omitempty"`
+	Id      openapi_types.UUID  `json:"id"`
+
+	// MapSlug Slug for the public festival map. Non-null only for live festivals.
+	MapSlug   *string                  `json:"map_slug,omitempty"`
+	Name      string                   `json:"name"`
+	Slug      string                   `json:"slug"`
+	StartDate *openapi_types.Date      `json:"start_date,omitempty"`
+	Status    FestivalAppearanceStatus `json:"status"`
+}
+
+// FestivalAppearanceStatus defines model for FestivalAppearance.Status.
+type FestivalAppearanceStatus string
 
 // FestivalSpot defines model for FestivalSpot.
 type FestivalSpot struct {
@@ -882,6 +916,9 @@ type ServerInterface interface {
 	// List collections for an artist profile
 	// (GET /profiles/{profileID}/collections)
 	ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
+	// List an artist's public festival appearances
+	// (GET /profiles/{profileID}/festivals)
+	ListArtistFestivals(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
 	// List public festivals by status
 	// (GET /public/festivals)
 	ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams)
@@ -1215,6 +1252,12 @@ func (_ Unimplemented) GetProfile(w http.ResponseWriter, r *http.Request, profil
 // List collections for an artist profile
 // (GET /profiles/{profileID}/collections)
 func (_ Unimplemented) ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List an artist's public festival appearances
+// (GET /profiles/{profileID}/festivals)
+func (_ Unimplemented) ListArtistFestivals(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2852,6 +2895,32 @@ func (siw *ServerInterfaceWrapper) ListCollections(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListArtistFestivals operation middleware
+func (siw *ServerInterfaceWrapper) ListArtistFestivals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "profileID" -------------
+	var profileID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "profileID", chi.URLParam(r, "profileID"), &profileID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListArtistFestivals(w, r, profileID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPublicFestivals operation middleware
 func (siw *ServerInterfaceWrapper) ListPublicFestivals(w http.ResponseWriter, r *http.Request) {
 
@@ -3205,6 +3274,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}/collections", wrapper.ListCollections)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/{profileID}/festivals", wrapper.ListArtistFestivals)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/public/festivals", wrapper.ListPublicFestivals)
@@ -6290,6 +6362,44 @@ func (response ListCollections200JSONResponse) VisitListCollectionsResponse(w ht
 	return err
 }
 
+type ListArtistFestivalsRequestObject struct {
+	ProfileID openapi_types.UUID `json:"profileID"`
+}
+
+type ListArtistFestivalsResponseObject interface {
+	VisitListArtistFestivalsResponse(w http.ResponseWriter) error
+}
+
+type ListArtistFestivals200JSONResponse []FestivalAppearance
+
+func (response ListArtistFestivals200JSONResponse) VisitListArtistFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListArtistFestivals400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListArtistFestivals400ApplicationProblemPlusJSONResponse) VisitListArtistFestivalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListPublicFestivalsRequestObject struct {
 	Params ListPublicFestivalsParams
 }
@@ -6514,6 +6624,9 @@ type StrictServerInterface interface {
 	// List collections for an artist profile
 	// (GET /profiles/{profileID}/collections)
 	ListCollections(ctx context.Context, request ListCollectionsRequestObject) (ListCollectionsResponseObject, error)
+	// List an artist's public festival appearances
+	// (GET /profiles/{profileID}/festivals)
+	ListArtistFestivals(ctx context.Context, request ListArtistFestivalsRequestObject) (ListArtistFestivalsResponseObject, error)
 	// List public festivals by status
 	// (GET /public/festivals)
 	ListPublicFestivals(ctx context.Context, request ListPublicFestivalsRequestObject) (ListPublicFestivalsResponseObject, error)
@@ -8114,6 +8227,32 @@ func (sh *strictHandler) ListCollections(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListCollectionsResponseObject); ok {
 		if err := validResponse.VisitListCollectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListArtistFestivals operation middleware
+func (sh *strictHandler) ListArtistFestivals(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	var request ListArtistFestivalsRequestObject
+
+	request.ProfileID = profileID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListArtistFestivals(ctx, request.(ListArtistFestivalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListArtistFestivals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListArtistFestivalsResponseObject); ok {
+		if err := validResponse.VisitListArtistFestivalsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

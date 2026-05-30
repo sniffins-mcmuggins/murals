@@ -386,6 +386,34 @@ components:
           type: string
           format: date-time
 
+    FestivalAppearance:
+      type: object
+      required: [id, name, slug, status]
+      description: A publicly-visible festival an artist is appearing at.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [open, live]
+        map_slug:
+          type: string
+          nullable: true
+          description: Slug for the public festival map. Non-null only for live festivals.
+
     ApplicationForm:
       type: object
       properties:
@@ -1067,6 +1095,35 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Collection"
+
+  /profiles/{profileID}/festivals:
+    get:
+      operationId: listArtistFestivals
+      summary: List an artist's public festival appearances
+      description: >-
+        Public. Returns the publicly-visible festivals (open or live) where this
+        artist has an accepted application and/or an assigned spot, for the
+        "Appearances" section on the public profile. map_slug is non-null only
+        for live festivals (the public map renders for live festivals only).
+      tags: [artist]
+      parameters:
+        - name: profileID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Array of festival appearances (empty array if none).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FestivalAppearance"
+        "400":
+          $ref: "#/components/responses/BadRequest"
 
   /collections:
     post:

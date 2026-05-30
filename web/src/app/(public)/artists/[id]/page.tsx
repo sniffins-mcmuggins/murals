@@ -58,11 +58,14 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
 export default async function ArtistPage({ params }: ArtistPageProps) {
   const { id } = await params
 
-  const [profileRes, collectionsRes] = await Promise.all([
+  const [profileRes, collectionsRes, festivalsRes] = await Promise.all([
     apiClient.GET('/profiles/{profileID}', {
       params: { path: { profileID: id } },
     }),
     apiClient.GET('/profiles/{profileID}/collections', {
+      params: { path: { profileID: id } },
+    }),
+    apiClient.GET('/profiles/{profileID}/festivals', {
       params: { path: { profileID: id } },
     }),
   ])
@@ -73,6 +76,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
 
   const profile = profileRes.data
   const collections = collectionsRes.data ?? []
+  const appearances = festivalsRes.data ?? []
 
   const statusLabel: Record<string, string> = {
     active: 'Active',
@@ -198,6 +202,35 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             </nav>
           )}
         </header>
+
+        {/* Festival appearances */}
+        {appearances.length > 0 && (
+          <section aria-label="Appearances" className="mb-10">
+            <h2 className="font-serif text-3xl text-ink mb-4">Appearances</h2>
+            <ul className="flex flex-col gap-2">
+              {appearances.map((festival) => {
+                const year = festival.start_date ? festival.start_date.slice(0, 4) : ''
+                const label = `Appearing at ${festival.name}${/^\d{4}$/.test(year) ? ` ${year}` : ''}`
+                return (
+                  <li key={festival.id}>
+                    {festival.map_slug ? (
+                      <Link
+                        href={`/festivals/${festival.map_slug}/map`}
+                        className="inline-flex items-center gap-1 font-mono text-sm uppercase tracking-wide text-clay hover:text-amber transition-colors"
+                      >
+                        {label} <span aria-hidden="true">→</span>
+                      </Link>
+                    ) : (
+                      <span className="font-mono text-sm uppercase tracking-wide text-mid">
+                        {label}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
 
         {/* Collections */}
         {collections.length > 0 && (
