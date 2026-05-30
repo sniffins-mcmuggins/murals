@@ -179,6 +179,21 @@ type AcceptedArtist struct {
 	W3w      *string             `json:"w3w,omitempty"`
 }
 
+// AnalyticsResponse Aggregated analytics for an artist profile. GDPR-clean — no individual user data.
+type AnalyticsResponse struct {
+	// LinkClicks Number of link clicks recorded in the window.
+	LinkClicks int64 `json:"link_clicks"`
+
+	// ProfileViews Number of times the public profile was viewed in the window.
+	ProfileViews int64 `json:"profile_views"`
+
+	// QrScans Number of times the artist's QR code was downloaded in the window.
+	QrScans int64 `json:"qr_scans"`
+
+	// WindowDays The number of days covered by this report (90 for free tier, 730 for Pro).
+	WindowDays int `json:"window_days"`
+}
+
 // Application defines model for Application.
 type Application struct {
 	Answers         *map[string]interface{} `json:"answers,omitempty"`
@@ -931,6 +946,9 @@ type ServerInterface interface {
 	// Update own artist profile
 	// (PATCH /profiles/me)
 	PatchProfileMe(w http.ResponseWriter, r *http.Request)
+	// Get aggregated analytics for the authenticated artist's profile
+	// (GET /profiles/me/analytics)
+	GetMyAnalytics(w http.ResponseWriter, r *http.Request)
 	// Get a branded QR code (PNG) for the authenticated artist's public profile
 	// (GET /profiles/me/qr)
 	GetMyProfileQR(w http.ResponseWriter, r *http.Request)
@@ -1258,6 +1276,12 @@ func (_ Unimplemented) GetProfileMe(w http.ResponseWriter, r *http.Request) {
 // Update own artist profile
 // (PATCH /profiles/me)
 func (_ Unimplemented) PatchProfileMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get aggregated analytics for the authenticated artist's profile
+// (GET /profiles/me/analytics)
+func (_ Unimplemented) GetMyAnalytics(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2845,6 +2869,28 @@ func (siw *ServerInterfaceWrapper) PatchProfileMe(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetMyAnalytics operation middleware
+func (siw *ServerInterfaceWrapper) GetMyAnalytics(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyAnalytics(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMyProfileQR operation middleware
 func (siw *ServerInterfaceWrapper) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
 
@@ -3289,6 +3335,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/profiles/me", wrapper.PatchProfileMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/me/analytics", wrapper.GetMyAnalytics)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/me/qr", wrapper.GetMyProfileQR)
@@ -6267,6 +6316,59 @@ func (response PatchProfileMe404ApplicationProblemPlusJSONResponse) VisitPatchPr
 	return err
 }
 
+type GetMyAnalyticsRequestObject struct {
+}
+
+type GetMyAnalyticsResponseObject interface {
+	VisitGetMyAnalyticsResponse(w http.ResponseWriter) error
+}
+
+type GetMyAnalytics200JSONResponse AnalyticsResponse
+
+func (response GetMyAnalytics200JSONResponse) VisitGetMyAnalyticsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyAnalytics401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyAnalytics401ApplicationProblemPlusJSONResponse) VisitGetMyAnalyticsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyAnalytics404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyAnalytics404ApplicationProblemPlusJSONResponse) VisitGetMyAnalyticsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMyProfileQRRequestObject struct {
 }
 
@@ -6639,6 +6741,9 @@ type StrictServerInterface interface {
 	// Update own artist profile
 	// (PATCH /profiles/me)
 	PatchProfileMe(ctx context.Context, request PatchProfileMeRequestObject) (PatchProfileMeResponseObject, error)
+	// Get aggregated analytics for the authenticated artist's profile
+	// (GET /profiles/me/analytics)
+	GetMyAnalytics(ctx context.Context, request GetMyAnalyticsRequestObject) (GetMyAnalyticsResponseObject, error)
 	// Get a branded QR code (PNG) for the authenticated artist's public profile
 	// (GET /profiles/me/qr)
 	GetMyProfileQR(ctx context.Context, request GetMyProfileQRRequestObject) (GetMyProfileQRResponseObject, error)
@@ -8175,6 +8280,30 @@ func (sh *strictHandler) PatchProfileMe(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PatchProfileMeResponseObject); ok {
 		if err := validResponse.VisitPatchProfileMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyAnalytics operation middleware
+func (sh *strictHandler) GetMyAnalytics(w http.ResponseWriter, r *http.Request) {
+	var request GetMyAnalyticsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyAnalytics(ctx, request.(GetMyAnalyticsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyAnalytics")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyAnalyticsResponseObject); ok {
+		if err := validResponse.VisitGetMyAnalyticsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

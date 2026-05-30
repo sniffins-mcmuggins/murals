@@ -211,6 +211,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/me/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get aggregated analytics for the authenticated artist's profile
+         * @description Returns event counts (profile views, QR scans, link clicks) for the caller's artist profile. Window: 90 days for free tier, 730 days (2 years) for Pro. No individual user data is stored — GDPR-clean.
+         */
+        get: operations["getMyAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileID}": {
         parameters: {
             query?: never;
@@ -1549,6 +1569,26 @@ export interface components {
             /** @description Slug for the public festival map. Non-null only for live festivals. */
             map_slug?: string | null;
         };
+        /** @description Aggregated analytics for an artist profile. GDPR-clean — no individual user data. */
+        AnalyticsResponse: {
+            /**
+             * Format: int64
+             * @description Number of times the public profile was viewed in the window.
+             */
+            profile_views: number;
+            /**
+             * Format: int64
+             * @description Number of times the artist's QR code was downloaded in the window.
+             */
+            qr_scans: number;
+            /**
+             * Format: int64
+             * @description Number of link clicks recorded in the window.
+             */
+            link_clicks: number;
+            /** @description The number of days covered by this report (90 for free tier, 730 for Pro). */
+            window_days: number;
+        };
         ApplicationForm: {
             /** Format: uuid */
             id?: string;
@@ -2094,6 +2134,28 @@ export interface operations {
                 };
                 content: {
                     "image/png": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMyAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aggregated event counts and the window that was applied. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];

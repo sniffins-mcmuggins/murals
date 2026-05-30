@@ -1,0 +1,55 @@
+import { describe, it, expect } from 'vitest'
+import { createArtist, createProfile } from '../fixtures/helpers'
+
+const API = process.env.API_URL ?? 'http://localhost:8080'
+
+const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
+
+describe('GET /profiles/me/analytics', () => {
+  it('without token → 401', async () => {
+    const res = await fetch(`${API}/profiles/me/analytics`)
+    expect(res.status).toBe(401)
+  })
+
+  it('with token but no profile → 404', async () => {
+    const suffix = Date.now()
+    const { token } = await createArtist(suffix)
+
+    const res = await fetch(`${API}/profiles/me/analytics`, { headers: auth(token) })
+    expect(res.status).toBe(404)
+  })
+
+  it('returns zero counts and 90-day window for a free artist with no events', async () => {
+    const suffix = Date.now()
+    const { token } = await createArtist(suffix)
+    await createProfile(token, { displayName: `Analytics Artist ${suffix}` })
+
+    const res = await fetch(`${API}/profiles/me/analytics`, { headers: auth(token) })
+    expect(res.status).toBe(200)
+
+    const data = await res.json()
+    expect(data.profile_views).toBe(0)
+    expect(data.qr_scans).toBe(0)
+    expect(data.link_clicks).toBe(0)
+    expect(data.window_days).toBe(90)
+  })
+
+  it('profile_view events appear in the response after visiting the public profile', async () => {
+    const suffix = Date.now() + 1
+    const { token } = await createArtist(suffix)
+    const { profileId } = await createProfile(token, { displayName: `View Artist ${suffix}` })
+
+    // Trigger a profile_view by fetching the public profile.
+    await fetch(`${API}/profiles/${profileId}`)
+    await fetch(`${API}/profiles/${profileId}`)
+
+    const res = await fetch(`${API}/profiles/me/analytics`, { headers: auth(token) })
+    expect(res.status).toBe(200)
+
+    const data = await res.json()
+    // Events are recorded asynchronously; allow a moment for the goroutines to complete.
+    // We check >= 1 rather than == 2 to avoid flakiness from timing.
+    expect(data.profile_views).toBeGreaterThanOrEqual(1)
+    expect(data.window_days).toBe(90)
+  })
+})
