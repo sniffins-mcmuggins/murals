@@ -66,7 +66,8 @@ func buildCriteria(inputs []criterionInput) ([]reviewCriterion, error) {
 		return nil, fmt.Errorf("max 10 criteria allowed")
 	}
 	result := make([]reviewCriterion, len(inputs))
-	usedIDs := map[string]int{}
+	slugCount := map[string]int{} // how many times each base slug has been generated
+	seen := map[string]struct{}{} // every ID assigned so far (generated + caller-supplied)
 	for i, inp := range inputs {
 		label := strings.TrimSpace(inp.Label)
 		if label == "" {
@@ -82,22 +83,28 @@ func buildCriteria(inputs []criterionInput) ([]reviewCriterion, error) {
 		if maxV < minV || maxV > 10 {
 			return nil, fmt.Errorf("criterion max must be between min and 10")
 		}
-		// Preserve caller-supplied ID (non-empty) to keep existing scores valid.
-		id := inp.ID
-		if id == "" {
+
+		var id string
+		if inp.ID != "" {
+			// Preserve a caller-supplied ID (keeps existing scores valid).
+			id = inp.ID
+		} else {
 			base := slugifyCriterion(label)
 			if base == "" {
 				base = fmt.Sprintf("criterion-%d", i+1)
 			}
-			n := usedIDs[base]
-			usedIDs[base]++
-			if n == 0 {
+			slugCount[base]++
+			if slugCount[base] == 1 {
 				id = base
 			} else {
-				id = fmt.Sprintf("%s-%d", base, n+1)
+				id = fmt.Sprintf("%s-%d", base, slugCount[base])
 			}
 		}
-		usedIDs[id]++
+
+		if _, dup := seen[id]; dup {
+			return nil, fmt.Errorf("duplicate criterion id %q", id)
+		}
+		seen[id] = struct{}{}
 		result[i] = reviewCriterion{ID: id, Label: label, Min: minV, Max: maxV}
 	}
 	return result, nil

@@ -233,6 +233,35 @@ func TestPatchForm_Criteria_LabelCollisionGetsUniqueID(t *testing.T) {
 	assert.NotEqual(t, id0, id1, "duplicate labels must produce distinct IDs")
 }
 
+func TestPatchForm_Criteria_ThreeDuplicateLabels_SequentialIDs(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgTok := createTestUser(t, db, "crit-org-4@test")
+	festID := createTestFestival(t, db, orgID, "crit-fest-4", "draft")
+	createTestApplicationForm(t, db, festID)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	body := `{"review_criteria":[{"label":"Quality","min":1,"max":5},{"label":"Quality","min":1,"max":5},{"label":"Quality","min":1,"max":5}]}`
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", body, orgTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var form map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&form))
+	_ = resp.Body.Close()
+
+	criteria := form["review_criteria"].([]any)
+	ids := []string{
+		criteria[0].(map[string]any)["id"].(string),
+		criteria[1].(map[string]any)["id"].(string),
+		criteria[2].(map[string]any)["id"].(string),
+	}
+	assert.Equal(t, []string{"quality", "quality-2", "quality-3"}, ids)
+}
+
 func TestPatchForm_Criteria_Validation_MaxTooLarge(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
