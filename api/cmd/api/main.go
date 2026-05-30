@@ -138,8 +138,8 @@ func main() {
 	r.Post("/profiles", artist.CreateProfileHandler(pool))
 	r.Get("/profiles/me", artist.GetMyProfileHandler(pool))
 	r.Patch("/profiles/me", artist.UpdateProfileHandler(pool))
-	r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase))          // literal /me before /{profileID}
-	r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))                  // literal /me before /{profileID}
+	r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase)) // literal /me before /{profileID}
+	r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))        // literal /me before /{profileID}
 	r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
 	r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(pool))
 	r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(pool)) // public festival appearances
