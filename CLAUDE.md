@@ -4,9 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-Pre-build. No application codebase exists yet — this repo contains planning documents and static HTML demos only. Tech stack decisions are pending (see Outstanding Decisions in README.md).
+In build. The application codebase exists and is the source of truth — a Go REST API, a Next.js browser platform, and a React Native public app, with an end-to-end test suite running against a Docker Compose stack. The static HTML demo is retained only for the CPF organiser meeting. Most "tech stack" decisions are now made *in code* (see What Exists and Key Technical Decisions); the genuinely-open ones are listed under Outstanding Tech Decisions below.
 
 ## What Exists
+
+### Application codebase (source of truth)
+
+| Path | Purpose |
+|------|---------|
+| `api/` | Go REST API. chi router, pgx + sqlc (`internal/sqlcdb`), JWT auth, Stripe billing, SES email, MinIO/S3 images. Entry point `cmd/api/main.go`. |
+| `web/` | Next.js (App Router) browser platform for artists & organisers. Typed against the OpenAPI client (`@render/api-client`). |
+| `mobile/` | React Native public app (no Expo). |
+| `db/` | golang-migrate migrations, sqlc queries, seed data. |
+| `openapi/` | OpenAPI spec + generated TS client. |
+| `infra/` | docker-compose stack (api, web, db, minio, prometheus) + prometheus config. |
+| `e2e/` | Vitest API gate (`e2e/api/`) + Playwright browser specs (`e2e/browser/`). |
+| `Taskfile.yml` | Root task runner — `task up`, `task e2e`, `task db:migrate`, etc. |
+
+### Planning & demo artefacts
 
 | File | Purpose |
 |------|---------|
@@ -40,9 +55,19 @@ Three products sharing one platform:
 - **Artist pricing:** Free £10/yr, Pro £35/yr (5 collections), Pro+ £50/yr (unlimited)
 - **Organiser pricing:** £35 setup fee + monthly subscription from go-live (£19/£49/£99 by festival size)
 
+## Tech Stack (Decided — in code)
+
+- **API:** Go + chi router, pgx pool, sqlc-generated queries, golang-migrate migrations
+- **Web:** Next.js (App Router), React Query, OpenAPI-typed client
+- **Mobile:** React Native (no Expo)
+- **Payments:** Stripe (billing package wired end-to-end)
+- **Image storage:** MinIO locally, S3 + CDN (`CDNBaseURL`) in prod
+- **Auth:** JWT + `session_version` revocation, TOTP MFA, Google/Apple OAuth
+- **Local stack:** Docker Compose (`infra/`), orchestrated via Taskfile
+
 ## Outstanding Tech Decisions (TBD)
 
-Framework, app platform (React Native / Flutter / PWA), payment processor, image CDN, hosting, and chat provider are all undecided. Don't assume or implement these without confirming with the user.
+Hosting target and chat/messaging provider (Stream / Sendbird / Pusher — embedded, not built in-house) remain undecided. Chat is not yet implemented. Don't assume or implement these without confirming with the user.
 
 ## Design System (Demo)
 

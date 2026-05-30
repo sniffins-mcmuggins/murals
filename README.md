@@ -1,5 +1,5 @@
-# [Platform Name] — Project README
-> Working name: **Render** (renderltd.com available) · Previously considered: Gesso · Name TBD  
+# Render — Project README
+> Name: **Render** (used throughout the codebase; module path `sniffins-mcmuggins/render`) · Previously considered: Gesso  
 > Status: In build · Concept locked · Branding in progress  
 > Last updated: May 2026
 
@@ -458,9 +458,9 @@ First Global client should be acquired at discount/free for reference credibilit
 - Analytics events (anonymised)
 - Magazine content (or handled by Substack)
 
-### Image Storage
-- Portfolio images need reliable CDN delivery
-- Consider Cloudinary or AWS S3 + CloudFront
+### Image Storage (decided)
+- **Local/CI:** MinIO (S3-compatible), see `infra/docker-compose.yml`
+- **Prod:** S3 + CDN, served via `CDNBaseURL`. Browser uploads use presigned PUT URLs (`/images/presign` → PUT → `/images/confirm`)
 - Images are central to the product — performance matters
 
 ---
@@ -608,13 +608,13 @@ First Global client should be acquired at discount/free for reference credibilit
 
 | Decision | Status | Notes |
 |----------|--------|-------|
-| **Platform name** | TBD | Render (renderltd.com available), Gesso (domains taken). Come back to this. |
-| **Tech stack** | TBD | Framework decisions pending. CTO + Dev 2 to decide. |
-| **App platform** | TBD | React Native vs Flutter vs PWA. |
-| **Payment processor** | TBD | Stripe most likely. |
-| **Image CDN** | TBD | Cloudinary vs AWS S3 + CloudFront. |
-| **Hosting** | TBD | AWS / GCP / Vercel / Railway. |
-| **Chat provider** | TBD | Stream vs Sendbird vs Pusher — evaluate pricing and features. |
+| **Platform name** | Decided | **Render** — used throughout the codebase (module `sniffins-mcmuggins/render`). Final branding/logo still in progress. |
+| **Tech stack** | Decided | Go + chi + pgx + sqlc (API), Next.js App Router (web). See [Tech Architecture Notes](#tech-architecture-notes). |
+| **App platform** | Decided | React Native (no Expo) — `mobile/`. |
+| **Payment processor** | Decided | Stripe — wired end-to-end (`api/internal/billing`). |
+| **Image CDN** | Decided | MinIO locally, S3 + CDN (`CDNBaseURL`) in prod. |
+| **Hosting** | TBD | AWS / GCP / Vercel / Railway. Local + CI run on Docker Compose (`infra/`). |
+| **Chat provider** | TBD | Stream vs Sendbird vs Pusher — evaluate pricing and features. Not yet implemented. |
 | **Artist commission marketplace** | Year 2 | Not Year 1. Feature design needed. |
 | **Custom map layouts** | Year 1 or 2? | Geographic map for pilot. Custom layout (indoor/venue) to follow. |
 | **Offline map support** | TBD | Would improve festival day experience significantly. |
