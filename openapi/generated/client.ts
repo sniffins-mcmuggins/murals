@@ -194,6 +194,23 @@ export interface paths {
         patch: operations["patchProfileMe"];
         trace?: never;
     };
+    "/profiles/me/qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a branded QR code (PNG) for the authenticated artist's public profile */
+        get: operations["getMyProfileQR"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileID}": {
         parameters: {
             query?: never;
@@ -1997,6 +2014,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMyProfileQR: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Branded QR code encoding the artist's public profile URL. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

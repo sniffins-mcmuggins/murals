@@ -1003,6 +1003,27 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /profiles/me/qr:
+    get:
+      operationId: getMyProfileQR
+      summary: Get a branded QR code (PNG) for the authenticated artist's public profile
+      tags: [profiles]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Branded QR code encoding the artist's public profile URL.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /profiles/{profileID}:
     get:
       operationId: getProfile
