@@ -46,9 +46,6 @@ func slugifyCriterion(label string) string {
 
 // parseCriteria unmarshals review_criteria JSON from the DB model.
 // Returns nil slice (not error) when the column is the empty-array default.
-// parseCriteria is consumed by the score handler (next task).
-//
-//nolint:unused
 func parseCriteria(raw json.RawMessage) ([]reviewCriterion, error) {
 	if len(raw) == 0 || string(raw) == "[]" || string(raw) == "null" {
 		return nil, nil
