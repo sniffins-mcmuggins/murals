@@ -382,6 +382,43 @@ func TestListApplications_CriterionScores_EmptyWhenNoCriteria(t *testing.T) {
 	assert.Empty(t, csRaw, "criterion_scores must be empty when no criteria configured")
 }
 
+func TestListApplications_TopLevelAvg_IsMeanOfCriterionAverages(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, ownerTok := createTestUser(t, db, "cs-owner-avg@test")
+	rev1ID, rev1Tok := createTestUser(t, db, "cs-rev-avg1@test")
+	rev2ID, rev2Tok := createTestUser(t, db, "cs-rev-avg2@test")
+	artistID, _ := createTestUser(t, db, "cs-art-avg@test")
+	createTestArtistProfile(t, db, artistID, "CS Artist Avg")
+
+	festID := createTestFestival(t, db, ownerID, "cs-fest-avg", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	setCriteria(t, db, festID, `[{"id":"art","label":"Artistic","min":1,"max":5},{"id":"feas","label":"Feasibility","min":1,"max":5}]`)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, rev1ID)
+	addReviewer(t, db, festID, rev2ID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	// rev1 scores art=4 and feas=4. rev2 scores art=2 only.
+	// Per-criterion avgs: art=(4+2)/2=3.0, feas=4.0. Mean of criterion avgs = (3.0+4.0)/2 = 3.5.
+	// A raw AVG over all 3 rows would be (4+4+2)/3 = 3.33 — so the assertion distinguishes the two.
+	scoreWithCriterion(t, srv, festID, appID, "art", 4, rev1Tok)
+	scoreWithCriterion(t, srv, festID, appID, "feas", 4, rev1Tok)
+	scoreWithCriterion(t, srv, festID, appID, "art", 2, rev2Tok)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", ownerTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	assert.InDelta(t, 3.5, list[0]["avg_score"], 0.001, "top-level avg must be mean of per-criterion averages, not raw row average")
+}
+
 func TestListApplications_OrphanedCriterionScores_Omitted(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

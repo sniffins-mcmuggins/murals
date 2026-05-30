@@ -183,15 +183,16 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		resp := make([]applicationResponse, len(items))
 		for i, it := range items {
 			a := it.resp
-			a.Notes = notesByApp[it.id.String()]
+			appIDStr := it.id.String()
+			a.Notes = notesByApp[appIDStr]
 
-			if sum, ok := summaryByApp[it.id.String()]; ok {
+			if sum, ok := summaryByApp[appIDStr]; ok {
 				avg := sum.avg
 				a.AvgScore = &avg
 				a.ScoreCount = sum.count
 			}
 
-			myRows := myScoresByApp[it.id.String()]
+			myRows := myScoresByApp[appIDStr]
 			if len(criteria) == 0 {
 				// No rubric — surface the caller's 'overall' score.
 				for _, row := range myRows {
@@ -218,7 +219,7 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 						Min:         c.Min,
 						Max:         c.Max,
 					}
-					if sum, ok := criterionSummaries[criterionKey{it.id.String(), c.ID}]; ok {
+					if sum, ok := criterionSummaries[criterionKey{appIDStr, c.ID}]; ok {
 						avg := sum.avg
 						entry.AvgScore = &avg
 						entry.ScoreCount = sum.count
@@ -232,6 +233,22 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 					cs = append(cs, entry)
 				}
 				a.CriterionScores = cs
+
+				// Top-level avg_score = mean of per-criterion averages (spec 4c).
+				var totalAvg float64
+				avgCount := 0
+				for _, entry := range cs {
+					if entry.AvgScore != nil {
+						totalAvg += *entry.AvgScore
+						avgCount++
+					}
+				}
+				if avgCount > 0 {
+					avgMean := totalAvg / float64(avgCount)
+					a.AvgScore = &avgMean
+				} else {
+					a.AvgScore = nil
+				}
 
 				if myCount > 0 {
 					mean := int32(math.Round(float64(totalMy) / float64(myCount)))
