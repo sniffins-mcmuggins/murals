@@ -92,6 +92,10 @@ func ScoreApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if req.CriterionID != "overall" {
 			form, err := q.GetApplicationFormByFestivalID(r.Context(), festUUID)
 			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					httperr.UnprocessableEntity(w, "unknown criterion_id")
+					return
+				}
 				httperr.InternalServerError(w)
 				return
 			}

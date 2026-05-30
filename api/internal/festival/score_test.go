@@ -164,6 +164,25 @@ func TestScore_UnknownCriterion_Rejected(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
+func TestScore_NamedCriterion_NoForm_Returns422(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	ownerID, ownerTok := createTestUser(t, db, "rub-owner-noform@test")
+	artistID, _ := createTestUser(t, db, "rub-art-noform@test")
+	createTestArtistProfile(t, db, artistID, "Rub Artist NoForm")
+	festID := createTestFestival(t, db, ownerID, "rub-fest-noform", "open")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	srv := newScoreServer(db)
+	t.Cleanup(srv.Close)
+
+	// Named criterion when form doesn't exist → 422, not 500
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score",
+		`{"score":3,"criterion_id":"some-criterion"}`, ownerTok)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
 func setCriteriaViaPatch(t *testing.T, db *pgxpool.Pool, festID, ownerTok, criteriaJSON string) {
 	t.Helper()
 	r := chi.NewRouter()
