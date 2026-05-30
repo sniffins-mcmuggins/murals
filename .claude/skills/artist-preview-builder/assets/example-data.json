@@ -1,0 +1,42 @@
+{
+  "artist": {
+    "name": "Lady Gabe",
+    "tagline": "Muralist & illustrator bringing bold colour to Cheltenham walls",
+    "location": "Cheltenham, UK",
+    "bio": "Lady Gabe is a Cheltenham-based muralist and illustrator whose work turns blank walls into bursts of colour and character. Her style blends bold linework with a warm, painterly palette — equal parts street art energy and storybook charm.\nFrom large-scale exterior commissions to intimate studio illustration, she works across scale without losing the playful signature that makes a piece unmistakably hers. Her murals have become local landmarks, and her commissioned work reaches collectors well beyond the South West.",
+    "medium_tags": ["mural", "illustration", "spray paint", "commission"],
+    "socials": {
+      "instagram": "https://instagram.com/ladygabe",
+      "website": "https://ladygabe.com"
+    },
+    "hero_image": "https://picsum.photos/seed/ladygabe-hero/1600/1000",
+    "avatar": "https://picsum.photos/seed/ladygabe-avatar/400/400",
+    "stats": [
+      { "label": "Murals", "value": "40+" },
+      { "label": "Festivals", "value": "6" },
+      { "label": "Years", "value": "8" }
+    ]
+  },
+  "collections": [
+    {
+      "name": "Street Murals",
+      "description": "Large-scale exterior work across Cheltenham and the South West.",
+      "images": [
+        "https://picsum.photos/seed/gabe-mural-1/800/1000",
+        "https://picsum.photos/seed/gabe-mural-2/800/1000",
+        "https://picsum.photos/seed/gabe-mural-3/800/1000",
+        "https://picsum.photos/seed/gabe-mural-4/800/1000"
+      ]
+    },
+    {
+      "name": "Studio & Illustration",
+      "description": "Smaller-scale work, prints and commissions.",
+      "images": [
+        "https://picsum.photos/seed/gabe-studio-1/800/1000",
+        "https://picsum.photos/seed/gabe-studio-2/800/1000",
+        "https://picsum.photos/seed/gabe-studio-3/800/1000"
+      ]
+    }
+  ],
+  "claim_url": "https://render.app/claim?ref=ladygabe"
+}
