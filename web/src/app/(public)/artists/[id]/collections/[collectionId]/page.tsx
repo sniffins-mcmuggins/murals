@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { absoluteUrl } from '@/lib/site'
 
 interface CollectionPageProps {
   params: Promise<{ id: string; collectionId: string }>
@@ -31,9 +32,32 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
     return { title: 'Collection not found | Render' }
   }
 
+  const collection = collectionRes.data
+  const profile = profileRes.data
+  const title = `${collection.name} — ${profile.display_name} | Render`
+  const description =
+    collection.description || `${collection.name} by ${profile.display_name} on Render`
+  const canonical = absoluteUrl(`/artists/${id}/collections/${collectionId}`)
+  const image = collection.cover_s3_key || profile.avatar_s3_key || undefined
+
   return {
-    title: `${collectionRes.data.name} — ${profileRes.data.display_name} | Render`,
-    description: collectionRes.data.description || undefined,
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: 'article',
+      title,
+      description,
+      url: canonical,
+      siteName: 'Render',
+      images: image ? [{ url: image, alt: collection.name }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
   }
 }
 
