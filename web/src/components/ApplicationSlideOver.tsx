@@ -8,19 +8,6 @@ type Application = components['schemas']['Application']
 type ApplicationArtist = components['schemas']['ApplicationArtist']
 type ApplicationNote = components['schemas']['ApplicationNote']
 
-interface CriterionScore {
-  criterion_id?: string
-  label?: string
-  min?: number
-  max?: number
-  avg_score?: number | null
-  score_count?: number
-  my_score?: number | null
-}
-
-// Extended type until generated client is regenerated with criterion_scores
-type ApplicationWithScores = Application & { criterion_scores?: CriterionScore[] }
-
 interface FormField {
   id: string
   label: string
@@ -36,7 +23,7 @@ interface ReviewCriterion {
 }
 
 interface Props {
-  application: ApplicationWithScores | null
+  application: Application | null
   formFields: FormField[]
   festivalId: string
   onClose: () => void
@@ -158,7 +145,7 @@ export function ApplicationSlideOver({
               <div className="space-y-4">
                 {criteria.map(c => {
                   const cs = (application.criterion_scores ?? []).find(
-                    (s: { criterion_id?: string; my_score?: number | null }) => s.criterion_id === c.id
+                    s => s.criterion_id === c.id
                   )
                   const myCs = cs?.my_score ?? null
                   return (
@@ -212,9 +199,7 @@ export function ApplicationSlideOver({
               </p>
               {criteria.length > 0 && (
                 <div className="space-y-1">
-                  {(application.criterion_scores ?? []).map((cs: {
-                    criterion_id?: string; label?: string; avg_score?: number | null
-                  }) => (
+                  {(application.criterion_scores ?? []).map(cs => (
                     <p key={cs.criterion_id} className="font-sans text-xs text-mid">
                       {cs.label}
                       {cs.avg_score != null && (
