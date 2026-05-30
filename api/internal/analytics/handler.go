@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,6 +67,22 @@ func pgUUIDFromString(s string) (pgtype.UUID, error) {
 		return pgtype.UUID{}, err
 	}
 	return id, nil
+}
+
+// LinkClickHandler handles POST /profiles/{profileID}/link-click. Public — no auth.
+// Records a link_click event for the given profile and returns 204 immediately.
+func LinkClickHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profileID := chi.URLParam(r, "profileID")
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := RecordEvent(ctx, pool, EventLinkClick, profileID); err != nil {
+				slog.Error("link-click: record failed", "err", err)
+			}
+		}()
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 // MyAnalyticsHandler handles GET /profiles/me/analytics. Requires auth.

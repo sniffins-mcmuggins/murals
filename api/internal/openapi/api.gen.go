@@ -961,6 +961,9 @@ type ServerInterface interface {
 	// List an artist's public festival appearances
 	// (GET /profiles/{profileID}/festivals)
 	ListArtistFestivals(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
+	// Record a social link click for an artist profile
+	// (POST /profiles/{profileID}/link-click)
+	RecordLinkClick(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
 	// List public festivals by status
 	// (GET /public/festivals)
 	ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams)
@@ -1306,6 +1309,12 @@ func (_ Unimplemented) ListCollections(w http.ResponseWriter, r *http.Request, p
 // List an artist's public festival appearances
 // (GET /profiles/{profileID}/festivals)
 func (_ Unimplemented) ListArtistFestivals(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Record a social link click for an artist profile
+// (POST /profiles/{profileID}/link-click)
+func (_ Unimplemented) RecordLinkClick(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2991,6 +3000,32 @@ func (siw *ServerInterfaceWrapper) ListArtistFestivals(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// RecordLinkClick operation middleware
+func (siw *ServerInterfaceWrapper) RecordLinkClick(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "profileID" -------------
+	var profileID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "profileID", chi.URLParam(r, "profileID"), &profileID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecordLinkClick(w, r, profileID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPublicFestivals operation middleware
 func (siw *ServerInterfaceWrapper) ListPublicFestivals(w http.ResponseWriter, r *http.Request) {
 
@@ -3350,6 +3385,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}/festivals", wrapper.ListArtistFestivals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/profiles/{profileID}/link-click", wrapper.RecordLinkClick)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/public/festivals", wrapper.ListPublicFestivals)
@@ -6526,6 +6564,22 @@ func (response ListArtistFestivals400ApplicationProblemPlusJSONResponse) VisitLi
 	return err
 }
 
+type RecordLinkClickRequestObject struct {
+	ProfileID openapi_types.UUID `json:"profileID"`
+}
+
+type RecordLinkClickResponseObject interface {
+	VisitRecordLinkClickResponse(w http.ResponseWriter) error
+}
+
+type RecordLinkClick204Response struct {
+}
+
+func (response RecordLinkClick204Response) VisitRecordLinkClickResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
 type ListPublicFestivalsRequestObject struct {
 	Params ListPublicFestivalsParams
 }
@@ -6756,6 +6810,9 @@ type StrictServerInterface interface {
 	// List an artist's public festival appearances
 	// (GET /profiles/{profileID}/festivals)
 	ListArtistFestivals(ctx context.Context, request ListArtistFestivalsRequestObject) (ListArtistFestivalsResponseObject, error)
+	// Record a social link click for an artist profile
+	// (POST /profiles/{profileID}/link-click)
+	RecordLinkClick(ctx context.Context, request RecordLinkClickRequestObject) (RecordLinkClickResponseObject, error)
 	// List public festivals by status
 	// (GET /public/festivals)
 	ListPublicFestivals(ctx context.Context, request ListPublicFestivalsRequestObject) (ListPublicFestivalsResponseObject, error)
@@ -8406,6 +8463,32 @@ func (sh *strictHandler) ListArtistFestivals(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListArtistFestivalsResponseObject); ok {
 		if err := validResponse.VisitListArtistFestivalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RecordLinkClick operation middleware
+func (sh *strictHandler) RecordLinkClick(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	var request RecordLinkClickRequestObject
+
+	request.ProfileID = profileID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RecordLinkClick(ctx, request.(RecordLinkClickRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecordLinkClick")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecordLinkClickResponseObject); ok {
+		if err := validResponse.VisitRecordLinkClickResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

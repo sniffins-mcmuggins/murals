@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
-import { SocialIcon } from '@/components/SocialIcon'
+import { SocialLinks } from '@/components/SocialLinks'
 import { absoluteUrl } from '@/lib/site'
 
 interface ArtistPageProps {
@@ -185,22 +185,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           )}
 
           {/* Social links */}
-          {Object.keys(profile.social_links).length > 0 && (
-            <nav aria-label="Social links" className="flex flex-wrap gap-4">
-              {Object.entries(profile.social_links).map(([platform, url]) => (
-                <a
-                  key={platform}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={platform}
-                  className="text-mid hover:text-amber transition-colors"
-                >
-                  <SocialIcon platform={platform} className="w-6 h-6" />
-                </a>
-              ))}
-            </nav>
-          )}
+          <SocialLinks profileId={profile.id} socialLinks={profile.social_links} />
         </header>
 
         {/* Festival appearances */}
