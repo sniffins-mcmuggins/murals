@@ -245,6 +245,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/{profileID}/festivals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an artist's public festival appearances
+         * @description Public. Returns the publicly-visible festivals (open or live) where this artist has an accepted application and/or an assigned spot, for the "Appearances" section on the public profile. map_slug is non-null only for live festivals (the public map renders for live festivals only).
+         */
+        get: operations["listArtistFestivals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/collections": {
         parameters: {
             query?: never;
@@ -1508,6 +1528,21 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        /** @description A publicly-visible festival an artist is appearing at. */
+        FestivalAppearance: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            /** Format: date */
+            start_date?: string | null;
+            /** Format: date */
+            end_date?: string | null;
+            /** @enum {string} */
+            status: "open" | "live";
+            /** @description Slug for the public festival map. Non-null only for live festivals. */
+            map_slug?: string | null;
+        };
         ApplicationForm: {
             /** Format: uuid */
             id?: string;
@@ -2085,6 +2120,29 @@ export interface operations {
                     "application/json": components["schemas"]["Collection"][];
                 };
             };
+        };
+    };
+    listArtistFestivals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of festival appearances (empty array if none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FestivalAppearance"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
         };
     };
     postCollections: {
