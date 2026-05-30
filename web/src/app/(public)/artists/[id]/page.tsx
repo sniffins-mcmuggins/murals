@@ -3,9 +3,19 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { SocialIcon } from '@/components/SocialIcon'
+import { absoluteUrl } from '@/lib/site'
 
 interface ArtistPageProps {
   params: Promise<{ id: string }>
+}
+
+// Pick the best representative image for social cards / structured data:
+// avatar first, then the first headline photo.
+function primaryImage(profile: {
+  avatar_s3_key?: string | null
+  headline_image_urls?: string[] | null
+}): string | undefined {
+  return profile.avatar_s3_key || profile.headline_image_urls?.[0] || undefined
 }
 
 export async function generateMetadata({ params }: ArtistPageProps): Promise<Metadata> {
@@ -18,9 +28,30 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
     return { title: 'Artist not found | Render' }
   }
 
+  const title = `${data.display_name} | Render`
+  const description =
+    data.bio || `${data.display_name}${data.location_label ? ` — ${data.location_label}` : ''} on Render`
+  const canonical = absoluteUrl(`/artists/${id}`)
+  const image = primaryImage(data)
+
   return {
-    title: `${data.display_name} | Render`,
-    description: data.bio,
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: 'profile',
+      title,
+      description,
+      url: canonical,
+      siteName: 'Render',
+      images: image ? [{ url: image, alt: data.display_name }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
   }
 }
 
@@ -55,8 +86,45 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     ongoing: 'bg-clay text-offwhite',
   }
 
+  // schema.org structured data — a Person (visual artist) whose works are the
+  // public collections. Helps search engines surface the artist directly.
+  const profileUrl = absoluteUrl(`/artists/${id}`)
+  const artistImage = primaryImage(profile)
+  const sameAs = Object.values(profile.social_links ?? {}).filter(
+    (url): url is string => typeof url === 'string' && url.length > 0,
+  )
+
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    additionalType: 'https://schema.org/VisualArtist',
+    name: profile.display_name,
+    url: profileUrl,
+    ...(profile.bio ? { description: profile.bio } : {}),
+    ...(artistImage ? { image: artistImage } : {}),
+    ...(profile.location_label
+      ? { address: { '@type': 'PostalAddress', addressLocality: profile.location_label } }
+      : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
+    ...(collections.length > 0
+      ? {
+          workExample: collections.map((collection) => ({
+            '@type': 'VisualArtwork',
+            name: collection.name,
+            url: absoluteUrl(`/artists/${id}/collections/${collection.id}`),
+            creator: { '@type': 'Person', name: profile.display_name },
+            ...(collection.cover_s3_key ? { image: collection.cover_s3_key } : {}),
+          })),
+        }
+      : {}),
+  }
+
   return (
     <main className="min-h-screen bg-offwhite">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Headline photos strip */}
         {profile.headline_image_urls.length > 0 && (
