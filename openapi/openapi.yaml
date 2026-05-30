@@ -414,6 +414,27 @@ components:
           nullable: true
           description: Slug for the public festival map. Non-null only for live festivals.
 
+    AnalyticsResponse:
+      type: object
+      required: [profile_views, qr_scans, link_clicks, window_days]
+      description: Aggregated analytics for an artist profile. GDPR-clean — no individual user data.
+      properties:
+        profile_views:
+          type: integer
+          format: int64
+          description: Number of times the public profile was viewed in the window.
+        qr_scans:
+          type: integer
+          format: int64
+          description: Number of times the artist's QR code was downloaded in the window.
+        link_clicks:
+          type: integer
+          format: int64
+          description: Number of link clicks recorded in the window.
+        window_days:
+          type: integer
+          description: The number of days covered by this report (90 for free tier, 730 for Pro).
+
     ApplicationForm:
       type: object
       properties:
@@ -1085,6 +1106,30 @@ paths:
               schema:
                 type: string
                 format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/me/analytics:
+    get:
+      operationId: getMyAnalytics
+      summary: Get aggregated analytics for the authenticated artist's profile
+      description: >-
+        Returns event counts (profile views, QR scans, link clicks) for the
+        caller's artist profile. Window: 90 days for free tier, 730 days (2
+        years) for Pro. No individual user data is stored — GDPR-clean.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Aggregated event counts and the window that was applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
