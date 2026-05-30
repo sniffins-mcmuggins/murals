@@ -2,6 +2,7 @@ package artist
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"image"
 	"image/color"
@@ -9,12 +10,14 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
@@ -112,5 +115,15 @@ func ProfileQRHandler(pool *pgxpool.Pool, webPublicBase string) http.HandlerFunc
 		w.Header().Set("Cache-Control", "private, max-age=300")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(pngBytes)
+
+		// Fire-and-forget: record QR scan. Per background-work rule.
+		profileIDStr := profile.ID.String()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := analytics.RecordEvent(ctx, pool, analytics.EventQRScan, profileIDStr); err != nil {
+				slog.Error("analytics: record qr_scan failed", "err", err, "profile_id", profileIDStr)
+			}
+		}()
 	}
 }

@@ -1,8 +1,10 @@
 package artist
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
@@ -140,6 +143,18 @@ func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(profile, true))
+
+		// Fire-and-forget: record profile view. Uses a fresh context so the
+		// goroutine outlives the request. Per background-work rule: bounded
+		// timeout, no r.Context() capture.
+		profileIDStr := profile.ID.String()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := analytics.RecordEvent(ctx, pool, analytics.EventProfileView, profileIDStr); err != nil {
+				slog.Error("analytics: record profile_view failed", "err", err, "profile_id", profileIDStr)
+			}
+		}()
 	}
 }
 
