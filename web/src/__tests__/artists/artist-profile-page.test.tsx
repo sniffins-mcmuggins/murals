@@ -84,6 +84,7 @@ describe('ArtistPage', () => {
     mockGet
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([mockCollection]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
 
     const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
@@ -100,6 +101,7 @@ describe('ArtistPage', () => {
     mockGet
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([mockCollection]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
 
     const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
@@ -114,6 +116,7 @@ describe('ArtistPage', () => {
     mockGet
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
 
     const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
@@ -125,6 +128,7 @@ describe('ArtistPage', () => {
     mockGet
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
 
     await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
