@@ -3,6 +3,7 @@ package festival
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -134,8 +135,12 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			summaryByApp[s.ApplicationID.String()] = scoreSummary{avg: s.AvgScore, count: s.ScoreCount}
 		}
 
-		// Batch-fetch the caller's own scores.
-		myScoreByApp := map[string]int32{}
+		// Batch-fetch the caller's own scores (now per criterion).
+		type myScoreRow struct {
+			criterionID string
+			score       int32
+		}
+		myScoresByApp := map[string][]myScoreRow{}
 		myScores, err := q.GetMyScoresByApplications(r.Context(), sqlcdb.GetMyScoresByApplicationsParams{
 			Column1:    appIDs,
 			ReviewerID: callerUUID,
@@ -145,7 +150,32 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		for _, ms := range myScores {
-			myScoreByApp[ms.ApplicationID.String()] = ms.Score
+			k := ms.ApplicationID.String()
+			myScoresByApp[k] = append(myScoresByApp[k], myScoreRow{ms.CriterionID, ms.Score})
+		}
+
+		// Parse criteria config once for the whole batch.
+		criteria, _ := parseCriteria(form.ReviewCriteria)
+
+		// Batch-fetch per-criterion summaries (only when criteria are configured).
+		type criterionKey struct{ appID, criterionID string }
+		criterionSummaries := map[criterionKey]struct {
+			avg   float64
+			count int
+		}{}
+		if len(criteria) > 0 {
+			rows, err := q.CriterionSummaryByApplications(r.Context(), appIDs)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			for _, row := range rows {
+				k := criterionKey{row.ApplicationID.String(), row.CriterionID}
+				criterionSummaries[k] = struct {
+					avg   float64
+					count int
+				}{row.AvgScore, int(row.ScoreCount)}
+			}
 		}
 
 		// Assemble final response.
@@ -154,17 +184,62 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		for i, it := range items {
 			a := it.resp
 			a.Notes = notesByApp[it.id.String()]
+
 			if sum, ok := summaryByApp[it.id.String()]; ok {
 				avg := sum.avg
 				a.AvgScore = &avg
 				a.ScoreCount = sum.count
 			}
-			if ms, ok := myScoreByApp[it.id.String()]; ok {
-				m := ms
-				a.MyScore = &m
+
+			myRows := myScoresByApp[it.id.String()]
+			if len(criteria) == 0 {
+				// No rubric — surface the caller's 'overall' score.
+				for _, row := range myRows {
+					if row.criterionID == "overall" {
+						m := row.score
+						a.MyScore = &m
+						break
+					}
+				}
+			} else {
+				// Rubric — my_score = mean of scored criteria; criterion_scores populated.
+				myScoreLookup := map[string]int32{}
+				for _, row := range myRows {
+					myScoreLookup[row.criterionID] = row.score
+				}
+
+				cs := make([]criterionScore, 0, len(criteria))
+				var totalMy int32
+				myCount := 0
+				for _, c := range criteria {
+					entry := criterionScore{
+						CriterionID: c.ID,
+						Label:       c.Label,
+						Min:         c.Min,
+						Max:         c.Max,
+					}
+					if sum, ok := criterionSummaries[criterionKey{it.id.String(), c.ID}]; ok {
+						avg := sum.avg
+						entry.AvgScore = &avg
+						entry.ScoreCount = sum.count
+					}
+					if ms, ok := myScoreLookup[c.ID]; ok {
+						m := ms
+						entry.MyScore = &m
+						totalMy += ms
+						myCount++
+					}
+					cs = append(cs, entry)
+				}
+				a.CriterionScores = cs
+
+				if myCount > 0 {
+					mean := int32(math.Round(float64(totalMy) / float64(myCount)))
+					a.MyScore = &mean
+				}
 			}
-			// Apply anonymous review stripping AFTER my_score is set so the reveal
-			// is driven by whether the reviewer has scored, not the score lookup order.
+
+			// Anonymous review stripping (uses a.MyScore which is now set).
 			if shouldAnonymise(isReviewer, form.AnonymousReview, a.MyScore) {
 				a.Artist = &artistSummary{
 					DisplayName:   "",

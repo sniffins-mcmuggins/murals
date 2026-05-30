@@ -3,6 +3,7 @@ package festival_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -281,4 +282,131 @@ func TestListApplications_AnonymousReview_OffShowsFullIdentity(t *testing.T) {
 	assert.Equal(t, false, app["identity_hidden"], "identity_hidden must be false when anonymous_review is off")
 	artist := app["artist"].(map[string]any)
 	assert.Equal(t, "Real Name 4", artist["display_name"], "full name visible when anonymous_review is off")
+}
+
+// setCriteria patches review_criteria directly via DB (sqlc), bypassing the HTTP handler.
+func setCriteria(t *testing.T, pool *pgxpool.Pool, festivalID string, criteriaJSON string) {
+	t.Helper()
+	_, err := sqlcdb.New(pool).PatchFormCriteria(context.Background(), sqlcdb.PatchFormCriteriaParams{
+		FestivalID:     pgUUID(t, festivalID),
+		ReviewCriteria: []byte(criteriaJSON),
+	})
+	require.NoError(t, err)
+}
+
+// scoreWithCriterion submits a score for a named criterion via the HTTP server.
+func scoreWithCriterion(t *testing.T, srv *httptest.Server, festID, appID, criterionID string, score int, token string) {
+	t.Helper()
+	body := fmt.Sprintf(`{"score":%d,"criterion_id":%q}`, score, criterionID)
+	resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score", body, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
+func TestListApplications_CriterionScores_PopulatedAfterScoring(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, ownerTok := createTestUser(t, db, "cs-owner-1@test")
+	revID, revTok := createTestUser(t, db, "cs-rev-1@test")
+	artistID, _ := createTestUser(t, db, "cs-art-1@test")
+	createTestArtistProfile(t, db, artistID, "CS Artist 1")
+
+	festID := createTestFestival(t, db, ownerID, "cs-fest-1", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	setCriteria(t, db, festID, `[{"id":"art","label":"Artistic Quality","min":1,"max":5},{"id":"feas","label":"Feasibility","min":1,"max":5}]`)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, revID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	scoreWithCriterion(t, srv, festID, appID, "art", 4, revTok)
+	scoreWithCriterion(t, srv, festID, appID, "feas", 2, revTok)
+
+	// Owner view: sees criterion_scores with avg_score populated.
+	ownerResp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", ownerTok)
+	require.Equal(t, http.StatusOK, ownerResp.StatusCode)
+	var ownerList []map[string]any
+	require.NoError(t, json.NewDecoder(ownerResp.Body).Decode(&ownerList))
+	_ = ownerResp.Body.Close()
+	require.Len(t, ownerList, 1)
+
+	app := ownerList[0]
+	csRaw, ok := app["criterion_scores"].([]any)
+	require.True(t, ok, "criterion_scores must be an array")
+	require.Len(t, csRaw, 2)
+
+	csMap := map[string]map[string]any{}
+	for _, raw := range csRaw {
+		cs := raw.(map[string]any)
+		csMap[cs["criterion_id"].(string)] = cs
+	}
+	assert.InDelta(t, 4.0, csMap["art"]["avg_score"], 0.001, "art avg must be non-zero (sqlc canary)")
+	assert.InDelta(t, 2.0, csMap["feas"]["avg_score"], 0.001, "feas avg must be non-zero (sqlc canary)")
+	assert.Equal(t, "Artistic Quality", csMap["art"]["label"])
+
+	// Reviewer view: my_score at top level = mean of criteria scores = (4+2)/2 = 3, rounded.
+	revResp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", revTok)
+	require.Equal(t, http.StatusOK, revResp.StatusCode)
+	var revList []map[string]any
+	require.NoError(t, json.NewDecoder(revResp.Body).Decode(&revList))
+	_ = revResp.Body.Close()
+	require.Len(t, revList, 1)
+	assert.Equal(t, float64(3), revList[0]["my_score"], "my_score must be mean of criteria scores")
+}
+
+func TestListApplications_CriterionScores_EmptyWhenNoCriteria(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, ownerTok := createTestUser(t, db, "cs-owner-2@test")
+	artistID, _ := createTestUser(t, db, "cs-art-2@test")
+	createTestArtistProfile(t, db, artistID, "CS Artist 2")
+
+	festID := createTestFestival(t, db, ownerID, "cs-fest-2", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	createTestApplicationInFestival(t, db, festID, artistID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", ownerTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	csRaw := list[0]["criterion_scores"].([]any)
+	assert.Empty(t, csRaw, "criterion_scores must be empty when no criteria configured")
+}
+
+func TestListApplications_OrphanedCriterionScores_Omitted(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	ownerID, ownerTok := createTestUser(t, db, "cs-owner-3@test")
+	revID, revTok := createTestUser(t, db, "cs-rev-3@test")
+	artistID, _ := createTestUser(t, db, "cs-art-3@test")
+	createTestArtistProfile(t, db, artistID, "CS Artist 3")
+
+	festID := createTestFestival(t, db, ownerID, "cs-fest-3", "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+	setCriteria(t, db, festID, `[{"id":"temp","label":"Temp","min":1,"max":5}]`)
+	appID := createTestApplicationInFestival(t, db, festID, artistID)
+	addReviewer(t, db, festID, revID)
+
+	srv := newReviewListServer(db)
+	t.Cleanup(srv.Close)
+
+	scoreWithCriterion(t, srv, festID, appID, "temp", 3, revTok)
+	setCriteria(t, db, festID, `[]`)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", ownerTok)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	assert.Empty(t, list[0]["criterion_scores"].([]any))
 }
