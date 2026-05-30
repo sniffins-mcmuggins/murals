@@ -94,6 +94,17 @@ function ApplicationsView({ festivalId }: { festivalId: string }) {
     if (applicationsQuery.data) setLocalApps(applicationsQuery.data)
   }, [applicationsQuery.data])
 
+  // Keep an open slide-over in sync with refetched server data (e.g. after scoring,
+  // so score_count/avg_score update and the panel-average section appears).
+  useEffect(() => {
+    if (!applicationsQuery.data) return
+    setSelectedApp(prev => {
+      if (!prev) return prev
+      const fresh = applicationsQuery.data.find((a: Application) => a.id === prev.id)
+      return fresh ?? prev
+    })
+  }, [applicationsQuery.data])
+
   const formQuery = useQuery({
     queryKey: ['festival-form', festivalId],
     queryFn: async () => {
