@@ -25,6 +25,7 @@ const baseApp = {
   avg_score: null,
   score_count: 0,
   my_score: null,
+  criterion_scores: [],
   created_at: '2026-05-01T10:00:00Z',
   updated_at: '2026-05-01T10:00:00Z',
   artist: { display_name: 'Rosa Vane', medium_tags: ['spray paint'], avatar_s3_key: null, location_label: 'Bristol' },
@@ -40,6 +41,7 @@ const baseProps = {
   onWaitlist: noop,
   onScore: noop,
   isPending: false,
+  criteria: [],
 }
 
 describe('ApplicationSlideOver — owner mode (isReviewer=false)', () => {
@@ -110,5 +112,56 @@ describe('ApplicationSlideOver — anonymous mode (identity_hidden=true)', () =>
     const revealedApp = { ...anonApp, identity_hidden: false, artist: { ...baseApp.artist, display_name: 'Rosa Vane' } }
     render(<ApplicationSlideOver {...baseProps} application={revealedApp} isReviewer={true} />)
     expect(screen.getByText('Rosa Vane')).toBeInTheDocument()
+  })
+})
+
+describe('ApplicationSlideOver — rubric mode (criteria configured)', () => {
+  const criteria = [
+    { id: 'art', label: 'Artistic Quality', min: 1, max: 5 },
+    { id: 'feas', label: 'Feasibility', min: 1, max: 3 },
+  ]
+  const rubricApp = {
+    ...baseApp,
+    criterion_scores: [
+      { criterion_id: 'art', label: 'Artistic Quality', min: 1, max: 5, avg_score: null, score_count: 0, my_score: null },
+      { criterion_id: 'feas', label: 'Feasibility', min: 1, max: 3, avg_score: null, score_count: 0, my_score: null },
+    ],
+  }
+
+  it('shows one star row per criterion', () => {
+    render(<ApplicationSlideOver {...baseProps} application={rubricApp} isReviewer={true} criteria={criteria} />)
+    expect(screen.getByText('Artistic Quality')).toBeInTheDocument()
+    expect(screen.getByText('Feasibility')).toBeInTheDocument()
+    // max=3 for Feasibility → button labelled "Score Feasibility 3" exists, "...4" does not
+    expect(screen.getByLabelText('Score Feasibility 3')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Score Feasibility 4')).not.toBeInTheDocument()
+  })
+
+  it('calls onScore with criterion_id when a criterion star is clicked', () => {
+    const onScore = vi.fn()
+    render(<ApplicationSlideOver {...baseProps} application={rubricApp} isReviewer={true} criteria={criteria} onScore={onScore} />)
+    fireEvent.click(screen.getByLabelText('Score Artistic Quality 4'))
+    expect(onScore).toHaveBeenCalledWith('app-1', 4, 'art')
+  })
+
+  it('shows per-criterion panel averages after scoring', () => {
+    const scoredApp = {
+      ...rubricApp,
+      my_score: 3,
+      score_count: 1,
+      avg_score: 3.0,
+      criterion_scores: [
+        { criterion_id: 'art', label: 'Artistic Quality', min: 1, max: 5, avg_score: 4.0, score_count: 1, my_score: 4 },
+        { criterion_id: 'feas', label: 'Feasibility', min: 1, max: 3, avg_score: 2.0, score_count: 1, my_score: 2 },
+      ],
+    }
+    render(<ApplicationSlideOver {...baseProps} application={scoredApp} isReviewer={true} criteria={criteria} />)
+    expect(screen.getByText(/Panel average/i)).toBeInTheDocument()
+  })
+
+  it('hides single generic 5-star when criteria configured', () => {
+    render(<ApplicationSlideOver {...baseProps} application={rubricApp} isReviewer={true} criteria={criteria} />)
+    // generic per-app "Score 1" label should not exist (criterion rows use "Score <label> N")
+    expect(screen.queryByLabelText('Score 1')).not.toBeInTheDocument()
   })
 })
