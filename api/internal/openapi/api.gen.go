@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -872,6 +873,9 @@ type ServerInterface interface {
 	// Update own artist profile
 	// (PATCH /profiles/me)
 	PatchProfileMe(w http.ResponseWriter, r *http.Request)
+	// Get a branded QR code (PNG) for the authenticated artist's public profile
+	// (GET /profiles/me/qr)
+	GetMyProfileQR(w http.ResponseWriter, r *http.Request)
 	// Get public artist profile
 	// (GET /profiles/{profileID})
 	GetProfile(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
@@ -1193,6 +1197,12 @@ func (_ Unimplemented) GetProfileMe(w http.ResponseWriter, r *http.Request) {
 // Update own artist profile
 // (PATCH /profiles/me)
 func (_ Unimplemented) PatchProfileMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a branded QR code (PNG) for the authenticated artist's public profile
+// (GET /profiles/me/qr)
+func (_ Unimplemented) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2768,6 +2778,28 @@ func (siw *ServerInterfaceWrapper) PatchProfileMe(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetMyProfileQR operation middleware
+func (siw *ServerInterfaceWrapper) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyProfileQR(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetProfile operation middleware
 func (siw *ServerInterfaceWrapper) GetProfile(w http.ResponseWriter, r *http.Request) {
 
@@ -3164,6 +3196,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/profiles/me", wrapper.PatchProfileMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/me/qr", wrapper.GetMyProfileQR)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}", wrapper.GetProfile)
@@ -6136,6 +6171,65 @@ func (response PatchProfileMe404ApplicationProblemPlusJSONResponse) VisitPatchPr
 	return err
 }
 
+type GetMyProfileQRRequestObject struct {
+}
+
+type GetMyProfileQRResponseObject interface {
+	VisitGetMyProfileQRResponse(w http.ResponseWriter) error
+}
+
+type GetMyProfileQR200ImagepngResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response GetMyProfileQR200ImagepngResponse) VisitGetMyProfileQRResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/png")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetMyProfileQR401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyProfileQR401ApplicationProblemPlusJSONResponse) VisitGetMyProfileQRResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyProfileQR404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyProfileQR404ApplicationProblemPlusJSONResponse) VisitGetMyProfileQRResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetProfileRequestObject struct {
 	ProfileID openapi_types.UUID `json:"profileID"`
 }
@@ -6411,6 +6505,9 @@ type StrictServerInterface interface {
 	// Update own artist profile
 	// (PATCH /profiles/me)
 	PatchProfileMe(ctx context.Context, request PatchProfileMeRequestObject) (PatchProfileMeResponseObject, error)
+	// Get a branded QR code (PNG) for the authenticated artist's public profile
+	// (GET /profiles/me/qr)
+	GetMyProfileQR(ctx context.Context, request GetMyProfileQRRequestObject) (GetMyProfileQRResponseObject, error)
 	// Get public artist profile
 	// (GET /profiles/{profileID})
 	GetProfile(ctx context.Context, request GetProfileRequestObject) (GetProfileResponseObject, error)
@@ -7941,6 +8038,30 @@ func (sh *strictHandler) PatchProfileMe(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PatchProfileMeResponseObject); ok {
 		if err := validResponse.VisitPatchProfileMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyProfileQR operation middleware
+func (sh *strictHandler) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
+	var request GetMyProfileQRRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyProfileQR(ctx, request.(GetMyProfileQRRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyProfileQR")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyProfileQRResponseObject); ok {
+		if err := validResponse.VisitGetMyProfileQRResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
