@@ -3,7 +3,9 @@
 **Date:** 2026-05-30
 **Status:** Draft
 **Epic:** E18 (new)
-**Scope:** Let artists endorse other artists, and festival organisers endorse artists who appeared at their festival. Endorsements show as peer/organiser social proof on the artist's profile. Goal: build community and reduce churn — artists who feel recognised and connected stay.
+**Scope:** Let artists endorse other artists, and festival organisers endorse artists (badged with one of the organiser's own festivals). Endorsements show as peer/organiser social proof on the artist's profile. Goal: build community and reduce churn — artists who feel recognised and connected stay.
+
+> **Decision (2026-05-30):** an organiser can endorse **any** artist — the endorsee does **not** need to have appeared at the festival. The only authenticity guard retained is **festival ownership**: you can only badge an endorsement with a festival you own, so "Endorsed by [Festival]" is never a lie about whose festival it is.
 
 ---
 
@@ -12,7 +14,7 @@
 Endorsements are a small, high-leverage trust signal. Two kinds, derived from **context**, not a role column (the `user_role` enum was dropped in migration 5, and a user can be both artist and organiser):
 
 - **Peer endorsement** — any artist (a user with an `artist_profile`) vouches for another artist. Optional short testimonial + "endorsed for" skill tags.
-- **Organiser endorsement** — the owner of a festival endorses an artist **who actually appeared at it**. Higher-trust, badged with the festival name ("Endorsed by the Cheltenham Paint Festival team"). Gated on a real, verifiable festival relationship so it can't be faked.
+- **Organiser endorsement** — the owner of a festival endorses an artist, badged with the festival name ("Endorsed by the Cheltenham Paint Festival team"). Gated on **festival ownership only** — the endorser must own the festival they badge with (so the attribution is truthful), but the artist need not have appeared there.
 
 The endorsee always controls their own page: they can hide any individual endorsement; the endorser can withdraw. Endorsements are public content, so they plug into E17 moderation (flaggable, `moderation_status`).
 
@@ -24,7 +26,7 @@ The endorsee always controls their own page: they can hide any individual endors
 
 | # | Ticket | Depends on | Areas | Notes |
 |---|--------|-----------|-------|-------|
-| **E18.1** | Endorsements core — table, create/withdraw, peer-vs-organiser validation, one-per-pair, no self-endorse, endorsee notify | — *(foundation)* | api, db, e2e, **security** | Authenticity is the hard part: organiser endorsements must prove festival ownership + appearance. |
+| **E18.1** | Endorsements core — table, create/withdraw, peer-vs-organiser validation, one-per-pair, no self-endorse, endorsee notify | — *(foundation)* | api, db, e2e, **security** | Authenticity guard: organiser endorsements must prove **festival ownership** (no appearance check). |
 | **E18.2** | Profile display + endorsee controls — render on profile, organiser highlight, hide/show individual endorsements | E18.1 | api, web, e2e | The visible payoff. Endorsee owns what shows. |
 | **E18.3** | *(integration)* Flaggable + moderated endorsements — add `endorsement` target to E17 | E18.1, **E17.2/E17.3** | api, db, e2e | Adds `endorsement` as an E17 `target_type` + the `moderation_status` public filter. |
 
@@ -71,7 +73,7 @@ CREATE INDEX idx_endorsements_endorsee ON endorsements (endorsee_id) WHERE moder
   - **Self-endorse** → `400` (also DB-CHECKed).
   - **Endorsee must be an artist** (has an `artist_profile`) and that profile must be publicly reachable → else `404`/`400` (no probing drafts).
   - **`kind='peer'`:** endorser must have an `artist_profile`. `festival_id` ignored/must be null.
-  - **`kind='organiser'`:** endorser must **own** `festival_id` *and* the endorsee must have an **accepted/appeared** application at that festival (verifiable relationship). Fail either → `403`. This is the authenticity gate — it's what makes an organiser endorsement worth more than a peer one.
+  - **`kind='organiser'`:** endorser must **own** `festival_id`. Not the owner → `403`. (No appearance check — decided 2026-05-30.) Ownership is the authenticity gate that keeps the festival badge truthful.
   - **Upsert semantics:** second `POST` for the same pair updates `body`/`skills` (`ON CONFLICT (endorser_id, endorsee_id) DO UPDATE`), never duplicates.
   - Fires an endorsee notification (bounded background work, `background-work.md`) — email + (future) in-app.
 - `DELETE /endorsements/{id}` *(endorser only)* — withdraw.
@@ -89,7 +91,7 @@ Routing: all behind `auth.Middleware` (+ `beta.Gate` during beta). Literal paths
 - **E18.2:** an **Endorsements** section on the public artist profile —
   - Organiser endorsements highlighted with the festival name + a verified-style badge.
   - Peer endorsements as a grid of endorser avatars/names; testimonial text where present; "endorsed for: murals, portraits" chips from `skills`.
-  - An **"Endorse"** button on *other* artists' profiles (hidden on your own), opening a small composer (optional blurb + skill tags). Organisers get an "Endorse as [Festival]" option only for artists who appeared at a festival they own (the API enforces it; the UI just offers it).
+  - An **"Endorse"** button on *other* artists' profiles (hidden on your own), opening a small composer (optional blurb + skill tags). Organisers get an "Endorse as [Festival]" option listing the festivals **they own** to badge with (the API enforces ownership; the UI just offers it).
   - The endorsee's own profile view shows hide/show toggles per endorsement (E18.2 control).
 - Design system per `CLAUDE.md`; organiser badge in DM Mono, testimonials in Cormorant Garamond (it's a quote).
 
@@ -106,9 +108,8 @@ Per `api-handler-checklist.md`, `auth-changes.md`:
 **One-per-pair race:** two concurrent `POST`s for the same pair via `Promise.all` → exactly one create, one upsert-merge (no duplicate; `endorsements_one_per_pair` + `ON CONFLICT` guarantee it) — the concurrent pattern from `api-handler-checklist.md`.
 
 **Organiser-endorsement forgery (the key authenticity test):**
-- Organiser A endorses artist X **for festival A owns and X appeared at** → `201`, `kind='organiser'`.
-- A endorses X **for a festival A does NOT own** → `403`.
-- A endorses X **for A's festival where X never had an accepted application** → `403`.
+- Organiser A endorses artist X **badged with a festival A owns** → `201`, `kind='organiser'` (no appearance required).
+- A endorses X **badged with a festival A does NOT own** → `403` (the retained authenticity guard).
 - A non-owner tries to attribute an endorsement to someone else's festival → `403`.
 
 **Ownership of mutations (IDOR):** only the endorser can `DELETE`; only the endorsee can `PATCH …/visibility`. Cross-user attempts → `403`. The endorser cannot un-hide what the endorsee hid; the endorsee cannot edit the endorser's words.
@@ -121,7 +122,7 @@ Per `api-handler-checklist.md`, `auth-changes.md`:
 
 ## 5. Open decisions (for review — defaults chosen)
 
-1. **Organiser-endorsement gating.** Default: **require** a real relationship (endorser owns the festival AND endorsee has an accepted/appeared application there). Strong authenticity, but means organisers can only endorse artists who actually showed up. Alternative: allow any organiser to endorse any artist (looser, less trustworthy badge).
+1. **Organiser-endorsement gating.** **Locked 2026-05-30:** an organiser may endorse **any** artist; the only guard is that they must **own** the festival they badge with (truthful attribution). No appearance requirement.
 2. **Testimonial length / required?** Default: optional, short (≤ 280 chars). A pure one-click vouch is valid (no text). Alternative: require a sentence to make endorsements meaningful.
 3. **"Endorsed for" skill tags.** Default: optional free-to-pick tags reusing the artist's existing `medium`/skill vocabulary. Alternative: drop tags in v1, just a vouch + blurb.
 4. **Reciprocity highlight.** Default: if A and B endorse each other, show a subtle "mutual" marker. Cheap, nice community signal. Alternative: ignore directionality.

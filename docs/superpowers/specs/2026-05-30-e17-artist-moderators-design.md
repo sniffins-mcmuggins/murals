@@ -160,7 +160,7 @@ Per `auth-changes.md`, `api-handler-checklist.md`, `sqlc-and-schema.md`:
 2. **Reason taxonomy.** Default: `spam | ai_generated | abuse | off_topic | copyright | other`. `ai_generated` is first-class because "no AI slop" is the explicit goal.
 3. **Who can flag.** Default: any authenticated member (during beta, that's any founding member). Could later require account standing/age to flag.
 4. **Hide vs remove.** Default: `hide` = reversible, moderator-available; `remove` = hard, admin-only; `restore` undoes a hide. Owners are emailed (bounded background work, `background-work.md`) when their content is hidden, with the reason.
-5. **Mod-built prospect pages (E17.4).** Default: include as an optional stretch ticket that widens E15.4's `POST /admin/prospects` auth to `is_moderator OR is_admin` — reusing all its machinery. Confirm you want trusted mods doing recruitment, vs keeping it admin-only.
+5. **Mod-built prospect pages (E17.4).** **Locked 2026-05-30:** **included** as an optional stretch ticket that widens E15.4's `POST /admin/prospects` auth to `is_moderator OR is_admin` — reusing all its machinery. Gated on E15.4 landing.
 6. **Can moderators grant moderators?** Default: **no** — only admins grant/revoke `is_moderator`, to keep privilege escalation controlled.
 
 ---

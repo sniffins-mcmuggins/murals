@@ -143,10 +143,10 @@ Per `api-handler-checklist.md`, `auth-changes.md`, and E15.4/E15.5's rules:
 
 ## 5. Open decisions (for review — defaults chosen)
 
-1. **Reward type.** Default: **comp months via E15.5** (e.g. 1 free month per qualified referral). Reuses the gift/comp machinery — no new billing path. Alternatives: E16 invite-quota top-ups, or status/leaderboard only (no material reward).
-2. **Qualifying milestone.** Default: referred artist **claims and goes public** (going public is itself gated on pay/comp via E15.5, so "live" is a real, low-fraud signal). Alternatives: claim-only (higher fraud), or referred artist *pays* (highest bar, lowest volume).
-3. **Reward magnitude + cap.** Default: a small per-referral reward with a per-referrer monthly cap to bound cost and farming. Pick the numbers.
-4. **Two-sided?** Default: **one-sided** (referrer rewarded) for v1 — the referred artist already gets the comp/founder perks from E16/E15.5. Alternative: also credit the new artist (two-sided) for stronger pull, at higher cost.
+1. **Reward type.** **Locked 2026-05-30:** **comp months via E15.5** (≈1 free month per qualified referral). Reuses the gift/comp machinery — no new billing path.
+2. **Qualifying milestone.** **Locked 2026-05-30:** referred artist **claims and goes public** (going public is itself gated on pay/comp via E15.5, so "live" is a real, low-fraud signal).
+3. **Reward magnitude + cap.** Default: ≈1 month per qualified referral, with a per-referrer **monthly cap** to bound cost and farming (exact numbers are ops config, env-tunable).
+4. **Sidedness.** **Locked 2026-05-30:** **one-sided** (referrer rewarded only) — the referred artist already gets the comp/founder perks from E16/E15.5.
 5. **Attribution window.** Default: first-touch, attributed at claim, no expiry on the pending state (a prospect can claim weeks later). Alternative: a 30-day attribution window.
 6. **Direct-invite outcome (E20.3).** Default: a streamlined **"invited to apply"** state — pre-fills/fast-tracks the application but the organiser still reviews. Alternative: auto-create a draft application; (explicitly **not** auto-accept).
 7. **Who can refer / invite.** Default: artists + organisers can both *refer to platform*; only organisers can *invite to a festival* (they own festivals). Confirm.

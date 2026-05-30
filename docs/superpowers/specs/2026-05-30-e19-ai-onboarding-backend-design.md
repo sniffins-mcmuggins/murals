@@ -124,7 +124,7 @@ Per `prod-fail-loud.md`, the Anthropic client is an external service:
 - `AI_BUILD_REQUIRED bool` — when `AI_BUILD_ENABLED && AI_BUILD_REQUIRED`, a missing/invalid `ANTHROPIC_API_KEY` → `os.Exit(1)` at boot (fail loud). When enabled-but-not-required (dev), a missing key logs `slog.Warn` and the planner stage uses a stub.
 - `AI_BUILD_DAILY_CAP int`, `AI_BUILD_PER_IP_DAILY int`, plus model + token-budget envs.
 
-Implementation uses the **`claude-api` skill** — prompt caching on the system prompt is mandatory (it's the same ~2k-token voice/brand/schema block every call). Model tiering: Opus for the plan/bio (it goes *to the artist* — quality is the conversion lever); Haiku reserved for any cheap intake classification.
+Implementation uses the **`claude-api` skill** — prompt caching on the system prompt is mandatory (it's the same ~2k-token voice/brand/schema block every call). Model (locked 2026-05-30): **Sonnet** (`claude-sonnet-4-6`) for the plan/bio — strong copy at a cost that lets us run a higher daily cap for the same spend. The model id is an env var (`AI_BUILD_MODEL`) so an Opus arm can be A/B'd later without code change.
 
 ---
 
@@ -208,8 +208,8 @@ Per `api-handler-checklist.md`, `prod-fail-loud.md`, `background-work.md`, and E
 
 ## 8. Open decisions (for review — defaults chosen)
 
-1. **Model per stage.** Default: **Opus** for the plan/bio (conversion-critical), Haiku only for cheap intake classification if needed. Token budget capped per job. Alternative: Sonnet for the plan to cut cost.
-2. **Global daily cap.** Default: a conservative `AI_BUILD_DAILY_CAP` (e.g. **50/day**) at launch, env-tunable, with over-cap → waitlist capture rather than a hard "no". Pick the number.
+1. **Model.** **Locked 2026-05-30:** **Sonnet** (`claude-sonnet-4-6`) for the plan/bio, via `AI_BUILD_MODEL` env so it's swappable/A-B-able. Token budget capped per job.
+2. **Global daily cap.** **Locked 2026-05-30:** **env-configurable** (`AI_BUILD_DAILY_CAP`), default 50, tuned at deploy — not a fixed spec number. Over-cap → waitlist capture, not a hard "no".
 3. **Per-IP / per-session limits.** Default: **1 active build per session, 3/day per IP**. Tune.
 4. **Consent-to-contact (GDPR).** Default: explicit opt-in checkbox at intake; the recontact list includes **only** opt-ins; raw IP never stored (hash only). Confirm this is the bar you want.
 5. **Harvester: Go-native vs Python subprocess.** Default: **Go-native** so the SSRF guard is one auditable code path (the existing Python script has no SSRF guard and sandboxing a subprocess is harder). The Python script stays the operator/skill tool; E19 reimplements its heuristics in guarded Go.
