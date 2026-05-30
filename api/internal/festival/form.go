@@ -256,10 +256,11 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		// If the caller is the festival organiser, include owner-only fields.
+		// Owners and invited reviewers see panel-internal fields (review_criteria,
+		// anonymous_review). The public/artists get the stripped response.
 		if principal, authErr := auth.User(r.Context()); authErr == nil {
-			fest, festErr := q.GetFestivalByID(r.Context(), festUUID)
-			if festErr == nil && fest.OrganiserID.String() == principal.UserID {
+			role, roleErr := resolveFestivalAccess(r.Context(), q, festUUID, principal.UserID)
+			if roleErr == nil && role != roleNone {
 				_ = json.NewEncoder(w).Encode(toFormResponse(form))
 				return
 			}

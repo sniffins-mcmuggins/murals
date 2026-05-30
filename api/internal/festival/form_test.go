@@ -262,6 +262,48 @@ func TestPatchForm_Criteria_ThreeDuplicateLabels_SequentialIDs(t *testing.T) {
 	assert.Equal(t, []string{"quality", "quality-2", "quality-3"}, ids)
 }
 
+func TestGetForm_ReviewerSeesReviewCriteria(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgTok := createTestUser(t, db, "gf-rc-org@test")
+	revID, revTok := createTestUser(t, db, "gf-rc-rev@test")
+	festID := createTestFestival(t, db, orgID, "gf-rc-fest", "open")
+	createTestApplicationForm(t, db, festID)
+	addReviewer(t, db, festID, revID)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
+	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Owner configures criteria.
+	patch := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form",
+		`{"review_criteria":[{"label":"Artistic Quality","min":1,"max":5}]}`, orgTok)
+	require.Equal(t, http.StatusOK, patch.StatusCode)
+	_ = patch.Body.Close()
+
+	// Reviewer GET sees review_criteria.
+	revResp := doRequest(t, srv, "GET", "/festivals/"+festID+"/form", "", revTok)
+	require.Equal(t, http.StatusOK, revResp.StatusCode)
+	var revForm map[string]any
+	require.NoError(t, json.NewDecoder(revResp.Body).Decode(&revForm))
+	_ = revResp.Body.Close()
+	rc, ok := revForm["review_criteria"].([]any)
+	require.True(t, ok, "reviewer must receive review_criteria")
+	require.Len(t, rc, 1)
+
+	// Anonymous GET does NOT include review_criteria.
+	anonResp := doRequest(t, srv, "GET", "/festivals/"+festID+"/form", "", "")
+	require.Equal(t, http.StatusOK, anonResp.StatusCode)
+	var anonForm map[string]any
+	require.NoError(t, json.NewDecoder(anonResp.Body).Decode(&anonForm))
+	_ = anonResp.Body.Close()
+	_, hasRC := anonForm["review_criteria"]
+	require.False(t, hasRC, "anonymous caller must NOT see review_criteria")
+}
+
 func TestPatchForm_Criteria_Validation_MaxTooLarge(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

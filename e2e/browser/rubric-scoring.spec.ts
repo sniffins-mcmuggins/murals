@@ -90,10 +90,10 @@ test.describe('rubric scoring', () => {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
       await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
 
-      await expect(page.getByRole('button', { name: /Score/i })).toBeVisible()
+      await expect(page.getByRole('button', { name: /Score/i }).first()).toBeVisible()
       await expect(page.getByLabel('Score 1')).not.toBeVisible()
 
-      await page.getByRole('button', { name: /Score/i }).click()
+      await page.getByRole('button', { name: /Score/i }).first().click()
 
       await expect(page.getByText('Artistic Quality')).toBeVisible({ timeout: 5_000 })
       await expect(page.getByText('Feasibility')).toBeVisible()

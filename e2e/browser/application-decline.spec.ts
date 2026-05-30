@@ -50,9 +50,9 @@ test('organiser declines an application via the UI', async ({ browser }) => {
   try {
     await page.goto(`/organiser/festivals/${festivalId}/applications`)
     // Pending tab is active by default — wait for the Decline action button to appear
-    await expect(page.getByRole('button', { name: 'Decline' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeVisible({ timeout: 10_000 })
 
-    await page.getByRole('button', { name: 'Decline' }).click()
+    await page.getByRole('button', { name: 'Decline', exact: true }).click()
 
     // After declining, the application leaves the Pending tab
     await expect(page.getByText('No applications here.')).toBeVisible({ timeout: 10_000 })
