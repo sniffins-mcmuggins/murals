@@ -26,6 +26,7 @@ type profileResponse struct {
 	UserID            string          `json:"user_id"`
 	DisplayName       string          `json:"display_name"`
 	Bio               string          `json:"bio"`
+	Visibility        string          `json:"visibility"`
 	LocationLabel     *string         `json:"location_label,omitempty"`
 	MediumTags        []string        `json:"medium_tags"`
 	SocialLinks       json.RawMessage `json:"social_links"`
@@ -52,6 +53,7 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 		UserID:            p.UserID.String(),
 		DisplayName:       p.DisplayName,
 		Bio:               p.Bio,
+		Visibility:        p.Visibility,
 		MediumTags:        p.MediumTags,
 		SocialLinks:       p.SocialLinks,
 		AvatarS3Key:       p.AvatarS3Key,
@@ -122,6 +124,7 @@ func CreateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // GetProfileHandler handles GET /profiles/{profileID}. Public — no auth required.
+// Draft profiles are only visible to their owner.
 func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profileUUID, err := pgUUIDFromString(chi.URLParam(r, "profileID"))
@@ -139,6 +142,16 @@ func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			httperr.InternalServerError(w)
 			return
+		}
+
+		// Draft profiles are invisible to non-owners. 404 (not 403) to avoid
+		// revealing that the profile exists.
+		if profile.Visibility != "public" {
+			principal, authErr := auth.User(r.Context())
+			if authErr != nil || principal.UserID != profile.UserID.String() {
+				httperr.NotFound(w)
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -204,6 +217,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			SocialLinks       json.RawMessage `json:"socialLinks"`
 			AvatarS3Key       *string         `json:"avatarS3Key"`
 			HeadlineImageUrls []string        `json:"headlineImageUrls"`
+			Visibility        *string         `json:"visibility"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -263,6 +277,14 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if headlineImageUrls == nil {
 			headlineImageUrls = []string{}
 		}
+		visibility := existing.Visibility
+		if req.Visibility != nil {
+			if *req.Visibility != "draft" && *req.Visibility != "public" {
+				httperr.UnprocessableEntity(w, "visibility must be draft or public")
+				return
+			}
+			visibility = *req.Visibility
+		}
 
 		updated, err := q.UpdateArtistProfile(r.Context(), sqlcdb.UpdateArtistProfileParams{
 			ID:                existing.ID,
@@ -274,6 +296,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			SocialLinks:       socialLinks,
 			AvatarS3Key:       avatarS3Key,
 			HeadlineImageUrls: headlineImageUrls,
+			Visibility:        visibility,
 		})
 		if err != nil {
 			httperr.InternalServerError(w)

@@ -134,6 +134,7 @@ func GetCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // ListCollectionsHandler handles GET /profiles/{profileID}/collections. Public.
+// Draft profiles return 404 for non-owners, matching GetProfileHandler behaviour.
 func ListCollectionsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profileUUID, err := pgUUIDFromString(chi.URLParam(r, "profileID"))
@@ -142,6 +143,25 @@ func ListCollectionsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		q := sqlcdb.New(pool)
+
+		// Visibility gate: look up the profile first, 404 draft for non-owners.
+		profile, err := q.GetArtistProfileByID(r.Context(), profileUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+		if profile.Visibility != "public" {
+			principal, authErr := auth.User(r.Context())
+			if authErr != nil || principal.UserID != profile.UserID.String() {
+				httperr.NotFound(w)
+				return
+			}
+		}
+
 		collections, err := q.ListCollectionsByProfileID(r.Context(), profileUUID)
 		if err != nil {
 			httperr.InternalServerError(w)
