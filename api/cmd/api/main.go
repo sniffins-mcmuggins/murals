@@ -162,8 +162,10 @@ func main() {
 		r.Get("/profiles/me", artist.GetMyProfileHandler(pool))
 		r.Patch("/profiles/me", artist.UpdateProfileHandler(pool))
 		r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase))   // literal /me before /{profileID}
-		r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))          // literal /me before /{profileID}
-		r.Post("/profiles/{profileID}/link-click", analytics.LinkClickHandler(pool)) // public — no auth
+		r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))                 // literal /me before /{profileID}
+		r.Post("/profiles/me/preview-token/rotate", artist.RotatePreviewTokenHandler(pool)) // literal /me before /{profileID}
+		r.Get("/profiles/preview/{token}", artist.PreviewByTokenHandler(pool))              // literal /preview before /{profileID}
+		r.Post("/profiles/{profileID}/link-click", analytics.LinkClickHandler(pool))        // public — no auth
 		r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
 		r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(pool))
 		r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(pool)) // public festival appearances

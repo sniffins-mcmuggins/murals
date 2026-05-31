@@ -33,3 +33,13 @@ LIMIT $1 OFFSET $2;
 -- name: CountPublicProfiles :one
 SELECT COUNT(*) FROM artist_profiles
 WHERE visibility = 'public';
+
+-- name: GetArtistProfileByPreviewToken :one
+SELECT * FROM artist_profiles WHERE preview_token = $1;
+
+-- name: RotateArtistProfilePreviewToken :one
+UPDATE artist_profiles
+SET preview_token = replace(gen_random_uuid()::text, '-', ''),
+    updated_at    = now()
+WHERE user_id = $1
+RETURNING *;
