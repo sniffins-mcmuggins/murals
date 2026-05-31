@@ -1,6 +1,13 @@
+---
+paths:
+  - "db/**"
+  - "api/internal/sqlcdb/**"
+  - "api/internal/db/**"
+---
+
 # sqlc + schema changes
 
-When touching `db/migrations/`, `db/queries/`, or `api/internal/sqlcdb/`, load: @db/migrations @db/queries @api/internal/sqlcdb/models.go
+@db/migrations @db/queries @api/internal/sqlcdb/models.go
 
 This rule is about keeping migration SQL, query SQL, and generated Go code in lockstep — and avoiding the race conditions that turn first-touch INSERTs into 500s.
 

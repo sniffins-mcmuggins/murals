@@ -1,6 +1,12 @@
+---
+paths:
+  - "api/cmd/api/**"
+  - "api/internal/**"
+---
+
 # API handler implementation checklist
 
-When adding new HTTP handlers or route groups in `api/cmd/api/main.go` or `api/internal/*/`, load: @api/cmd/api/main.go
+@api/cmd/api/main.go
 
 This rule captures the class of bugs that pass code review and pass unit tests but are broken in production — specifically because unit tests bypass the middleware stack.
 
