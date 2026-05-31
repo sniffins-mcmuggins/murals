@@ -157,6 +157,7 @@ func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(profile, true))
 
+		// TODO(visibility): skip analytics event for owner self-view of draft
 		// Fire-and-forget: record profile view. Uses a fresh context so the
 		// goroutine outlives the request. Per background-work rule: bounded
 		// timeout, no r.Context() capture.
