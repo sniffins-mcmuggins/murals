@@ -107,6 +107,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	assertStatus(createProfResp, http.StatusCreated)
 	profile := decodeJSON(createProfResp)
 	profileID := profile["id"].(string)
+	userID := profile["user_id"].(string)
 	assert.Equal(t, "Round Trip Artist", profile["display_name"])
 
 	// 4. Update profile
@@ -117,7 +118,9 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	updated := decodeJSON(updateProfResp)
 	assert.Equal(t, "I paint big things", updated["bio"])
 
-	// 5. Publish the profile so anonymous viewers can see it
+	// 5. Publish the profile so anonymous viewers can see it.
+	// The publish gate requires an entitlement — grant one via the DB helper.
+	grantArtistBasic(t, db, userID)
 	resp = do("PATCH", "/profiles/me", `{"visibility":"public"}`, token)
 	assertStatus(resp, http.StatusOK)
 	_ = resp.Body.Close()

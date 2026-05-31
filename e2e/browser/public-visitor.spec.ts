@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
+import { Client } from 'pg'
 import {
   createArtist,
   createProfile,
-  publishProfile,
   createCollection,
   uploadImage,
   createOrganiser,
@@ -14,14 +14,26 @@ import {
   createSpot,
   assignArtistToSpot,
 } from '../fixtures/helpers'
+import { forcePublish } from '../fixtures/db-helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 
 test.describe('public visitor flow', () => {
+  let db: Client
   let festivalId: string
   let profileId: string
   let collectionId: string
   let artistDisplayName: string
+
+  test.beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+  })
+
+  test.afterAll(async () => {
+    await db.end()
+  })
 
   test.beforeAll(async () => {
     const suffix = Date.now()
@@ -31,7 +43,7 @@ test.describe('public visitor flow', () => {
     const artist = await createArtist(suffix)
     const { profileId: pid } = await createProfile(artist.token, { displayName: artistDisplayName })
     profileId = pid
-    await publishProfile(artist.token)
+    await forcePublish(db, artist.userId) // bypass entitlement gate — this test is about public visitor flow
     const { collectionId: cid } = await createCollection(artist.token, { name: 'Wall Pieces' })
     collectionId = cid
     await uploadImage(artist.token, collectionId)

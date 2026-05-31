@@ -2,14 +2,28 @@
 // Gaps: PATCH /collections/{id} with focal values should round-trip from DB
 // correctly, and out-of-range values should be server-clamped to [0, 100].
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
 import { createArtist, createProfile, createCollection, uniqueSuffix } from '../fixtures/helpers.js'
+import { forcePublish } from '../fixtures/db-helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 const json = { 'Content-Type': 'application/json' }
 
 describe('collection focal point', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+  })
+
+  afterAll(async () => {
+    await db.end()
+  })
+
   it('PATCH /collections/{id} without token → 401', async () => {
     const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
@@ -26,13 +40,10 @@ describe('collection focal point', () => {
 
   it('setting focal point values round-trips through the DB', async () => {
     const suffix = uniqueSuffix()
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Artist ${suffix}` })
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Bypass publish gate — this test is about focal point fields, not the publish gate.
+    await forcePublish(db, userId)
     const { collectionId } = await createCollection(token, { name: `FP Coll ${suffix}` })
 
     const patchRes = await fetch(`${API}/collections/${collectionId}`, {
@@ -72,13 +83,10 @@ describe('collection focal point', () => {
 
   it('focal point defaults to 50/50 on new collections', async () => {
     const suffix = uniqueSuffix()
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Default ${suffix}` })
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Bypass publish gate — this test is about focal point defaults, not the publish gate.
+    await forcePublish(db, userId)
     const { collectionId } = await createCollection(token, { name: `FP Default Coll ${suffix}` })
 
     const res = await fetch(`${API}/collections/${collectionId}`)

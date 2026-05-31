@@ -1,11 +1,25 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
 import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
+import { forcePublish } from '../fixtures/db-helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 const json = (res: Response) => res.json()
 
 describe('profile images', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+  })
+
+  afterAll(async () => {
+    await db.end()
+  })
+
   it('PATCH /profiles/me without token → 401', async () => {
     const res = await fetch(`${API}/profiles/me`, {
       method: 'PATCH',
@@ -17,13 +31,10 @@ describe('profile images', () => {
 
   it('profile response includes headline_image_urls array (empty by default)', async () => {
     const suffix = uniqueSuffix()
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Image Artist ${suffix}` })
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Bypass publish gate — this test is about image fields, not the publish gate.
+    await forcePublish(db, userId)
 
     const res = await fetch(`${API}/profiles/${profileId}`)
     expect(res.status).toBe(200)
@@ -34,13 +45,10 @@ describe('profile images', () => {
 
   it('set avatar and headline images via PATCH, appear on public profile', async () => {
     const suffix = uniqueSuffix() + 1
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Hero Artist ${suffix}` })
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Bypass publish gate — this test is about image fields, not the publish gate.
+    await forcePublish(db, userId)
 
     const patchRes = await fetch(`${API}/profiles/me`, {
       method: 'PATCH',

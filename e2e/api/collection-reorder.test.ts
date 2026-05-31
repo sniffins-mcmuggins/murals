@@ -2,12 +2,19 @@
 // Gaps identified in audit: success path, IDOR, and 401 probes for
 // PUT /collections/order and PUT /collections/{id}/images/order.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
 import { createArtist, createProfile, createCollection } from '../fixtures/helpers.js'
+import { forcePublish } from '../fixtures/db-helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 const json = { 'Content-Type': 'application/json' }
+
+let db: Client
+beforeAll(async () => { db = new Client({ connectionString: DB_URL }); await db.connect() })
+afterAll(async () => { await db.end() })
 
 // Attach an image directly without going through MinIO — AttachImageHandler
 // accepts any s3Key/cdnUrl, no MinIO validation.
@@ -44,17 +51,13 @@ describe('collection reorder', () => {
 
   it('reorders collections and order persists in GET /profiles/{profileID}/collections', async () => {
     const suffix = Date.now()
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Reorder Colls ${suffix}` })
     const { collectionId: idA } = await createCollection(token, { name: `A-${suffix}` })
     const { collectionId: idB } = await createCollection(token, { name: `B-${suffix}` })
 
-    // Publish profile so anonymous fetches can see it.
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { ...{ 'Content-Type': 'application/json' }, ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Bypass publish gate — this test is about collection ordering, not the publish gate.
+    await forcePublish(db, userId)
 
     // Explicitly set A first, then assert we can flip to B first.
     // (Don't rely on creation-time ordering — both rows may share the same millisecond.)

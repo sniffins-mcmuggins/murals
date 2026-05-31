@@ -305,6 +305,7 @@ type ArtistProfile struct {
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	HeadlineImageUrls []string           `db:"headline_image_urls" json:"headline_image_urls"`
 	Visibility        string             `db:"visibility" json:"visibility"`
+	PreviewToken      string             `db:"preview_token" json:"preview_token"`
 }
 
 type BetaInvite struct {

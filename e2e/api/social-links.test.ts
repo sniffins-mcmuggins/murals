@@ -1,12 +1,26 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
 import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
+import { forcePublish } from '../fixtures/db-helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 const json = (res: Response) => res.json()
 
 describe('social links', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+  })
+
+  afterAll(async () => {
+    await db.end()
+  })
+
   it('PATCH /profiles/me without token → 401', async () => {
     const res = await fetch(`${API}/profiles/me`, {
       method: 'PATCH',
@@ -18,7 +32,7 @@ describe('social links', () => {
 
   it('set social links and they appear on the public profile', async () => {
     const suffix = uniqueSuffix()
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Social Artist ${suffix}` })
 
     const patchRes = await fetch(`${API}/profiles/me`, {
@@ -36,12 +50,8 @@ describe('social links', () => {
     expect(updated.social_links.instagram).toBe('https://instagram.com/testartist')
     expect(updated.social_links.website).toBe('https://testartist.com')
 
-    // Publish before anonymous fetch.
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Publish before anonymous fetch (bypass gate — this test is about social links, not the publish gate).
+    await forcePublish(db, userId)
 
     const publicRes = await fetch(`${API}/profiles/${profileId}`)
     expect(publicRes.status).toBe(200)
@@ -75,7 +85,7 @@ describe('social links', () => {
 
   it('clear all social links by sending empty object', async () => {
     const suffix = uniqueSuffix() + 2
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Clear Artist ${suffix}` })
 
     await fetch(`${API}/profiles/me`, {
@@ -93,12 +103,8 @@ describe('social links', () => {
     const data = await json(clearRes)
     expect(Object.keys(data.social_links)).toHaveLength(0)
 
-    // Publish before anonymous fetch.
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Publish before anonymous fetch (bypass gate — this test is about social links, not the publish gate).
+    await forcePublish(db, userId)
 
     const publicRes = await fetch(`${API}/profiles/${profileId}`)
     const pub = await json(publicRes)

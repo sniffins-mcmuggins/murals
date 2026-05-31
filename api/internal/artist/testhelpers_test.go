@@ -3,10 +3,12 @@ package artist_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -58,6 +60,31 @@ func createTestProfile(t *testing.T, pool *pgxpool.Pool, userID, displayName str
 		t.Fatalf("create profile for %s: %v", userID, err)
 	}
 	return profile.ID.String()
+}
+
+func pgTimestamptzForArtistTest(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t, Valid: true}
+}
+
+func grantArtistBasic(t *testing.T, pool *pgxpool.Pool, userID string) {
+	t.Helper()
+	q := sqlcdb.New(pool)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("g"), bcrypt.MinCost)
+	hashStr := string(hash)
+	grantor, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
+		Email: "grantor-" + userID + "@test", PasswordHash: &hashStr,
+	})
+	require.NoError(t, err)
+	_, err = q.CreateAccessGrant(context.Background(), sqlcdb.CreateAccessGrantParams{
+		UserID:      pgUUID(t, userID),
+		Plan:        "artist_basic",
+		FestivalID:  pgtype.UUID{},
+		ValidUntil:  pgTimestamptzForArtistTest(time.Now().Add(30 * 24 * time.Hour)),
+		GrantedBy:   grantor.ID,
+		PromoCodeID: pgtype.UUID{},
+		Note:        nil,
+	})
+	require.NoError(t, err)
 }
 
 // publishTestProfile sets a profile's visibility to "public" so it passes

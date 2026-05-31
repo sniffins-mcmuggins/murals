@@ -1,19 +1,52 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
+import { createHmac } from 'node:crypto'
 import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-jwt-secret-change-in-prod'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 
-async function publishProfile(token: string): Promise<void> {
-  const res = await fetch(`${API}/profiles/me`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...auth(token) },
-    body: JSON.stringify({ visibility: 'public' }),
-  })
-  if (!res.ok) throw new Error(`publishProfile failed: ${res.status}`)
+function base64url(buf: Buffer | string): string {
+  return Buffer.from(buf).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
+function signHS256(payload: Record<string, unknown>, secret: string): string {
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const body = base64url(JSON.stringify(payload))
+  const sig = base64url(createHmac('sha256', secret).update(`${header}.${body}`).digest())
+  return `${header}.${body}.${sig}`
 }
 
 describe('profile visibility (E15.1)', () => {
+  let db: Client
+  let adminToken: string
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+
+    // Seed an admin for tests that need to publish via the API (so the gate passes).
+    const adminEmail = `admin-vis-${Date.now()}@vis.test`
+    await fetch(`${API}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: adminEmail, password: 'adminpass123' }),
+    })
+    const { rows } = await db.query<{ id: string; session_version: number }>(
+      `UPDATE users SET is_admin = true, mfa_enabled = true, mfa_secret = 'fake-totp'
+       WHERE email = $1 RETURNING id, session_version`,
+      [adminEmail],
+    )
+    const { id: adminUserId, session_version: sv } = rows[0]
+    const now = Math.floor(Date.now() / 1000)
+    adminToken = signHS256({ sub: adminUserId, is_admin: true, sv, iat: now, exp: now + 3600 }, JWT_SECRET)
+  })
+
+  afterAll(async () => {
+    await db.end()
+  })
+
   it('new profile is draft — anonymous GET returns 404', async () => {
     const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
@@ -75,11 +108,19 @@ describe('profile visibility (E15.1)', () => {
 
   it('PATCH visibility to public → anonymous GET 200, appears in /public/profiles', async () => {
     const suffix = uniqueSuffix() + 6
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Going Public ${suffix}` })
 
     // Confirm draft state first
     expect((await fetch(`${API}/profiles/${profileId}`)).status).toBe(404)
+
+    // Grant access so the publish gate passes.
+    const grantRes = await fetch(`${API}/admin/users/${userId}/grants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth(adminToken) },
+      body: JSON.stringify({ plan: 'artist_basic', duration_days: 30, note: 'visibility e2e test' }),
+    })
+    expect(grantRes.status).toBe(201)
 
     // Flip to public
     const patchRes = await fetch(`${API}/profiles/me`, {

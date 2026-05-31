@@ -17,6 +17,7 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/billing"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
@@ -34,6 +35,7 @@ type profileResponse struct {
 	HeadlineImageUrls []string        `json:"headline_image_urls"`
 	CreatedAt         string          `json:"created_at"`
 	UpdatedAt         string          `json:"updated_at"`
+	PreviewToken      *string         `json:"preview_token,omitempty"`
 }
 
 type profileListResponse struct {
@@ -63,6 +65,9 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 	}
 	if !public || p.ShowLocation {
 		resp.LocationLabel = p.LocationLabel
+	}
+	if !public {
+		resp.PreviewToken = &p.PreviewToken
 	}
 	return resp
 }
@@ -284,6 +289,24 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				httperr.UnprocessableEntity(w, "visibility must be draft or public")
 				return
 			}
+			// Gate draft → public: requires active subscription or comp grant.
+			if *req.Visibility == "public" && existing.Visibility == "draft" {
+				canPub, pubErr := billing.CanPublish(r.Context(), pool, userUUID)
+				if pubErr != nil {
+					slog.Error("publish gate: check entitlement", "err", pubErr, "user_id", principal.UserID)
+					httperr.InternalServerError(w)
+					return
+				}
+				if !canPub {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusPaymentRequired)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"code":    "payment_required",
+						"message": "An active artist subscription or comp grant is required to publish.",
+					})
+					return
+				}
+			}
 			visibility = *req.Visibility
 		}
 
@@ -306,6 +329,67 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(updated, false))
+	}
+}
+
+// PreviewByTokenHandler handles GET /profiles/preview/{token}.
+// Public — no auth required. Returns the profile regardless of draft/public visibility,
+// as long as the preview_token matches. The preview_token is NOT included in the response.
+func PreviewByTokenHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := chi.URLParam(r, "token")
+		if token == "" {
+			httperr.BadRequest(w, "token is required")
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		profile, err := q.GetArtistProfileByPreviewToken(r.Context(), token)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		// public=true: hides preview_token from response — the link IS the secret.
+		_ = json.NewEncoder(w).Encode(toProfileResponse(profile, true))
+	}
+}
+
+// RotatePreviewTokenHandler handles POST /profiles/me/preview-token/rotate.
+// Owner-only — requires auth. Generates a fresh preview_token, invalidating
+// any previously shared links.
+func RotatePreviewTokenHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, err := auth.User(r.Context())
+		if err != nil {
+			httperr.Unauthorized(w)
+			return
+		}
+		userUUID, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		profile, err := q.RotateArtistProfilePreviewToken(r.Context(), userUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		// public=false: includes the new preview_token so the owner can share it.
+		_ = json.NewEncoder(w).Encode(toProfileResponse(profile, false))
 	}
 }
 
