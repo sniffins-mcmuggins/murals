@@ -307,6 +307,17 @@ type ArtistProfile struct {
 	Visibility        string             `db:"visibility" json:"visibility"`
 }
 
+type BetaInvite struct {
+	ID        pgtype.UUID        `db:"id" json:"id"`
+	Code      string             `db:"code" json:"code"`
+	CreatedBy pgtype.UUID        `db:"created_by" json:"created_by"`
+	MaxUses   int32              `db:"max_uses" json:"max_uses"`
+	UsedCount int32              `db:"used_count" json:"used_count"`
+	Cohort    string             `db:"cohort" json:"cohort"`
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type Collection struct {
 	ID              pgtype.UUID        `db:"id" json:"id"`
 	ArtistProfileID pgtype.UUID        `db:"artist_profile_id" json:"artist_profile_id"`
@@ -440,4 +451,14 @@ type User struct {
 	SessionVersion   int32              `db:"session_version" json:"session_version"`
 	StripeCustomerID *string            `db:"stripe_customer_id" json:"stripe_customer_id"`
 	IsAdmin          bool               `db:"is_admin" json:"is_admin"`
+	IsBeta           bool               `db:"is_beta" json:"is_beta"`
+	BetaCohort       *string            `db:"beta_cohort" json:"beta_cohort"`
+	InvitedBy        pgtype.UUID        `db:"invited_by" json:"invited_by"`
+	InvitedVia       pgtype.UUID        `db:"invited_via" json:"invited_via"`
+}
+
+type WaitlistRequest struct {
+	ID        pgtype.UUID        `db:"id" json:"id"`
+	Email     string             `db:"email" json:"email"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
