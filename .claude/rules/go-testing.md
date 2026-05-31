@@ -16,7 +16,7 @@ func TestMyThing(t *testing.T) {
 }
 ```
 
-Do NOT add `t.Parallel()` to helper functions (those that take `t *testing.T` but aren't named `Test*`).
+Do NOT add `t.Parallel()` to helper functions (those that take `t *testing.T` but aren't named `Test*`). Do NOT add it to `t.Run` subtests — subtests run sequentially within a parent test by default, which is correct; adding `t.Parallel()` inside a subtest changes its scheduling relative to sibling subtests and is usually wrong.
 
 ## Database: `testutil.NewDB(t)`
 
@@ -112,37 +112,24 @@ r.Get("/festivals/{festivalID}", festival.GetHandler(db))
 srv := httptest.NewServer(r)
 t.Cleanup(srv.Close)
 
-resp := doRequest(t, srv, "POST", "/festivals", `{"name":"Test"}`, token)
+resp := testutil.DoRequest(t, srv, "POST", "/festivals", `{"name":"Test"}`, token)
 require.Equal(t, http.StatusCreated, resp.StatusCode)
 _ = resp.Body.Close()
 ```
 
 Always `t.Cleanup(srv.Close)` and always close response bodies.
 
-## `doRequest` helper (for router-based tests)
+## `testutil.DoRequest` (for router-based tests)
 
-Copy this into any test file that uses `httptest.NewServer`:
+Use `testutil.DoRequest` — do NOT copy a local version into each test file:
 
 ```go
-func doRequest(t *testing.T, srv *httptest.Server, method, path, body, token string) *http.Response {
-    t.Helper()
-    var reqBody io.Reader
-    if body != "" {
-        reqBody = strings.NewReader(body)
-    }
-    req, err := http.NewRequestWithContext(t.Context(), method, srv.URL+path, reqBody)
-    require.NoError(t, err)
-    if body != "" {
-        req.Header.Set("Content-Type", "application/json")
-    }
-    if token != "" {
-        req.Header.Set("Authorization", "Bearer "+token)
-    }
-    resp, err := http.DefaultClient.Do(req)
-    require.NoError(t, err)
-    return resp
-}
+resp := testutil.DoRequest(t, srv, "POST", "/festivals", `{"name":"Test"}`, token)
+require.Equal(t, http.StatusCreated, resp.StatusCode)
+_ = resp.Body.Close()
 ```
+
+Signature: `DoRequest(t, srv, method, path, body, token string) *http.Response`. Pass `""` for body or token when not needed. Sets `Content-Type: application/json` and `Authorization: Bearer` automatically when the respective args are non-empty.
 
 ## Package-level test helpers
 
@@ -173,4 +160,4 @@ Use the external test package: `package foo_test`, not `package foo`. This enfor
 - No custom Postgres container setup — use `testutil.NewDB(t)`
 - No custom user/JWT creation — use `testutil.CreateUser(t, pool)`
 - No hardcoded secrets — use `testutil.TestSecret`
-- No `t.Parallel()` inside subtests (`t.Run`) unless you're certain the subtest is safe to parallelise independently
+- No `t.Parallel()` inside `t.Run` subtests — sequential within the parent is correct

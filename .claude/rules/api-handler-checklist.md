@@ -1,7 +1,6 @@
 ---
 paths:
   - "api/cmd/api/**"
-  - "api/internal/**"
 ---
 
 # API handler implementation checklist
