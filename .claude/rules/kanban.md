@@ -64,6 +64,50 @@ Mutate `addProjectV2ItemById` with the issue's node ID, then set Status and Prio
 **Mark all freshly-closed issues Done in one pass:**
 Use `gh api graphql` to query all board items, filter where `content.state == CLOSED` and `Status != Done`, then mutate each. Ask Claude to write and run this inline — no script file needed.
 
+## Issue relationships
+
+We use two GitHub native relationship types on all epics and tasks. Both are managed via GraphQL mutations — no web UI needed.
+
+### Sub-issues (parent epic → child task)
+
+Every `[EX.Y]` task must be a sub-issue of its `[EX]` parent epic.
+
+```graphql
+mutation {
+  addSubIssue(input: { issueId: "<parent-node-id>", subIssueId: "<child-node-id>" }) {
+    issue { number }
+    subIssue { number }
+  }
+}
+```
+
+Get a node ID: `gh api graphql -f query='{ repository(owner: "sniffins-mcmuggins", name: "murals") { issue(number: NNN) { id } } }'`
+
+To remove: `removeSubIssue(input: { issueId: ..., subIssueId: ... })`
+
+To query sub-issues on an epic: `subIssues(first: 10) { nodes { number title } }` on the `Issue` type.
+
+### Blocking dependencies (blocked-by)
+
+Use `addBlockedBy` to record that issue A cannot start until issue B is done:
+
+```graphql
+mutation {
+  addBlockedBy(input: { issueId: "<blocked-node-id>", blockingIssueId: "<blocking-node-id>" }) {
+    clientMutationId
+  }
+}
+```
+
+- `issueId` = the issue that is blocked
+- `blockingIssueId` = the issue that must be resolved first
+
+To remove: `removeBlockedBy(input: { issueId: ..., blockingIssueId: ... })`
+
+To query an issue's blockers: `blockedBy(first: 10) { nodes { number title } }` on the `Issue` type. The inverse is `blocking(first: 10) { nodes { number title } }`.
+
+**When a blocking issue is merged/closed:** the `blocked` label on the dependent issue becomes stale. Remove the label and call `removeBlockedBy` to clean the relationship — then re-check if there are any remaining blockers before moving it to Ready.
+
 ## WIP rules
 
 - **In progress**: max 2–3 issues. If a new issue needs starting, move something out first.
@@ -98,6 +142,7 @@ P2 (post-pilot):
 2. Scan "In progress": anything stale (no commit activity in 3+ days)? Move back to Ready and note it.
 3. Scan "Ready": more than 6 items? Move the lowest-priority ones to Backlog.
 4. Check that the active branch issue is In progress (not Ready).
+5. For any issue just closed/merged: check its `subIssues` list on GitHub — if all sub-issues are now Done, the parent epic can also move to Done. Remove stale `blocked` labels from issues whose blocking issue just closed, and call `removeBlockedBy` to clean the relationship.
 
 ## Adding a new epic to the board
 
@@ -105,3 +150,7 @@ P2 (post-pilot):
 2. Add it to the board via `addProjectV2ItemById` and set Status + Priority immediately.
 3. Apply `priority:` label and milestone on the issue itself.
 4. If it's P0, add it to the "Current priority triage" section above and update the epic table in `issue-labels.md`.
+5. Wire relationships immediately (see "Issue relationships" above):
+   - Each `[EX.Y]` task: `addSubIssue` to its `[EX]` epic.
+   - Each task with explicit cross-issue dependencies: `addBlockedBy` for each blocker.
+   - Apply the `blocked` label on any issue with open blockers.

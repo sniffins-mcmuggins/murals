@@ -111,6 +111,9 @@ Every P0 issue should be assigned to one of the two active milestones. P1/P2 iss
 4. If P0, assign to the appropriate milestone (Beta Launch or CPF 2027 Pilot).
 5. If the issue is blocked, add `blocked` label and link the blocking issue in the body.
 6. Add it to the project board and set Status to match its actual state.
+7. Wire relationships via `gh api graphql` (see `kanban.md` → "Issue relationships"):
+   - If `[EX.Y]`: run `addSubIssue` to attach it to the parent `[EX]` epic.
+   - If it has explicit cross-issue blockers: run `addBlockedBy` for each one.
 
 ### Creating a new epic
 1. Check the "Current epic numbering" table above — use the next E number.
@@ -118,10 +121,12 @@ Every P0 issue should be assigned to one of the two active milestones. P1/P2 iss
 3. Body must contain a checklist of sub-issues (add them as `[ ] [EX.Y] #NNN — …` lines).
 4. Add it to the board and set Status + Priority via `gh api graphql` mutations (see `kanban.md`).
 5. Label: `type:epic` + relevant `area:` labels.
+6. Once sub-issue tickets are created, run `addSubIssue` for each one (see `kanban.md` → "Issue relationships").
 
 ### Periodic audit (run when asked to tidy the board)
 1. Scan open issues for titles not matching `[EX]` / `[EX.Y]` → rename or close.
 2. Scan open issues with no `priority:` label → apply one.
 3. Scan open P0 issues with no milestone → assign to Beta Launch or CPF 2027 Pilot.
-4. Scan for stale `blocked` labels (blocking issue is now closed) → remove.
+4. Scan for stale `blocked` labels (blocking issue is now closed) → remove the label **and** call `removeBlockedBy` to clean the native relationship.
 5. Query the board via `gh api graphql` and mark freshly-closed items Done (see `kanban.md`).
+6. For each freshly-closed `[EX.Y]` issue: check if all sibling sub-issues are also closed — if so, the parent epic can be moved to Done as well.
