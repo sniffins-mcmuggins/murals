@@ -148,7 +148,7 @@ components:
 
     ArtistProfile:
       type: object
-      required: [id, user_id, display_name, bio, medium_tags, social_links, headline_image_urls, created_at, updated_at]
+      required: [id, user_id, display_name, bio, visibility, medium_tags, social_links, headline_image_urls, created_at, updated_at]
       properties:
         id:
           type: string
@@ -160,6 +160,12 @@ components:
           type: string
         bio:
           type: string
+        visibility:
+          type: string
+          enum: [draft, public]
+          description: >-
+            Profile visibility. draft = owner-only; public = discoverable
+            by anyone. Defaults to draft on creation.
         location_label:
           type: string
           nullable: true
