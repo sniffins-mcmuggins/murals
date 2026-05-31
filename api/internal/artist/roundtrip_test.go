@@ -14,6 +14,7 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -23,7 +24,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/auth/signup", auth.SignupHandler(db))
+	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Post("/profiles", artist.CreateProfileHandler(db))
 	r.Get("/profiles/me", artist.GetMyProfileHandler(db))

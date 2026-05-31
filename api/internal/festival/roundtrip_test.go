@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
@@ -27,7 +28,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/auth/signup", auth.SignupHandler(db))
+	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Get("/me", auth.MeHandler(db))
 

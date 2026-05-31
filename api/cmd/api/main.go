@@ -105,7 +105,7 @@ func main() {
 
 	r.Get("/healthz", health.Handler(pool))
 	r.Handle("/metrics", metrics.Handler())
-	r.Post("/auth/signup", auth.SignupHandler(pool))
+	r.Post("/auth/signup", auth.SignupHandler(pool, cfg))
 
 	// Rate-limited auth routes (5/min per IP) — login, password reset, MFA verify,
 	// and promo redemption (prevents bulk code enumeration).
