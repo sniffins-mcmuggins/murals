@@ -2,6 +2,8 @@ package artist_test
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +19,8 @@ import (
 
 const testSecret = "test-secret-key"
 
+var testUserSeq atomic.Int64
+
 func pgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
 	parsed, err := uuid.Parse(s)
@@ -26,8 +30,9 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
 }
 
-func createTestUser(t *testing.T, pool *pgxpool.Pool, email string) (userID string, token string) {
+func createTestUser(t *testing.T, pool *pgxpool.Pool) (userID string, token string) {
 	t.Helper()
+	email := fmt.Sprintf("t-%d@t.local", testUserSeq.Add(1))
 	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
 	if err != nil {
 		t.Fatalf("bcrypt: %v", err)
@@ -39,7 +44,7 @@ func createTestUser(t *testing.T, pool *pgxpool.Pool, email string) (userID stri
 		PasswordHash: &hashStr,
 	})
 	if err != nil {
-		t.Fatalf("create user %s: %v", email, err)
+		t.Fatalf("create user: %v", err)
 	}
 	userID = user.ID.String()
 	token, err = auth.IssueToken(userID, user.IsAdmin, user.SessionVersion, testSecret)

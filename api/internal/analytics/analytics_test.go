@@ -2,6 +2,8 @@ package analytics_test
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,14 +17,12 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
+var analyticsUserSeq atomic.Int64
+
 // setupProfile creates a user + artist profile and returns the profile UUID string.
 func setupProfile(t *testing.T, db *pgxpool.Pool) string {
 	t.Helper()
-	return setupProfileEmail(t, db, "artist@example.com")
-}
-
-func setupProfileEmail(t *testing.T, db *pgxpool.Pool, email string) string {
-	t.Helper()
+	email := fmt.Sprintf("t-%d@t.local", analyticsUserSeq.Add(1))
 	hash, err := bcrypt.GenerateFromPassword([]byte("pw"), bcrypt.MinCost)
 	require.NoError(t, err)
 	hs := string(hash)
@@ -87,7 +87,7 @@ func TestGetCounts_ExcludesOtherProfiles(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	profileA := setupProfile(t, db)
-	profileB := setupProfileEmail(t, db, "other@example.com")
+	profileB := setupProfile(t, db)
 
 	require.NoError(t, analytics.RecordEvent(context.Background(), db, analytics.EventProfileView, profileA))
 	require.NoError(t, analytics.RecordEvent(context.Background(), db, analytics.EventProfileView, profileB))

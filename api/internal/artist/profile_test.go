@@ -19,7 +19,7 @@ import (
 func TestCreateProfile_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "artist1@example.com")
+	userID, token := createTestUser(t, db)
 	_ = userID
 	handler := auth.Middleware(db, testSecret)(artist.CreateProfileHandler(db))
 
@@ -39,7 +39,7 @@ func TestCreateProfile_Success(t *testing.T) {
 func TestCreateProfile_DuplicateProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "artist2@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Alice")
 	handler := auth.Middleware(db, testSecret)(artist.CreateProfileHandler(db))
 
@@ -56,7 +56,7 @@ func TestCreateProfile_DuplicateProfile(t *testing.T) {
 func TestGetProfile_Public(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, _ := createTestUser(t, db, "artist3@example.com")
+	userID, _ := createTestUser(t, db)
 	profileID := createTestProfile(t, db, userID, "Bob Street")
 	publishTestProfile(t, db, profileID)
 
@@ -98,7 +98,7 @@ func TestGetProfile_NotFound(t *testing.T) {
 func TestUpdateProfile_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "artist4@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Carol")
 	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
 
@@ -119,7 +119,7 @@ func TestUpdateProfile_Success(t *testing.T) {
 func TestUpdateProfile_NoProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := createTestUser(t, db, "artist5@example.com")
+	_, token := createTestUser(t, db)
 	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
 
 	body := `{"displayName":"Nobody"}`
@@ -135,7 +135,7 @@ func TestUpdateProfile_NoProfile(t *testing.T) {
 func TestGetMyProfile_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "artist6@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Dana")
 	handler := auth.Middleware(db, testSecret)(artist.GetMyProfileHandler(db))
 
@@ -398,7 +398,7 @@ func TestUpdateProfile_NonVisibilityPatch_NoGrant_Returns200(t *testing.T) {
 func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "artist7@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Eve")
 
 	// First PATCH: enable show_location

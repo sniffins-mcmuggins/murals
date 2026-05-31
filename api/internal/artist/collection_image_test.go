@@ -20,7 +20,7 @@ import (
 func TestAttachImage_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "img1@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Hank")
 
 	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
@@ -61,7 +61,7 @@ func TestAttachImage_Success(t *testing.T) {
 func TestAttachImage_SecondImageOrder(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "img2@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Iris")
 
 	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
@@ -101,7 +101,7 @@ func TestAttachImage_SecondImageOrder(t *testing.T) {
 func TestReorderImages_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "img3@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Jake")
 
 	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
@@ -161,7 +161,7 @@ func TestReorderImages_Success(t *testing.T) {
 func TestDeleteImage_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "img4@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Karen")
 
 	createColH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))

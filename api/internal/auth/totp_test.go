@@ -37,7 +37,7 @@ func TestTOTPEnroll_Unauthenticated(t *testing.T) {
 func TestTOTPEnroll_ReturnsQRAndSecret(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "totp-enroll@example.com", "password123")
+	_, token, enrollEmail := signupAndLogin(t, db, "password123")
 
 	handler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
 
@@ -57,7 +57,7 @@ func TestTOTPEnroll_ReturnsQRAndSecret(t *testing.T) {
 	assert.NotEmpty(t, secret, "secret should be returned in plaintext for manual entry")
 
 	// Verify DB: encrypted secret stored, mfa_enabled still false.
-	user := fetchUser(t, db, "totp-enroll@example.com")
+	user := fetchUser(t, db, enrollEmail)
 	assert.False(t, user.MfaEnabled, "mfa_enabled must remain false until confirm")
 	require.NotNil(t, user.MfaSecret, "mfa_secret must be stored after enroll")
 	assert.NotEqual(t, secret, *user.MfaSecret, "stored secret must be encrypted, not plaintext")
@@ -66,7 +66,7 @@ func TestTOTPEnroll_ReturnsQRAndSecret(t *testing.T) {
 func TestTOTPConfirm_ValidCode(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "totp-confirm@example.com", "password123")
+	_, token, confirmEmail := signupAndLogin(t, db, "password123")
 
 	// Enroll first.
 	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
@@ -94,14 +94,14 @@ func TestTOTPConfirm_ValidCode(t *testing.T) {
 	confirmHandler.ServeHTTP(cw, cr)
 	require.Equal(t, http.StatusOK, cw.Code, cw.Body.String())
 
-	user := fetchUser(t, db, "totp-confirm@example.com")
+	user := fetchUser(t, db, confirmEmail)
 	assert.True(t, user.MfaEnabled, "mfa_enabled must be true after confirm with valid code")
 }
 
 func TestTOTPConfirm_InvalidCode(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "totp-invalid@example.com", "password123")
+	_, token, invalidEmail := signupAndLogin(t, db, "password123")
 
 	// Enroll first.
 	enrollHandler := auth.Middleware(db, testSecret)(auth.TOTPEnrollHandler(db, testTOTPKey))
@@ -122,7 +122,7 @@ func TestTOTPConfirm_InvalidCode(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, cw.Code, cw.Body.String())
 
-	user := fetchUser(t, db, "totp-invalid@example.com")
+	user := fetchUser(t, db, invalidEmail)
 	assert.False(t, user.MfaEnabled, "mfa_enabled must stay false after invalid code")
 }
 
@@ -133,7 +133,7 @@ func TestTOTPConfirm_InvalidCode(t *testing.T) {
 func TestTOTPEnroll_RejectsReEnrollWithoutCurrentCode(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "totp-reenroll@example.com", "password123")
+	_, token, reenrollEmail := signupAndLogin(t, db, "password123")
 	enrollAndConfirmMFA(t, db, token)
 
 	// Attempt to re-enrol without supplying current_code — must be rejected.
@@ -148,7 +148,7 @@ func TestTOTPEnroll_RejectsReEnrollWithoutCurrentCode(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, ew.Code, ew.Body.String())
 
 	// The stored secret must not have changed (mfa_enabled still true).
-	user := fetchUser(t, db, "totp-reenroll@example.com")
+	user := fetchUser(t, db, reenrollEmail)
 	assert.True(t, user.MfaEnabled, "mfa_enabled must remain true after rejected re-enrol")
 }
 
@@ -157,7 +157,7 @@ func TestTOTPEnroll_RejectsReEnrollWithoutCurrentCode(t *testing.T) {
 func TestTOTPEnroll_AllowsReEnrollWithValidCurrentCode(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "totp-reenroll-ok@example.com", "password123")
+	_, token, reenrollOkEmail := signupAndLogin(t, db, "password123")
 	oldSecret := enrollAndConfirmMFA(t, db, token)
 
 	code, err := totp.GenerateCode(oldSecret, time.Now())
@@ -181,14 +181,14 @@ func TestTOTPEnroll_AllowsReEnrollWithValidCurrentCode(t *testing.T) {
 	assert.NotEqual(t, oldSecret, newSecret, "re-enrol must produce a different secret")
 
 	// mfa_enabled must drop back to false until the new secret is confirmed.
-	user := fetchUser(t, db, "totp-reenroll-ok@example.com")
+	user := fetchUser(t, db, reenrollOkEmail)
 	assert.False(t, user.MfaEnabled, "re-enrol returns user to un-confirmed state")
 }
 
 func TestTOTPConfirm_NoEnrollment(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "totp-noenroll@example.com", "password123")
+	_, token, _ := signupAndLogin(t, db, "password123")
 
 	confirmHandler := auth.Middleware(db, testSecret)(auth.TOTPConfirmHandler(db, testTOTPKey))
 	body := `{"code":"123456"}`
@@ -259,10 +259,10 @@ func loginRaw(t *testing.T, db *pgxpool.Pool, email, password string) *httptest.
 func TestLogin_MFAEnabled_ReturnsMFAToken(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "mfa-login@example.com", "password123")
+	_, token, mfaEmail := signupAndLogin(t, db, "password123")
 	enrollAndConfirmMFA(t, db, token)
 
-	w := loginRaw(t, db, "mfa-login@example.com", "password123")
+	w := loginRaw(t, db, mfaEmail, "password123")
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var resp map[string]any
@@ -281,9 +281,9 @@ func TestLogin_MFAEnabled_ReturnsMFAToken(t *testing.T) {
 func TestLogin_MFADisabled_ReturnsFullToken(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	createTestUser(t, db, "no-mfa@example.com", "password123")
+	noMFAEmail := createTestUser(t, db, "password123")
 
-	w := loginRaw(t, db, "no-mfa@example.com", "password123")
+	w := loginRaw(t, db, noMFAEmail, "password123")
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var resp map[string]any
@@ -304,11 +304,11 @@ func TestLogin_MFADisabled_ReturnsFullToken(t *testing.T) {
 func TestTOTPVerify_ValidCode(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, sessionToken := signupAndLogin(t, db, "verify-ok@example.com", "password123")
+	_, sessionToken, verifyEmail := signupAndLogin(t, db, "password123")
 	secret := enrollAndConfirmMFA(t, db, sessionToken)
 
 	// Login → get mfa_token.
-	lw := loginRaw(t, db, "verify-ok@example.com", "password123")
+	lw := loginRaw(t, db, verifyEmail, "password123")
 	require.Equal(t, http.StatusOK, lw.Code, lw.Body.String())
 	var loginResp map[string]any
 	require.NoError(t, json.NewDecoder(lw.Body).Decode(&loginResp))
@@ -346,10 +346,10 @@ func TestTOTPVerify_ValidCode(t *testing.T) {
 func TestTOTPVerify_InvalidCode(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, sessionToken := signupAndLogin(t, db, "verify-bad@example.com", "password123")
+	_, sessionToken, verifyBadEmail := signupAndLogin(t, db, "password123")
 	enrollAndConfirmMFA(t, db, sessionToken)
 
-	lw := loginRaw(t, db, "verify-bad@example.com", "password123")
+	lw := loginRaw(t, db, verifyBadEmail, "password123")
 	require.Equal(t, http.StatusOK, lw.Code, lw.Body.String())
 	var loginResp map[string]any
 	require.NoError(t, json.NewDecoder(lw.Body).Decode(&loginResp))
@@ -384,7 +384,7 @@ func TestTOTPVerify_NoToken(t *testing.T) {
 func TestTOTPVerify_FullTokenRejected(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, fullToken := signupAndLogin(t, db, "verify-fulltoken@example.com", "password123")
+	_, fullToken, _ := signupAndLogin(t, db, "password123")
 	// Enroll + confirm MFA so the user even has a secret — verifying with the
 	// full session token (Scope == "") must still be rejected because only
 	// mfa_pending-scoped tokens may exchange for a session.

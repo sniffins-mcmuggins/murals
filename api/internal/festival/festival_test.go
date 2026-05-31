@@ -20,7 +20,7 @@ import (
 func TestCreateFestival(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, orgToken := createTestUser(t, db, "org@example.com")
+	_, orgToken, _ := createTestUser(t, db)
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -39,8 +39,8 @@ func TestCreateFestival(t *testing.T) {
 func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org2@example.com")
-	festID := createTestFestival(t, db, orgID, "draft-fest", "draft")
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -63,9 +63,9 @@ func TestGetFestival_PublicDraftReturns404(t *testing.T) {
 func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org3@example.com")
-	_, otherToken := createTestUser(t, db, "other@example.com")
-	festID := createTestFestival(t, db, orgID, "my-fest", "draft")
+	orgID, orgToken, _ := createTestUser(t, db)
+	_, otherToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -93,8 +93,8 @@ func TestUpdateFestival_OnlyOrganiserCanUpdate(t *testing.T) {
 func TestDeleteFestival_SoftDelete(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org4@example.com")
-	festID := createTestFestival(t, db, orgID, "to-delete", "draft")
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -117,9 +117,9 @@ func TestDeleteFestival_SoftDelete(t *testing.T) {
 func TestListFestivals(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "org5@example.com")
-	createTestFestival(t, db, orgID, "fest-a", "draft")
-	createTestFestival(t, db, orgID, "fest-b", "draft")
+	orgID, orgToken, _ := createTestUser(t, db)
+	createTestFestival(t, db, orgID, "draft")
+	createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))

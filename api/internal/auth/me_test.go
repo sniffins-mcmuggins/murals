@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,10 +17,11 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (cookie *http.Cookie, token string) {
+func signupAndLogin(t *testing.T, db *pgxpool.Pool, password string) (cookie *http.Cookie, token, email string) {
 	t.Helper()
+	email = fmt.Sprintf("t-%d@t.local", authUserSeq.Add(1))
 
-	signupBody := `{"email":"` + email + `","password":"` + password + `"}`
+	signupBody := fmt.Sprintf(`{"email":%q,"password":%q}`, email, password)
 	sr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", strings.NewReader(signupBody))
 	sr.Header.Set("Content-Type", "application/json")
 	sw := httptest.NewRecorder()
@@ -28,7 +30,7 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (coo
 		t.Fatalf("signup failed: %d %s", sw.Code, sw.Body.String())
 	}
 
-	loginBody := `{"email":"` + email + `","password":"` + password + `"}`
+	loginBody := fmt.Sprintf(`{"email":%q,"password":%q}`, email, password)
 	lr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", strings.NewReader(loginBody))
 	lr.Header.Set("Content-Type", "application/json")
 	lw := httptest.NewRecorder()
@@ -46,13 +48,13 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (coo
 			cookie = c
 		}
 	}
-	return cookie, token
+	return cookie, token, email
 }
 
 func TestMeHandler_AuthedCookie(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	cookie, _ := signupAndLogin(t, db, "frank@example.com", "password123")
+	cookie, _, email := signupAndLogin(t, db, "password123")
 
 	handler := auth.Middleware(db, testSecret)(auth.MeHandler(db))
 
@@ -64,14 +66,14 @@ func TestMeHandler_AuthedCookie(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var resp map[string]any
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
-	assert.Equal(t, "frank@example.com", resp["email"])
+	assert.Equal(t, email, resp["email"])
 	assert.Nil(t, resp["password_hash"], "password_hash must not appear in response")
 }
 
 func TestMeHandler_AuthedBearer(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := signupAndLogin(t, db, "grace@example.com", "password123")
+	_, token, _ := signupAndLogin(t, db, "password123")
 
 	handler := auth.Middleware(db, testSecret)(auth.MeHandler(db))
 

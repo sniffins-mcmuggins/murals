@@ -20,7 +20,7 @@ import (
 func TestCreateCollection_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "col1@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Dave")
 	handler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 
@@ -40,7 +40,7 @@ func TestCreateCollection_Success(t *testing.T) {
 func TestCreateCollection_NoProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := createTestUser(t, db, "col2@example.com")
+	_, token := createTestUser(t, db)
 	handler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 
 	body := `{"name":"My Work"}`
@@ -56,7 +56,7 @@ func TestCreateCollection_NoProfile(t *testing.T) {
 func TestListCollections_Public(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "col3@example.com")
+	userID, token := createTestUser(t, db)
 	profileID := createTestProfile(t, db, userID, "Eve")
 	publishTestProfile(t, db, profileID)
 	createHandler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
@@ -92,7 +92,7 @@ func TestListCollections_Public(t *testing.T) {
 func TestUpdateCollection_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "col4@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Frank")
 
 	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
@@ -133,7 +133,7 @@ func TestUpdateCollection_Success(t *testing.T) {
 func TestDeleteCollection_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "col5@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Grace")
 
 	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
@@ -167,7 +167,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 func TestUpdateCollection_WrongOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	ownerID, ownerToken := createTestUser(t, db, "col6owner@example.com")
+	ownerID, ownerToken := createTestUser(t, db)
 	createTestProfile(t, db, ownerID, "Owner")
 	createH := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/collections",
@@ -180,7 +180,7 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&created))
 	collectionID := created["id"].(string)
 
-	otherID, otherToken := createTestUser(t, db, "col6other@example.com")
+	otherID, otherToken := createTestUser(t, db)
 	createTestProfile(t, db, otherID, "Other")
 
 	router := chi.NewRouter()
@@ -205,7 +205,7 @@ func TestUpdateCollection_WrongOwner(t *testing.T) {
 func TestReorderCollections_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "reorder1@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Reorder Artist")
 
 	// Create two collections via the handler
@@ -266,7 +266,7 @@ func TestReorderCollections_Unauthenticated(t *testing.T) {
 func TestReorderCollections_UnknownID(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "reorder3@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "Reorder3")
 
 	router := chi.NewRouter()

@@ -1,6 +1,7 @@
 package festival_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,13 +27,14 @@ func newReviewerServer(db *pgxpool.Pool) *httptest.Server {
 func TestInviteReviewer_OwnerAddsExistingUser(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	ownerID, ownerTok := createTestUser(t, db, "rev-owner-1@test")
-	_, _ = createTestUser(t, db, "rev-existing-1@test")
-	festID := createTestFestival(t, db, ownerID, "rev-fest-1", "open")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	_, _, existingEmail := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	srv := newReviewerServer(db)
 	t.Cleanup(srv.Close)
 
-	resp := doRequest(t, srv, "POST", "/festivals/"+festID+"/reviewers", `{"email":"rev-existing-1@test"}`, ownerTok)
+	resp := doRequest(t, srv, "POST", "/festivals/"+festID+"/reviewers",
+		fmt.Sprintf(`{"email":%q}`, existingEmail), ownerTok)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	_ = resp.Body.Close()
 }
@@ -40,9 +42,9 @@ func TestInviteReviewer_OwnerAddsExistingUser(t *testing.T) {
 func TestInviteReviewer_NonOwnerForbidden(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	ownerID, _ := createTestUser(t, db, "rev-owner-2@test")
-	_, strangerTok := createTestUser(t, db, "rev-stranger-2@test")
-	festID := createTestFestival(t, db, ownerID, "rev-fest-2", "open")
+	ownerID, _, _ := createTestUser(t, db)
+	_, strangerTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	srv := newReviewerServer(db)
 	t.Cleanup(srv.Close)
 
@@ -54,8 +56,8 @@ func TestInviteReviewer_NonOwnerForbidden(t *testing.T) {
 func TestInviteReviewer_RequiresAuth(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	ownerID, _ := createTestUser(t, db, "rev-owner-3@test")
-	festID := createTestFestival(t, db, ownerID, "rev-fest-3", "open")
+	ownerID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	srv := newReviewerServer(db)
 	t.Cleanup(srv.Close)
 
@@ -67,8 +69,8 @@ func TestInviteReviewer_RequiresAuth(t *testing.T) {
 func TestInviteReviewer_OwnerAddsNewEmail(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	ownerID, ownerTok := createTestUser(t, db, "rev-owner-4@test")
-	festID := createTestFestival(t, db, ownerID, "rev-fest-4", "open")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	srv := newReviewerServer(db)
 	t.Cleanup(srv.Close)
 

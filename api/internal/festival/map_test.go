@@ -21,11 +21,11 @@ import (
 func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "maporg@example.com")
-	festID := createTestFestival(t, db, orgID, "map-fest-live", "live")
+	orgID, _, _ := createTestUser(t, db)
+	festID, festSlug := createTestFestival(t, db, orgID, "live")
 
 	// Create artist and accept them
-	artistUserID, _ := createTestUser(t, db, "mapartist@example.com")
+	artistUserID, _, _ := createTestUser(t, db)
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Map Artist")
 
 	q := sqlcdb.New(db)
@@ -67,7 +67,7 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp := doRequest(t, srv, "GET", "/festivals/slug/map-fest-live/map", "", "")
+	resp := doRequest(t, srv, "GET", "/festivals/slug/"+festSlug+"/map", "", "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
@@ -84,8 +84,8 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "maporg2@example.com")
-	createTestFestival(t, db, orgID, "map-fest-draft", "draft")
+	orgID, _, _ := createTestUser(t, db)
+	_, draftSlug := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -94,7 +94,7 @@ func TestGetMapData_NonLiveFestivalReturns404(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp := doRequest(t, srv, "GET", "/festivals/slug/map-fest-draft/map", "", "")
+	resp := doRequest(t, srv, "GET", "/festivals/slug/"+draftSlug+"/map", "", "")
 	require.Equal(t, http.StatusNotFound, resp.StatusCode, "expected 404 for non-live festival")
 	_ = resp.Body.Close()
 }

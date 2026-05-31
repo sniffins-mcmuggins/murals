@@ -247,8 +247,8 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "rtclosed-org@example.com")
-	festID := createTestFestival(t, db, orgID, "rt-closed-form", "open")
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 
 	// Set close_at in the past
 	pastTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -262,7 +262,7 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 	})
 	require.NoError(t, err, "upsert form")
 
-	artistID, artistToken := createTestUser(t, db, "rtclosed-artist@example.com")
+	artistID, artistToken, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Closed Form Artist")
 
 	r := chi.NewRouter()
@@ -281,11 +281,11 @@ func TestFestivalDomainRoundTrip_ClosedFormBlocked(t *testing.T) {
 func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "rtmap-org@example.com")
-	festID := createTestFestival(t, db, orgID, "rt-map-pins", "live")
+	orgID, _, _ := createTestUser(t, db)
+	festID, mapPinsSlug := createTestFestival(t, db, orgID, "live")
 
 	// Accept artist WITHOUT pin
-	artistUserID, _ := createTestUser(t, db, "rtmap-artist@example.com")
+	artistUserID, _, _ := createTestUser(t, db)
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Unpinned Artist")
 
 	q := sqlcdb.New(db)
@@ -304,7 +304,7 @@ func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp := doRequest(t, srv, "GET", "/festivals/slug/rt-map-pins/map", "", "")
+	resp := doRequest(t, srv, "GET", "/festivals/slug/"+mapPinsSlug+"/map", "", "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))

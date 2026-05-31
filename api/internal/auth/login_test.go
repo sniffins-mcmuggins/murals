@@ -3,8 +3,10 @@ package auth_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,8 +19,12 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-func createTestUser(t *testing.T, db *pgxpool.Pool, email, password string) {
+var authUserSeq atomic.Int64
+
+// createTestUser creates a user with a unique generated email and returns that email.
+func createTestUser(t *testing.T, db *pgxpool.Pool, password string) string {
 	t.Helper()
+	email := fmt.Sprintf("t-%d@t.local", authUserSeq.Add(1))
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		t.Fatalf("bcrypt: %v", err)
@@ -32,16 +38,17 @@ func createTestUser(t *testing.T, db *pgxpool.Pool, email, password string) {
 	if err != nil {
 		t.Fatalf("create test user: %v", err)
 	}
+	return email
 }
 
 func TestLoginHandler_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	createTestUser(t, db, "dave@example.com", "correctpassword")
+	email := createTestUser(t, db, "correctpassword")
 
 	handler := auth.LoginHandler(db, testSecret)
 
-	body := `{"email":"dave@example.com","password":"correctpassword"}`
+	body := fmt.Sprintf(`{"email":%q,"password":"correctpassword"}`, email)
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", bytes.NewBufferString(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -68,11 +75,11 @@ func TestLoginHandler_Success(t *testing.T) {
 func TestLoginHandler_WrongPassword(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	createTestUser(t, db, "eve@example.com", "correctpassword")
+	email := createTestUser(t, db, "correctpassword")
 
 	handler := auth.LoginHandler(db, testSecret)
 
-	body := `{"email":"eve@example.com","password":"wrongpassword"}`
+	body := fmt.Sprintf(`{"email":%q,"password":"wrongpassword"}`, email)
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login", bytes.NewBufferString(body))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()

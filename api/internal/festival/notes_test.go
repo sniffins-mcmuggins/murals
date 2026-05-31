@@ -65,7 +65,7 @@ func TestAddApplicationNote_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
-	_, otherToken := createTestUser(t, db, "notesother@example.com")
+	_, otherToken, _ := createTestUser(t, db)
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -90,8 +90,8 @@ func TestAddApplicationNote_CrossFestivalRejected(t *testing.T) {
 	sc := setupReviewScenario(t, db)
 
 	// Create a second festival (with its own form) owned by a different organiser.
-	orgID, orgToken := createTestUser(t, db, "notescrossorg@example.com")
-	otherFestID := createTestFestival(t, db, orgID, "notes-other-fest", "open")
+	orgID, orgToken, _ := createTestUser(t, db)
+	otherFestID, _ := createTestFestival(t, db, orgID, "open")
 	// Give the second festival its own form so the mismatch check is exercised.
 	createTestApplicationForm(t, db, otherFestID)
 
