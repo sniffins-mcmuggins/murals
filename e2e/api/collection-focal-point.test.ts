@@ -28,6 +28,11 @@ describe('collection focal point', () => {
     const suffix = Date.now()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Artist ${suffix}` })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
     const { collectionId } = await createCollection(token, { name: `FP Coll ${suffix}` })
 
     const patchRes = await fetch(`${API}/collections/${collectionId}`, {
@@ -69,6 +74,11 @@ describe('collection focal point', () => {
     const suffix = Date.now()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Default ${suffix}` })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
     const { collectionId } = await createCollection(token, { name: `FP Default Coll ${suffix}` })
 
     const res = await fetch(`${API}/collections/${collectionId}`)

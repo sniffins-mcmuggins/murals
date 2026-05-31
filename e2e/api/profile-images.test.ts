@@ -19,6 +19,11 @@ describe('profile images', () => {
     const suffix = Date.now()
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Image Artist ${suffix}` })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
 
     const res = await fetch(`${API}/profiles/${profileId}`)
     expect(res.status).toBe(200)
@@ -31,6 +36,11 @@ describe('profile images', () => {
     const suffix = Date.now() + 1
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Hero Artist ${suffix}` })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
 
     const patchRes = await fetch(`${API}/profiles/me`, {
       method: 'PATCH',
