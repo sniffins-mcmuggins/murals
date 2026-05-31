@@ -707,4 +707,56 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
 
 ---
 
+## Issue & Board Conventions
+
+**Board:** https://github.com/users/sniffins-mcmuggins/projects/1
+
+### Issue naming
+
+All issues use `[EX]` (epic) or `[EX.Y]` (task) prefixes. No `feat:`, `Epic:`, or `Design:` prefixes.
+
+| Epic range | Coverage |
+|---|---|
+| E1–E10 | Phase 1 foundations (done) |
+| E11 | Production infrastructure |
+| E12–E14 | Auth, Stripe, E2E (done) |
+| E15 | Profile visibility & publish flow |
+| E16 | Private beta portal |
+| E17 | Content moderation |
+| E18 | Endorsements |
+| E19 | AI onboarding (icebox) |
+| E20 | Refer-an-artist |
+| E21 | Public mobile: GPS audio, festival trail, save/seen-it |
+| E22 | Organiser review & selection (panellist, rubric, anon, multi-round) |
+
+**Next epic: E23.** See `.claude/rules/issue-labels.md` for the full label set and hygiene rules.
+
+### Labels
+
+Three categories — always apply at least one from each:
+
+- **Type:** `type:epic` · `type:task` · `type:planning`
+- **Area:** `area:api` · `area:web` · `area:mobile` · `area:db` · `area:infra` · `area:ci` · `area:openapi` · `area:e2e`
+- **Priority:** `priority:p0` (CPF must-have) · `priority:p1` (launch nice-to-have) · `priority:p2` (post-pilot)
+- **State:** `blocked` · `security` · `good-first-subagent`
+
+### Milestones
+
+| Milestone | Due | For |
+|---|---|---|
+| Beta Launch | Aug 2027 | Working platform live for founding members |
+| CPF 2027 Pilot | Oct 2027 | CPF applications open through the platform |
+
+All P0 issues should be assigned to one of these milestones.
+
+### Board columns
+
+`Icebox` → `Backlog` → `Ready` → `In progress` → `In review` → `Done`
+
+- **Ready**: max 6 items — genuinely startable in the next sprint.
+- **In progress**: max 2–3 items at once.
+- Scripts: `uv run scripts/sync-done-to-board.py --apply` (mark closed items Done).
+
+---
+
 *This README is the canonical reference for the project. Update it as decisions are made. When using Claude Code, share this file as context at the start of every session.*
