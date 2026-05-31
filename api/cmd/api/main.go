@@ -18,6 +18,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/beta"
 	"github.com/sniffins-mcmuggins/render/api/internal/billing"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
@@ -32,6 +33,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if cfg.BetaMode {
+		slog.Info("beta mode enabled — invite-only access enforced")
+	}
 
 	logger := newLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
@@ -102,10 +106,15 @@ func main() {
 
 	r.Get("/healthz", health.Handler(pool))
 	r.Handle("/metrics", metrics.Handler())
-	r.Post("/auth/signup", auth.SignupHandler(pool))
+
+	// Public routes — no auth or beta gate required.
+	r.Get("/public/beta-status", beta.BetaStatusHandler(cfg))
+	r.Get("/public/festivals", festival.ListPublicHandler(pool))
+	r.Get("/public/profiles", artist.ListPublicProfilesHandler(pool))
+	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(pool))
 
 	// Rate-limited auth routes (5/min per IP) — login, password reset, MFA verify,
-	// and promo redemption (prevents bulk code enumeration).
+	// promo redemption (prevents bulk code enumeration), and waitlist signups.
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RateLimitMiddleware)
 		r.Post("/auth/login", auth.LoginHandler(pool, cfg.JWTSecret))
@@ -113,7 +122,10 @@ func main() {
 		r.Post("/auth/reset-password", auth.ResetPasswordHandler(pool))
 		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
 		r.Post("/promo/redeem", admin.RedeemPromoHandler(pool))
+		r.Post("/waitlist", beta.WaitlistHandler(pool))
 	})
+
+	r.Post("/auth/signup", auth.SignupHandler(pool, cfg))
 
 	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
 	r.Post("/auth/mfa/enroll", auth.TOTPEnrollHandler(pool, cfg.TOTPEncryptionKey))
@@ -129,113 +141,130 @@ func main() {
 		r.Post("/auth/oauth/apple/callback", auth.AppleCallbackHandler(pool, cfg.AppleClientID, cfg.AppleTeamID, cfg.AppleKeyID, cfg.ApplePrivateKey, cfg.APIPublicBase, cfg.WebPublicBase, cfg.JWTSecret))
 	}
 
-	r.Get("/me", auth.MeHandler(pool))
-	r.Get("/me/summary", me.SummaryHandler(pool))
-	r.Post("/images/presign", image.PresignHandler(mcPublic, cfg.MinioBucket))
-	r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
+	// ── Authenticated + beta-gated routes ──
+	// beta.Gate is a no-op when BetaMode is false (launch exit path).
+	// Anonymous requests pass through; downstream handlers return 401 if they
+	// require auth. Authenticated non-beta users receive 403 when BetaMode=true.
+	r.Group(func(r chi.Router) {
+		r.Use(beta.Gate(cfg, pool))
 
-	// Artist profiles
-	r.Post("/profiles", artist.CreateProfileHandler(pool))
-	r.Get("/profiles/me", artist.GetMyProfileHandler(pool))
-	r.Patch("/profiles/me", artist.UpdateProfileHandler(pool))
-	r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase))   // literal /me before /{profileID}
-	r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))          // literal /me before /{profileID}
-	r.Post("/profiles/{profileID}/link-click", analytics.LinkClickHandler(pool)) // public — no auth
-	r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
-	r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(pool))
-	r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(pool)) // public festival appearances
+		r.Get("/me", auth.MeHandler(pool))
+		r.Get("/me/summary", me.SummaryHandler(pool))
+		r.Post("/images/presign", image.PresignHandler(mcPublic, cfg.MinioBucket))
+		r.Post("/images/confirm", image.ConfirmHandler(mc, cfg.MinioBucket, cfg.CDNBaseURL))
 
-	// Collections
-	r.Post("/collections", artist.CreateCollectionHandler(pool))
-	r.Put("/collections/order", artist.ReorderCollectionsHandler(pool)) // literal before /{collectionID}
-	r.Get("/collections/{collectionID}", artist.GetCollectionHandler(pool))
-	r.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(pool))
-	r.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(pool))
-	r.Get("/collections/{collectionID}/images", artist.ListCollectionImagesHandler(pool))
-	r.Post("/collections/{collectionID}/images", artist.AttachImageHandler(pool))
-	r.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(pool))
-	r.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(pool))
+		// Artist profiles
+		r.Post("/profiles", artist.CreateProfileHandler(pool))
+		r.Get("/profiles/me", artist.GetMyProfileHandler(pool))
+		r.Patch("/profiles/me", artist.UpdateProfileHandler(pool))
+		r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase))   // literal /me before /{profileID}
+		r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))          // literal /me before /{profileID}
+		r.Post("/profiles/{profileID}/link-click", analytics.LinkClickHandler(pool)) // public — no auth
+		r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
+		r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(pool))
+		r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(pool)) // public festival appearances
 
-	// Festivals
-	r.Post("/festivals", festival.CreateHandler(pool))
-	r.Get("/festivals", festival.ListHandler(pool))
-	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(pool))
-	r.Get("/public/festivals", festival.ListPublicHandler(pool))
-	r.Get("/public/profiles", artist.ListPublicProfilesHandler(pool))
-	r.Get("/festivals/{festivalID}", festival.GetHandler(pool))
-	r.Patch("/festivals/{festivalID}", festival.UpdateHandler(pool))
-	r.Delete("/festivals/{festivalID}", festival.DeleteHandler(pool))
+		// Collections
+		r.Post("/collections", artist.CreateCollectionHandler(pool))
+		r.Put("/collections/order", artist.ReorderCollectionsHandler(pool)) // literal before /{collectionID}
+		r.Get("/collections/{collectionID}", artist.GetCollectionHandler(pool))
+		r.Patch("/collections/{collectionID}", artist.UpdateCollectionHandler(pool))
+		r.Delete("/collections/{collectionID}", artist.DeleteCollectionHandler(pool))
+		r.Get("/collections/{collectionID}/images", artist.ListCollectionImagesHandler(pool))
+		r.Post("/collections/{collectionID}/images", artist.AttachImageHandler(pool))
+		r.Put("/collections/{collectionID}/images/order", artist.ReorderImagesHandler(pool))
+		r.Delete("/collections/{collectionID}/images/{imageID}", artist.DeleteImageHandler(pool))
 
-	// Application forms
-	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(pool))
-	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(pool))
-	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(pool))
+		// Festivals
+		r.Post("/festivals", festival.CreateHandler(pool))
+		r.Get("/festivals", festival.ListHandler(pool))
+		r.Get("/festivals/{festivalID}", festival.GetHandler(pool))
+		r.Patch("/festivals/{festivalID}", festival.UpdateHandler(pool))
+		r.Delete("/festivals/{festivalID}", festival.DeleteHandler(pool))
 
-	// Applications
-	r.Get("/me/applications", festival.GetMyApplicationsHandler(pool))
-	r.Get("/me/reviewing", festival.MyReviewingHandler(pool))
-	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(pool))
+		// Application forms
+		r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(pool))
+		r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(pool))
+		r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(pool))
 
-	// Review
-	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool, mailer))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool, mailer))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/waitlist", festival.WaitlistApplicationHandler(pool, mailer))
-	r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(pool))
-	r.Post("/festivals/{festivalID}/applications/reorder", festival.ReorderApplicationsHandler(pool))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/notes", festival.AddApplicationNoteHandler(pool))
+		// Applications
+		r.Get("/me/applications", festival.GetMyApplicationsHandler(pool))
+		r.Get("/me/reviewing", festival.MyReviewingHandler(pool))
+		r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(pool))
 
-	// Reviewer management — owner only (handler-level check).
-	r.Post("/festivals/{festivalID}/reviewers", festival.InviteReviewerHandler(pool, mailer, cfg.WebPublicBase))
-	r.Get("/festivals/{festivalID}/reviewers", festival.ListReviewersHandler(pool))
-	r.Delete("/festivals/{festivalID}/reviewers/{userID}", festival.RemoveReviewerHandler(pool))
+		// Review
+		r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
+		r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool, mailer))
+		r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool, mailer))
+		r.Post("/festivals/{festivalID}/applications/{applicationID}/waitlist", festival.WaitlistApplicationHandler(pool, mailer))
+		r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(pool))
+		r.Post("/festivals/{festivalID}/applications/reorder", festival.ReorderApplicationsHandler(pool))
+		r.Post("/festivals/{festivalID}/applications/{applicationID}/notes", festival.AddApplicationNoteHandler(pool))
 
-	// Per-reviewer score — owner or reviewer (handler-level check).
-	r.Put("/festivals/{festivalID}/applications/{applicationID}/score", festival.ScoreApplicationHandler(pool))
+		// Reviewer management — owner only (handler-level check).
+		r.Post("/festivals/{festivalID}/reviewers", festival.InviteReviewerHandler(pool, mailer, cfg.WebPublicBase))
+		r.Get("/festivals/{festivalID}/reviewers", festival.ListReviewersHandler(pool))
+		r.Delete("/festivals/{festivalID}/reviewers/{userID}", festival.RemoveReviewerHandler(pool))
 
-	// Spots (map editor)
-	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))
-	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(pool))
-	r.Patch("/festivals/{festivalID}/spots/{spotID}", festival.UpdateSpotHandler(pool))
-	r.Delete("/festivals/{festivalID}/spots/{spotID}", festival.DeleteSpotHandler(pool))
-	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(pool))
-	r.Delete("/festivals/{festivalID}/spots/{spotID}/artist", festival.ClearSpotArtistHandler(pool))
+		// Per-reviewer score — owner or reviewer (handler-level check).
+		r.Put("/festivals/{festivalID}/applications/{applicationID}/score", festival.ScoreApplicationHandler(pool))
 
-	// Billing — webhook first (no auth required; Stripe POSTs directly).
-	// CSRF posture: the session cookie is SameSite=Lax (api/internal/auth/login.go),
-	// which blocks cross-site form POSTs to these endpoints. The Authorization
-	// header path is unaffected by SameSite. Do not relax to SameSiteNoneMode
-	// without adding a CSRF token.
-	r.Method(http.MethodPost, "/billing/webhook", billing.WebhookHandler(pool, stripeClient, cfg.StripeWebhookSecret, billingPrices))
-	r.Post("/billing/artist/checkout", billing.ArtistCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
-	r.Post("/billing/organiser/setup-checkout", billing.OrgSetupCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
-	r.Post("/billing/festival/{festivalID}/activate-checkout", billing.FestivalActivateCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
-	r.Post("/billing/portal", billing.CustomerPortalHandler(pool, stripeClient, cfg.SiteBase))
-	// billing.RequirePlan(pool, "artist_pro") is available as middleware for
-	// gating Pro-only routes. Wire it on the consumer endpoint when one lands
-	// (e.g. a Pro-only feature flag check), not here — gating policy is a
-	// product decision separate from the payments plumbing.
-	//
-	// Test-only probe: exercises RequirePlan from the routing layer so e2e tests
-	// can verify the no-sub / basic / pro decision tree end-to-end. The handler
-	// returns 200 if and only if the middleware lets the request through. Path
-	// is namespaced under /_test/ and exposes no real functionality; keep it as
-	// the smallest possible probe until a real Pro-only endpoint replaces it.
-	r.With(billing.RequirePlan(pool, "artist_pro")).Get("/_test/billing/pro-only", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+		// Spots (map editor)
+		r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))
+		r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(pool))
+		r.Patch("/festivals/{festivalID}/spots/{spotID}", festival.UpdateSpotHandler(pool))
+		r.Delete("/festivals/{festivalID}/spots/{spotID}", festival.DeleteSpotHandler(pool))
+		r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(pool))
+		r.Delete("/festivals/{festivalID}/spots/{spotID}/artist", festival.ClearSpotArtistHandler(pool))
 
-	// Admin — requires admin role + MFA enrollment.
-	r.Route("/admin", func(r chi.Router) {
-		r.Use(admin.RequireAdmin(pool))
-		r.Get("/users", admin.ListUsersHandler(pool))
-		r.Get("/users/{userID}", admin.GetUserHandler(pool))
-		r.Post("/users/{userID}/password-reset", admin.TriggerPasswordResetHandler(pool, mailer, cfg.WebPublicBase))
-		r.Post("/users/{userID}/grants", admin.CreateGrantHandler(pool))
-		r.Delete("/grants/{grantID}", admin.RevokeGrantHandler(pool))
-		r.Get("/promo-codes", admin.ListPromoCodesHandler(pool))
-		r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
-		r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
+		// Billing — webhook first (no auth required; Stripe POSTs directly).
+		// CSRF posture: the session cookie is SameSite=Lax (api/internal/auth/login.go),
+		// which blocks cross-site form POSTs to these endpoints. The Authorization
+		// header path is unaffected by SameSite. Do not relax to SameSiteNoneMode
+		// without adding a CSRF token.
+		r.Method(http.MethodPost, "/billing/webhook", billing.WebhookHandler(pool, stripeClient, cfg.StripeWebhookSecret, billingPrices))
+		r.Post("/billing/artist/checkout", billing.ArtistCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
+		r.Post("/billing/organiser/setup-checkout", billing.OrgSetupCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
+		r.Post("/billing/festival/{festivalID}/activate-checkout", billing.FestivalActivateCheckoutHandler(pool, stripeClient, billingPrices, cfg.SiteBase))
+		r.Post("/billing/portal", billing.CustomerPortalHandler(pool, stripeClient, cfg.SiteBase))
+		// billing.RequirePlan(pool, "artist_pro") is available as middleware for
+		// gating Pro-only routes. Wire it on the consumer endpoint when one lands
+		// (e.g. a Pro-only feature flag check), not here — gating policy is a
+		// product decision separate from the payments plumbing.
+		//
+		// Test-only probe: exercises RequirePlan from the routing layer so e2e tests
+		// can verify the no-sub / basic / pro decision tree end-to-end. The handler
+		// returns 200 if and only if the middleware lets the request through. Path
+		// is namespaced under /_test/ and exposes no real functionality; keep it as
+		// the smallest possible probe until a real Pro-only endpoint replaces it.
+		r.With(billing.RequirePlan(pool, "artist_pro")).Get("/_test/billing/pro-only", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// Admin — requires admin role + MFA enrollment.
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(admin.RequireAdmin(pool))
+			r.Get("/users", admin.ListUsersHandler(pool))
+			r.Get("/users/{userID}", admin.GetUserHandler(pool))
+			r.Post("/users/{userID}/password-reset", admin.TriggerPasswordResetHandler(pool, mailer, cfg.WebPublicBase))
+			r.Post("/users/{userID}/grants", admin.CreateGrantHandler(pool))
+			r.Delete("/grants/{grantID}", admin.RevokeGrantHandler(pool))
+			r.Get("/promo-codes", admin.ListPromoCodesHandler(pool))
+			r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
+			r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
+		})
+
+		// Test-only probe: always enforces beta gate regardless of BETA_MODE env.
+		// Returns 401 if unauthenticated, 403 if authenticated but not beta,
+		// 200 if authenticated + is_beta=true.
+		// Namespaced under /_test/ — exposes no real functionality.
+		r.With(beta.Gate(config.Config{BetaMode: true}, pool)).Get("/_test/beta/gated", func(w http.ResponseWriter, r *http.Request) {
+			if _, err := auth.User(r.Context()); err != nil {
+				http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		})
 	})
 
 	srv := &http.Server{

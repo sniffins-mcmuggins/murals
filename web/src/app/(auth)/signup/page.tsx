@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, FormEvent } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 
@@ -10,11 +10,19 @@ type Role = 'artist' | 'organiser'
 export default function SignupPage() {
   const router = useRouter()
 
+  const searchParams = useSearchParams()
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>('artist')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  useEffect(() => {
+    const code = searchParams.get('invite')
+    if (code) setInviteCode(code)
+  }, [searchParams])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -22,9 +30,16 @@ export default function SignupPage() {
     setPending(true)
 
     try {
+      const body = { email, password, role, ...(inviteCode ? { invite_code: inviteCode } : {}) }
+
       const { response } = await apiClient.POST('/auth/signup', {
-        body: { email, password, role },
+        body,
       })
+
+      if (response.status === 403) {
+        setError('A valid invite code is required to sign up.')
+        return
+      }
 
       if (response.status === 409) {
         setError('Email already registered')
@@ -116,6 +131,22 @@ export default function SignupPage() {
               <option value="organiser">Festival organiser</option>
             </select>
           </div>
+
+          {inviteCode && (
+            <div>
+              <label htmlFor="invite" className="block font-sans text-sm text-ink mb-1">
+                Invite code
+              </label>
+              <input
+                id="invite"
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                className="w-full border border-light rounded-lg px-3 py-2 font-mono text-sm text-ink bg-offwhite placeholder:text-mid focus:outline-none focus:border-amber"
+                placeholder="FOUNDING-XXXX"
+              />
+            </div>
+          )}
 
           {error && (
             <p role="alert" className="font-sans text-sm text-clay">

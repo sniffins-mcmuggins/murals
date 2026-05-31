@@ -56,6 +56,10 @@ type Config struct {
 	StripeFestivalAnnualPrice     string // £49/yr recurring listing fee
 	// Frontend base URL (for Stripe redirect URLs)
 	SiteBase string
+	// BetaMode gates the platform behind invite-only access when true.
+	// Set BETA_MODE=true in production to enable beta. Setting it to false
+	// (the default) is a no-op passthrough — zero code rip-out at launch.
+	BetaMode bool
 }
 
 func Load() Config {
@@ -97,6 +101,7 @@ func Load() Config {
 		StripeFestivalActivationPrice: env("STRIPE_FESTIVAL_ACTIVATION_PRICE_ID", ""),
 		StripeFestivalAnnualPrice:     env("STRIPE_FESTIVAL_ANNUAL_PRICE_ID", ""),
 		SiteBase:                      env("SITE_BASE_URL", "http://localhost:3000"),
+		BetaMode:                      envBool("BETA_MODE", false),
 	}
 }
 

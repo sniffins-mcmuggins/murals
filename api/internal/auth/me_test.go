@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -22,7 +23,7 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, email, password string) (coo
 	sr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", strings.NewReader(signupBody))
 	sr.Header.Set("Content-Type", "application/json")
 	sw := httptest.NewRecorder()
-	auth.SignupHandler(db).ServeHTTP(sw, sr)
+	auth.SignupHandler(db, config.Config{}).ServeHTTP(sw, sr)
 	if sw.Code != http.StatusCreated {
 		t.Fatalf("signup failed: %d %s", sw.Code, sw.Body.String())
 	}

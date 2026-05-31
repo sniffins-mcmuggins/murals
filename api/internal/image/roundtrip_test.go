@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	imagehandler "github.com/sniffins-mcmuggins/render/api/internal/image"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
@@ -26,7 +27,7 @@ func TestImageUploadRoundTrip(t *testing.T) {
 	// Router mirrors production wiring
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/auth/signup", auth.SignupHandler(db))
+	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Post("/images/presign", imagehandler.PresignHandler(ms.Client, ms.Bucket))
 	r.Post("/images/confirm", imagehandler.ConfirmHandler(ms.Client, ms.Bucket, ms.CDNBase()))
