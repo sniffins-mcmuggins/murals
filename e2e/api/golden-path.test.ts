@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
+import { createHmac } from 'node:crypto'
 import { s3Put } from '../fixtures/helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-jwt-secret-change-in-prod'
 
 function auth(token: string) {
   return { Authorization: `Bearer ${token}` }
@@ -10,6 +14,16 @@ function auth(token: string) {
 async function json(res: Response) {
   const text = await res.text()
   try { return JSON.parse(text) } catch { return text }
+}
+
+function base64url(buf: Buffer | string): string {
+  return Buffer.from(buf).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
+function signHS256(payload: Record<string, unknown>, secret: string): string {
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const body = base64url(JSON.stringify(payload))
+  const sig = base64url(createHmac('sha256', secret).update(`${header}.${body}`).digest())
+  return `${header}.${body}.${sig}`
 }
 
 describe('golden path', () => {
@@ -23,6 +37,33 @@ describe('golden path', () => {
   let festivalSlug: string
   let applicationId: string
   let artistId: string
+  let db: Client
+  let adminToken: string
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+
+    // Seed an admin user for the publish-gate grant in step 20.5
+    const adminEmail = `admin-gp-${suffix}@golden.test`
+    await fetch(`${API}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: adminEmail, password: 'adminpass123' }),
+    })
+    const { rows } = await db.query<{ id: string; session_version: number }>(
+      `UPDATE users SET is_admin = true, mfa_enabled = true, mfa_secret = 'fake-totp'
+       WHERE email = $1 RETURNING id, session_version`,
+      [adminEmail],
+    )
+    const { id: adminUserId, session_version: sv } = rows[0]
+    const now = Math.floor(Date.now() / 1000)
+    adminToken = signHS256({ sub: adminUserId, is_admin: true, sv, iat: now, exp: now + 3600 }, JWT_SECRET)
+  })
+
+  afterAll(async () => {
+    await db.end()
+  })
 
   it('1. artist signup + login', async () => {
     const signupRes = await fetch(`${API}/auth/signup`, {
@@ -264,6 +305,20 @@ describe('golden path', () => {
   })
 
   it('20.5. publish artist profile (set visibility to public)', async () => {
+    // Grant the artist a comp access grant so the publish gate passes.
+    // artistId is the profile ID; look up the user ID by email.
+    const { rows: uRows } = await db.query<{ id: string }>(
+      'SELECT id FROM users WHERE email = $1',
+      [`artist-${suffix}@golden.test`],
+    )
+    const artistUserId = uRows[0].id
+    const grantRes = await fetch(`${API}/admin/users/${artistUserId}/grants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth(adminToken) },
+      body: JSON.stringify({ plan: 'artist_basic', duration_days: 30, note: 'golden path e2e grant' }),
+    })
+    expect(grantRes.status).toBe(201)
+
     const res = await fetch(`${API}/profiles/me`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...auth(artistToken) },

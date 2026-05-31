@@ -431,3 +431,25 @@ func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 	require.NoError(t, json.NewDecoder(w3.Body).Decode(&resp))
 	assert.Equal(t, "New bio", resp["bio"])
 }
+
+func TestUpdateProfile_PublicToPublic_NoGrant_Returns200(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "pub-to-pub@example.com")
+	profileID := createTestProfile(t, db, userID, "StillPublic Artist")
+	publishTestProfile(t, db, profileID) // set public via DB — no grant needed
+
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
+	body := `{"visibility":"public"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "public", resp["visibility"])
+}

@@ -7,7 +7,8 @@
 //
 // Users are created once in beforeAll to keep signup/login traffic under the
 // rate-limit ceiling when this file runs alongside the rest of the e2e suite.
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
 import {
   createArtist,
   createOrganiser,
@@ -20,8 +21,10 @@ import {
   ArtistSetup,
   OrganiserSetup,
 } from '../fixtures/helpers.js'
+import { forcePublish } from '../fixtures/db-helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 const SUFFIX = `gaps-isol-${Date.now()}`
 
 function auth(token: string) {
@@ -35,8 +38,12 @@ describe('authorization isolation', () => {
   let orgB: OrganiserSetup
   let profileAName: string
   let profileBName: string
+  let db: Client
 
   beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+
     artistA = await createArtist(`${SUFFIX}-aA`)
     artistB = await createArtist(`${SUFFIX}-aB`)
     orgA = await createOrganiser(`${SUFFIX}-oA`)
@@ -45,17 +52,13 @@ describe('authorization isolation', () => {
     profileBName = `B ${SUFFIX}`
     await createProfile(artistA.token, { displayName: profileAName })
     await createProfile(artistB.token, { displayName: profileBName })
-    // Publish both profiles so anonymous GETs on their collections succeed.
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(artistA.token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
-    await fetch(`${API}/profiles/me`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...auth(artistB.token) },
-      body: JSON.stringify({ visibility: 'public' }),
-    })
+    // Bypass publish gate — these tests are about auth isolation, not the publish gate.
+    await forcePublish(db, artistA.userId)
+    await forcePublish(db, artistB.userId)
+  })
+
+  afterAll(async () => {
+    await db.end()
   })
 
   it('user A cannot PATCH user B\'s collection (403)', async () => {

@@ -1,20 +1,24 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { Client } from 'pg'
 import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
+import { forcePublish } from '../fixtures/db-helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 
-async function publishProfile(token: string): Promise<void> {
-  const res = await fetch(`${API}/profiles/me`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...auth(token) },
-    body: JSON.stringify({ visibility: 'public' }),
-  })
-  if (!res.ok) throw new Error(`publishProfile failed: ${res.status}`)
-}
-
 describe('GET /profiles/me/analytics', () => {
+  let db: Client
+
+  beforeAll(async () => {
+    db = new Client({ connectionString: DB_URL })
+    await db.connect()
+  })
+
+  afterAll(async () => {
+    await db.end()
+  })
   it('without token → 401', async () => {
     const res = await fetch(`${API}/profiles/me/analytics`)
     expect(res.status).toBe(401)
@@ -45,9 +49,10 @@ describe('GET /profiles/me/analytics', () => {
 
   it('profile_view events appear in the response after visiting the public profile', async () => {
     const suffix = uniqueSuffix() + 1
-    const { token } = await createArtist(suffix)
+    const { token, userId } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `View Artist ${suffix}` })
-    await publishProfile(token)
+    // Bypass publish gate — this test is about analytics events, not the publish gate.
+    await forcePublish(db, userId)
 
     // Trigger a profile_view by fetching the public profile.
     await fetch(`${API}/profiles/${profileId}`)
