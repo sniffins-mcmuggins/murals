@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test'
 import * as path from 'path'
+import { Client } from 'pg'
+import { forcePublish } from '../fixtures/db-helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
+const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
 const FIXTURE_JPG = path.join(__dirname, '../fixtures/test.jpg')
 
 test('artist onboarding: signup → profile → collection → upload → public page', async ({ page }) => {
@@ -59,12 +62,16 @@ test('artist onboarding: signup → profile → collection → upload → public
   // Wait for the image thumbnail to appear
   await expect(page.locator('img[src*="localhost:9000"], img[src*="cdnUrl"], img[alt]').first()).toBeVisible({ timeout: 15_000 })
 
-  // Publish the profile so it is visible to anonymous visitors
-  const publishRes = await page.request.patch(`${API}/profiles/me`, {
-    data: { visibility: 'public' },
-    headers: { 'Content-Type': 'application/json' },
-  })
-  expect(publishRes.ok()).toBe(true)
+  // Publish the profile so it is visible to anonymous visitors.
+  // Uses a direct DB update (forcePublish) to bypass the entitlement gate —
+  // this test covers the onboarding flow, not the publish gate.
+  const db = new Client({ connectionString: DB_URL })
+  await db.connect()
+  try {
+    await forcePublish(db, profile.user_id)
+  } finally {
+    await db.end()
+  }
 
   // ── 7. Verify public artist profile page (unauthenticated) ───────────────────
   // Open public page in a fresh context (no auth)

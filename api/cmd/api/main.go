@@ -40,10 +40,6 @@ func main() {
 	logger := newLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
 
-	if cfg.BetaMode {
-		slog.Info("beta mode enabled — invite-only access enforced")
-	}
-
 	ctx := context.Background()
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -161,7 +157,7 @@ func main() {
 		r.Post("/profiles", artist.CreateProfileHandler(pool))
 		r.Get("/profiles/me", artist.GetMyProfileHandler(pool))
 		r.Patch("/profiles/me", artist.UpdateProfileHandler(pool))
-		r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase))   // literal /me before /{profileID}
+		r.Get("/profiles/me/qr", artist.ProfileQRHandler(pool, cfg.WebPublicBase))          // literal /me before /{profileID}
 		r.Get("/profiles/me/analytics", analytics.MyAnalyticsHandler(pool))                 // literal /me before /{profileID}
 		r.Post("/profiles/me/preview-token/rotate", artist.RotatePreviewTokenHandler(pool)) // literal /me before /{profileID}
 		r.Get("/profiles/preview/{token}", artist.PreviewByTokenHandler(pool))              // literal /preview before /{profileID}
