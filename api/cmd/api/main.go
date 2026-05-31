@@ -32,6 +32,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if cfg.BetaMode {
+		slog.Info("beta mode enabled — invite-only access enforced")
+	}
 
 	logger := newLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
