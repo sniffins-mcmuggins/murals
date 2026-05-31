@@ -1,0 +1,47 @@
+# artist Spec
+**Path:** `api/internal/artist/`
+**Last updated:** 2026-05-31
+
+## Contract
+- CRUD for artist profiles: create, get-mine, update, public-get (by profile ID)
+- Collections: create, get, patch, reorder, delete
+- Collection images: add, reorder, delete, set-cover
+- QR code: generate branded PNG for the artist's public profile URL
+- Public listing: `ListPublicProfilesHandler` — returns only `visibility: public` profiles
+- Visibility gating: `GET /profiles/{profileID}` — 404 for non-public profiles
+- Preview sharing: `GET /profiles/preview/{token}` — returns any profile (draft or public) matching the `preview_token`; no auth required; token is the secret
+- Preview token rotation: `POST /profiles/me/preview-token/rotate` — generates a new token, invalidating any previously shared preview links; owner-only
+
+## Boundaries
+- Does NOT own subscription/entitlement logic — calls `billing.CanPublish` to check publish eligibility
+- Does NOT own analytics events — fires profile-view events via the analytics package on public profile reads
+- Does NOT own festival applications — the festival package manages those
+
+## Key Decisions
+- **One profile per user**: `CreateProfileHandler` enforces uniqueness via DB constraint; calling it twice returns 409
+- **Visibility states**: `draft` (owner only) and `public` (world-readable). No intermediate state.
+- **Publish gate**: `PATCH /profiles/me` with `visibility: public` calls `billing.CanPublish` — fails with 403 if the user has no active subscription or grant
+- **Collections have `display_order`**: default `0`; ordered by `(display_order, created_at)`. Tests that assert creation order MUST call the reorder endpoint first — two rows created in the same millisecond under parallel load have a non-deterministic natural order
+- **Images have a two-step flow**: presign (→ `image` package), PUT to MinIO (→ client), confirm (→ `image` package), then attach to collection. The `artist` package only handles attach + set-cover
+- **Downgrade behaviour**: data exceeding a plan limit is locked (not deleted) when an artist downgrades
+- **Preview token is the secret**: opaque UUID-derived string stored on the profile row; not a JWT, carries no claims. Sharing the URL grants access. Rotating revokes all previously shared links immediately.
+- **`preview_token` omitted from public responses**: `toProfileResponse(p, public=true)` sets `PreviewToken = nil`; only the rotate response (`public=false`) returns it so the owner can copy the new link
+
+## Invariants
+- Public profile read MUST return 404 (not 403) for non-public profiles — information about private profiles must not leak
+- `preview_token` MUST NOT appear in any response where `toProfileResponse` is called with `public=true` — the token is the access credential
+- QR code encodes the public profile URL — always `/p/{profile_id}`, never a route that might change
+- `display_order` must never be assumed unique — ties are broken by `created_at`, and two rows can share the same millisecond
+- `/profiles/me` and `/profiles/preview/{token}` are literal sub-paths — they MUST remain registered before `/{profileID}` in `main.go`
+
+## AI Context
+- `profile.go`: profile CRUD + visibility management + publish gate + `RotatePreviewTokenHandler` + `PreviewByTokenHandler`
+- `collection.go`: collection CRUD + reorder
+- `collection_image.go`: image attach/reorder/delete/set-cover — reads `s3_key` from the confirmed image record
+- `qr.go`: QR code generation — uses `github.com/skip2/go-qrcode`; output is PNG bytes returned directly
+- `errors.go`: package-level sentinel errors used across handlers
+- `testhelpers_test.go`: shared helpers for creating profiles, collections, images in tests — check before writing new test setup
+- Analytics: `profile.go` fires a `profile_view` event on public reads — this calls into the analytics package; do not remove it accidentally when refactoring the public GET handler
+
+## Changelog
+2026-05-31 — initial spec
