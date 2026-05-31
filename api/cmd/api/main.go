@@ -40,6 +40,10 @@ func main() {
 	logger := newLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
 
+	if cfg.BetaMode {
+		slog.Info("beta mode enabled — invite-only access enforced")
+	}
+
 	ctx := context.Background()
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
