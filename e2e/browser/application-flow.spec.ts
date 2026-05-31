@@ -1,5 +1,6 @@
 import { test, expect, Browser } from '@playwright/test'
 import {
+  uniqueSuffix,
   createArtist,
   createProfile,
   createOrganiser,
@@ -27,7 +28,7 @@ async function loginAs(
 }
 
 test('apply → accept → pin → map data contains pin', async ({ browser }) => {
-  const suffix = Date.now()
+  const suffix = uniqueSuffix()
   const baseURL = process.env.BASE_URL ?? 'http://localhost:3000'
 
   // ── beforeAll equivalent: set up test data via API ────────────────────────────

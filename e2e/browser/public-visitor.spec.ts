@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import {
+  uniqueSuffix,
   createArtist,
   createProfile,
   createCollection,
@@ -36,7 +37,7 @@ test.describe('public visitor flow', () => {
   })
 
   test.beforeAll(async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     artistDisplayName = `Public Artist ${suffix}`
 
     // Set up artist with profile, collection, and image
