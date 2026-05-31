@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createArtist, createProfile } from '../fixtures/helpers'
+import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
@@ -15,7 +15,7 @@ async function publishProfile(token: string): Promise<void> {
 
 describe('profile visibility (E15.1)', () => {
   it('new profile is draft — anonymous GET returns 404', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Draft ${suffix}` })
 
@@ -24,7 +24,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('owner can GET their own draft profile and sees visibility=draft', async () => {
-    const suffix = Date.now() + 1
+    const suffix = uniqueSuffix() + 1
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Draft Owner ${suffix}` })
 
@@ -36,7 +36,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('draft profile collections return 404 for anonymous caller', async () => {
-    const suffix = Date.now() + 2
+    const suffix = uniqueSuffix() + 2
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Draft Coll ${suffix}` })
 
@@ -45,7 +45,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('owner can GET collections on their draft profile', async () => {
-    const suffix = Date.now() + 3
+    const suffix = uniqueSuffix() + 3
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Draft Coll Owner ${suffix}` })
 
@@ -54,7 +54,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('non-owner authenticated user cannot see draft profile', async () => {
-    const suffix = Date.now() + 4
+    const suffix = uniqueSuffix() + 4
     const { token: ownerToken } = await createArtist(suffix)
     const { profileId } = await createProfile(ownerToken, { displayName: `Draft Other ${suffix}` })
 
@@ -64,7 +64,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('draft profile does not appear in GET /public/profiles', async () => {
-    const suffix = Date.now() + 5
+    const suffix = uniqueSuffix() + 5
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Hidden ${suffix}` })
 
@@ -74,7 +74,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('PATCH visibility to public → anonymous GET 200, appears in /public/profiles', async () => {
-    const suffix = Date.now() + 6
+    const suffix = uniqueSuffix() + 6
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Going Public ${suffix}` })
 
@@ -102,7 +102,7 @@ describe('profile visibility (E15.1)', () => {
   })
 
   it('PATCH visibility with invalid value → 422', async () => {
-    const suffix = Date.now() + 7
+    const suffix = uniqueSuffix() + 7
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `Bad Vis ${suffix}` })
 

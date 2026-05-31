@@ -3,7 +3,7 @@
 // correctly, and out-of-range values should be server-clamped to [0, 100].
 
 import { describe, it, expect } from 'vitest'
-import { createArtist, createProfile, createCollection } from '../fixtures/helpers.js'
+import { createArtist, createProfile, createCollection, uniqueSuffix } from '../fixtures/helpers.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
@@ -11,7 +11,7 @@ const json = { 'Content-Type': 'application/json' }
 
 describe('collection focal point', () => {
   it('PATCH /collections/{id} without token → 401', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Auth ${suffix}` })
     const { collectionId } = await createCollection(token, { name: `FP Auth Coll ${suffix}` })
@@ -25,7 +25,7 @@ describe('collection focal point', () => {
   })
 
   it('setting focal point values round-trips through the DB', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Artist ${suffix}` })
     await fetch(`${API}/profiles/me`, {
@@ -54,7 +54,7 @@ describe('collection focal point', () => {
   })
 
   it('out-of-range focal values are clamped to [0, 100]', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Clamp ${suffix}` })
     const { collectionId } = await createCollection(token, { name: `FP Clamp Coll ${suffix}` })
@@ -71,7 +71,7 @@ describe('collection focal point', () => {
   })
 
   it('focal point defaults to 50/50 on new collections', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `FP Default ${suffix}` })
     await fetch(`${API}/profiles/me`, {
