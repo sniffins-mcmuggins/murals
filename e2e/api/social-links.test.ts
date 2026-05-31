@@ -36,6 +36,13 @@ describe('social links', () => {
     expect(updated.social_links.instagram).toBe('https://instagram.com/testartist')
     expect(updated.social_links.website).toBe('https://testartist.com')
 
+    // Publish before anonymous fetch.
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+
     const publicRes = await fetch(`${API}/profiles/${profileId}`)
     expect(publicRes.status).toBe(200)
     const pub = await json(publicRes)
@@ -85,6 +92,13 @@ describe('social links', () => {
     expect(clearRes.status).toBe(200)
     const data = await json(clearRes)
     expect(Object.keys(data.social_links)).toHaveLength(0)
+
+    // Publish before anonymous fetch.
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
 
     const publicRes = await fetch(`${API}/profiles/${profileId}`)
     const pub = await json(publicRes)

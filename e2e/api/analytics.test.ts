@@ -5,6 +5,15 @@ const API = process.env.API_URL ?? 'http://localhost:8080'
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 
+async function publishProfile(token: string): Promise<void> {
+  const res = await fetch(`${API}/profiles/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth(token) },
+    body: JSON.stringify({ visibility: 'public' }),
+  })
+  if (!res.ok) throw new Error(`publishProfile failed: ${res.status}`)
+}
+
 describe('GET /profiles/me/analytics', () => {
   it('without token → 401', async () => {
     const res = await fetch(`${API}/profiles/me/analytics`)
@@ -38,6 +47,7 @@ describe('GET /profiles/me/analytics', () => {
     const suffix = Date.now() + 1
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `View Artist ${suffix}` })
+    await publishProfile(token)
 
     // Trigger a profile_view by fetching the public profile.
     await fetch(`${API}/profiles/${profileId}`)

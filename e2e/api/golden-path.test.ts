@@ -263,6 +263,16 @@ describe('golden path', () => {
     expect(found).toBeDefined()
   })
 
+  it('20.5. publish artist profile (set visibility to public)', async () => {
+    const res = await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(artistToken) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+    expect(res.status).toBe(200)
+    expect((await json(res)).visibility).toBe('public')
+  })
+
   it('21. public profile accessible (unauthenticated)', async () => {
     const res = await fetch(`${API}/profiles/${profileId}`)
     expect(res.status).toBe(200)
