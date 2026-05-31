@@ -41,6 +41,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/waitlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join the waitlist */
+        post: operations["postWaitlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/beta-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check whether the server is in beta mode */
+        get: operations["getPublicBetaStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -1377,6 +1411,11 @@ export interface components {
             email: string;
             /** @example hunter2hunter */
             password: string;
+            /**
+             * @description Required when the server is in beta mode (BETA_MODE=true). Ignored otherwise.
+             * @example FOUNDING-ABC123
+             */
+            invite_code?: string;
         };
         LoginRequest: {
             /** Format: email */
@@ -1898,6 +1937,7 @@ export interface operations {
                     "application/json": components["schemas"]["User"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             /** @description Email already registered. */
             409: {
                 headers: {
@@ -1908,6 +1948,54 @@ export interface operations {
                 };
             };
             422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    postWaitlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Added to waitlist (idempotent on email). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    getPublicBetaStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Beta mode flag. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        beta_mode: boolean;
+                    };
+                };
+            };
         };
     };
     postAuthLogin: {

@@ -25,6 +25,8 @@ tags:
     description: Artist profiles, collections, and collection images
   - name: festival
     description: Festival creation, management, applications, and map data
+  - name: beta
+    description: Beta access — waitlist and invite-gate status
 
 components:
   schemas:
@@ -78,6 +80,10 @@ components:
           type: string
           minLength: 8
           example: hunter2hunter
+        invite_code:
+          type: string
+          description: Required when the server is in beta mode (BETA_MODE=true). Ignored otherwise.
+          example: FOUNDING-ABC123
 
     LoginRequest:
       type: object
@@ -864,6 +870,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           description: Email already registered.
           content:
@@ -872,6 +880,45 @@ paths:
                 $ref: "#/components/schemas/Problem"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+
+  /waitlist:
+    post:
+      operationId: postWaitlist
+      summary: Join the waitlist
+      tags: [beta]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "204":
+          description: Added to waitlist (idempotent on email).
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /public/beta-status:
+    get:
+      operationId: getPublicBetaStatus
+      summary: Check whether the server is in beta mode
+      tags: [beta]
+      responses:
+        "200":
+          description: Beta mode flag.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [beta_mode]
+                properties:
+                  beta_mode:
+                    type: boolean
 
   /auth/login:
     post:

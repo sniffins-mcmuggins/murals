@@ -542,8 +542,11 @@ type ScoreResponse struct {
 
 // SignupRequest defines model for SignupRequest.
 type SignupRequest struct {
-	Email    openapi_types.Email `json:"email"`
-	Password string              `json:"password"`
+	Email openapi_types.Email `json:"email"`
+
+	// InviteCode Required when the server is in beta mode (BETA_MODE=true). Ignored otherwise.
+	InviteCode *string `json:"invite_code,omitempty"`
+	Password   string  `json:"password"`
 }
 
 // UnassignedArtist defines model for UnassignedArtist.
@@ -734,6 +737,11 @@ type ListPublicProfilesParams struct {
 	PerPage *int `form:"per_page,omitempty" json:"per_page,omitempty"`
 }
 
+// PostWaitlistJSONBody defines parameters for PostWaitlist.
+type PostWaitlistJSONBody struct {
+	Email openapi_types.Email `json:"email"`
+}
+
 // ForgotPasswordJSONRequestBody defines body for ForgotPassword for application/json ContentType.
 type ForgotPasswordJSONRequestBody ForgotPasswordJSONBody
 
@@ -814,6 +822,9 @@ type PostProfilesJSONRequestBody = CreateProfileRequest
 
 // PatchProfileMeJSONRequestBody defines body for PatchProfileMe for application/json ContentType.
 type PatchProfileMeJSONRequestBody = UpdateProfileRequest
+
+// PostWaitlistJSONRequestBody defines body for PostWaitlist for application/json ContentType.
+type PostWaitlistJSONRequestBody PostWaitlistJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -988,12 +999,18 @@ type ServerInterface interface {
 	// Record a social link click for an artist profile
 	// (POST /profiles/{profileID}/link-click)
 	RecordLinkClick(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
+	// Check whether the server is in beta mode
+	// (GET /public/beta-status)
+	GetPublicBetaStatus(w http.ResponseWriter, r *http.Request)
 	// List public festivals by status
 	// (GET /public/festivals)
 	ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams)
 	// Paginated list of public artist profiles
 	// (GET /public/profiles)
 	ListPublicProfiles(w http.ResponseWriter, r *http.Request, params ListPublicProfilesParams)
+	// Join the waitlist
+	// (POST /waitlist)
+	PostWaitlist(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -1342,6 +1359,12 @@ func (_ Unimplemented) RecordLinkClick(w http.ResponseWriter, r *http.Request, p
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Check whether the server is in beta mode
+// (GET /public/beta-status)
+func (_ Unimplemented) GetPublicBetaStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List public festivals by status
 // (GET /public/festivals)
 func (_ Unimplemented) ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams) {
@@ -1351,6 +1374,12 @@ func (_ Unimplemented) ListPublicFestivals(w http.ResponseWriter, r *http.Reques
 // Paginated list of public artist profiles
 // (GET /public/profiles)
 func (_ Unimplemented) ListPublicProfiles(w http.ResponseWriter, r *http.Request, params ListPublicProfilesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Join the waitlist
+// (POST /waitlist)
+func (_ Unimplemented) PostWaitlist(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3050,6 +3079,20 @@ func (siw *ServerInterfaceWrapper) RecordLinkClick(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// GetPublicBetaStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicBetaStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicBetaStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPublicFestivals operation middleware
 func (siw *ServerInterfaceWrapper) ListPublicFestivals(w http.ResponseWriter, r *http.Request) {
 
@@ -3120,6 +3163,20 @@ func (siw *ServerInterfaceWrapper) ListPublicProfiles(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListPublicProfiles(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostWaitlist operation middleware
+func (siw *ServerInterfaceWrapper) PostWaitlist(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostWaitlist(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3414,10 +3471,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/profiles/{profileID}/link-click", wrapper.RecordLinkClick)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/public/beta-status", wrapper.GetPublicBetaStatus)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/public/festivals", wrapper.ListPublicFestivals)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/public/profiles", wrapper.ListPublicProfiles)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/waitlist", wrapper.PostWaitlist)
 	})
 
 	return r
@@ -3537,6 +3600,22 @@ func (response PostAuthSignup201JSONResponse) VisitPostAuthSignupResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAuthSignup403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PostAuthSignup403ApplicationProblemPlusJSONResponse) VisitPostAuthSignupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -6604,6 +6683,29 @@ func (response RecordLinkClick204Response) VisitRecordLinkClickResponse(w http.R
 	return nil
 }
 
+type GetPublicBetaStatusRequestObject struct {
+}
+
+type GetPublicBetaStatusResponseObject interface {
+	VisitGetPublicBetaStatusResponse(w http.ResponseWriter) error
+}
+
+type GetPublicBetaStatus200JSONResponse struct {
+	BetaMode bool `json:"beta_mode"`
+}
+
+func (response GetPublicBetaStatus200JSONResponse) VisitGetPublicBetaStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListPublicFestivalsRequestObject struct {
 	Params ListPublicFestivalsParams
 }
@@ -6660,6 +6762,38 @@ func (response ListPublicProfiles200JSONResponse) VisitListPublicProfilesRespons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostWaitlistRequestObject struct {
+	Body *PostWaitlistJSONRequestBody
+}
+
+type PostWaitlistResponseObject interface {
+	VisitPostWaitlistResponse(w http.ResponseWriter) error
+}
+
+type PostWaitlist204Response struct {
+}
+
+func (response PostWaitlist204Response) VisitPostWaitlistResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PostWaitlist422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PostWaitlist422ApplicationProblemPlusJSONResponse) VisitPostWaitlistResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -6837,12 +6971,18 @@ type StrictServerInterface interface {
 	// Record a social link click for an artist profile
 	// (POST /profiles/{profileID}/link-click)
 	RecordLinkClick(ctx context.Context, request RecordLinkClickRequestObject) (RecordLinkClickResponseObject, error)
+	// Check whether the server is in beta mode
+	// (GET /public/beta-status)
+	GetPublicBetaStatus(ctx context.Context, request GetPublicBetaStatusRequestObject) (GetPublicBetaStatusResponseObject, error)
 	// List public festivals by status
 	// (GET /public/festivals)
 	ListPublicFestivals(ctx context.Context, request ListPublicFestivalsRequestObject) (ListPublicFestivalsResponseObject, error)
 	// Paginated list of public artist profiles
 	// (GET /public/profiles)
 	ListPublicProfiles(ctx context.Context, request ListPublicProfilesRequestObject) (ListPublicProfilesResponseObject, error)
+	// Join the waitlist
+	// (POST /waitlist)
+	PostWaitlist(ctx context.Context, request PostWaitlistRequestObject) (PostWaitlistResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -8520,6 +8660,30 @@ func (sh *strictHandler) RecordLinkClick(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// GetPublicBetaStatus operation middleware
+func (sh *strictHandler) GetPublicBetaStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetPublicBetaStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicBetaStatus(ctx, request.(GetPublicBetaStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicBetaStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicBetaStatusResponseObject); ok {
+		if err := validResponse.VisitGetPublicBetaStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListPublicFestivals operation middleware
 func (sh *strictHandler) ListPublicFestivals(w http.ResponseWriter, r *http.Request, params ListPublicFestivalsParams) {
 	var request ListPublicFestivalsRequestObject
@@ -8565,6 +8729,37 @@ func (sh *strictHandler) ListPublicProfiles(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListPublicProfilesResponseObject); ok {
 		if err := validResponse.VisitListPublicProfilesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostWaitlist operation middleware
+func (sh *strictHandler) PostWaitlist(w http.ResponseWriter, r *http.Request) {
+	var request PostWaitlistRequestObject
+
+	var body PostWaitlistJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostWaitlist(ctx, request.(PostWaitlistRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostWaitlist")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostWaitlistResponseObject); ok {
+		if err := validResponse.VisitPostWaitlistResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
