@@ -29,3 +29,7 @@ mobile/android/app/.cxx/
 # Claude Code — commit shared rules, ignore per-user state
 .claude/settings.local.json
 .claude/worktrees/
+
+playwright-report/
+
+test-results/

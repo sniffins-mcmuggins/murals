@@ -69,25 +69,51 @@ Three products sharing one platform:
 
 Hosting target and chat/messaging provider (Stream / Sendbird / Pusher — embedded, not built in-house) remain undecided. Chat is not yet implemented. Don't assume or implement these without confirming with the user.
 
-## Design System (Demo)
+## Living Specs
 
-The demo establishes the visual identity — use it as reference for any UI work:
+Every meaningful package has a colocated `<package>.spec.md` describing its contract, boundaries, key decisions, invariants, and AI context. A `.claude/rules/spec-<package>.md` stub loads the spec automatically when Claude enters that directory.
 
-```
-Colors:
-  --ink:      #1A1A2E  (dark navy — primary dark)
-  --amber:    #E8A838  (gold — primary accent)
-  --clay:     #C45C3A  (terracotta — secondary accent)
-  --offwhite: #FAF7F2  (warm white — background)
-  --warm:     #F0EAE0  (warm grey — secondary background)
-  --mid:      #8A8896  (mid grey — secondary text)
-  --light:    #E2DDD6  (light grey — borders)
+### Spec sections (fixed headings — referenced by rules and skills)
 
-Typography:
-  Cormorant Garamond (serif) — headings, artist bios, large numbers
-  DM Sans — body text, UI labels
-  DM Mono — badges, stats, monospace labels (uppercase, letter-spacing)
-```
+| Section | Purpose |
+|---------|---------|
+| `## Contract` | What the package promises to do — public surface, inputs/outputs, guarantees |
+| `## Boundaries` | What it deliberately does NOT do — prevents misdirected work |
+| `## Key Decisions` | Locked-in design choices with rationale; what was rejected and why |
+| `## Invariants` | Rules the code must always maintain; things that if broken break callers or security |
+| `## AI Context` | What to know before touching this package — gotchas, read order, cross-file deps |
+| `## Changelog` | Brief log of spec updates: `YYYY-MM-DD — description` |
+
+### Obligations when working in a package
+
+1. **Before touching code**: the spec is already in context (loaded by the path rule). Use it.
+2. **After changing behaviour**: if your change adds, removes, or alters the package's observable behaviour, propose a spec update inline — not as a separate step, not in a follow-up PR.
+3. **New package**: write the spec before or alongside the first PR. Add the rule stub too.
+
+### Packages with specs
+
+| Package | Spec |
+|---------|------|
+| `api/internal/auth/` | `auth.spec.md` |
+| `api/internal/billing/` | `billing.spec.md` |
+| `api/internal/festival/` | `festival.spec.md` |
+| `api/internal/artist/` | `artist.spec.md` |
+| `api/internal/beta/` | `beta.spec.md` |
+| `api/internal/admin/` | `admin.spec.md` |
+| `api/internal/analytics/` | `analytics.spec.md` |
+| `api/internal/image/` | `image.spec.md` |
+| `api/internal/email/` | `email.spec.md` |
+| `api/internal/me/` | `me.spec.md` |
+| `api/cmd/api/` | `api.spec.md` |
+| `db/` | `db.spec.md` |
+| `web/src/app/(artist)/` | `artist.spec.md` |
+| `web/src/app/dashboard/` | `dashboard.spec.md` |
+| `web/src/app/(public)/` | `public.spec.md` |
+| `web/src/lib/` | `lib.spec.md` |
+
+### Packages without specs (thin/generated — not worth maintaining)
+
+`sqlcdb` (auto-generated), `config` (env vars only), `httperr`, `health`, `metrics`, `middleware`, `testutil`, `openapi`.
 
 ## Mission Constraint
 

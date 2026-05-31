@@ -1,6 +1,13 @@
+---
+paths:
+  - "api/**/*.go"
+---
+
 # Background work (`go func()` outside tests)
 
-When adding a detached goroutine in `api/` outside test files, load: @api/internal/auth/reset.go (canonical example: `forgotPasswordWork`)
+@api/internal/auth/reset.go
+
+Canonical example of the detached goroutine pattern: `forgotPasswordWork`.
 
 This rule is about goroutines launched *from* an HTTP handler that outlive the request — typically because we don't want to make the user wait for SES, S3 writes, analytics, etc.
 

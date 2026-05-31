@@ -1,6 +1,13 @@
+---
+paths:
+  - "api/internal/auth/**"
+  - "api/cmd/api/**"
+  - "db/queries/users.sql"
+---
+
 # Auth changes
 
-When touching `api/internal/auth/`, auth wiring in `api/cmd/api/main.go`, or any migration that alters the `users` table, load: @api/internal/auth/jwt.go @api/internal/auth/middleware.go @api/internal/auth/login.go @api/internal/auth/oauth.go @api/internal/auth/totp.go @api/internal/auth/reset.go @api/internal/auth/ratelimit.go @api/cmd/api/main.go @db/queries/users.sql
+@api/internal/auth/jwt.go @api/internal/auth/middleware.go @api/internal/auth/login.go @api/internal/auth/oauth.go @api/internal/auth/totp.go @api/internal/auth/reset.go @api/internal/auth/ratelimit.go @db/queries/users.sql
 
 This rule is for security regressions that pass code review because the bad version *looks fine*. Each section below has a real bug from history with the fix.
 
@@ -70,21 +77,6 @@ if !user.MfaEnabled { ... }
 **Do not** increment `session_version` on demotion as a workaround — that requires every future demotion path to remember to call it. Read the live value instead.
 
 **Admin-triggered password reset: session revocation is intentionally deferred.** `TriggerPasswordResetHandler` fires a goroutine that creates a reset token but does NOT call `IncrementSessionVersion`. Session revocation only happens when the user clicks the reset link and calls `ResetPasswordHandler`. This is deliberate: revocation proves the user received the email. If you want immediate revocation on admin trigger, add `IncrementSessionVersion` in the handler and document the policy change.
-
-## Route groups with middleware require an e2e probe
-
-Unit tests in `api/internal/admin/*_test.go` inject `auth.WithUserForTest()` directly into the request context, bypassing the JWT middleware and `RequireAdmin`. If `r.Use(admin.RequireAdmin(pool))` were accidentally removed from the route group in `main.go`, every unit test would still pass.
-
-For every new protected route group, the **first** e2e test must be an unauthenticated HTTP request to confirm the middleware is actually wired:
-
-```typescript
-it('GET /admin/users without token → 401', async () => {
-  const res = await fetch(`${API}/admin/users`)
-  expect(res.status).toBe(401)
-})
-```
-
-This test has no DB seeding and catches dropped `r.Use(...)` calls that no unit test would detect.
 
 ## Pre-merge checklist for auth changes
 

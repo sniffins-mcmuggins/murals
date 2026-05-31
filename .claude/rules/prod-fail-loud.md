@@ -1,6 +1,12 @@
+---
+paths:
+  - "api/cmd/api/**"
+  - "api/internal/config/**"
+---
+
 # Production must fail loud, never silent
 
-When wiring an external-service client (SES, S3, payment, push, OAuth provider) in `api/cmd/api/main.go` or adding config in `api/internal/config/config.go`, load: @api/cmd/api/main.go @api/internal/config/config.go
+@api/cmd/api/main.go @api/internal/config/config.go
 
 This rule exists because the *worst* class of prod bug is one that looks like nothing happened.
 

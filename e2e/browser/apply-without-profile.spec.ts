@@ -1,5 +1,6 @@
 import { test, expect, Browser } from '@playwright/test'
 import {
+  uniqueSuffix,
   createUser,
   createOrganiser,
   createFestival,
@@ -24,7 +25,7 @@ async function loginAs(
 }
 
 test('apply without artist profile shows inline profile_required CTA', async ({ browser }) => {
-  const suffix = Date.now()
+  const suffix = uniqueSuffix()
   const baseURL = process.env.BASE_URL ?? 'http://localhost:3000'
 
   const organiser = await createOrganiser(suffix)
