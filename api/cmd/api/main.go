@@ -255,9 +255,14 @@ func main() {
 		})
 
 		// Test-only probe: always enforces beta gate regardless of BETA_MODE env.
-		// Returns 200 if the request passes gate checks (authenticated + is_beta=true).
+		// Returns 401 if unauthenticated, 403 if authenticated but not beta,
+		// 200 if authenticated + is_beta=true.
 		// Namespaced under /_test/ — exposes no real functionality.
-		r.With(beta.Gate(config.Config{BetaMode: true}, pool)).Get("/_test/beta/gated", func(w http.ResponseWriter, _ *http.Request) {
+		r.With(beta.Gate(config.Config{BetaMode: true}, pool)).Get("/_test/beta/gated", func(w http.ResponseWriter, r *http.Request) {
+			if _, err := auth.User(r.Context()); err != nil {
+				http.Error(w, `{"error":"Unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
 		})
 	})
