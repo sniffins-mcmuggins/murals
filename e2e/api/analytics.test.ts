@@ -1,9 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { createArtist, createProfile } from '../fixtures/helpers'
+import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
+
+async function publishProfile(token: string): Promise<void> {
+  const res = await fetch(`${API}/profiles/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth(token) },
+    body: JSON.stringify({ visibility: 'public' }),
+  })
+  if (!res.ok) throw new Error(`publishProfile failed: ${res.status}`)
+}
 
 describe('GET /profiles/me/analytics', () => {
   it('without token → 401', async () => {
@@ -12,7 +21,7 @@ describe('GET /profiles/me/analytics', () => {
   })
 
   it('with token but no profile → 404', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
 
     const res = await fetch(`${API}/profiles/me/analytics`, { headers: auth(token) })
@@ -20,7 +29,7 @@ describe('GET /profiles/me/analytics', () => {
   })
 
   it('returns zero counts and 90-day window for a free artist with no events', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `Analytics Artist ${suffix}` })
 
@@ -35,9 +44,10 @@ describe('GET /profiles/me/analytics', () => {
   })
 
   it('profile_view events appear in the response after visiting the public profile', async () => {
-    const suffix = Date.now() + 1
+    const suffix = uniqueSuffix() + 1
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `View Artist ${suffix}` })
+    await publishProfile(token)
 
     // Trigger a profile_view by fetching the public profile.
     await fetch(`${API}/profiles/${profileId}`)
@@ -54,7 +64,7 @@ describe('GET /profiles/me/analytics', () => {
   })
 
   it('link_click events appear in the response after POST /profiles/{profileID}/link-click', async () => {
-    const suffix = Date.now() + 2
+    const suffix = uniqueSuffix() + 2
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Link Artist ${suffix}` })
 

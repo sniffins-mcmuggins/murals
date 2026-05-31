@@ -58,6 +58,7 @@ func TestGetProfile_Public(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, _ := createTestUser(t, db, "artist3@example.com")
 	profileID := createTestProfile(t, db, userID, "Bob Street")
+	publishTestProfile(t, db, profileID)
 
 	r := chi.NewRouter()
 	r.Get("/profiles/{profileID}", artist.GetProfileHandler(db))

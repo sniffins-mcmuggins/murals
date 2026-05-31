@@ -49,6 +49,13 @@ describe('collection reorder', () => {
     const { collectionId: idA } = await createCollection(token, { name: `A-${suffix}` })
     const { collectionId: idB } = await createCollection(token, { name: `B-${suffix}` })
 
+    // Publish profile so anonymous fetches can see it.
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { ...{ 'Content-Type': 'application/json' }, ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+
     // Explicitly set A first, then assert we can flip to B first.
     // (Don't rely on creation-time ordering — both rows may share the same millisecond.)
     const init = await fetch(`${API}/collections/order`, {

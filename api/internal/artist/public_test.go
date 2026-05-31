@@ -28,9 +28,23 @@ func createArtistWithProfile(t *testing.T, pool *pgxpool.Pool, email, displayNam
 		PasswordHash: &hashStr,
 	})
 	require.NoError(t, err)
-	_, err = q.CreateArtistProfile(context.Background(), sqlcdb.CreateArtistProfileParams{
+	profile, err := q.CreateArtistProfile(context.Background(), sqlcdb.CreateArtistProfileParams{
 		UserID:      user.ID,
 		DisplayName: displayName,
+	})
+	require.NoError(t, err)
+	// Publish so ListPublicProfiles (visibility = 'public') returns this profile.
+	_, err = q.UpdateArtistProfile(context.Background(), sqlcdb.UpdateArtistProfileParams{
+		ID:                profile.ID,
+		DisplayName:       profile.DisplayName,
+		Bio:               profile.Bio,
+		LocationLabel:     profile.LocationLabel,
+		ShowLocation:      profile.ShowLocation,
+		MediumTags:        []string{},
+		SocialLinks:       profile.SocialLinks,
+		AvatarS3Key:       profile.AvatarS3Key,
+		HeadlineImageUrls: []string{},
+		Visibility:        "public",
 	})
 	require.NoError(t, err)
 }

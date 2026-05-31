@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createArtist, createProfile } from '../fixtures/helpers'
+import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 
@@ -17,7 +17,7 @@ describe('social links', () => {
   })
 
   it('set social links and they appear on the public profile', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Social Artist ${suffix}` })
 
@@ -36,6 +36,13 @@ describe('social links', () => {
     expect(updated.social_links.instagram).toBe('https://instagram.com/testartist')
     expect(updated.social_links.website).toBe('https://testartist.com')
 
+    // Publish before anonymous fetch.
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+
     const publicRes = await fetch(`${API}/profiles/${profileId}`)
     expect(publicRes.status).toBe(200)
     const pub = await json(publicRes)
@@ -44,7 +51,7 @@ describe('social links', () => {
   })
 
   it('update (overwrite) existing social links', async () => {
-    const suffix = Date.now() + 1
+    const suffix = uniqueSuffix() + 1
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `Update Artist ${suffix}` })
 
@@ -67,7 +74,7 @@ describe('social links', () => {
   })
 
   it('clear all social links by sending empty object', async () => {
-    const suffix = Date.now() + 2
+    const suffix = uniqueSuffix() + 2
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Clear Artist ${suffix}` })
 
@@ -86,13 +93,20 @@ describe('social links', () => {
     const data = await json(clearRes)
     expect(Object.keys(data.social_links)).toHaveLength(0)
 
+    // Publish before anonymous fetch.
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+
     const publicRes = await fetch(`${API}/profiles/${profileId}`)
     const pub = await json(publicRes)
     expect(Object.keys(pub.social_links)).toHaveLength(0)
   })
 
   it('social links are not included in response when omitted from PATCH', async () => {
-    const suffix = Date.now() + 3
+    const suffix = uniqueSuffix() + 3
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `Preserve Artist ${suffix}` })
 

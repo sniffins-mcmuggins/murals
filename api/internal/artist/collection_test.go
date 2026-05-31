@@ -58,6 +58,7 @@ func TestListCollections_Public(t *testing.T) {
 	db := testutil.NewDB(t)
 	userID, token := createTestUser(t, db, "col3@example.com")
 	profileID := createTestProfile(t, db, userID, "Eve")
+	publishTestProfile(t, db, profileID)
 	createHandler := auth.Middleware(db, testSecret)(artist.CreateCollectionHandler(db))
 
 	for _, name := range []string{"Alpha", "Beta"} {

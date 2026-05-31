@@ -12,6 +12,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AnalyticsEventType string
+
+const (
+	AnalyticsEventTypeProfileView AnalyticsEventType = "profile_view"
+	AnalyticsEventTypeQrScan      AnalyticsEventType = "qr_scan"
+	AnalyticsEventTypeLinkClick   AnalyticsEventType = "link_click"
+)
+
+func (e *AnalyticsEventType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AnalyticsEventType(s)
+	case string:
+		*e = AnalyticsEventType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AnalyticsEventType: %T", src)
+	}
+	return nil
+}
+
+type NullAnalyticsEventType struct {
+	AnalyticsEventType AnalyticsEventType `json:"analytics_event_type"`
+	Valid              bool               `json:"valid"` // Valid is true if AnalyticsEventType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAnalyticsEventType) Scan(value interface{}) error {
+	if value == nil {
+		ns.AnalyticsEventType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AnalyticsEventType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAnalyticsEventType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AnalyticsEventType), nil
+}
+
 type ApplicationStatus string
 
 const (
@@ -199,6 +242,13 @@ type AccessGrant struct {
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type AnalyticsEvent struct {
+	ID         pgtype.UUID        `db:"id" json:"id"`
+	EventType  AnalyticsEventType `db:"event_type" json:"event_type"`
+	ProfileID  pgtype.UUID        `db:"profile_id" json:"profile_id"`
+	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+}
+
 type Application struct {
 	ID          pgtype.UUID        `db:"id" json:"id"`
 	FormID      pgtype.UUID        `db:"form_id" json:"form_id"`
@@ -254,6 +304,7 @@ type ArtistProfile struct {
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	HeadlineImageUrls []string           `db:"headline_image_urls" json:"headline_image_urls"`
+	Visibility        string             `db:"visibility" json:"visibility"`
 }
 
 type Collection struct {

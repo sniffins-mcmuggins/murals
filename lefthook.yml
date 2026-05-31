@@ -8,7 +8,7 @@ pre-commit:
       glob: "web/**/*.{ts,tsx,js,jsx}"
       run: cd web && npm run lint
     web-typecheck:
-      glob: "web/**/*.{ts,tsx}"
+      glob: "{web/**/*.{ts,tsx},openapi/**/*.{yaml,ts}}"
       run: cd web && npm run typecheck
     mobile-lint:
       glob: "mobile/**/*.{ts,tsx,js,jsx}"

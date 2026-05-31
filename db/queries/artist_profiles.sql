@@ -11,22 +11,25 @@ SELECT * FROM artist_profiles WHERE user_id = $1;
 
 -- name: UpdateArtistProfile :one
 UPDATE artist_profiles
-SET display_name   = $2,
-    bio            = $3,
-    location_label = $4,
-    show_location  = $5,
-    medium_tags    = $6,
-    social_links          = $7,
-    avatar_s3_key         = $8,
-    headline_image_urls   = $9,
-    updated_at            = now()
+SET display_name        = $2,
+    bio                 = $3,
+    location_label      = $4,
+    show_location       = $5,
+    medium_tags         = $6,
+    social_links        = $7,
+    avatar_s3_key       = $8,
+    headline_image_urls = $9,
+    visibility          = $10,
+    updated_at          = now()
 WHERE id = $1
 RETURNING *;
 
 -- name: ListPublicProfiles :many
 SELECT * FROM artist_profiles
+WHERE visibility = 'public'
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CountPublicProfiles :one
-SELECT COUNT(*) FROM artist_profiles;
+SELECT COUNT(*) FROM artist_profiles
+WHERE visibility = 'public';

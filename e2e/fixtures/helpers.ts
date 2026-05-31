@@ -2,6 +2,13 @@ import * as http from 'node:http'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 
+// Generates a unique suffix safe to use in emails, slugs, and display names.
+// Combines timestamp + random hex so parallel tests in the same millisecond
+// don't collide, and re-runs against a live DB don't collide either.
+export function uniqueSuffix(): string {
+  return `${Date.now()}${Math.random().toString(36).slice(2, 7)}`
+}
+
 // node:http PUT — used for MinIO presigned URLs because fetch() treats Host as a
 // forbidden header, preventing us from setting it explicitly. node:http lets us
 // control all headers. Host is derived from the URL so it matches the HMAC signature.
@@ -36,7 +43,7 @@ export interface UserSetup {
 
 export async function createUser(
   prefix = 'user',
-  suffix: string | number = Date.now(),
+  suffix: string | number = uniqueSuffix(),
 ): Promise<UserSetup> {
   const email = `${prefix}-${suffix}@e2e.test`
   const password = 'testpass123'
@@ -89,6 +96,15 @@ export async function createProfile(
   }
   const data = await res.json()
   return { profileId: data.id }
+}
+
+export async function publishProfile(token: string): Promise<void> {
+  const res = await fetch(`${API}/profiles/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ visibility: 'public' }),
+  })
+  if (!res.ok) throw new Error(`Publish profile failed: ${res.status}`)
 }
 
 export async function createCollection(

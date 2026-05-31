@@ -45,6 +45,17 @@ describe('authorization isolation', () => {
     profileBName = `B ${SUFFIX}`
     await createProfile(artistA.token, { displayName: profileAName })
     await createProfile(artistB.token, { displayName: profileBName })
+    // Publish both profiles so anonymous GETs on their collections succeed.
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(artistA.token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(artistB.token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
   })
 
   it('user A cannot PATCH user B\'s collection (403)', async () => {

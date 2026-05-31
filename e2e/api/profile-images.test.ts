@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createArtist, createProfile } from '../fixtures/helpers'
+import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
@@ -16,9 +16,14 @@ describe('profile images', () => {
   })
 
   it('profile response includes headline_image_urls array (empty by default)', async () => {
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Image Artist ${suffix}` })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
 
     const res = await fetch(`${API}/profiles/${profileId}`)
     expect(res.status).toBe(200)
@@ -28,9 +33,14 @@ describe('profile images', () => {
   })
 
   it('set avatar and headline images via PATCH, appear on public profile', async () => {
-    const suffix = Date.now() + 1
+    const suffix = uniqueSuffix() + 1
     const { token } = await createArtist(suffix)
     const { profileId } = await createProfile(token, { displayName: `Hero Artist ${suffix}` })
+    await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(token) },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
 
     const patchRes = await fetch(`${API}/profiles/me`, {
       method: 'PATCH',
@@ -61,7 +71,7 @@ describe('profile images', () => {
   })
 
   it('update headline images replaces the array', async () => {
-    const suffix = Date.now() + 2
+    const suffix = uniqueSuffix() + 2
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `Replace Artist ${suffix}` })
 
@@ -89,7 +99,7 @@ describe('profile images', () => {
   })
 
   it('PATCH without headlineImageUrls preserves existing images', async () => {
-    const suffix = Date.now() + 3
+    const suffix = uniqueSuffix() + 3
     const { token } = await createArtist(suffix)
     await createProfile(token, { displayName: `Preserve Image Artist ${suffix}` })
 

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import {
   createArtist,
   createProfile,
+  publishProfile,
   createCollection,
   uploadImage,
   createOrganiser,
@@ -30,6 +31,7 @@ test.describe('public visitor flow', () => {
     const artist = await createArtist(suffix)
     const { profileId: pid } = await createProfile(artist.token, { displayName: artistDisplayName })
     profileId = pid
+    await publishProfile(artist.token)
     const { collectionId: cid } = await createCollection(artist.token, { name: 'Wall Pieces' })
     collectionId = cid
     await uploadImage(artist.token, collectionId)

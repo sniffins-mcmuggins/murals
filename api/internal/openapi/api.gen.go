@@ -47,6 +47,24 @@ func (e ApplicationStatus) Valid() bool {
 	}
 }
 
+// Defines values for ArtistProfileVisibility.
+const (
+	ArtistProfileVisibilityDraft  ArtistProfileVisibility = "draft"
+	ArtistProfileVisibilityPublic ArtistProfileVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the ArtistProfileVisibility enum.
+func (e ArtistProfileVisibility) Valid() bool {
+	switch e {
+	case ArtistProfileVisibilityDraft:
+		return true
+	case ArtistProfileVisibilityPublic:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CollectionStatus.
 const (
 	CollectionStatusActive   CollectionStatus = "active"
@@ -70,16 +88,16 @@ func (e CollectionStatus) Valid() bool {
 
 // Defines values for FestivalAppearanceStatus.
 const (
-	FestivalAppearanceStatusLive FestivalAppearanceStatus = "live"
-	FestivalAppearanceStatusOpen FestivalAppearanceStatus = "open"
+	Live FestivalAppearanceStatus = "live"
+	Open FestivalAppearanceStatus = "open"
 )
 
 // Valid indicates whether the value is a known member of the FestivalAppearanceStatus enum.
 func (e FestivalAppearanceStatus) Valid() bool {
 	switch e {
-	case FestivalAppearanceStatusLive:
+	case Live:
 		return true
-	case FestivalAppearanceStatusOpen:
+	case Open:
 		return true
 	default:
 		return false
@@ -273,7 +291,13 @@ type ArtistProfile struct {
 	SocialLinks   map[string]string  `json:"social_links"`
 	UpdatedAt     time.Time          `json:"updated_at"`
 	UserId        openapi_types.UUID `json:"user_id"`
+
+	// Visibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
+	Visibility ArtistProfileVisibility `json:"visibility"`
 }
+
+// ArtistProfileVisibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
+type ArtistProfileVisibility string
 
 // AttachImageRequest defines model for AttachImageRequest.
 type AttachImageRequest struct {

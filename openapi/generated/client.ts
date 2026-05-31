@@ -1435,6 +1435,11 @@ export interface components {
             user_id: string;
             display_name: string;
             bio: string;
+            /**
+             * @description Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
+             * @enum {string}
+             */
+            visibility: "draft" | "public";
             /** @description City/region. Only present if show_location is true (public response). */
             location_label?: string | null;
             /**

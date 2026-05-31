@@ -59,6 +59,13 @@ test('artist onboarding: signup → profile → collection → upload → public
   // Wait for the image thumbnail to appear
   await expect(page.locator('img[src*="localhost:9000"], img[src*="cdnUrl"], img[alt]').first()).toBeVisible({ timeout: 15_000 })
 
+  // Publish the profile so it is visible to anonymous visitors
+  const publishRes = await page.request.patch(`${API}/profiles/me`, {
+    data: { visibility: 'public' },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  expect(publishRes.ok()).toBe(true)
+
   // ── 7. Verify public artist profile page (unauthenticated) ───────────────────
   // Open public page in a fresh context (no auth)
   const publicPage = await page.context().browser()!.newPage()

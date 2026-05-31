@@ -116,18 +116,23 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	updated := decodeJSON(updateProfResp)
 	assert.Equal(t, "I paint big things", updated["bio"])
 
-	// 5. Fetch own profile via /profiles/me
+	// 5. Publish the profile so anonymous viewers can see it
+	resp = do("PATCH", "/profiles/me", `{"visibility":"public"}`, token)
+	assertStatus(resp, http.StatusOK)
+	_ = resp.Body.Close()
+
+	// 6. Fetch own profile via /profiles/me
 	resp = do("GET", "/profiles/me", "", token)
 	assertStatus(resp, http.StatusOK)
 	_ = resp.Body.Close()
 
-	// 6. Fetch public profile — no token
+	// 7. Fetch public profile — no token
 	resp = do("GET", "/profiles/"+profileID, "", "") //nolint:bodyclose // body closed inside decodeJSON
 	assertStatus(resp, http.StatusOK)
 	public := decodeJSON(resp)
 	assert.Equal(t, "Round Trip Artist", public["display_name"])
 
-	// 7. Create two collections
+	// 8. Create two collections
 	resp = do("POST", "/collections", `{"name":"Alpha","description":"First"}`, token) //nolint:bodyclose // body closed inside decodeJSON
 	assertStatus(resp, http.StatusCreated)
 	colAlpha := decodeJSON(resp)
@@ -139,20 +144,20 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	colBetaID := colBeta["id"].(string)
 	_ = colBetaID
 
-	// 8. List collections for profile
+	// 9. List collections for profile
 	resp = do("GET", "/profiles/"+profileID+"/collections", "", "") //nolint:bodyclose // body closed inside decodeJSONArray
 	assertStatus(resp, http.StatusOK)
 	collections := decodeJSONArray(resp)
 	assert.Len(t, collections, 2)
 
-	// 9. Update collection
+	// 10. Update collection
 	resp = do("PATCH", "/collections/"+colAlphaID, //nolint:bodyclose // body closed inside decodeJSON
 		`{"name":"Alpha Renamed","status":"ongoing"}`, token)
 	assertStatus(resp, http.StatusOK)
 	col := decodeJSON(resp)
 	assert.Equal(t, "ongoing", col["status"])
 
-	// 10. Attach two images
+	// 11. Attach two images
 	resp = do("POST", "/collections/"+colAlphaID+"/images", //nolint:bodyclose // body closed inside decodeJSON
 		`{"s3Key":"img1.jpg","cdnUrl":"http://cdn/img1.jpg"}`, token)
 	assertStatus(resp, http.StatusCreated)
@@ -165,7 +170,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	img2 := decodeJSON(resp)
 	img2ID := img2["id"].(string)
 
-	// 11. Reorder: put img2 before img1
+	// 12. Reorder: put img2 before img1
 	reorderBody, err := json.Marshal(map[string]any{"imageIds": []string{img2ID, img1ID}})
 	require.NoError(t, err)
 	resp = do("PUT", "/collections/"+colAlphaID+"/images/order", string(reorderBody), token) //nolint:bodyclose // body closed inside decodeJSONArray
@@ -173,17 +178,17 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	images := decodeJSONArray(resp)
 	assert.Equal(t, img2ID, images[0]["id"])
 
-	// 12. Delete one image
+	// 13. Delete one image
 	resp = do("DELETE", "/collections/"+colAlphaID+"/images/"+img1ID, "", token)
 	assertStatus(resp, http.StatusNoContent)
 	_ = resp.Body.Close()
 
-	// 13. Delete collection
+	// 14. Delete collection
 	resp = do("DELETE", "/collections/"+colAlphaID, "", token)
 	assertStatus(resp, http.StatusNoContent)
 	_ = resp.Body.Close()
 
-	// 14. Verify collection is gone
+	// 15. Verify collection is gone
 	resp = do("GET", "/collections/"+colAlphaID, "", "")
 	assertStatus(resp, http.StatusNotFound)
 	_ = resp.Body.Close()

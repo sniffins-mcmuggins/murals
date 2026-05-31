@@ -14,6 +14,7 @@ import (
 
 const countPublicProfiles = `-- name: CountPublicProfiles :one
 SELECT COUNT(*) FROM artist_profiles
+WHERE visibility = 'public'
 `
 
 func (q *Queries) CountPublicProfiles(ctx context.Context) (int64, error) {
@@ -26,7 +27,7 @@ func (q *Queries) CountPublicProfiles(ctx context.Context) (int64, error) {
 const createArtistProfile = `-- name: CreateArtistProfile :one
 INSERT INTO artist_profiles (user_id, display_name)
 VALUES ($1, $2)
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility
 `
 
 type CreateArtistProfileParams struct {
@@ -50,12 +51,13 @@ func (q *Queries) CreateArtistProfile(ctx context.Context, arg CreateArtistProfi
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.HeadlineImageUrls,
+		&i.Visibility,
 	)
 	return i, err
 }
 
 const getArtistProfileByID = `-- name: GetArtistProfileByID :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls FROM artist_profiles WHERE id = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility FROM artist_profiles WHERE id = $1
 `
 
 func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (ArtistProfile, error) {
@@ -74,12 +76,13 @@ func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (Art
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.HeadlineImageUrls,
+		&i.Visibility,
 	)
 	return i, err
 }
 
 const getArtistProfileByUserID = `-- name: GetArtistProfileByUserID :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls FROM artist_profiles WHERE user_id = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility FROM artist_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UUID) (ArtistProfile, error) {
@@ -98,12 +101,14 @@ func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UU
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.HeadlineImageUrls,
+		&i.Visibility,
 	)
 	return i, err
 }
 
 const listPublicProfiles = `-- name: ListPublicProfiles :many
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls FROM artist_profiles
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility FROM artist_profiles
+WHERE visibility = 'public'
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -135,6 +140,7 @@ func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfiles
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.HeadlineImageUrls,
+			&i.Visibility,
 		); err != nil {
 			return nil, err
 		}
@@ -148,17 +154,18 @@ func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfiles
 
 const updateArtistProfile = `-- name: UpdateArtistProfile :one
 UPDATE artist_profiles
-SET display_name   = $2,
-    bio            = $3,
-    location_label = $4,
-    show_location  = $5,
-    medium_tags    = $6,
-    social_links          = $7,
-    avatar_s3_key         = $8,
-    headline_image_urls   = $9,
-    updated_at            = now()
+SET display_name        = $2,
+    bio                 = $3,
+    location_label      = $4,
+    show_location       = $5,
+    medium_tags         = $6,
+    social_links        = $7,
+    avatar_s3_key       = $8,
+    headline_image_urls = $9,
+    visibility          = $10,
+    updated_at          = now()
 WHERE id = $1
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility
 `
 
 type UpdateArtistProfileParams struct {
@@ -171,6 +178,7 @@ type UpdateArtistProfileParams struct {
 	SocialLinks       json.RawMessage `db:"social_links" json:"social_links"`
 	AvatarS3Key       *string         `db:"avatar_s3_key" json:"avatar_s3_key"`
 	HeadlineImageUrls []string        `db:"headline_image_urls" json:"headline_image_urls"`
+	Visibility        string          `db:"visibility" json:"visibility"`
 }
 
 func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfileParams) (ArtistProfile, error) {
@@ -184,6 +192,7 @@ func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfi
 		arg.SocialLinks,
 		arg.AvatarS3Key,
 		arg.HeadlineImageUrls,
+		arg.Visibility,
 	)
 	var i ArtistProfile
 	err := row.Scan(
@@ -199,6 +208,7 @@ func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfi
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.HeadlineImageUrls,
+		&i.Visibility,
 	)
 	return i, err
 }

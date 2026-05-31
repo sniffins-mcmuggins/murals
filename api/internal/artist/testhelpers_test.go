@@ -59,3 +59,37 @@ func createTestProfile(t *testing.T, pool *pgxpool.Pool, userID, displayName str
 	}
 	return profile.ID.String()
 }
+
+// publishTestProfile sets a profile's visibility to "public" so it passes
+// the visibility gate on public endpoints. Copies all existing field values.
+func publishTestProfile(t *testing.T, pool *pgxpool.Pool, profileID string) {
+	t.Helper()
+	q := sqlcdb.New(pool)
+	existing, err := q.GetArtistProfileByID(context.Background(), pgUUID(t, profileID))
+	if err != nil {
+		t.Fatalf("get profile %s for publish: %v", profileID, err)
+	}
+	headlineImageUrls := existing.HeadlineImageUrls
+	if headlineImageUrls == nil {
+		headlineImageUrls = []string{}
+	}
+	mediumTags := existing.MediumTags
+	if mediumTags == nil {
+		mediumTags = []string{}
+	}
+	_, err = q.UpdateArtistProfile(context.Background(), sqlcdb.UpdateArtistProfileParams{
+		ID:                existing.ID,
+		DisplayName:       existing.DisplayName,
+		Bio:               existing.Bio,
+		LocationLabel:     existing.LocationLabel,
+		ShowLocation:      existing.ShowLocation,
+		MediumTags:        mediumTags,
+		SocialLinks:       existing.SocialLinks,
+		AvatarS3Key:       existing.AvatarS3Key,
+		HeadlineImageUrls: headlineImageUrls,
+		Visibility:        "public",
+	})
+	if err != nil {
+		t.Fatalf("publish profile %s: %v", profileID, err)
+	}
+}
