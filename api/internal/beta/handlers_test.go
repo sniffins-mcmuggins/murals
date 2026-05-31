@@ -81,3 +81,14 @@ func TestWaitlistHandler_MissingEmail_Returns422(t *testing.T) {
 	handler.ServeHTTP(w, r)
 	assert.Equal(t, http.StatusUnprocessableEntity, w.Code)
 }
+
+func TestWaitlistHandler_InvalidJSON_Returns400(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	handler := beta.WaitlistHandler(db)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/waitlist", strings.NewReader(`{"email": bad json`))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
