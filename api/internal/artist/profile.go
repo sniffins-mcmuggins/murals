@@ -17,6 +17,7 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/billing"
 	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
@@ -287,6 +288,24 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if *req.Visibility != "draft" && *req.Visibility != "public" {
 				httperr.UnprocessableEntity(w, "visibility must be draft or public")
 				return
+			}
+			// Gate draft → public: requires active subscription or comp grant.
+			if *req.Visibility == "public" && existing.Visibility == "draft" {
+				canPub, pubErr := billing.CanPublish(r.Context(), pool, userUUID)
+				if pubErr != nil {
+					slog.Error("publish gate: check entitlement", "err", pubErr, "user_id", principal.UserID)
+					httperr.InternalServerError(w)
+					return
+				}
+				if !canPub {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusPaymentRequired)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"code":    "payment_required",
+						"message": "An active artist subscription or comp grant is required to publish.",
+					})
+					return
+				}
 			}
 			visibility = *req.Visibility
 		}

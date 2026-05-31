@@ -312,6 +312,89 @@ func TestRotatePreviewToken_RequiresAuth(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
+func TestUpdateProfile_DraftToPublic_NoEntitlement_Returns402(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "pub-gate-deny@example.com")
+	_ = createTestProfile(t, db, userID, "Gate Test Artist")
+
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
+	body := `{"visibility":"public"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusPaymentRequired, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "payment_required", resp["code"])
+}
+
+func TestUpdateProfile_DraftToPublic_WithGrant_Returns200(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "pub-gate-allow@example.com")
+	_ = createTestProfile(t, db, userID, "Entitled Artist")
+	grantArtistBasic(t, db, userID)
+
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
+	body := `{"visibility":"public"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "public", resp["visibility"])
+}
+
+func TestUpdateProfile_PublicToDraft_NoGrant_Returns200(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "pub-to-draft@example.com")
+	profileID := createTestProfile(t, db, userID, "WasPublic Artist")
+	publishTestProfile(t, db, profileID) // direct DB publish — bypasses gate
+
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
+	body := `{"visibility":"draft"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "draft", resp["visibility"])
+}
+
+func TestUpdateProfile_NonVisibilityPatch_NoGrant_Returns200(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	userID, token := createTestUser(t, db, "bio-update-nogate@example.com")
+	_ = createTestProfile(t, db, userID, "Bio Artist")
+
+	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
+	body := `{"bio":"My updated bio"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/profiles/me",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
 func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
