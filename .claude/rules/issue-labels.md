@@ -116,7 +116,7 @@ Every P0 issue should be assigned to one of the two active milestones. P1/P2 iss
 1. Check the "Current epic numbering" table above — use the next E number.
 2. Update the table in this file with the new epic.
 3. Body must contain a checklist of sub-issues (add them as `[ ] [EX.Y] #NNN — …` lines).
-4. Add an entry to `DECISIONS` in `scripts/organise-board.py` for the epic and each sub-task.
+4. Add it to the board and set Status + Priority via `gh api graphql` mutations (see `kanban.md`).
 5. Label: `type:epic` + relevant `area:` labels.
 
 ### Periodic audit (run when asked to tidy the board)
@@ -124,4 +124,4 @@ Every P0 issue should be assigned to one of the two active milestones. P1/P2 iss
 2. Scan open issues with no `priority:` label → apply one.
 3. Scan open P0 issues with no milestone → assign to Beta Launch or CPF 2027 Pilot.
 4. Scan for stale `blocked` labels (blocking issue is now closed) → remove.
-5. Run `uv run scripts/sync-done-to-board.py --apply` to mark freshly-closed items Done.
+5. Query the board via `gh api graphql` and mark freshly-closed items Done (see `kanban.md`).

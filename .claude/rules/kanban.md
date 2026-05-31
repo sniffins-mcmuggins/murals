@@ -1,6 +1,6 @@
 # Kanban board hygiene
 
-When the user asks to triage the board, update issue statuses, organise the kanban, or keep the project board up to date, load: @scripts/sync-done-to-board.py @scripts/organise-board.py
+When the user asks to triage the board, update issue statuses, organise the kanban, or keep the project board up to date.
 
 Board: https://github.com/users/sniffins-mcmuggins/projects/1/views/1
 Project ID: `PVT_kwHOEQNUZM4BZPlW` (project number 1, owner `sniffins-mcmuggins`)
@@ -44,27 +44,25 @@ Status field:   PVTSSF_lAHOEQNUZM4BZPlWzhUPpIk
 Priority field: PVTSSF_lAHOEQNUZM4BZPlWzhUPpMA
 ```
 
-## Scripts
+## Board hygiene via gh CLI
 
-### `scripts/sync-done-to-board.py`
+Use `gh api graphql` mutations to update board items directly. Key IDs:
 
-Marks closed issues/merged PRs that are already on the board as Done. Run after a sprint or batch of merges.
-
-```bash
-uv run scripts/sync-done-to-board.py           # dry run
-uv run scripts/sync-done-to-board.py --apply   # apply
+```
+PROJECT_ID:       PVT_kwHOEQNUZM4BZPlW
+STATUS_FIELD_ID:  PVTSSF_lAHOEQNUZM4BZPlWzhUPpIk
+PRIORITY_FIELD_ID: PVTSSF_lAHOEQNUZM4BZPlWzhUPpMA
 ```
 
-### `scripts/organise-board.py`
+**Move a closed issue to Done on the board:**
+1. Find the item ID: query `projectV2.items` filtering by issue number.
+2. Mutate `updateProjectV2ItemFieldValue` with `singleSelectOptionId: "98236657"` (Done).
 
-One-shot triage script. Encodes explicit status + priority decisions per issue number, backfills all closed repo issues as Done, and syncs anything still open-but-closed.
+**Add a new issue to the board:**
+Mutate `addProjectV2ItemById` with the issue's node ID, then set Status and Priority fields.
 
-```bash
-uv run scripts/organise-board.py           # dry run
-uv run scripts/organise-board.py --apply   # apply
-```
-
-When adding new issues, add an entry to the `DECISIONS` dict at the top of this script with the issue number and the target `(status, priority)`.
+**Mark all freshly-closed issues Done in one pass:**
+Use `gh api graphql` to query all board items, filter where `content.state == CLOSED` and `Status != Done`, then mutate each. Ask Claude to write and run this inline — no script file needed.
 
 ## WIP rules
 
@@ -96,14 +94,14 @@ P2 (post-pilot):
 
 ## Periodic hygiene (run at the start of each session or after a PR merge)
 
-1. `uv run scripts/sync-done-to-board.py --apply` — move any freshly-closed items to Done.
+1. Query board items via `gh api graphql`, find any closed/merged with Status != Done, update them.
 2. Scan "In progress": anything stale (no commit activity in 3+ days)? Move back to Ready and note it.
 3. Scan "Ready": more than 6 items? Move the lowest-priority ones to Backlog.
 4. Check that the active branch issue is In progress (not Ready).
 
 ## Adding a new epic to the board
 
-1. Create the GitHub issue with the `[EX]` / `[EX.Y]` naming convention.
-2. Add an entry to `DECISIONS` in `scripts/organise-board.py`.
-3. Assign Priority immediately — don't leave it unset.
-4. If it's P0, add it to the "Current priority triage" section above.
+1. Create the GitHub issue with the `[EX]` / `[EX.Y]` naming convention — see `issue-labels.md` for the next E number.
+2. Add it to the board via `addProjectV2ItemById` and set Status + Priority immediately.
+3. Apply `priority:` label and milestone on the issue itself.
+4. If it's P0, add it to the "Current priority triage" section above and update the epic table in `issue-labels.md`.
