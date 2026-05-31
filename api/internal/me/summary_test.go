@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/me"
@@ -22,7 +21,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-var testUserSeq, testFestSeq atomic.Int64
+var testFestSeq atomic.Int64
 
 func pgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -34,22 +33,8 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 }
 
 func createTestUser(t *testing.T, pool *pgxpool.Pool) string {
-	t.Helper()
-	email := fmt.Sprintf("t-%d@t.local", testUserSeq.Add(1))
-	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("bcrypt: %v", err)
-	}
-	hashStr := string(hash)
-	q := sqlcdb.New(pool)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hashStr,
-	})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	return user.ID.String()
+	userID, _, _ := testutil.CreateUser(t, pool)
+	return userID
 }
 
 func createTestArtistProfile(t *testing.T, pool *pgxpool.Pool, userID, displayName string) string {

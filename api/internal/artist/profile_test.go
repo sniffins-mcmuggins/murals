@@ -153,7 +153,7 @@ func TestGetMyProfile_Success(t *testing.T) {
 func TestPreviewByToken_ValidToken_Returns200(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, ownerToken := createTestUser(t, db, "preview-valid@example.com")
+	userID, ownerToken := createTestUser(t, db)
 	_ = createTestProfile(t, db, userID, "Preview Artist")
 
 	r := chi.NewRouter()
@@ -210,7 +210,7 @@ func TestPreviewByToken_BadToken_Returns404(t *testing.T) {
 func TestPreviewByToken_DraftVisible(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, ownerToken := createTestUser(t, db, "preview-draft@example.com")
+	userID, ownerToken := createTestUser(t, db)
 	profileID := createTestProfile(t, db, userID, "Draft Artist")
 
 	r := chi.NewRouter()
@@ -249,7 +249,7 @@ func TestPreviewByToken_DraftVisible(t *testing.T) {
 func TestRotatePreviewToken_InvalidatesOldToken(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, ownerToken := createTestUser(t, db, "preview-rotate@example.com")
+	userID, ownerToken := createTestUser(t, db)
 	_ = createTestProfile(t, db, userID, "Rotate Artist")
 
 	r := chi.NewRouter()
@@ -315,7 +315,7 @@ func TestRotatePreviewToken_RequiresAuth(t *testing.T) {
 func TestUpdateProfile_DraftToPublic_NoEntitlement_Returns402(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "pub-gate-deny@example.com")
+	userID, token := createTestUser(t, db)
 	_ = createTestProfile(t, db, userID, "Gate Test Artist")
 
 	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
@@ -336,7 +336,7 @@ func TestUpdateProfile_DraftToPublic_NoEntitlement_Returns402(t *testing.T) {
 func TestUpdateProfile_DraftToPublic_WithGrant_Returns200(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "pub-gate-allow@example.com")
+	userID, token := createTestUser(t, db)
 	_ = createTestProfile(t, db, userID, "Entitled Artist")
 	grantArtistBasic(t, db, userID)
 
@@ -358,7 +358,7 @@ func TestUpdateProfile_DraftToPublic_WithGrant_Returns200(t *testing.T) {
 func TestUpdateProfile_PublicToDraft_NoGrant_Returns200(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "pub-to-draft@example.com")
+	userID, token := createTestUser(t, db)
 	profileID := createTestProfile(t, db, userID, "WasPublic Artist")
 	publishTestProfile(t, db, profileID) // direct DB publish — bypasses gate
 
@@ -380,7 +380,7 @@ func TestUpdateProfile_PublicToDraft_NoGrant_Returns200(t *testing.T) {
 func TestUpdateProfile_NonVisibilityPatch_NoGrant_Returns200(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "bio-update-nogate@example.com")
+	userID, token := createTestUser(t, db)
 	_ = createTestProfile(t, db, userID, "Bio Artist")
 
 	handler := auth.Middleware(db, testSecret)(artist.UpdateProfileHandler(db))
@@ -435,7 +435,7 @@ func TestUpdateProfile_ShowLocationPreservedWhenOmitted(t *testing.T) {
 func TestUpdateProfile_PublicToPublic_NoGrant_Returns200(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "pub-to-pub@example.com")
+	userID, token := createTestUser(t, db)
 	profileID := createTestProfile(t, db, userID, "StillPublic Artist")
 	publishTestProfile(t, db, profileID) // set public via DB — no grant needed
 

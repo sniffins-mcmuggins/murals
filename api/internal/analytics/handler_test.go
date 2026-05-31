@@ -3,7 +3,6 @@ package analytics_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -21,7 +19,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-const handlerSecret = "test-secret"
+const handlerSecret = testutil.TestSecret
 
 func toPgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -31,20 +29,8 @@ func toPgUUID(t *testing.T, s string) pgtype.UUID {
 }
 
 func makeUser(t *testing.T, db *pgxpool.Pool) (userID, token string) {
-	t.Helper()
-	email := fmt.Sprintf("t-%d@t.local", analyticsUserSeq.Add(1))
-	hash, err := bcrypt.GenerateFromPassword([]byte("pw"), bcrypt.MinCost)
-	require.NoError(t, err)
-	hs := string(hash)
-	q := sqlcdb.New(db)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hs,
-	})
-	require.NoError(t, err)
-	token, err = auth.IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, handlerSecret)
-	require.NoError(t, err)
-	return user.ID.String(), token
+	userID, token, _ = testutil.CreateUser(t, db)
+	return userID, token
 }
 
 func makeProfile(t *testing.T, db *pgxpool.Pool, userID string) string {

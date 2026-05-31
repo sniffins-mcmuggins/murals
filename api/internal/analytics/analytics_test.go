@@ -2,38 +2,25 @@ package analytics_test
 
 import (
 	"context"
-	"fmt"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-var analyticsUserSeq atomic.Int64
-
 // setupProfile creates a user + artist profile and returns the profile UUID string.
 func setupProfile(t *testing.T, db *pgxpool.Pool) string {
 	t.Helper()
-	email := fmt.Sprintf("t-%d@t.local", analyticsUserSeq.Add(1))
-	hash, err := bcrypt.GenerateFromPassword([]byte("pw"), bcrypt.MinCost)
-	require.NoError(t, err)
-	hs := string(hash)
+	userID, _, _ := testutil.CreateUser(t, db)
 	q := sqlcdb.New(db)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hs,
-	})
-	require.NoError(t, err)
 	profile, err := q.CreateArtistProfile(context.Background(), sqlcdb.CreateArtistProfileParams{
-		UserID:      user.ID,
+		UserID:      toPgUUID(t, userID),
 		DisplayName: "Test Artist",
 	})
 	require.NoError(t, err)

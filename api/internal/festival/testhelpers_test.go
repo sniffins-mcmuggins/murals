@@ -10,15 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
-	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
+	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-const testSecret = "test-secret-key"
+const testSecret = testutil.TestSecret
 
-var testUserSeq, testFestSeq atomic.Int64
+var testFestSeq atomic.Int64
 
 func pgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -30,27 +29,7 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 }
 
 func createTestUser(t *testing.T, pool *pgxpool.Pool) (userID, token, email string) {
-	t.Helper()
-	email = fmt.Sprintf("t-%d@t.local", testUserSeq.Add(1))
-	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("bcrypt: %v", err)
-	}
-	hashStr := string(hash)
-	q := sqlcdb.New(pool)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hashStr,
-	})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, user.IsAdmin, user.SessionVersion, testSecret)
-	if err != nil {
-		t.Fatalf("issue token: %v", err)
-	}
-	return userID, token, email
+	return testutil.CreateUser(t, pool)
 }
 
 func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, status string) (festID, slug string) {

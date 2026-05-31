@@ -2,7 +2,6 @@ package auth_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,26 +15,14 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-const testSecret = "test-secret"
+const testSecret = testutil.TestSecret
 
 // createUserAndIssueToken creates a real user row and returns the user's UUID
 // (as a string, suitable for JWT subject) plus a valid token bound to that
 // user's current session_version. The auth middleware reads the row from the
 // DB to validate the embedded sv, so the token has to refer to a real user.
-func createUserAndIssueToken(t *testing.T, db *pgxpool.Pool, isAdmin bool) (userID, token, email string) {
-	t.Helper()
-	email = fmt.Sprintf("t-%d@t.local", authUserSeq.Add(1))
-	q := sqlcdb.New(db)
-	pwHash := "x"
-	user, err := q.CreateUser(t.Context(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &pwHash,
-	})
-	require.NoError(t, err)
-	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, isAdmin, user.SessionVersion, testSecret)
-	require.NoError(t, err)
-	return userID, token, email
+func createUserAndIssueToken(t *testing.T, db *pgxpool.Pool, _ bool) (userID, token, email string) {
+	return testutil.CreateUser(t, db)
 }
 
 func TestMiddleware_ValidCookie(t *testing.T) {
