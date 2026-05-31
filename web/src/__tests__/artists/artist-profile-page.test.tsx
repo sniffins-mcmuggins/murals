@@ -32,6 +32,7 @@ const mockProfile: components['schemas']['ArtistProfile'] = {
   user_id: 'user-uuid-456',
   display_name: 'Alice Muralist',
   bio: 'A street artist from Bristol.',
+  visibility: 'public',
   location_label: 'Bristol, UK',
   medium_tags: ['mural', 'stencil'],
   social_links: { instagram: 'https://instagram.com/alice' },
