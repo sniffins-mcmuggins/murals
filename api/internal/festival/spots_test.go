@@ -27,9 +27,9 @@ type spotsScenario struct {
 
 func setupSpotsScenario(t *testing.T, db *pgxpool.Pool) spotsScenario {
 	t.Helper()
-	orgID, orgToken := createTestUser(t, db, "spotorg@example.com")
-	festID := createTestFestival(t, db, orgID, "spot-festival", "open")
-	artistUserID, _ := createTestUser(t, db, "spotartist@example.com")
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	artistUserID, _, _ := createTestUser(t, db)
 	artistProfileID := createTestArtistProfile(t, db, artistUserID, "Spot Artist")
 	q := sqlcdb.New(db)
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
@@ -90,7 +90,7 @@ func TestGetSpots_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupSpotsScenario(t, db)
-	_, other := createTestUser(t, db, "spotsother@example.com")
+	_, other, _ := createTestUser(t, db)
 	srv := newSpotsServer(db)
 	t.Cleanup(srv.Close)
 
@@ -288,7 +288,7 @@ func TestSetSpotArtist_422ForNonAcceptedArtist(t *testing.T) {
 	db := testutil.NewDB(t)
 	sc := setupSpotsScenario(t, db)
 
-	otherUserID, _ := createTestUser(t, db, "spotuninvited@example.com")
+	otherUserID, _, _ := createTestUser(t, db)
 	otherProfileID := createTestArtistProfile(t, db, otherUserID, "Uninvited Artist")
 
 	srv := newSpotsServer(db)

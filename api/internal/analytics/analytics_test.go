@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
@@ -18,22 +17,10 @@ import (
 // setupProfile creates a user + artist profile and returns the profile UUID string.
 func setupProfile(t *testing.T, db *pgxpool.Pool) string {
 	t.Helper()
-	return setupProfileEmail(t, db, "artist@example.com")
-}
-
-func setupProfileEmail(t *testing.T, db *pgxpool.Pool, email string) string {
-	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte("pw"), bcrypt.MinCost)
-	require.NoError(t, err)
-	hs := string(hash)
+	userID, _, _ := testutil.CreateUser(t, db)
 	q := sqlcdb.New(db)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hs,
-	})
-	require.NoError(t, err)
 	profile, err := q.CreateArtistProfile(context.Background(), sqlcdb.CreateArtistProfileParams{
-		UserID:      user.ID,
+		UserID:      toPgUUID(t, userID),
 		DisplayName: "Test Artist",
 	})
 	require.NoError(t, err)
@@ -87,7 +74,7 @@ func TestGetCounts_ExcludesOtherProfiles(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	profileA := setupProfile(t, db)
-	profileB := setupProfileEmail(t, db, "other@example.com")
+	profileB := setupProfile(t, db)
 
 	require.NoError(t, analytics.RecordEvent(context.Background(), db, analytics.EventProfileView, profileA))
 	require.NoError(t, analytics.RecordEvent(context.Background(), db, analytics.EventProfileView, profileB))

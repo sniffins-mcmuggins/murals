@@ -45,7 +45,7 @@ func TestProfileQR_Unauthenticated(t *testing.T) {
 func TestProfileQR_NoProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := createTestUser(t, db, "qr-noprofile@example.com")
+	_, token := createTestUser(t, db)
 	handler := auth.Middleware(db, testSecret)(artist.ProfileQRHandler(db, testWebBase))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/profiles/me/qr", nil)
@@ -59,7 +59,7 @@ func TestProfileQR_NoProfile(t *testing.T) {
 func TestProfileQR_ReturnsPNG(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := createTestUser(t, db, "qr-ok@example.com")
+	userID, token := createTestUser(t, db)
 	createTestProfile(t, db, userID, "QR Artist")
 	handler := auth.Middleware(db, testSecret)(artist.ProfileQRHandler(db, testWebBase))
 

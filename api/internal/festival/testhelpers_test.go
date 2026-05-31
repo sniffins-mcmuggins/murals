@@ -2,19 +2,22 @@ package festival_test
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
-	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
+	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-const testSecret = "test-secret-key"
+const testSecret = testutil.TestSecret
+
+var testFestSeq atomic.Int64
 
 func pgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -25,31 +28,13 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
 }
 
-func createTestUser(t *testing.T, pool *pgxpool.Pool, email string) (userID string, token string) {
-	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("bcrypt: %v", err)
-	}
-	hashStr := string(hash)
-	q := sqlcdb.New(pool)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hashStr,
-	})
-	if err != nil {
-		t.Fatalf("create user %s: %v", email, err)
-	}
-	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, user.IsAdmin, user.SessionVersion, testSecret)
-	if err != nil {
-		t.Fatalf("issue token: %v", err)
-	}
-	return userID, token
+func createTestUser(t *testing.T, pool *pgxpool.Pool) (userID, token, email string) {
+	return testutil.CreateUser(t, pool)
 }
 
-func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, slug, status string) string {
+func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, status string) (festID, slug string) {
 	t.Helper()
+	slug = fmt.Sprintf("fest-%d", testFestSeq.Add(1))
 	q := sqlcdb.New(pool)
 	fest, err := q.CreateFestival(context.Background(), sqlcdb.CreateFestivalParams{
 		OrganiserID:   pgUUID(t, organiserID),
@@ -60,9 +45,9 @@ func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, slug, sta
 		Status:        sqlcdb.FestivalStatus(status),
 	})
 	if err != nil {
-		t.Fatalf("create festival %s: %v", slug, err)
+		t.Fatalf("create festival: %v", err)
 	}
-	return fest.ID.String()
+	return fest.ID.String(), slug
 }
 
 func createTestArtistProfile(t *testing.T, pool *pgxpool.Pool, userID, displayName string) string {

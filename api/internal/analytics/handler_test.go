@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/analytics"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -20,7 +19,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-const handlerSecret = "test-secret"
+const handlerSecret = testutil.TestSecret
 
 func toPgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -29,20 +28,9 @@ func toPgUUID(t *testing.T, s string) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
 }
 
-func makeUser(t *testing.T, db *pgxpool.Pool, email string) (userID, token string) {
-	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte("pw"), bcrypt.MinCost)
-	require.NoError(t, err)
-	hs := string(hash)
-	q := sqlcdb.New(db)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hs,
-	})
-	require.NoError(t, err)
-	token, err = auth.IssueToken(user.ID.String(), user.IsAdmin, user.SessionVersion, handlerSecret)
-	require.NoError(t, err)
-	return user.ID.String(), token
+func makeUser(t *testing.T, db *pgxpool.Pool) (userID, token string) {
+	userID, token, _ = testutil.CreateUser(t, db)
+	return userID, token
 }
 
 func makeProfile(t *testing.T, db *pgxpool.Pool, userID string) string {
@@ -82,7 +70,7 @@ func TestMyAnalyticsHandler_Unauthenticated(t *testing.T) {
 func TestMyAnalyticsHandler_NoProfile_Returns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, token := makeUser(t, db, "no-profile@example.com")
+	_, token := makeUser(t, db)
 	handler := auth.Middleware(db, handlerSecret)(analytics.MyAnalyticsHandler(db))
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/profiles/me/analytics", nil)
@@ -96,7 +84,7 @@ func TestMyAnalyticsHandler_NoProfile_Returns404(t *testing.T) {
 func TestMyAnalyticsHandler_FreeUser_90DayWindow(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := makeUser(t, db, "free@example.com")
+	userID, token := makeUser(t, db)
 	profileID := makeProfile(t, db, userID)
 
 	require.NoError(t, analytics.RecordEvent(context.Background(), db, analytics.EventProfileView, profileID))
@@ -120,7 +108,7 @@ func TestMyAnalyticsHandler_FreeUser_90DayWindow(t *testing.T) {
 func TestMyAnalyticsHandler_ProUser_2YearWindow(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := makeUser(t, db, "pro@example.com")
+	userID, token := makeUser(t, db)
 	profileID := makeProfile(t, db, userID)
 	grantPro(t, db, userID)
 
@@ -149,7 +137,7 @@ func TestMyAnalyticsHandler_ProUser_2YearWindow(t *testing.T) {
 func TestMyAnalyticsHandler_ZeroCountsWhenNoEvents(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID, token := makeUser(t, db, "empty@example.com")
+	userID, token := makeUser(t, db)
 	makeProfile(t, db, userID)
 
 	handler := auth.Middleware(db, handlerSecret)(analytics.MyAnalyticsHandler(db))

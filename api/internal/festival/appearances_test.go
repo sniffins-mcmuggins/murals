@@ -34,8 +34,8 @@ func TestListArtistFestivals_AcceptedAppears(t *testing.T) {
 	db := testutil.NewDB(t)
 	q := sqlcdb.New(db)
 
-	orgID, _ := createTestUser(t, db, "appear-org-1@example.com")
-	artistUserID, _ := createTestUser(t, db, "appear-artist-1@example.com")
+	orgID, _, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Lady Gabe")
 
 	start := time.Date(2027, 10, 1, 0, 0, 0, 0, time.UTC)
@@ -88,11 +88,11 @@ func TestListArtistFestivals_AssignedSpotAppears(t *testing.T) {
 	db := testutil.NewDB(t)
 	q := sqlcdb.New(db)
 
-	orgID, _ := createTestUser(t, db, "appear-org-2@example.com")
-	artistUserID, _ := createTestUser(t, db, "appear-artist-2@example.com")
+	orgID, _, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Spot Artist")
 
-	festID := createTestFestival(t, db, orgID, "spot-fest-live", "live")
+	festID, _ := createTestFestival(t, db, orgID, "live")
 
 	// Artist has an assigned spot but no festival_artists row.
 	lat := pgtype.Numeric{}
@@ -132,11 +132,11 @@ func TestListArtistFestivals_ExcludesDeclinedAndPending(t *testing.T) {
 	db := testutil.NewDB(t)
 	q := sqlcdb.New(db)
 
-	orgID, _ := createTestUser(t, db, "appear-org-3@example.com")
-	artistUserID, _ := createTestUser(t, db, "appear-artist-3@example.com")
+	orgID, _, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Rejected Artist")
 
-	declinedFest := createTestFestival(t, db, orgID, "declined-fest-live", "live")
+	declinedFest, _ := createTestFestival(t, db, orgID, "live")
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, declinedFest),
 		ArtistID:   pgUUID(t, artistID),
@@ -144,7 +144,7 @@ func TestListArtistFestivals_ExcludesDeclinedAndPending(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	invitedFest := createTestFestival(t, db, orgID, "invited-fest-live", "live")
+	invitedFest, _ := createTestFestival(t, db, orgID, "live")
 	_, err = q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, invitedFest),
 		ArtistID:   pgUUID(t, artistID),
@@ -170,13 +170,13 @@ func TestListArtistFestivals_ExcludesNonPublicFestivals(t *testing.T) {
 	db := testutil.NewDB(t)
 	q := sqlcdb.New(db)
 
-	orgID, _ := createTestUser(t, db, "appear-org-4@example.com")
-	artistUserID, _ := createTestUser(t, db, "appear-artist-4@example.com")
+	orgID, _, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Draft Artist")
 
 	// Accepted at a draft festival and an archived one — neither is public.
-	for i, status := range []string{"draft", "archived"} {
-		festID := createTestFestival(t, db, orgID, "nonpublic-fest-"+string(rune('a'+i)), status)
+	for _, status := range []string{"draft", "archived"} {
+		festID, _ := createTestFestival(t, db, orgID, status)
 		_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 			FestivalID: pgUUID(t, festID),
 			ArtistID:   pgUUID(t, artistID),
@@ -203,11 +203,11 @@ func TestListArtistFestivals_OpenFestivalHasNoMapSlug(t *testing.T) {
 	db := testutil.NewDB(t)
 	q := sqlcdb.New(db)
 
-	orgID, _ := createTestUser(t, db, "appear-org-5@example.com")
-	artistUserID, _ := createTestUser(t, db, "appear-artist-5@example.com")
+	orgID, _, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Open Artist")
 
-	openFest := createTestFestival(t, db, orgID, "open-appear-fest", "open")
+	openFest, _ := createTestFestival(t, db, orgID, "open")
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, openFest),
 		ArtistID:   pgUUID(t, artistID),
@@ -236,7 +236,7 @@ func TestListArtistFestivals_EmptyArrayNotNull(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	artistUserID, _ := createTestUser(t, db, "appear-artist-6@example.com")
+	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Lonely Artist")
 
 	r := chi.NewRouter()

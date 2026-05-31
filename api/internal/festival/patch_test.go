@@ -44,7 +44,7 @@ func TestPatchApplicationFlags_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
-	_, otherToken := createTestUser(t, db, "patchother@example.com")
+	_, otherToken, _ := createTestUser(t, db)
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -67,7 +67,7 @@ func TestReorderApplications(t *testing.T) {
 	sc := setupReviewScenario(t, db)
 
 	// Create second artist + application in same festival
-	artistID2, _ := createTestUser(t, db, "reorder-artist2@example.com")
+	artistID2, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID2, "Reorder Artist 2")
 	appID2 := createTestApplicationInFestival(t, db, sc.festID, artistID2)
 

@@ -42,7 +42,7 @@ func TestWaitlistApplication_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
-	_, otherToken := createTestUser(t, db, "waitother@example.com")
+	_, otherToken, _ := createTestUser(t, db)
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))

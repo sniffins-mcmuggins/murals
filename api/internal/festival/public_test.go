@@ -17,11 +17,11 @@ import (
 func TestListPublicFestivals(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "pub-org@example.com")
+	orgID, _, _ := createTestUser(t, db)
 
 	// Create one live and one draft festival
-	createTestFestival(t, db, orgID, "live-fest-2027", "live")
-	createTestFestival(t, db, orgID, "draft-fest-2027", "draft")
+	_, liveSlug := createTestFestival(t, db, orgID, "live")
+	createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Get("/public/festivals", festival.ListPublicHandler(db))
@@ -36,16 +36,16 @@ func TestListPublicFestivals(t *testing.T) {
 	_ = resp.Body.Close()
 
 	assert.Len(t, body, 1)
-	assert.Equal(t, "live-fest-2027", body[0]["slug"])
+	assert.Equal(t, liveSlug, body[0]["slug"])
 }
 
 func TestListPublicFestivals_StatusFilter(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "pub-org2@example.com")
+	orgID, _, _ := createTestUser(t, db)
 
-	createTestFestival(t, db, orgID, "open-fest-2027", "open")
-	createTestFestival(t, db, orgID, "live-fest2-2027", "live")
+	_, openSlug := createTestFestival(t, db, orgID, "open")
+	createTestFestival(t, db, orgID, "live")
 
 	r := chi.NewRouter()
 	r.Get("/public/festivals", festival.ListPublicHandler(db))
@@ -60,7 +60,7 @@ func TestListPublicFestivals_StatusFilter(t *testing.T) {
 	_ = resp.Body.Close()
 
 	assert.Len(t, body, 1)
-	assert.Equal(t, "open-fest-2027", body[0]["slug"])
+	assert.Equal(t, openSlug, body[0]["slug"])
 }
 
 func TestListPublicFestivals_InvalidStatus(t *testing.T) {

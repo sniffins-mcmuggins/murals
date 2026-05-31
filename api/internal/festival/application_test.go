@@ -19,12 +19,12 @@ import (
 func TestSubmitApplication_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "applyorg@example.com")
-	festID := createTestFestival(t, db, orgID, "apply-fest", "open")
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 	createTestApplicationFormWithFields(t, db, festID,
 		`[{"id":"q1","label":"Why?","type":"long_text","required":true}]`)
 
-	artistID, artistToken := createTestUser(t, db, "applyartist@example.com")
+	artistID, artistToken, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Apply Artist")
 
 	r := chi.NewRouter()
@@ -43,12 +43,12 @@ func TestSubmitApplication_Success(t *testing.T) {
 func TestSubmitApplication_MissingRequiredField(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "applyorg2@example.com")
-	festID := createTestFestival(t, db, orgID, "apply-fest2", "open")
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 	createTestApplicationFormWithFields(t, db, festID,
 		`[{"id":"q1","label":"Why?","type":"long_text","required":true}]`)
 
-	artistID, artistToken := createTestUser(t, db, "applyartist2@example.com")
+	artistID, artistToken, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Apply Artist 2")
 
 	r := chi.NewRouter()
@@ -68,11 +68,11 @@ func TestSubmitApplication_MissingRequiredField(t *testing.T) {
 func TestSubmitApplication_DuplicateReturns409(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "applyorg3@example.com")
-	festID := createTestFestival(t, db, orgID, "apply-fest3", "open")
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 
-	artistID, artistToken := createTestUser(t, db, "applyartist3@example.com")
+	artistID, artistToken, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Apply Artist 3")
 
 	r := chi.NewRouter()
@@ -96,12 +96,12 @@ func TestSubmitApplication_DuplicateReturns409(t *testing.T) {
 func TestSubmitApplication_NoArtistProfile_Returns409(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "applyorg-noprofile@example.com")
-	festID := createTestFestival(t, db, orgID, "apply-fest-noprofile", "open")
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 
 	// User created, but NO artist profile.
-	_, userToken := createTestUser(t, db, "apply-noprofile@example.com")
+	_, userToken, _ := createTestUser(t, db)
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))

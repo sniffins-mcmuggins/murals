@@ -27,11 +27,11 @@ type reviewScenario struct {
 
 func setupReviewScenario(t *testing.T, db *pgxpool.Pool) reviewScenario {
 	t.Helper()
-	orgID, orgToken := createTestUser(t, db, "revorg@example.com")
-	festID := createTestFestival(t, db, orgID, "review-fest", "open")
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 
-	artistID, _ := createTestUser(t, db, "revartist@example.com")
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Review Artist")
 
 	// Insert application directly via sqlc
@@ -132,7 +132,7 @@ func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
-	_, otherToken := createTestUser(t, db, "revother@example.com")
+	_, otherToken, _ := createTestUser(t, db)
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -158,12 +158,12 @@ func TestListApplications_AnonymousReview_StripsIdentityForUnscored(t *testing.T
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, _ := createTestUser(t, db, "anon-owner-1@test")
-	revID, revTok := createTestUser(t, db, "anon-rev-1@test")
-	artistID, _ := createTestUser(t, db, "anon-art-1@test")
+	ownerID, _, _ := createTestUser(t, db)
+	revID, revTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Real Name")
 
-	festID := createTestFestival(t, db, ownerID, "anon-fest-1", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	setFormAnonymousReview(t, db, festID, true)
 	createTestApplicationInFestival(t, db, festID, artistID)
@@ -191,12 +191,12 @@ func TestListApplications_AnonymousReview_RevealsAfterScore(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, _ := createTestUser(t, db, "anon-owner-2@test")
-	revID, revTok := createTestUser(t, db, "anon-rev-2@test")
-	artistID, _ := createTestUser(t, db, "anon-art-2@test")
+	ownerID, _, _ := createTestUser(t, db)
+	revID, revTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Real Name 2")
 
-	festID := createTestFestival(t, db, ownerID, "anon-fest-2", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	setFormAnonymousReview(t, db, festID, true)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
@@ -228,11 +228,11 @@ func TestListApplications_AnonymousReview_OwnerAlwaysSeesFull(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, ownerTok := createTestUser(t, db, "anon-owner-3@test")
-	artistID, _ := createTestUser(t, db, "anon-art-3@test")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Real Name 3")
 
-	festID := createTestFestival(t, db, ownerID, "anon-fest-3", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	setFormAnonymousReview(t, db, festID, true)
 	createTestApplicationInFestival(t, db, festID, artistID)
@@ -257,12 +257,12 @@ func TestListApplications_AnonymousReview_OffShowsFullIdentity(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, _ := createTestUser(t, db, "anon-owner-4@test")
-	revID, revTok := createTestUser(t, db, "anon-rev-4@test")
-	artistID, _ := createTestUser(t, db, "anon-art-4@test")
+	ownerID, _, _ := createTestUser(t, db)
+	revID, revTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "Real Name 4")
 
-	festID := createTestFestival(t, db, ownerID, "anon-fest-4", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	// anonymous_review is false by default — do NOT call setFormAnonymousReview
 	createTestApplicationInFestival(t, db, festID, artistID)
@@ -307,12 +307,12 @@ func TestListApplications_CriterionScores_PopulatedAfterScoring(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, ownerTok := createTestUser(t, db, "cs-owner-1@test")
-	revID, revTok := createTestUser(t, db, "cs-rev-1@test")
-	artistID, _ := createTestUser(t, db, "cs-art-1@test")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	revID, revTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "CS Artist 1")
 
-	festID := createTestFestival(t, db, ownerID, "cs-fest-1", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	setCriteria(t, db, festID, `[{"id":"art","label":"Artistic Quality","min":1,"max":5},{"id":"feas","label":"Feasibility","min":1,"max":5}]`)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
@@ -360,11 +360,11 @@ func TestListApplications_CriterionScores_EmptyWhenNoCriteria(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, ownerTok := createTestUser(t, db, "cs-owner-2@test")
-	artistID, _ := createTestUser(t, db, "cs-art-2@test")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "CS Artist 2")
 
-	festID := createTestFestival(t, db, ownerID, "cs-fest-2", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	createTestApplicationInFestival(t, db, festID, artistID)
 
@@ -386,13 +386,13 @@ func TestListApplications_TopLevelAvg_IsMeanOfCriterionAverages(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, ownerTok := createTestUser(t, db, "cs-owner-avg@test")
-	rev1ID, rev1Tok := createTestUser(t, db, "cs-rev-avg1@test")
-	rev2ID, rev2Tok := createTestUser(t, db, "cs-rev-avg2@test")
-	artistID, _ := createTestUser(t, db, "cs-art-avg@test")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	rev1ID, rev1Tok, _ := createTestUser(t, db)
+	rev2ID, rev2Tok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "CS Artist Avg")
 
-	festID := createTestFestival(t, db, ownerID, "cs-fest-avg", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	setCriteria(t, db, festID, `[{"id":"art","label":"Artistic","min":1,"max":5},{"id":"feas","label":"Feasibility","min":1,"max":5}]`)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
@@ -423,12 +423,12 @@ func TestListApplications_OrphanedCriterionScores_Omitted(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	ownerID, ownerTok := createTestUser(t, db, "cs-owner-3@test")
-	revID, revTok := createTestUser(t, db, "cs-rev-3@test")
-	artistID, _ := createTestUser(t, db, "cs-art-3@test")
+	ownerID, ownerTok, _ := createTestUser(t, db)
+	revID, revTok, _ := createTestUser(t, db)
+	artistID, _, _ := createTestUser(t, db)
 	createTestArtistProfile(t, db, artistID, "CS Artist 3")
 
-	festID := createTestFestival(t, db, ownerID, "cs-fest-3", "open")
+	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
 	setCriteria(t, db, festID, `[{"id":"temp","label":"Temp","min":1,"max":5}]`)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)

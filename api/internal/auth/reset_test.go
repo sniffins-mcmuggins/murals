@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -44,12 +45,12 @@ func (s *stubSender) getSent() []string {
 func TestForgotPassword_KnownEmail(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	createTestUser(t, db, "alice@example.com", "password123")
+	email := createTestUser(t, db, "password123")
 	sender := &stubSender{}
 	handler := auth.ForgotPasswordHandler(db, sender, "")
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/forgot-password",
-		bytes.NewBufferString(`{"email":"alice@example.com"}`))
+		bytes.NewBufferString(fmt.Sprintf(`{"email":%q}`, email)))
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -57,7 +58,7 @@ func TestForgotPassword_KnownEmail(t *testing.T) {
 	assert.Equal(t, http.StatusAccepted, w.Code)
 	// Email is sent in a goroutine — give it a moment
 	require.Eventually(t, func() bool { return len(sender.getSent()) == 1 }, 2*time.Second, 50*time.Millisecond)
-	assert.Equal(t, "alice@example.com", sender.getSent()[0])
+	assert.Equal(t, email, sender.getSent()[0])
 }
 
 func TestForgotPassword_UnknownEmail_StillAccepted(t *testing.T) {
@@ -100,11 +101,11 @@ func TestResetPassword_InvalidToken(t *testing.T) {
 func TestResetPassword_InvalidatesOldSessions(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	_, oldToken := signupAndLogin(t, db, "session-invalidate@example.com", "password123")
+	_, oldToken, siEmail := signupAndLogin(t, db, "password123")
 
 	// Build a reset token directly (skipping the email step).
 	q := sqlcdb.New(db)
-	user, err := q.GetUserByEmail(t.Context(), "session-invalidate@example.com")
+	user, err := q.GetUserByEmail(t.Context(), siEmail)
 	require.NoError(t, err)
 
 	rawToken := make([]byte, 32)
@@ -148,7 +149,7 @@ func TestResetPassword_InvalidatesOldSessions(t *testing.T) {
 
 	// Logging in with the new password yields a token that DOES authenticate.
 	newLogin := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/login",
-		strings.NewReader(`{"email":"session-invalidate@example.com","password":"differentpassword456"}`))
+		strings.NewReader(fmt.Sprintf(`{"email":%q,"password":"differentpassword456"}`, siEmail)))
 	newLogin.Header.Set("Content-Type", "application/json")
 	newW := httptest.NewRecorder()
 	auth.LoginHandler(db, testSecret).ServeHTTP(newW, newLogin)

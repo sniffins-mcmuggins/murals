@@ -3,8 +3,10 @@ package me_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
@@ -12,13 +14,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/me"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
+
+var testFestSeq atomic.Int64
 
 func pgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -29,22 +32,9 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
 }
 
-func createTestUser(t *testing.T, pool *pgxpool.Pool, email string) string {
-	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("bcrypt: %v", err)
-	}
-	hashStr := string(hash)
-	q := sqlcdb.New(pool)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hashStr,
-	})
-	if err != nil {
-		t.Fatalf("create user %s: %v", email, err)
-	}
-	return user.ID.String()
+func createTestUser(t *testing.T, pool *pgxpool.Pool) string {
+	userID, _, _ := testutil.CreateUser(t, pool)
+	return userID
 }
 
 func createTestArtistProfile(t *testing.T, pool *pgxpool.Pool, userID, displayName string) string {
@@ -60,8 +50,9 @@ func createTestArtistProfile(t *testing.T, pool *pgxpool.Pool, userID, displayNa
 	return profile.ID.String()
 }
 
-func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, name, slug string) string {
+func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, name string) (festID, slug string) {
 	t.Helper()
+	slug = fmt.Sprintf("fest-%d", testFestSeq.Add(1))
 	q := sqlcdb.New(pool)
 	fest, err := q.CreateFestival(context.Background(), sqlcdb.CreateFestivalParams{
 		OrganiserID:   pgUUID(t, organiserID),
@@ -72,15 +63,15 @@ func createTestFestival(t *testing.T, pool *pgxpool.Pool, organiserID, name, slu
 		Status:        sqlcdb.FestivalStatus("draft"),
 	})
 	if err != nil {
-		t.Fatalf("create festival %s: %v", slug, err)
+		t.Fatalf("create festival: %v", err)
 	}
-	return fest.ID.String()
+	return fest.ID.String(), slug
 }
 
 func TestSummary_NoProfileNoFestivals(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID := createTestUser(t, db, "alice@example.com")
+	userID := createTestUser(t, db)
 
 	handler := me.SummaryHandler(db)
 	ctx := auth.WithUserForTest(t.Context(), userID, false)
@@ -101,7 +92,7 @@ func TestSummary_NoProfileNoFestivals(t *testing.T) {
 func TestSummary_WithProfile(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID := createTestUser(t, db, "bob@example.com")
+	userID := createTestUser(t, db)
 	profileID := createTestArtistProfile(t, db, userID, "Bob the Painter")
 
 	handler := me.SummaryHandler(db)
@@ -127,8 +118,8 @@ func TestSummary_WithProfile(t *testing.T) {
 func TestSummary_WithFestivals(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	userID := createTestUser(t, db, "carol@example.com")
-	festID := createTestFestival(t, db, userID, "My Festival", "my-festival")
+	userID := createTestUser(t, db)
+	festID, slug := createTestFestival(t, db, userID, "My Festival")
 
 	handler := me.SummaryHandler(db)
 	ctx := auth.WithUserForTest(t.Context(), userID, false)
@@ -151,7 +142,7 @@ func TestSummary_WithFestivals(t *testing.T) {
 	require.Len(t, body.Festivals, 1)
 	assert.Equal(t, festID, body.Festivals[0].ID)
 	assert.Equal(t, "My Festival", body.Festivals[0].Name)
-	assert.Equal(t, "my-festival", body.Festivals[0].Slug)
+	assert.Equal(t, slug, body.Festivals[0].Slug)
 	assert.Equal(t, "draft", body.Festivals[0].Status)
 }
 

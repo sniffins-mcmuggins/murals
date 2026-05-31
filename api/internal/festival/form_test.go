@@ -18,8 +18,8 @@ import (
 func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgToken := createTestUser(t, db, "formorg@example.com")
-	festID := createTestFestival(t, db, orgID, "form-test-fest", "draft")
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -51,9 +51,9 @@ func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "formorg2@example.com")
-	_, otherToken := createTestUser(t, db, "formorg3@example.com")
-	festID := createTestFestival(t, db, orgID, "form-test-fest2", "draft")
+	orgID, _, _ := createTestUser(t, db)
+	_, otherToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -70,8 +70,8 @@ func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 func TestGetForm_Public(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "formorg4@example.com")
-	festID := createTestFestival(t, db, orgID, "form-test-fest3", "draft")
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
@@ -93,8 +93,8 @@ func TestGetForm_Public(t *testing.T) {
 func TestGetForm_NotFound(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "formorg5@example.com")
-	festID := createTestFestival(t, db, orgID, "form-no-form", "draft")
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
@@ -111,9 +111,9 @@ func TestGetForm_NotFound(t *testing.T) {
 func TestPatchForm_AnonymousReview_RequiresOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, _ := createTestUser(t, db, "patchform-org1@test")
-	_, otherTok := createTestUser(t, db, "patchform-other1@test")
-	festID := createTestFestival(t, db, orgID, "patchform-fest1", "draft")
+	orgID, _, _ := createTestUser(t, db)
+	_, otherTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
@@ -130,8 +130,8 @@ func TestPatchForm_AnonymousReview_RequiresOwner(t *testing.T) {
 func TestPatchForm_AnonymousReview_TogglesOn(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "patchform-org2@test")
-	festID := createTestFestival(t, db, orgID, "patchform-fest2", "draft")
+	orgID, orgTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
@@ -162,8 +162,8 @@ func TestPatchForm_AnonymousReview_TogglesOn(t *testing.T) {
 func TestPatchForm_AnonymousReview_404_NoForm(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "patchform-org3@test")
-	festID := createTestFestival(t, db, orgID, "patchform-fest3", "draft")
+	orgID, orgTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	// No form created
 
 	r := chi.NewRouter()
@@ -180,8 +180,8 @@ func TestPatchForm_AnonymousReview_404_NoForm(t *testing.T) {
 func TestPatchForm_Criteria_AddAndList(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "crit-org-1@test")
-	festID := createTestFestival(t, db, orgID, "crit-fest-1", "draft")
+	orgID, orgTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
@@ -210,8 +210,8 @@ func TestPatchForm_Criteria_AddAndList(t *testing.T) {
 func TestPatchForm_Criteria_LabelCollisionGetsUniqueID(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "crit-org-2@test")
-	festID := createTestFestival(t, db, orgID, "crit-fest-2", "draft")
+	orgID, orgTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
@@ -236,8 +236,8 @@ func TestPatchForm_Criteria_LabelCollisionGetsUniqueID(t *testing.T) {
 func TestPatchForm_Criteria_ThreeDuplicateLabels_SequentialIDs(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "crit-org-4@test")
-	festID := createTestFestival(t, db, orgID, "crit-fest-4", "draft")
+	orgID, orgTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()
@@ -265,9 +265,9 @@ func TestPatchForm_Criteria_ThreeDuplicateLabels_SequentialIDs(t *testing.T) {
 func TestGetForm_ReviewerSeesReviewCriteria(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "gf-rc-org@test")
-	revID, revTok := createTestUser(t, db, "gf-rc-rev@test")
-	festID := createTestFestival(t, db, orgID, "gf-rc-fest", "open")
+	orgID, orgTok, _ := createTestUser(t, db)
+	revID, revTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
 	createTestApplicationForm(t, db, festID)
 	addReviewer(t, db, festID, revID)
 
@@ -307,8 +307,8 @@ func TestGetForm_ReviewerSeesReviewCriteria(t *testing.T) {
 func TestPatchForm_Criteria_Validation_MaxTooLarge(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	orgID, orgTok := createTestUser(t, db, "crit-org-3@test")
-	festID := createTestFestival(t, db, orgID, "crit-fest-3", "draft")
+	orgID, orgTok, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
 	createTestApplicationForm(t, db, festID)
 
 	r := chi.NewRouter()

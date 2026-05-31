@@ -9,13 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bcrypt"
 
-	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
+	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
-const testSecret = "test-secret-key"
+const testSecret = testutil.TestSecret
 
 func pgUUID(t *testing.T, s string) pgtype.UUID {
 	t.Helper()
@@ -26,26 +25,8 @@ func pgUUID(t *testing.T, s string) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
 }
 
-func createTestUser(t *testing.T, pool *pgxpool.Pool, email string) (userID string, token string) {
-	t.Helper()
-	hash, err := bcrypt.GenerateFromPassword([]byte("hunter2hunter"), bcrypt.MinCost)
-	if err != nil {
-		t.Fatalf("bcrypt: %v", err)
-	}
-	hashStr := string(hash)
-	q := sqlcdb.New(pool)
-	user, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email:        email,
-		PasswordHash: &hashStr,
-	})
-	if err != nil {
-		t.Fatalf("create user %s: %v", email, err)
-	}
-	userID = user.ID.String()
-	token, err = auth.IssueToken(userID, user.IsAdmin, user.SessionVersion, testSecret)
-	if err != nil {
-		t.Fatalf("issue token: %v", err)
-	}
+func createTestUser(t *testing.T, pool *pgxpool.Pool) (userID string, token string) {
+	userID, token, _ = testutil.CreateUser(t, pool)
 	return userID, token
 }
 
@@ -68,19 +49,14 @@ func pgTimestamptzForArtistTest(t time.Time) pgtype.Timestamptz {
 
 func grantArtistBasic(t *testing.T, pool *pgxpool.Pool, userID string) {
 	t.Helper()
+	grantorID, _, _ := testutil.CreateUser(t, pool)
 	q := sqlcdb.New(pool)
-	hash, _ := bcrypt.GenerateFromPassword([]byte("g"), bcrypt.MinCost)
-	hashStr := string(hash)
-	grantor, err := q.CreateUser(context.Background(), sqlcdb.CreateUserParams{
-		Email: "grantor-" + userID + "@test", PasswordHash: &hashStr,
-	})
-	require.NoError(t, err)
-	_, err = q.CreateAccessGrant(context.Background(), sqlcdb.CreateAccessGrantParams{
+	_, err := q.CreateAccessGrant(context.Background(), sqlcdb.CreateAccessGrantParams{
 		UserID:      pgUUID(t, userID),
 		Plan:        "artist_basic",
 		FestivalID:  pgtype.UUID{},
 		ValidUntil:  pgTimestamptzForArtistTest(time.Now().Add(30 * 24 * time.Hour)),
-		GrantedBy:   grantor.ID,
+		GrantedBy:   pgUUID(t, grantorID),
 		PromoCodeID: pgtype.UUID{},
 		Note:        nil,
 	})
