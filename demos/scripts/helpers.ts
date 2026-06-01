@@ -21,21 +21,17 @@ export async function slowType(
 
 /** Briefly highlight an element with an amber outline before interacting with it */
 export async function highlight(page: Page, selector: string): Promise<void> {
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel)
-    if (!el) return
-    const prev = (el as HTMLElement).style.outline
-    ;(el as HTMLElement).style.outline = '3px solid #f59e0b'
-    setTimeout(() => { (el as HTMLElement).style.outline = prev }, 800)
-  }, selector)
+  const el = page.locator(selector).first()
+  await el.evaluate((node) => {
+    const prev = (node as HTMLElement).style.outline
+    ;(node as HTMLElement).style.outline = '3px solid #f59e0b'
+    setTimeout(() => { (node as HTMLElement).style.outline = prev }, 800)
+  })
   await pause(900)
 }
 
-/** Smooth-scroll an element into view before interacting */
+/** Scroll an element into view before interacting */
 export async function scrollTo(page: Page, selector: string): Promise<void> {
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, selector)
+  await page.locator(selector).first().scrollIntoViewIfNeeded()
   await pause(600)
 }
