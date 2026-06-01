@@ -256,6 +256,7 @@ func main() {
 			r.Get("/promo-codes", admin.ListPromoCodesHandler(pool))
 			r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
 			r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
+			r.Post("/prospects", admin.CreateProspectHandler(pool))
 		})
 
 		// Test-only probe: always enforces beta gate regardless of BETA_MODE env.

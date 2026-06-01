@@ -13,6 +13,7 @@
 - Preview token rotation: `POST /profiles/me/preview-token/rotate` — generates a new token, invalidating any previously shared preview links; owner-only
 - Publish: `POST /profiles/me/publish` — flips draft → public, gated on `billing.CanPublish`; 402 if not entitled
 - Unpublish: `POST /profiles/me/unpublish` — flips public → draft; always allowed
+- Unclaimed prospect profiles: accessible only via preview token; never returned by GET /profiles/{id} or public listing
 
 ## Boundaries
 - Does NOT own subscription/entitlement logic — calls `billing.CanPublish` to check publish eligibility
@@ -28,6 +29,7 @@
 - **Downgrade behaviour**: data exceeding a plan limit is locked (not deleted) when an artist downgrades
 - **Preview token is the secret**: opaque UUID-derived string stored on the profile row; not a JWT, carries no claims. Sharing the URL grants access. Rotating revokes all previously shared links immediately.
 - **`preview_token` omitted from public responses**: `toProfileResponse(p, public=true)` sets `PreviewToken = nil`; only the rotate response (`public=false`) returns it so the owner can copy the new link
+- **Nullable user_id**: profiles owned by nobody until claimed; the partial unique index (WHERE user_id IS NOT NULL) enforces 1:1 user↔profile invariant only for claimed profiles
 
 ## Invariants
 - Public profile read MUST return 404 (not 403) for non-public profiles — information about private profiles must not leak
@@ -35,9 +37,10 @@
 - QR code encodes the public profile URL — always `/p/{profile_id}`, never a route that might change
 - `display_order` must never be assumed unique — ties are broken by `created_at`, and two rows can share the same millisecond
 - `/profiles/me` and `/profiles/preview/{token}` are literal sub-paths — they MUST remain registered before `/{profileID}` in `main.go`
+- GET /profiles/{profileID} MUST 404 for unclaimed profiles (user_id IS NULL) regardless of requester's auth state
 
 ## AI Context
-- `profile.go`: profile CRUD + visibility management + publish gate + `RotatePreviewTokenHandler` + `PreviewByTokenHandler`
+- `profile.go`: profile CRUD + visibility management + publish gate + `RotatePreviewTokenHandler` + `PreviewByTokenHandler`; `toProfileResponse` returns `UserID *string` (null for unclaimed prospects, set since migration 000018)
 - `publish.go`: `PublishHandler`, `UnpublishHandler` — thin wrappers around `SetArtistProfileVisibility` query + billing gate
 - `collection.go`: collection CRUD + reorder
 - `collection_image.go`: image attach/reorder/delete/set-cover — reads `s3_key` from the confirmed image record
@@ -47,5 +50,6 @@
 - Analytics: `profile.go` fires a `profile_view` event on public reads — this calls into the analytics package; do not remove it accidentally when refactoring the public GET handler
 
 ## Changelog
+2026-06-01 — E15.4: nullable user_id, prospect profile visibility invariants
 2026-06-01 — E15.3: publish/unpublish endpoints, preview_token in ArtistProfile response, PublishBar web component
 2026-05-31 — initial spec

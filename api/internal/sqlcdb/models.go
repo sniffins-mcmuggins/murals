@@ -306,6 +306,9 @@ type ArtistProfile struct {
 	HeadlineImageUrls []string           `db:"headline_image_urls" json:"headline_image_urls"`
 	Visibility        string             `db:"visibility" json:"visibility"`
 	PreviewToken      string             `db:"preview_token" json:"preview_token"`
+	ClaimToken        *string            `db:"claim_token" json:"claim_token"`
+	ClaimedAt         pgtype.Timestamptz `db:"claimed_at" json:"claimed_at"`
+	CreatedBy         pgtype.UUID        `db:"created_by" json:"created_by"`
 }
 
 type BetaInvite struct {

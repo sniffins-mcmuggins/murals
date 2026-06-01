@@ -16,12 +16,15 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>('artist')
   const [inviteCode, setInviteCode] = useState('')
+  const [claimToken, setClaimToken] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
   useEffect(() => {
     const code = searchParams.get('invite')
     if (code) setInviteCode(code)
+    const claim = searchParams.get('claim')
+    if (claim) setClaimToken(claim)
   }, [searchParams])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -30,9 +33,15 @@ export default function SignupPage() {
     setPending(true)
 
     try {
-      const body = { email, password, role, ...(inviteCode ? { invite_code: inviteCode } : {}) }
+      const body = { 
+        email, 
+        password, 
+        role, 
+        ...(inviteCode ? { invite_code: inviteCode } : {}),
+        ...(claimToken ? { claim_token: claimToken } : {}),
+      }
 
-      const { response } = await apiClient.POST('/auth/signup', {
+      const { response, data } = await apiClient.POST('/auth/signup', {
         body,
       })
 
@@ -56,8 +65,11 @@ export default function SignupPage() {
         return
       }
 
-      // Redirect to login — user must sign in after signing up.
-      router.push('/login?registered=1')
+      if (data?.claimed_profile_id) {
+        router.push('/login?registered=1&claim=1')
+      } else {
+        router.push('/login?registered=1')
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

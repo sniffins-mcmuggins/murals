@@ -290,10 +290,12 @@ type ArtistProfile struct {
 	MediumTags    []string `json:"medium_tags"`
 
 	// PreviewToken Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses.
-	PreviewToken *string            `json:"preview_token,omitempty"`
-	SocialLinks  map[string]string  `json:"social_links"`
-	UpdatedAt    time.Time          `json:"updated_at"`
-	UserId       openapi_types.UUID `json:"user_id"`
+	PreviewToken *string           `json:"preview_token,omitempty"`
+	SocialLinks  map[string]string `json:"social_links"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+
+	// UserId UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
+	UserId *openapi_types.UUID `json:"user_id,omitempty"`
 
 	// Visibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
 	Visibility ArtistProfileVisibility `json:"visibility"`
@@ -370,6 +372,19 @@ type CreateCollectionRequest struct {
 // CreateProfileRequest defines model for CreateProfileRequest.
 type CreateProfileRequest struct {
 	DisplayName string `json:"displayName"`
+}
+
+// CreateProspectRequest defines model for CreateProspectRequest.
+type CreateProspectRequest struct {
+	Bio         *string `json:"bio,omitempty"`
+	DisplayName string  `json:"display_name"`
+	Images      *[]struct {
+		Caption   *string `json:"caption,omitempty"`
+		SourceUrl string  `json:"source_url"`
+	} `json:"images,omitempty"`
+	LocationLabel *string            `json:"location_label,omitempty"`
+	MediumTags    *[]string          `json:"medium_tags,omitempty"`
+	SocialLinks   *map[string]string `json:"social_links,omitempty"`
 }
 
 // CriterionScore defines model for CriterionScore.
@@ -512,6 +527,13 @@ type ProfileListResponse struct {
 	Total int `json:"total"`
 }
 
+// ProspectResponse defines model for ProspectResponse.
+type ProspectResponse struct {
+	ClaimToken string             `json:"claim_token"`
+	PreviewUrl string             `json:"preview_url"`
+	ProfileId  openapi_types.UUID `json:"profile_id"`
+}
+
 // ReorderCollectionsRequest defines model for ReorderCollectionsRequest.
 type ReorderCollectionsRequest struct {
 	// CollectionIds Ordered list of collection IDs. display_order is set by position (0-indexed).
@@ -545,11 +567,23 @@ type ScoreResponse struct {
 
 // SignupRequest defines model for SignupRequest.
 type SignupRequest struct {
-	Email openapi_types.Email `json:"email"`
+	// ClaimToken Optional. If present, binds a pre-built prospect profile to this new account atomically. 409 if the token has already been claimed.
+	ClaimToken *string             `json:"claim_token,omitempty"`
+	Email      openapi_types.Email `json:"email"`
 
 	// InviteCode Required when the server is in beta mode (BETA_MODE=true). Ignored otherwise.
 	InviteCode *string `json:"invite_code,omitempty"`
 	Password   string  `json:"password"`
+}
+
+// SignupResponse defines model for SignupResponse.
+type SignupResponse struct {
+	// ClaimedProfileId ID of the profile that was bound to this account via claim_token. Absent if no claim_token was provided.
+	ClaimedProfileId *openapi_types.UUID `json:"claimed_profile_id,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	Email            openapi_types.Email `json:"email"`
+	Id               openapi_types.UUID  `json:"id"`
+	IsAdmin          bool                `json:"is_admin"`
 }
 
 // UnassignedArtist defines model for UnassignedArtist.
@@ -745,6 +779,9 @@ type PostWaitlistJSONBody struct {
 	Email openapi_types.Email `json:"email"`
 }
 
+// CreateProspectJSONRequestBody defines body for CreateProspect for application/json ContentType.
+type CreateProspectJSONRequestBody = CreateProspectRequest
+
 // ForgotPasswordJSONRequestBody defines body for ForgotPassword for application/json ContentType.
 type ForgotPasswordJSONRequestBody ForgotPasswordJSONBody
 
@@ -831,6 +868,9 @@ type PostWaitlistJSONRequestBody PostWaitlistJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Create a pre-registered prospect profile (admin only)
+	// (POST /admin/prospects)
+	CreateProspect(w http.ResponseWriter, r *http.Request)
 	// Request password reset email
 	// (POST /auth/forgot-password)
 	ForgotPassword(w http.ResponseWriter, r *http.Request)
@@ -1025,6 +1065,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Create a pre-registered prospect profile (admin only)
+// (POST /admin/prospects)
+func (_ Unimplemented) CreateProspect(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Request password reset email
 // (POST /auth/forgot-password)
@@ -1412,6 +1458,28 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// CreateProspect operation middleware
+func (siw *ServerInterfaceWrapper) CreateProspect(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateProspect(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ForgotPassword operation middleware
 func (siw *ServerInterfaceWrapper) ForgotPassword(w http.ResponseWriter, r *http.Request) {
@@ -3365,6 +3433,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/prospects", wrapper.CreateProspect)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/forgot-password", wrapper.ForgotPassword)
 	})
 	r.Group(func(r chi.Router) {
@@ -3569,6 +3640,76 @@ type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
 type UnprocessableEntityApplicationProblemPlusJSONResponse Problem
 
+type CreateProspectRequestObject struct {
+	Body *CreateProspectJSONRequestBody
+}
+
+type CreateProspectResponseObject interface {
+	VisitCreateProspectResponse(w http.ResponseWriter) error
+}
+
+type CreateProspect201JSONResponse ProspectResponse
+
+func (response CreateProspect201JSONResponse) VisitCreateProspectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProspect401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProspect401ApplicationProblemPlusJSONResponse) VisitCreateProspectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProspect403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProspect403ApplicationProblemPlusJSONResponse) VisitCreateProspectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProspect422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProspect422ApplicationProblemPlusJSONResponse) VisitCreateProspectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ForgotPasswordRequestObject struct {
 	Body *ForgotPasswordJSONRequestBody
 }
@@ -3661,7 +3802,7 @@ type PostAuthSignupResponseObject interface {
 	VisitPostAuthSignupResponse(w http.ResponseWriter) error
 }
 
-type PostAuthSignup201JSONResponse User
+type PostAuthSignup201JSONResponse SignupResponse
 
 func (response PostAuthSignup201JSONResponse) VisitPostAuthSignupResponse(w http.ResponseWriter) error {
 
@@ -6994,6 +7135,9 @@ func (response PostWaitlist422ApplicationProblemPlusJSONResponse) VisitPostWaitl
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Create a pre-registered prospect profile (admin only)
+	// (POST /admin/prospects)
+	CreateProspect(ctx context.Context, request CreateProspectRequestObject) (CreateProspectResponseObject, error)
 	// Request password reset email
 	// (POST /auth/forgot-password)
 	ForgotPassword(ctx context.Context, request ForgotPasswordRequestObject) (ForgotPasswordResponseObject, error)
@@ -7212,6 +7356,37 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// CreateProspect operation middleware
+func (sh *strictHandler) CreateProspect(w http.ResponseWriter, r *http.Request) {
+	var request CreateProspectRequestObject
+
+	var body CreateProspectJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateProspect(ctx, request.(CreateProspectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateProspect")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateProspectResponseObject); ok {
+		if err := validResponse.VisitCreateProspectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ForgotPassword operation middleware

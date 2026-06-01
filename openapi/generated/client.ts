@@ -146,6 +146,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/prospects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a pre-registered prospect profile (admin only)
+         * @description Creates an unclaimed artist profile from seed data produced by the artist-preview-builder skill. Returns a claim token the artist uses at signup to bind the waiting profile to their account.
+         */
+        post: operations["createProspect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/images/presign": {
         parameters: {
             query?: never;
@@ -1443,6 +1463,20 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        SignupResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            is_admin: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description ID of the profile that was bound to this account via claim_token. Absent if no claim_token was provided.
+             */
+            claimed_profile_id?: string;
+        };
         SignupRequest: {
             /**
              * Format: email
@@ -1456,6 +1490,8 @@ export interface components {
              * @example FOUNDING-ABC123
              */
             invite_code?: string;
+            /** @description Optional. If present, binds a pre-built prospect profile to this new account atomically. 409 if the token has already been claimed. */
+            claim_token?: string;
         };
         LoginRequest: {
             /** Format: email */
@@ -1510,8 +1546,11 @@ export interface components {
         ArtistProfile: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            user_id: string;
+            /**
+             * Format: uuid
+             * @description UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
+             */
+            user_id?: string | null;
             display_name: string;
             bio: string;
             /**
@@ -1858,6 +1897,26 @@ export interface components {
             slug: string;
             status: string;
         };
+        CreateProspectRequest: {
+            display_name: string;
+            bio?: string;
+            location_label?: string | null;
+            medium_tags?: string[];
+            social_links?: {
+                [key: string]: string;
+            };
+            images?: {
+                /** Format: uri */
+                source_url: string;
+                caption?: string;
+            }[];
+        };
+        ProspectResponse: {
+            /** Format: uuid */
+            profile_id: string;
+            claim_token: string;
+            preview_url: string;
+        };
     };
     responses: {
         /** @description Invalid request body or parameters. */
@@ -1976,7 +2035,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["User"];
+                    "application/json": components["schemas"]["SignupResponse"];
                 };
             };
             403: components["responses"]["Forbidden"];
@@ -2143,6 +2202,33 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    createProspect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProspectRequest"];
+            };
+        };
+        responses: {
+            /** @description Prospect created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProspectResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["UnprocessableEntity"];
         };
     };
     postImagesPresign: {

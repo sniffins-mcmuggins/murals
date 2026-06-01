@@ -8,6 +8,7 @@
 - `auth.User(ctx)` lets handlers retrieve the authenticated principal
 - Handles: signup, login, password reset (forgot + reset), TOTP MFA (enrol/confirm/verify), Google OAuth, Apple OAuth
 - Rate-limits login, forgot-password, and MFA verify at 5/min per IP (configurable for CI)
+- Claim-on-signup: `POST /auth/signup` accepts optional `claim_token`; atomically binds a waiting prospect profile after account creation; 409 if token already used or invalid
 
 ## Boundaries
 - Does NOT decide what users can do after authentication — that is `admin.RequireAdmin`, `billing.RequirePlan`, `beta.Gate`, or handler-level entitlement checks
@@ -40,4 +41,5 @@
 - Unit tests inject context via `auth.WithUserForTest()` — this bypasses middleware, so `task api:test` passing does NOT confirm route wiring (see `.claude/rules/api-handler-checklist.md`)
 
 ## Changelog
+2026-06-01 — E15.4: claim_token support in signup
 2026-05-31 — initial spec

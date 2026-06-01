@@ -37,9 +37,12 @@ func TestSignupHandler_Success(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	var resp map[string]any
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
-	assert.Equal(t, "alice@example.com", resp["email"])
-	assert.Equal(t, false, resp["is_admin"])
-	assert.Nil(t, resp["password_hash"], "password_hash must not appear in response")
+	user, ok := resp["user"].(map[string]any)
+	require.True(t, ok, "response must have a 'user' object")
+	assert.Equal(t, "alice@example.com", user["email"])
+	assert.Equal(t, false, user["is_admin"])
+	assert.Nil(t, user["password_hash"], "password_hash must not appear in response")
+	assert.Nil(t, resp["claimed_profile_id"], "claimed_profile_id must be absent when no claim_token sent")
 }
 
 func TestSignupHandler_DuplicateEmail(t *testing.T) {
@@ -117,6 +120,82 @@ func TestSignup_BetaModeOn_InvalidInviteCode_Returns403(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestSignupHandler_ClaimProfile(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	// Create a prospect profile with a claim token directly in the DB.
+	const claimToken = "testclaimtoken123"
+	_, err := db.Exec(
+		t.Context(),
+		`INSERT INTO artist_profiles (display_name, claim_token)
+		 VALUES ('Pre-built Artist', $1)`,
+		claimToken,
+	)
+	require.NoError(t, err)
+
+	handler := auth.SignupHandler(db, config.Config{})
+	body := `{"email":"claimer@e2e.test","password":"password123","claim_token":"testclaimtoken123"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.NotEmpty(t, resp["claimed_profile_id"])
+}
+
+func TestSignupHandler_ClaimAlreadyClaimed(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	// Create and pre-claim a prospect.
+	userID, _, _ := testutil.CreateUser(t, db)
+	userUUID, _ := uuid.Parse(userID)
+	const claimToken = "alreadyclaimedtoken"
+	_, err := db.Exec(
+		t.Context(),
+		`INSERT INTO artist_profiles (display_name, claim_token, user_id, claimed_at)
+		 VALUES ('Claimed Already', $1, $2, now())`,
+		claimToken, userUUID,
+	)
+	require.NoError(t, err)
+
+	handler := auth.SignupHandler(db, config.Config{})
+	body := `{"email":"latecomer@e2e.test","password":"password123","claim_token":"alreadyclaimedtoken"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "already_claimed", resp["code"])
+}
+
+func TestSignupHandler_ClaimBadToken(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	handler := auth.SignupHandler(db, config.Config{})
+	body := `{"email":"badtoken@e2e.test","password":"password123","claim_token":"nosuchtoken"}`
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup",
+		bytes.NewBufferString(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "already_claimed", resp["code"])
 }
 
 func TestSignup_BetaModeOn_ValidInvite_SetsBetaFields(t *testing.T) {
