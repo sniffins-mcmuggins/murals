@@ -116,7 +116,7 @@ describe('E18 endorsements', () => {
     // Confirm no duplicate in DB
     const { rows } = await db.query(
       `SELECT COUNT(*) AS n FROM endorsements WHERE endorser_id = (SELECT id FROM users WHERE email LIKE $1)`,
-      [`endorser-${SUFFIX}%`],
+      [`%endorser-${SUFFIX}%`],
     )
     expect(Number(rows[0].n)).toBe(1)
   })
