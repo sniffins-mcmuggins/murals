@@ -102,8 +102,8 @@ func main() {
 
 	var adminID string
 	if err := conn.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash, role, is_beta)
-		 VALUES ($1, $2, 'admin', true) RETURNING id`,
+		`INSERT INTO users (email, password_hash, is_admin, is_beta)
+		 VALUES ($1, $2, true, true) RETURNING id`,
 		adminEmail, pwHash).Scan(&adminID); err != nil {
 		log.Fatalf("insert admin: %v", err)
 	}
@@ -111,8 +111,8 @@ func main() {
 
 	var marcusID string
 	if err := conn.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash, role, is_beta)
-		 VALUES ($1, $2, 'organiser', true) RETURNING id`,
+		`INSERT INTO users (email, password_hash, is_beta)
+		 VALUES ($1, $2, true) RETURNING id`,
 		marcusEmail, pwHash).Scan(&marcusID); err != nil {
 		log.Fatalf("insert marcus: %v", err)
 	}
@@ -120,8 +120,8 @@ func main() {
 
 	var gabeUserID, gabeProfileID string
 	if err := conn.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash, role, is_beta)
-		 VALUES ($1, $2, 'artist', true) RETURNING id`,
+		`INSERT INTO users (email, password_hash, is_beta)
+		 VALUES ($1, $2, true) RETURNING id`,
 		ladyGabeEmail, pwHash).Scan(&gabeUserID); err != nil {
 		log.Fatalf("insert ladygabe user: %v", err)
 	}
@@ -150,8 +150,8 @@ func main() {
 	for _, a := range artistSeed {
 		var uid, pid string
 		if err := conn.QueryRow(ctx,
-			`INSERT INTO users (email, password_hash, role, is_beta)
-			 VALUES ($1, $2, 'artist', true) RETURNING id`,
+			`INSERT INTO users (email, password_hash, is_beta)
+			 VALUES ($1, $2, true) RETURNING id`,
 			a.email, pwHash).Scan(&uid); err != nil {
 			log.Fatalf("insert fictional artist %s: %v", a.email, err)
 		}
