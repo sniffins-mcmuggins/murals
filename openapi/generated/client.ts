@@ -399,6 +399,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/{profileID}/endorsements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List public endorsements for an artist profile */
+        get: operations["listProfileEndorsements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/endorsements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create or update an endorsement */
+        post: operations["createEndorsement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/endorsements/received": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all endorsements received (endorsee management view)
+         * @description Returns all endorsements received by the authenticated artist, including hidden ones. For the endorsee's own management page.
+         */
+        get: operations["listReceivedEndorsements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/endorsements/{endorsementID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw an endorsement (endorser only) */
+        delete: operations["deleteEndorsement"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/endorsements/{endorsementID}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Show or hide an endorsement (endorsee only) */
+        patch: operations["setEndorsementVisibility"];
+        trace?: never;
+    };
     "/collections": {
         parameters: {
             query?: never;
@@ -1918,6 +2006,40 @@ export interface components {
             claim_token: string;
             preview_url: string;
         };
+        EndorsementResponse: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "peer" | "organiser";
+            /** Format: uuid */
+            endorser_id: string;
+            endorser_display_name?: string | null;
+            endorser_avatar_s3_key?: string | null;
+            /** Format: uuid */
+            festival_id?: string | null;
+            festival_name?: string | null;
+            body?: string | null;
+            skills: string[];
+            hidden_by_endorsee: boolean;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EndorsementListResponse: {
+            endorsements: components["schemas"]["EndorsementResponse"][];
+        };
+        CreateEndorsementRequest: {
+            /** Format: uuid */
+            endorsee_id: string;
+            /** @enum {string} */
+            kind: "peer" | "organiser";
+            /** Format: uuid */
+            festival_id?: string | null;
+            body?: string | null;
+            skills?: string[];
+        };
+        SetEndorsementVisibilityRequest: {
+            hidden: boolean;
+        };
     };
     responses: {
         /** @description Invalid request body or parameters. */
@@ -2547,6 +2669,131 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    listProfileEndorsements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public endorsements (moderation_status=ok, hidden_by_endorsee=false), organiser-first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndorsementListResponse"];
+                };
+            };
+        };
+    };
+    createEndorsement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEndorsementRequest"];
+            };
+        };
+        responses: {
+            /** @description Endorsement created or updated (upserts on repeat endorser+endorsee pair). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndorsementResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    listReceivedEndorsements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All received endorsements including hidden ones. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndorsementListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteEndorsement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endorsementID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Endorsement withdrawn. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setEndorsementVisibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endorsementID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetEndorsementVisibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated endorsement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndorsementResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     postCollections: {

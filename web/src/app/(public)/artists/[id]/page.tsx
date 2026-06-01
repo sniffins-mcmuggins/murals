@@ -58,7 +58,7 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
 export default async function ArtistPage({ params }: ArtistPageProps) {
   const { id } = await params
 
-  const [profileRes, collectionsRes, festivalsRes] = await Promise.all([
+  const [profileRes, collectionsRes, festivalsRes, endorsementsRes] = await Promise.all([
     apiClient.GET('/profiles/{profileID}', {
       params: { path: { profileID: id } },
     }),
@@ -66,6 +66,9 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
       params: { path: { profileID: id } },
     }),
     apiClient.GET('/profiles/{profileID}/festivals', {
+      params: { path: { profileID: id } },
+    }),
+    apiClient.GET('/profiles/{profileID}/endorsements', {
       params: { path: { profileID: id } },
     }),
   ])
@@ -77,6 +80,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   const profile = profileRes.data
   const collections = collectionsRes.data ?? []
   const appearances = festivalsRes.data ?? []
+  const endorsements = endorsementsRes.data?.endorsements ?? []
 
   const statusLabel: Record<string, string> = {
     active: 'Active',
@@ -186,6 +190,13 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
 
           {/* Social links */}
           <SocialLinks profileId={profile.id} socialLinks={profile.social_links} />
+
+          <Link
+            href={`/endorse/${id}`}
+            className="inline-block mt-4 font-mono text-xs uppercase tracking-widest border border-light text-mid hover:text-ink hover:border-ink px-4 py-2 rounded transition-colors"
+          >
+            Endorse this artist
+          </Link>
         </header>
 
         {/* Festival appearances */}
@@ -255,6 +266,86 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                 </Link>
               ))}
             </div>
+          </section>
+        )}
+
+        {/* Endorsements */}
+        {endorsements.length > 0 && (
+          <section aria-label="Endorsements" className="mt-10">
+            <h2 className="font-serif text-3xl text-ink mb-6">Endorsements</h2>
+
+            {/* Organiser endorsements first */}
+            {endorsements.filter((e) => e.kind === 'organiser').map((e) => (
+              <div key={e.id} className="mb-6 p-5 border border-light rounded-lg bg-warm">
+                <div className="flex items-start gap-3">
+                  {e.endorser_avatar_s3_key && (
+                    <img
+                      src={e.endorser_avatar_s3_key}
+                      alt={e.endorser_display_name ?? ''}
+                      className="w-10 h-10 rounded-full object-cover flex-none"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      {e.festival_name && (
+                        <span className="font-mono text-xs uppercase tracking-widest bg-amber text-ink px-2 py-0.5 rounded">
+                          {e.festival_name}
+                        </span>
+                      )}
+                      {e.endorser_display_name && (
+                        <span className="font-sans text-sm text-mid">via {e.endorser_display_name}</span>
+                      )}
+                    </div>
+                    {e.body && (
+                      <p className="font-serif text-lg text-ink leading-relaxed mt-2">{e.body}</p>
+                    )}
+                    {e.skills && e.skills.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {e.skills.map((s) => (
+                          <span key={s} className="font-mono text-xs uppercase tracking-wide bg-light text-ink px-2 py-0.5 rounded">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Peer endorsements */}
+            {endorsements.filter((e) => e.kind === 'peer').length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {endorsements.filter((e) => e.kind === 'peer').map((e) => (
+                  <div key={e.id} className="p-4 border border-light rounded-lg bg-offwhite">
+                    <div className="flex items-center gap-3 mb-2">
+                      {e.endorser_avatar_s3_key && (
+                        <img
+                          src={e.endorser_avatar_s3_key}
+                          alt={e.endorser_display_name ?? ''}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="font-sans text-sm font-medium text-ink">
+                        {e.endorser_display_name ?? 'Anonymous artist'}
+                      </span>
+                    </div>
+                    {e.body && (
+                      <p className="font-serif text-base text-ink leading-relaxed">{e.body}</p>
+                    )}
+                    {e.skills && e.skills.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {e.skills.map((s) => (
+                          <span key={s} className="font-mono text-xs uppercase tracking-wide bg-warm text-mid px-2 py-0.5 rounded">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
       </div>

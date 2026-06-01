@@ -23,6 +23,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	"github.com/sniffins-mcmuggins/render/api/internal/db"
 	"github.com/sniffins-mcmuggins/render/api/internal/email"
+	"github.com/sniffins-mcmuggins/render/api/internal/endorsement"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
@@ -170,6 +171,13 @@ func main() {
 		r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
 		r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(pool))
 		r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(pool)) // public festival appearances
+		r.Get("/profiles/{profileID}/endorsements", endorsement.ListPublicHandler(pool))    // public
+
+		// Endorsements (literal /received before /{endorsementID} param)
+		r.Get("/endorsements/received", endorsement.ListReceivedHandler(pool))
+		r.Post("/endorsements", endorsement.CreateHandlerWithMailer(pool, mailer))
+		r.Delete("/endorsements/{endorsementID}", endorsement.DeleteHandler(pool))
+		r.Patch("/endorsements/{endorsementID}/visibility", endorsement.SetVisibilityHandler(pool))
 
 		// Collections
 		r.Post("/collections", artist.CreateCollectionHandler(pool))

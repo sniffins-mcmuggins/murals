@@ -110,6 +110,7 @@ Every meaningful package has a colocated `<package>.spec.md` describing its cont
 | `web/src/app/dashboard/` | `dashboard.spec.md` |
 | `web/src/app/(public)/` | `public.spec.md` |
 | `web/src/lib/` | `lib.spec.md` |
+| `api/internal/endorsement/` | `endorsement.spec.md` |
 
 ### Packages without specs (thin/generated — not worth maintaining)
 
