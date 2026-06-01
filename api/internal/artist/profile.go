@@ -24,7 +24,7 @@ import (
 
 type profileResponse struct {
 	ID                string          `json:"id"`
-	UserID            string          `json:"user_id"`
+	UserID            *string         `json:"user_id"`
 	DisplayName       string          `json:"display_name"`
 	Bio               string          `json:"bio"`
 	Visibility        string          `json:"visibility"`
@@ -50,9 +50,14 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 	if headlineImageUrls == nil {
 		headlineImageUrls = []string{}
 	}
+	var userID *string
+	if p.UserID.Valid {
+		s := p.UserID.String()
+		userID = &s
+	}
 	resp := profileResponse{
 		ID:                p.ID.String(),
-		UserID:            p.UserID.String(),
+		UserID:            userID,
 		DisplayName:       p.DisplayName,
 		Bio:               p.Bio,
 		Visibility:        p.Visibility,
