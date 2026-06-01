@@ -54,24 +54,13 @@ test('V03 — Artist Signup', async ({ page }) => {
   await expect(page.locator('[role="status"]')).toBeVisible({ timeout: 8000 })
   await pause(1200)
 
-  // ── 4. Grant access (behind the scenes — not shown on screen) ─────────────────
-  const profileRes = await page.request.get(`${API}/profiles/me`)
-  if (!profileRes.ok()) throw new Error(`GET /profiles/me: ${profileRes.status()}`)
-  const profile = await profileRes.json()
-  const artistUserId: string = profile.user_id
-
-  const adminLoginRes = await page.request.post(`${API}/auth/login`, {
-    data: { email: 'admin@demo.art', password: 'demo-password-2027' },
+  // ── 4. Redeem promo code for access (behind the scenes — not shown on screen) ──
+  // DEMO2027 is seeded by task demo:seed — gives artist_basic for 2 years.
+  const redeemRes = await page.request.post(`${API}/promo/redeem`, {
+    data: { code: 'DEMO2027' },
     headers: { 'Content-Type': 'application/json' },
   })
-  if (!adminLoginRes.ok()) throw new Error(`Admin login: ${adminLoginRes.status()}`)
-  const { token: adminToken } = await adminLoginRes.json()
-
-  const grantRes = await page.request.post(`${API}/admin/users/${artistUserId}/grants`, {
-    data: { plan: 'artist_basic', duration_days: 730, note: 'Demo access — V03' },
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
-  })
-  if (!grantRes.ok()) throw new Error(`Grant: ${grantRes.status()}`)
+  if (!redeemRes.ok()) throw new Error(`Promo redeem: ${redeemRes.status()}`)
   await pause(600)
 
   // ── 5. Create collection and upload image ─────────────────────────────────────

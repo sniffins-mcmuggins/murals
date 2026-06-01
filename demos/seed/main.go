@@ -167,6 +167,16 @@ func main() {
 	}
 	fmt.Printf("  fictional artists: %d\n", len(seeded))
 
+	// Promo code for V03 — artist redeems this to get access before publishing
+	if _, err := conn.Exec(ctx,
+		`INSERT INTO promo_codes (code, plan, duration_days, created_by)
+		 VALUES ('DEMO2027', 'artist_basic', 730, $1)
+		 ON CONFLICT (code) DO UPDATE SET revoked_at = NULL, use_count = 0`,
+		adminID); err != nil {
+		log.Fatalf("insert promo code: %v", err)
+	}
+	fmt.Println("  promo code: DEMO2027")
+
 	var festivalID string
 	if err := conn.QueryRow(ctx,
 		`INSERT INTO festivals
