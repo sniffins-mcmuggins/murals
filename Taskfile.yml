@@ -69,3 +69,32 @@ tasks:
   billing:stripe-listen:
     desc: "Forward Stripe webhooks to local API (requires Stripe CLI installed and logged in)"
     cmd: stripe listen --forward-to localhost:8080/billing/webhook
+
+  demo:seed:
+    desc: "Wipe and re-seed the demo database (idempotent)"
+    dir: demos/seed
+    cmd: go run .
+
+  demo:record:
+    desc: "Record one demo video. Usage: task demo:record V=V02"
+    dir: demos
+    cmd: npx playwright test scripts/{{.V}}*.ts --config playwright.config.ts
+
+  demo:convert:
+    desc: "Convert all recorded .webm files to MP4 (requires ffmpeg)"
+    dir: demos
+    cmd: bash run.sh
+
+  demo:all:
+    desc: "Seed DB then record all four videos in sequence"
+    cmds:
+      - task: demo:seed
+      - task: demo:record
+        vars: { V: V01 }
+      - task: demo:record
+        vars: { V: V02 }
+      - task: demo:record
+        vars: { V: V03 }
+      - task: demo:record
+        vars: { V: V04 }
+      - task: demo:convert
