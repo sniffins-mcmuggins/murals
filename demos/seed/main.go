@@ -98,6 +98,13 @@ func main() {
 	); err != nil {
 		log.Fatalf("delete demo users: %v", err)
 	}
+	// Clean up V01-created festivals (fresh organiser user, so not caught by user delete).
+	// V01 creates "Cheltenham Paint Festival 2027" with a timestamped slug each run.
+	if _, err := conn.Exec(ctx,
+		`DELETE FROM festivals WHERE name = 'Cheltenham Paint Festival 2027' AND slug != 'cpf-2027'`,
+	); err != nil {
+		log.Fatalf("delete stale demo festivals: %v", err)
+	}
 	fmt.Println("Cleared existing demo rows")
 
 	var adminID string

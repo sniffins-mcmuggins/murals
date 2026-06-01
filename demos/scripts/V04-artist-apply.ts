@@ -17,12 +17,14 @@ test('V04 — Artist Apply', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Applications', exact: true })).toBeVisible({ timeout: 8000 })
   await pause(1200)
 
-  await expect(page.getByText('Cheltenham Paint Festival 2027')).toBeVisible({ timeout: 8000 })
+  // Scope to Open festivals section — may show multiple festivals with same name from demo runs
+  const openSection = page.locator('section').filter({ hasText: 'Open festivals' })
+  await expect(openSection.getByText('Cheltenham Paint Festival 2027').first()).toBeVisible({ timeout: 8000 })
   await pause(800)
   await highlight(page, 'a[href*="apply"]')
 
-  // Scope to the CPF 2027 list item to avoid strict-mode violations
-  const festivalItem = page.locator('li').filter({ hasText: 'Cheltenham Paint Festival 2027' })
+  // Use first matching CPF 2027 festival in the open list
+  const festivalItem = openSection.locator('li').filter({ hasText: 'Cheltenham Paint Festival 2027' }).first()
   await festivalItem.getByRole('link', { name: 'Apply' }).click()
   await pause(1200)
 
