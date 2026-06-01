@@ -19,53 +19,48 @@ test('V02 — Organiser Review', async ({ page }) => {
   await page.getByText('Cheltenham Paint Festival 2027').click()
   await pause(1200)
 
-  // ── 3. Open applications tab ─────────────────────────────────────────────────
+  // ── 3. Open applications page ────────────────────────────────────────────────
+  // The URL is now /organiser/festivals/{id} — extract ID, go to applications
   const festivalId = page.url().split('/').at(-1)!
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
-  await expect(page.getByRole('tab', { name: 'Pending' })).toBeVisible({ timeout: 8000 })
-  await page.getByRole('tab', { name: 'Pending' }).click()
+  // Tabs are plain <button> elements (not ARIA tabs); Pending is active by default
+  await expect(page.getByRole('button', { name: /Pending/ })).toBeVisible({ timeout: 8000 })
   await pause(1500)
 
-  // ── 4. Open Kit Harrow's application ─────────────────────────────────────────
-  await page.locator('.bg-warm.border.border-light').filter({ hasText: 'Kit Harrow' }).first().click()
-  await pause(1200)
-
-  // ── 5. Read the application ───────────────────────────────────────────────────
-  await scrollTo(page, '[role="dialog"], aside, [class*="slide"]')
-  await pause(2000)
-
-  // ── 6. Accept Kit ────────────────────────────────────────────────────────────
-  await highlight(page, 'button')
-  await page.getByRole('button', { name: 'Accept' }).click()
-  await pause(1500)
-  await page.keyboard.press('Escape')
+  // ── 4. Review Kit Harrow — Accept inline ─────────────────────────────────────
+  // Applications show inline Accept/Waitlist/Decline buttons on each card
+  const kitItem = page.locator('li').filter({ hasText: 'Kit Harrow' })
+  await expect(kitItem).toBeVisible({ timeout: 6000 })
   await pause(800)
+  // Scroll to and highlight the Accept button on Kit's card
+  await scrollTo(page, 'li:has-text("Kit Harrow") button:has-text("Accept")')
+  await highlight(page, 'li:has-text("Kit Harrow") button:has-text("Accept")')
+  await kitItem.getByRole('button', { name: 'Accept' }).click()
+  await pause(1500)
 
-  // ── 7. Festival map — Kit's pin is now visible ────────────────────────────────
+  // ── 5. Navigate to festival map — Kit's pin now visible ───────────────────────
   await page.goto(`/organiser/festivals/${festivalId}/map`)
   await pause(2000)
   await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10000 })
   await pause(2500)
 
-  // ── 8. Back to applications — open Tomás Cruz ────────────────────────────────
+  // ── 6. Back to applications — decline Tomás Cruz ─────────────────────────────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
-  await page.getByRole('tab', { name: 'Pending' }).click()
+  await expect(page.getByRole('button', { name: /Pending/ })).toBeVisible({ timeout: 8000 })
   await pause(600)
-  await page.locator('.bg-warm.border.border-light').filter({ hasText: 'Tomás Cruz' }).first().click()
-  await pause(1200)
-  await scrollTo(page, '[role="dialog"], aside, [class*="slide"]')
-  await pause(1500)
 
-  // ── 9. Decline Tomás ─────────────────────────────────────────────────────────
-  await highlight(page, 'button')
-  await page.getByRole('button', { name: 'Decline' }).click()
+  const tomasItem = page.locator('li').filter({ hasText: 'Tomás Cruz' })
+  await expect(tomasItem).toBeVisible({ timeout: 6000 })
+  await pause(800)
+  await scrollTo(page, 'li:has-text("Tomás Cruz") button:has-text("Decline")')
+  await highlight(page, 'li:has-text("Tomás Cruz") button:has-text("Decline")')
+  await tomasItem.getByRole('button', { name: 'Decline' }).click()
   await pause(1000)
-  // Handle optional confirmation
+
+  // Handle optional confirmation dialog
   const confirmBtn = page.getByRole('button', { name: /confirm|yes/i })
   if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await confirmBtn.click()
   }
-  await pause(1500)
-  await page.keyboard.press('Escape')
   await pause(2000)
 })
