@@ -126,6 +126,9 @@ func main() {
 	})
 
 	r.Post("/auth/signup", auth.SignupHandler(pool, cfg))
+	// Test-only probe: POST /_test/beta/signup runs SignupHandler with BetaMode=true.
+	// Allows e2e tests to exercise the invite-gated signup path without BETA_MODE=true in the stack.
+	r.Post("/_test/beta/signup", auth.SignupHandler(pool, config.Config{BetaMode: true}))
 
 	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
 	r.Post("/auth/mfa/enroll", auth.TOTPEnrollHandler(pool, cfg.TOTPEncryptionKey))

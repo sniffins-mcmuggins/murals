@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client } from 'pg'
 import { createHmac } from 'node:crypto'
-import { createArtist, createProfile, uniqueSuffix } from '../fixtures/helpers'
+import { createArtist, createCollection, createProfile, uniqueSuffix } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
@@ -74,6 +74,27 @@ describe('profile visibility (E15.1)', () => {
     const { profileId } = await createProfile(token, { displayName: `Draft Coll ${suffix}` })
 
     const res = await fetch(`${API}/profiles/${profileId}/collections`)
+    expect(res.status).toBe(404)
+  })
+
+  it('non-owner authenticated user cannot list collections on a draft profile (404)', async () => {
+    const suffix = uniqueSuffix() + 8
+    const { token: ownerToken } = await createArtist(suffix)
+    const { profileId } = await createProfile(ownerToken, { displayName: `Draft Coll NonOwner ${suffix}` })
+    const { token: otherToken } = await createArtist(suffix + 'x')
+
+    const res = await fetch(`${API}/profiles/${profileId}/collections`, { headers: auth(otherToken) })
+    expect(res.status).toBe(404)
+  })
+
+  it('non-owner authenticated user cannot read a collection on a draft profile (404)', async () => {
+    const suffix = uniqueSuffix() + 9
+    const { token: ownerToken } = await createArtist(suffix)
+    await createProfile(ownerToken, { displayName: `Draft Coll NonOwner2 ${suffix}` })
+    const { collectionId } = await createCollection(ownerToken, { name: `Secret Coll ${suffix}` })
+    const { token: otherToken } = await createArtist(suffix + 'y')
+
+    const res = await fetch(`${API}/collections/${collectionId}`, { headers: auth(otherToken) })
     expect(res.status).toBe(404)
   })
 

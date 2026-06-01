@@ -15,6 +15,7 @@ import {
   createProfile,
   createCollection,
   createFestival,
+  createSpot,
   setFestivalStatus,
   upsertForm,
   submitApplication,
@@ -218,6 +219,75 @@ describe('authorization isolation', () => {
         body: JSON.stringify({ status: 'submitted', ids: [applicationId] }),
       },
     )
+    expect(res.status).toBe(403)
+  })
+
+  // ── IDOR: spot CRUD on another organiser's festival (issue #219) ─────────────
+
+  it("organiser A cannot create a spot on organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Spot Create',
+      slug: `b-spot-create-${SUFFIX}`,
+    })
+    const res = await fetch(`${API}/festivals/${festivalId}/spots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+      body: JSON.stringify({ lat: 51.9, lng: -2.07 }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot update a spot on organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Spot Update',
+      slug: `b-spot-update-${SUFFIX}`,
+    })
+    const { spotId } = await createSpot(orgB.token, festivalId, 51.9, -2.07)
+    const res = await fetch(`${API}/festivals/${festivalId}/spots/${spotId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+      body: JSON.stringify({ lat: 51.8 }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot delete a spot on organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Spot Delete',
+      slug: `b-spot-delete-${SUFFIX}`,
+    })
+    const { spotId } = await createSpot(orgB.token, festivalId, 51.9, -2.07)
+    const res = await fetch(`${API}/festivals/${festivalId}/spots/${spotId}`, {
+      method: 'DELETE',
+      headers: auth(orgA.token),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot assign an artist to a spot on organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Spot Artist',
+      slug: `b-spot-artist-${SUFFIX}`,
+    })
+    const { spotId } = await createSpot(orgB.token, festivalId, 51.9, -2.07)
+    const res = await fetch(`${API}/festivals/${festivalId}/spots/${spotId}/artist`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
+      body: JSON.stringify({ artist_id: artistA.userId }),
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it("organiser A cannot clear the artist from a spot on organiser B's festival (403)", async () => {
+    const { festivalId } = await createFestival(orgB.token, {
+      name: 'B Spot Clear',
+      slug: `b-spot-clear-${SUFFIX}`,
+    })
+    const { spotId } = await createSpot(orgB.token, festivalId, 51.9, -2.07)
+    const res = await fetch(`${API}/festivals/${festivalId}/spots/${spotId}/artist`, {
+      method: 'DELETE',
+      headers: auth(orgA.token),
+    })
     expect(res.status).toBe(403)
   })
 })
