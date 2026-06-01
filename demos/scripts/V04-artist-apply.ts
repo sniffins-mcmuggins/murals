@@ -78,6 +78,6 @@ test('V04 — Artist Apply', async ({ page }) => {
   await pause(1200)
 
   // ── 5. Confirmation ───────────────────────────────────────────────────────────
-  await expect(page.getByText(/submitted|thank you|we.ll be in touch/i)).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'Application submitted' })).toBeVisible({ timeout: 10000 })
   await pause(3000)
 })
