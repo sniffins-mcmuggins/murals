@@ -78,7 +78,7 @@ tasks:
   demo:record:
     desc: "Record one demo video. Usage: task demo:record V=V02"
     dir: demos
-    cmd: npx playwright test scripts/{{.V}}*.ts --config playwright.config.ts
+    cmd: npx playwright test scripts/{{.V}}*.ts --config playwright.config.ts --output=output/raw/{{.V}}
 
   demo:convert:
     desc: "Convert all recorded .webm files to MP4 (requires ffmpeg)"
