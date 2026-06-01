@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './scripts',
   testMatch: '**/*.ts',
   workers: 1,
+  timeout: 180000,
   reporter: [['list']],
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:3000',

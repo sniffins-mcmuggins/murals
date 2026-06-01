@@ -9,7 +9,7 @@ export async function pause(ms: number): Promise<void> {
 export async function slowType(
   locator: Locator,
   text: string,
-  delayMs = 80,
+  delayMs = 45,
 ): Promise<void> {
   await locator.click()
   await locator.fill('')
