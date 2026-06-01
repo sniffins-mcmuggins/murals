@@ -39,7 +39,7 @@ test('V01 — Organiser Setup', async ({ page }) => {
 
   await slowType(page.locator('input[name="name"], input[placeholder*="Name" i]').first(), 'Cheltenham Paint Festival 2027')
   await pause(400)
-  await slowType(page.locator('input[name="slug"], input[placeholder*="Slug" i]').first(), 'cpf-2027-v01')
+  await slowType(page.locator('input[name="slug"], input[placeholder*="Slug" i]').first(), `cpf-2027-${suffix}`)
   await pause(400)
   await slowType(
     page.locator('textarea').first(),
