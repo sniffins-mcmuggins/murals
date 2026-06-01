@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test'
-import { pause, highlight, scrollTo } from './helpers.js'
+import { pause, highlight, scrollTo, slowType } from './helpers.js'
 
 test('V02 — Organiser Review', async ({ page }) => {
   // ── 1. Log in as Marcus ───────────────────────────────────────────────────────
   await page.goto('/login')
   await pause(800)
-  await page.fill('#email', 'marcus@cpf-demo.art')
-  await page.fill('#password', 'demo-password-2027')
+  await slowType(page.locator('#email'), 'marcus@cpf-demo.art')
+  await slowType(page.locator('#password'), 'demo-password-2027')
   await highlight(page, 'button[type=submit]')
   await page.click('button[type=submit]')
   await expect(page).toHaveURL('/dashboard', { timeout: 10000 })
