@@ -43,3 +43,10 @@ SET preview_token = replace(gen_random_uuid()::text, '-', ''),
     updated_at    = now()
 WHERE user_id = $1
 RETURNING *;
+
+-- name: SetArtistProfileVisibility :one
+UPDATE artist_profiles
+SET visibility = $2,
+    updated_at = now()
+WHERE user_id = $1
+RETURNING *;
