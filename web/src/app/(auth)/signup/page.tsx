@@ -41,7 +41,7 @@ export default function SignupPage() {
         ...(claimToken ? { claim_token: claimToken } : {}),
       }
 
-      const { response } = await apiClient.POST('/auth/signup', {
+      const { response, data } = await apiClient.POST('/auth/signup', {
         body,
       })
 
@@ -65,8 +65,6 @@ export default function SignupPage() {
         return
       }
 
-      // Check if a profile was claimed and redirect accordingly
-      const data = await response.json()
       if (data?.claimed_profile_id) {
         router.push('/login?registered=1&claim=1')
       } else {
