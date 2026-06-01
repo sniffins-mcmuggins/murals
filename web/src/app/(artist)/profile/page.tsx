@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth-server'
 import { cookies } from 'next/headers'
 import { createApiClient } from '@render/api-client'
 import ProfileForm from './ProfileForm'
+import PublishBar from './PublishBar'
 
 export default async function ProfilePage() {
   const user = await requireAuth()
@@ -23,6 +24,7 @@ export default async function ProfilePage() {
     <div>
       <h1 className="font-serif text-4xl text-ink mb-2">Profile</h1>
       <p className="font-sans text-mid mb-8">How the world sees you.</p>
+      <PublishBar initialProfile={profile} />
       <ProfileForm profile={profile} userId={user.id} />
     </div>
   )
