@@ -19,6 +19,8 @@ tags:
     description: Service health and readiness
   - name: auth
     description: Authentication and user identity
+  - name: admin
+    description: Admin-only operations
   - name: images
     description: Image upload pipeline (presign → PUT → confirm)
   - name: artist
@@ -68,6 +70,28 @@ components:
           type: string
           format: date-time
 
+    SignupResponse:
+      type: object
+      required: [id, email, is_admin, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        is_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        claimed_profile_id:
+          type: string
+          format: uuid
+          description: >-
+            ID of the profile that was bound to this account via claim_token.
+            Absent if no claim_token was provided.
+
     SignupRequest:
       type: object
       required: [email, password]
@@ -84,6 +108,11 @@ components:
           type: string
           description: Required when the server is in beta mode (BETA_MODE=true). Ignored otherwise.
           example: FOUNDING-ABC123
+        claim_token:
+          type: string
+          description: >-
+            Optional. If present, binds a pre-built prospect profile to this
+            new account atomically. 409 if the token has already been claimed.
 
     LoginRequest:
       type: object
@@ -154,7 +183,7 @@ components:
 
     ArtistProfile:
       type: object
-      required: [id, user_id, display_name, bio, visibility, medium_tags, social_links, headline_image_urls, created_at, updated_at]
+      required: [id, display_name, bio, visibility, medium_tags, social_links, headline_image_urls, created_at, updated_at]
       properties:
         id:
           type: string
@@ -162,6 +191,10 @@ components:
         user_id:
           type: string
           format: uuid
+          nullable: true
+          description: >-
+            UUID of the owning user. Null for unclaimed prospect profiles
+            (only accessible via preview token; never returned by public endpoints).
         display_name:
           type: string
         bio:
@@ -784,6 +817,49 @@ components:
         status:
           type: string
 
+    CreateProspectRequest:
+      type: object
+      required: [display_name]
+      properties:
+        display_name:
+          type: string
+        bio:
+          type: string
+        location_label:
+          type: string
+          nullable: true
+        medium_tags:
+          type: array
+          items:
+            type: string
+        social_links:
+          type: object
+          additionalProperties:
+            type: string
+        images:
+          type: array
+          items:
+            type: object
+            required: [source_url]
+            properties:
+              source_url:
+                type: string
+                format: uri
+              caption:
+                type: string
+
+    ProspectResponse:
+      type: object
+      required: [profile_id, claim_token, preview_url]
+      properties:
+        profile_id:
+          type: string
+          format: uuid
+        claim_token:
+          type: string
+        preview_url:
+          type: string
+
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -876,7 +952,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/SignupResponse"
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
@@ -1014,6 +1090,38 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /admin/prospects:
+    post:
+      operationId: createProspect
+      summary: Create a pre-registered prospect profile (admin only)
+      description: >-
+        Creates an unclaimed artist profile from seed data produced by the
+        artist-preview-builder skill. Returns a claim token the artist uses
+        at signup to bind the waiting profile to their account.
+      tags: [admin]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProspectRequest"
+      responses:
+        "201":
+          description: Prospect created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProspectResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 
   /images/presign:
     post:
