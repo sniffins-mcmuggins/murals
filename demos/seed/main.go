@@ -208,13 +208,28 @@ func main() {
 		}
 		if s.a.status == "accepted" {
 			if _, err := conn.Exec(ctx,
-				`INSERT INTO festival_artists (festival_id, artist_id, status, pin_lat, pin_lng)
-				 VALUES ($1, $2, 'accepted', $3, $4)`,
-				festivalID, s.profileID, s.a.pinLat, s.a.pinLng); err != nil {
+				`INSERT INTO festival_artists (festival_id, artist_id, status)
+				 VALUES ($1, $2, 'accepted')`,
+				festivalID, s.profileID); err != nil {
 				log.Fatalf("insert festival_artist %s: %v", s.a.name, err)
 			}
 		}
 	}
 	fmt.Printf("  applications: %d\n", len(seeded))
+
+	// Insert festival_spots for accepted artists (coordinates from artistSeed)
+	spotNumber := 1
+	for _, s := range seeded {
+		if s.a.status == "accepted" {
+			if _, err := conn.Exec(ctx,
+				`INSERT INTO festival_spots (festival_id, number, lat, lng, artist_id)
+				 VALUES ($1, $2, $3, $4, $5)`,
+				festivalID, spotNumber, s.a.pinLat, s.a.pinLng, s.profileID); err != nil {
+				log.Fatalf("insert festival_spot %s: %v", s.a.name, err)
+			}
+			spotNumber++
+		}
+	}
+	fmt.Printf("  festival_spots: %d\n", spotNumber-1)
 	fmt.Println("Demo seed complete ✓")
 }
