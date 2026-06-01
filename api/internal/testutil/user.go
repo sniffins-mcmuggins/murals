@@ -13,6 +13,37 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
+// CreateAdminUser inserts an admin user (is_admin=true, mfa_enabled=true) and
+// returns (userID, token, email). The token is signed with TestSecret.
+func CreateAdminUser(t *testing.T, pool *pgxpool.Pool) (userID, token, email string) {
+	t.Helper()
+	var err error
+	userID, _, email = CreateUser(t, pool)
+	_, err = pool.Exec(context.Background(),
+		`UPDATE users SET is_admin = true, mfa_enabled = true WHERE id = $1`, userID)
+	if err != nil {
+		t.Fatalf("CreateAdminUser: %v", err)
+	}
+	// Re-issue with is_admin=true (session_version unchanged = 1).
+	token, err = auth.IssueToken(userID, true, 1, TestSecret)
+	if err != nil {
+		t.Fatalf("CreateAdminUser: issue token: %v", err)
+	}
+	return userID, token, email
+}
+
+// CreateBetaUser inserts a regular user with is_beta=true and returns the userID.
+func CreateBetaUser(t *testing.T, pool *pgxpool.Pool) (userID string) {
+	t.Helper()
+	userID, _, _ = CreateUser(t, pool)
+	_, err := pool.Exec(context.Background(),
+		`UPDATE users SET is_beta = true WHERE id = $1`, userID)
+	if err != nil {
+		t.Fatalf("CreateBetaUser: %v", err)
+	}
+	return userID
+}
+
 // TestSecret is the JWT signing key shared by all test helpers.
 // Tests that wire up auth.Middleware should pass this constant.
 const TestSecret = "test-secret-key"

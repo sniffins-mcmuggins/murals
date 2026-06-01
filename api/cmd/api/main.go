@@ -260,7 +260,19 @@ func main() {
 			r.Post("/promo-codes", admin.CreatePromoCodeHandler(pool))
 			r.Delete("/promo-codes/{codeID}", admin.RevokePromoCodeHandler(pool))
 			r.Post("/prospects", admin.CreateProspectHandler(pool))
+
+			// Beta portal — admin invite management and feedback triage.
+			r.Get("/beta/invites", beta.AdminListInvitesHandler(pool))
+			r.Post("/beta/invites", beta.AdminCreateInviteHandler(pool, cfg.WebPublicBase))
+			r.Get("/beta/feedback", beta.AdminListFeedbackHandler(pool))
+			r.Patch("/beta/feedback/{feedbackID}", beta.AdminUpdateFeedbackHandler(pool))
 		})
+
+		// Beta member routes — authenticated + beta-gated (via the outer r.Use(beta.Gate)).
+		r.Post("/beta/invites", beta.MintInviteHandler(pool, cfg.WebPublicBase))
+		r.Get("/beta/me/invites", beta.GetMyInvitesHandler(pool))
+		r.Post("/beta/feedback", beta.SubmitFeedbackHandler(pool))
+		r.Get("/beta/feedback", beta.GetMyFeedbackHandler(pool))
 
 		// Test-only probe: always enforces beta gate regardless of BETA_MODE env.
 		// Returns 401 if unauthenticated, 403 if authenticated but not beta,

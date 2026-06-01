@@ -10,12 +10,17 @@ const NAV_LINKS = [
 ]
 
 export default async function ArtistLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth()
+  const user = await requireAuth()
   return (
     <div className="min-h-screen bg-offwhite flex">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-56 border-r border-light bg-warm shrink-0 pt-8 pb-6 px-4">
         <span className="font-serif text-xl text-ink mb-8 px-2">Render</span>
+        {user.is_beta && (
+          <span className="font-mono text-[10px] uppercase tracking-widest text-amber bg-ink px-2 py-0.5 rounded mb-4 mx-2 text-center">
+            Founding member
+          </span>
+        )}
         <nav className="flex flex-col gap-1">
           {NAV_LINKS.map(({ href, label }) => (
             <Link
@@ -30,6 +35,11 @@ export default async function ArtistLayout({ children }: { children: React.React
       </aside>
       {/* Mobile top nav */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-offwhite border-b border-light flex gap-4 px-4 py-3 overflow-x-auto">
+        {user.is_beta && (
+          <span className="font-mono text-[10px] uppercase tracking-widest text-amber bg-ink px-2 py-0.5 rounded self-center whitespace-nowrap">
+            Founding member
+          </span>
+        )}
         {NAV_LINKS.map(({ href, label }) => (
           <Link key={href} href={href} className="font-sans text-sm text-mid hover:text-ink whitespace-nowrap">
             {label}

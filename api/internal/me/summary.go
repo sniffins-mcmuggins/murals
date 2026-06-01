@@ -36,6 +36,7 @@ type festivalPayload struct {
 type summaryResponse struct {
 	ArtistProfile *artistProfilePayload `json:"artist_profile"`
 	Festivals     []festivalPayload     `json:"festivals"`
+	IsBeta        bool                  `json:"is_beta"`
 }
 
 // pgUUIDFromString parses a UUID string into a pgtype.UUID. Mirrors the
@@ -66,6 +67,12 @@ func SummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := sqlcdb.New(pool)
+
+		user, err := q.GetUserByID(r.Context(), userUUID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
 
 		var profilePayload *artistProfilePayload
 		profile, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
@@ -114,6 +121,7 @@ func SummaryHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		_ = json.NewEncoder(w).Encode(summaryResponse{
 			ArtistProfile: profilePayload,
 			Festivals:     festPayloads,
+			IsBeta:        user.IsBeta,
 		})
 	}
 }
