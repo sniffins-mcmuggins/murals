@@ -50,9 +50,14 @@ test('V01 — Organiser Setup', async ({ page }) => {
   await page.getByRole('button', { name: 'Create' }).click()
   await pause(1500)
 
-  // ── 5. Set up application form via API (not shown on screen) ─────────────────
-  const url = page.url()
-  const festivalId = url.split('/').at(-1)!
+  // ── 5. Navigate to festival detail and extract ID ─────────────────────────────
+  // After creation the modal closes and returns to the list page.
+  // Get the ID from the festival's link href, then navigate to the detail page.
+  await expect(page.getByText('Cheltenham Paint Festival 2027')).toBeVisible({ timeout: 8000 })
+  const festivalHref = await page.locator('a[href*="/organiser/festivals/"]').first().getAttribute('href')
+  const festivalId = festivalHref!.split('/').at(-1)!
+  await page.goto(`/organiser/festivals/${festivalId}`)
+  await pause(1200)
 
   const formRes = await page.request.put(`${API}/festivals/${festivalId}/form`, {
     data: {
