@@ -19,23 +19,20 @@ All issues must follow `[EX]` or `[EX.Y]` format:
 
 ### Current epic numbering
 
-| Epic | Title | Status |
-|------|-------|--------|
-| E1–E10 | Phase 1 foundations | Done |
-| E11 | Production infrastructure (Terraform, CI/CD) | Backlog/P0 |
-| E12 | Auth upgrades (OAuth, MFA, password reset) | Done |
-| E13 | Stripe payments | Done |
-| E14 | E2E test suite (auth + billing) | Done |
-| E15 | Private page sharing — prospect → claim → publish | In progress |
-| E16 | Private beta portal — invite-gated access | Ready |
-| E17 | Artists as moderators — flag queue, graded actions | Backlog |
-| E18 | Artist & organiser endorsements | Backlog |
-| E19 | AI onboarding backend — artist profile auto-build | Icebox |
-| E20 | Refer-an-artist — referral attribution, comp rewards | Backlog |
-| E21 | GPS-triggered artist audio + festival trail + save/seen | Backlog |
-| E22 | Organiser review & selection (panellist, rubric, anon, multi-round) | Backlog (E22.4 open) |
+Don't maintain a static table — query GitHub instead:
 
-**Next epic number: E23.** Before creating a new epic, check this table first.
+```bash
+# All epics (open and closed), sorted by number
+gh issue list --repo sniffins-mcmuggins/murals --label type:epic --state all --limit 50 \
+  --json number,title,state | \
+  python3 -c "import sys,json; [print(f'E{i[\"number\"]}: {i[\"title\"]} [{i[\"state\"]}]') for i in sorted(json.load(sys.stdin), key=lambda x: x['number'])]"
+
+# Next epic number: highest E-number issue + 1
+gh issue list --repo sniffins-mcmuggins/murals --label type:epic --state all --limit 50 \
+  --json number | python3 -c "import sys,json; print('Next:', max(i['number'] for i in json.load(sys.stdin)) + 1)"
+```
+
+Before creating a new epic, run the second command to get the next number.
 
 ---
 
@@ -116,12 +113,11 @@ Every P0 issue should be assigned to one of the two active milestones. P1/P2 iss
    - If it has explicit cross-issue blockers: run `addBlockedBy` for each one.
 
 ### Creating a new epic
-1. Check the "Current epic numbering" table above — use the next E number.
-2. Update the table in this file with the new epic.
-3. Body must contain a checklist of sub-issues (add them as `[ ] [EX.Y] #NNN — …` lines).
-4. Add it to the board and set Status + Priority via `gh api graphql` mutations (see `kanban.md`).
-5. Label: `type:epic` + relevant `area:` labels.
-6. Once sub-issue tickets are created, run `addSubIssue` for each one (see `kanban.md` → "Issue relationships").
+1. Run the next-number command above to get the correct E number.
+2. Body must contain a checklist of sub-issues (add them as `[ ] [EX.Y] #NNN — …` lines).
+3. Add it to the board and set Status + Priority via `gh api graphql` mutations (see `kanban.md`).
+4. Label: `type:epic` + relevant `area:` labels.
+5. Once sub-issue tickets are created, run `addSubIssue` for each one (see `kanban.md` → "Issue relationships").
 
 ### Periodic audit (run when asked to tidy the board)
 1. Scan open issues for titles not matching `[EX]` / `[EX.Y]` → rename or close.
