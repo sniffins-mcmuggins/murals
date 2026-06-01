@@ -8,6 +8,7 @@
 - Access grants: create/revoke plan grants for users (comps, overrides)
 - Promo codes: create codes, `RedeemPromoHandler` (rate-limited, handler-level auth check)
 - Promo `RedeemPromoHandler` is in the rate-limited group but NOT the admin-required group — it is the public redemption endpoint; auth check is inside the handler
+- Prospect profiles: `POST /admin/prospects` — creates unclaimed profiles from seed.json; returns claim_token + preview_url; idempotent by display_name + admin
 
 ## Boundaries
 - Does NOT manage festival content — organisers do that via the festival package
@@ -29,7 +30,9 @@
 - `users.go`: user management handlers
 - `grants.go`: `GrantHandler`, `RevokeGrantHandler` — creates rows in `access_grants` which billing reads via `CanPublish`/`RequirePlan`
 - `promo.go`: promo code CRUD + `RedeemPromoHandler` — note the dual registration (rate-limited group, not admin group) for the redemption endpoint
+- `prospects.go`: `CreateProspectHandler` — creates null-user_id prospect profiles from seed data; image upload is fire-and-forget background work (see background-work.md)
 - `helpers.go`: `pgUUIDFromString` package-local utility
 
 ## Changelog
+2026-06-01 — E15.4: POST /admin/prospects handler
 2026-05-31 — initial spec
