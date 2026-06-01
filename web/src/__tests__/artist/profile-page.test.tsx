@@ -34,7 +34,7 @@ describe('ProfilePage', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
   it('renders without throwing when profile is null', async () => {
-    const jsx = await ProfilePage()
+    const jsx = await ProfilePage({ searchParams: Promise.resolve({}) })
     const rendered = JSON.stringify(jsx)
     expect(rendered).toContain('Profile')
   })

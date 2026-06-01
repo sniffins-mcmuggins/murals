@@ -16,6 +16,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const nextPath = searchParams.get('next') ?? '/dashboard'
+  const claimRedirect = searchParams.get('claim')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -59,7 +60,11 @@ function LoginForm() {
       }
 
       // HTTP-only session cookie is set by the server automatically.
-      router.push(nextPath)
+      if (claimRedirect) {
+        router.push('/profile?claimed=1')
+      } else {
+        router.push(nextPath)
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
@@ -97,7 +102,11 @@ function LoginForm() {
         return
       }
 
-      router.push(nextPath)
+      if (claimRedirect) {
+        router.push('/profile?claimed=1')
+      } else {
+        router.push(nextPath)
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
