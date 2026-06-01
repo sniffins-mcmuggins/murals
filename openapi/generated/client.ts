@@ -265,6 +265,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/me/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish own artist profile (draft → public)
+         * @description Flips the authenticated artist's profile from draft to public. Requires an active artist subscription or comp grant — returns 402 with a payment_required payload if not entitled. Idempotent if already public.
+         */
+        post: operations["publishProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/me/unpublish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpublish own artist profile (public → draft)
+         * @description Flips the authenticated artist's profile from public to draft. Always allowed regardless of subscription state. Idempotent if already draft.
+         */
+        post: operations["unpublishProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileID}": {
         parameters: {
             query?: never;
@@ -1503,6 +1543,8 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+            /** @description Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses. */
+            preview_token?: string;
         };
         CreateProfileRequest: {
             /** @example Alice Muralist */
@@ -2269,6 +2311,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalyticsResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    publishProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated profile (visibility is now public). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Payment required — no active subscription or comp grant. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example payment_required */
+                        code: string;
+                        message: string;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unpublishProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated profile (visibility is now draft). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
                 };
             };
             401: components["responses"]["Unauthorized"];

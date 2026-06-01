@@ -200,6 +200,13 @@ components:
         updated_at:
           type: string
           format: date-time
+        preview_token:
+          type: string
+          description: >-
+            Opaque preview token. Only present in owner-facing responses
+            (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish).
+            Share /profiles/preview/{token} for pre-publish access. Omitted from
+            public responses.
 
     CreateProfileRequest:
       type: object
@@ -1183,6 +1190,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnalyticsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/me/publish:
+    post:
+      operationId: publishProfile
+      summary: Publish own artist profile (draft → public)
+      description: >-
+        Flips the authenticated artist's profile from draft to public.
+        Requires an active artist subscription or comp grant — returns 402
+        with a payment_required payload if not entitled. Idempotent if
+        already public.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated profile (visibility is now public).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "402":
+          description: Payment required — no active subscription or comp grant.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message]
+                properties:
+                  code:
+                    type: string
+                    example: payment_required
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/me/unpublish:
+    post:
+      operationId: unpublishProfile
+      summary: Unpublish own artist profile (public → draft)
+      description: >-
+        Flips the authenticated artist's profile from public to draft.
+        Always allowed regardless of subscription state. Idempotent if
+        already draft.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated profile (visibility is now draft).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
