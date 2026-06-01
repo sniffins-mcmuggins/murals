@@ -14,7 +14,7 @@ test('V04 — Artist Apply', async ({ page }) => {
 
   // ── 2. Find CPF 2027 in open festivals ────────────────────────────────────────
   await page.goto('/applications')
-  await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 8000 })
+  await expect(page.getByRole('heading', { name: 'Applications', exact: true })).toBeVisible({ timeout: 8000 })
   await pause(1200)
 
   await expect(page.getByText('Cheltenham Paint Festival 2027')).toBeVisible({ timeout: 8000 })
