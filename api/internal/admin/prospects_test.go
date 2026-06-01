@@ -41,9 +41,9 @@ func createAdminUser(t *testing.T, db *pgxpool.Pool) (string, string) {
 
 	// Enable MFA
 	_, err = q.SetMFAEnabled(ctx, sqlcdb.SetMFAEnabledParams{
-		ID:        user.ID,
+		ID:         user.ID,
 		MfaEnabled: true,
-		MfaSecret: ptr("fake-secret"),
+		MfaSecret:  ptr("fake-secret"),
 	})
 	require.NoError(t, err)
 
