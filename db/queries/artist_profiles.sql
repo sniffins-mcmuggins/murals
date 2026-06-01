@@ -50,3 +50,40 @@ SET visibility = $2,
     updated_at = now()
 WHERE user_id = $1
 RETURNING *;
+
+-- name: CreateProspectProfile :one
+-- Creates an unclaimed prospect profile (user_id NULL) seeded from admin data.
+INSERT INTO artist_profiles (display_name, bio, location_label, medium_tags, social_links, created_by)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
+
+-- name: GetArtistProfileByClaimToken :one
+SELECT * FROM artist_profiles WHERE claim_token = $1;
+
+-- name: ClaimArtistProfile :one
+-- Atomically binds a profile to a user. Returns no row if already claimed
+-- (user_id IS NOT NULL) or if the token doesn't exist — caller checks for
+-- pgx.ErrNoRows and returns 409.
+UPDATE artist_profiles
+SET user_id    = $1,
+    claimed_at = now(),
+    updated_at = now()
+WHERE claim_token = $2
+  AND user_id IS NULL
+RETURNING *;
+
+-- name: SetProspectClaimToken :one
+-- Sets a unique claim token on a prospect profile. Called during prospect creation.
+UPDATE artist_profiles
+SET claim_token = $2,
+    updated_at  = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: GetProspectByNameAndCreator :one
+-- Idempotency check: return an existing unclaimed prospect by name + admin creator.
+SELECT * FROM artist_profiles
+WHERE display_name = $1
+  AND created_by   = $2
+  AND user_id IS NULL
+LIMIT 1;

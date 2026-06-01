@@ -12,6 +12,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimArtistProfile = `-- name: ClaimArtistProfile :one
+UPDATE artist_profiles
+SET user_id    = $1,
+    claimed_at = now(),
+    updated_at = now()
+WHERE claim_token = $2
+  AND user_id IS NULL
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
+`
+
+type ClaimArtistProfileParams struct {
+	UserID     pgtype.UUID `db:"user_id" json:"user_id"`
+	ClaimToken *string     `db:"claim_token" json:"claim_token"`
+}
+
+// Atomically binds a profile to a user. Returns no row if already claimed
+// (user_id IS NOT NULL) or if the token doesn't exist — caller checks for
+// pgx.ErrNoRows and returns 409.
+func (q *Queries) ClaimArtistProfile(ctx context.Context, arg ClaimArtistProfileParams) (ArtistProfile, error) {
+	row := q.db.QueryRow(ctx, claimArtistProfile, arg.UserID, arg.ClaimToken)
+	var i ArtistProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.LocationLabel,
+		&i.ShowLocation,
+		&i.MediumTags,
+		&i.SocialLinks,
+		&i.AvatarS3Key,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HeadlineImageUrls,
+		&i.Visibility,
+		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
 const countPublicProfiles = `-- name: CountPublicProfiles :one
 SELECT COUNT(*) FROM artist_profiles
 WHERE visibility = 'public'
@@ -27,7 +70,7 @@ func (q *Queries) CountPublicProfiles(ctx context.Context) (int64, error) {
 const createArtistProfile = `-- name: CreateArtistProfile :one
 INSERT INTO artist_profiles (user_id, display_name)
 VALUES ($1, $2)
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
 `
 
 type CreateArtistProfileParams struct {
@@ -53,12 +96,92 @@ func (q *Queries) CreateArtistProfile(ctx context.Context, arg CreateArtistProfi
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
+const createProspectProfile = `-- name: CreateProspectProfile :one
+INSERT INTO artist_profiles (display_name, bio, location_label, medium_tags, social_links, created_by)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
+`
+
+type CreateProspectProfileParams struct {
+	DisplayName   string          `db:"display_name" json:"display_name"`
+	Bio           string          `db:"bio" json:"bio"`
+	LocationLabel *string         `db:"location_label" json:"location_label"`
+	MediumTags    []string        `db:"medium_tags" json:"medium_tags"`
+	SocialLinks   json.RawMessage `db:"social_links" json:"social_links"`
+	CreatedBy     pgtype.UUID     `db:"created_by" json:"created_by"`
+}
+
+// Creates an unclaimed prospect profile (user_id NULL) seeded from admin data.
+func (q *Queries) CreateProspectProfile(ctx context.Context, arg CreateProspectProfileParams) (ArtistProfile, error) {
+	row := q.db.QueryRow(ctx, createProspectProfile,
+		arg.DisplayName,
+		arg.Bio,
+		arg.LocationLabel,
+		arg.MediumTags,
+		arg.SocialLinks,
+		arg.CreatedBy,
+	)
+	var i ArtistProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.LocationLabel,
+		&i.ShowLocation,
+		&i.MediumTags,
+		&i.SocialLinks,
+		&i.AvatarS3Key,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HeadlineImageUrls,
+		&i.Visibility,
+		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
+const getArtistProfileByClaimToken = `-- name: GetArtistProfileByClaimToken :one
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles WHERE claim_token = $1
+`
+
+func (q *Queries) GetArtistProfileByClaimToken(ctx context.Context, claimToken *string) (ArtistProfile, error) {
+	row := q.db.QueryRow(ctx, getArtistProfileByClaimToken, claimToken)
+	var i ArtistProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.LocationLabel,
+		&i.ShowLocation,
+		&i.MediumTags,
+		&i.SocialLinks,
+		&i.AvatarS3Key,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HeadlineImageUrls,
+		&i.Visibility,
+		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
 
 const getArtistProfileByID = `-- name: GetArtistProfileByID :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token FROM artist_profiles WHERE id = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles WHERE id = $1
 `
 
 func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (ArtistProfile, error) {
@@ -79,12 +202,15 @@ func (q *Queries) GetArtistProfileByID(ctx context.Context, id pgtype.UUID) (Art
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
 
 const getArtistProfileByPreviewToken = `-- name: GetArtistProfileByPreviewToken :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token FROM artist_profiles WHERE preview_token = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles WHERE preview_token = $1
 `
 
 func (q *Queries) GetArtistProfileByPreviewToken(ctx context.Context, previewToken string) (ArtistProfile, error) {
@@ -105,12 +231,15 @@ func (q *Queries) GetArtistProfileByPreviewToken(ctx context.Context, previewTok
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
 
 const getArtistProfileByUserID = `-- name: GetArtistProfileByUserID :one
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token FROM artist_profiles WHERE user_id = $1
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles WHERE user_id = $1
 `
 
 func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UUID) (ArtistProfile, error) {
@@ -131,12 +260,54 @@ func (q *Queries) GetArtistProfileByUserID(ctx context.Context, userID pgtype.UU
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
+const getProspectByNameAndCreator = `-- name: GetProspectByNameAndCreator :one
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles
+WHERE display_name = $1
+  AND created_by   = $2
+  AND user_id IS NULL
+LIMIT 1
+`
+
+type GetProspectByNameAndCreatorParams struct {
+	DisplayName string      `db:"display_name" json:"display_name"`
+	CreatedBy   pgtype.UUID `db:"created_by" json:"created_by"`
+}
+
+// Idempotency check: return an existing unclaimed prospect by name + admin creator.
+func (q *Queries) GetProspectByNameAndCreator(ctx context.Context, arg GetProspectByNameAndCreatorParams) (ArtistProfile, error) {
+	row := q.db.QueryRow(ctx, getProspectByNameAndCreator, arg.DisplayName, arg.CreatedBy)
+	var i ArtistProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.LocationLabel,
+		&i.ShowLocation,
+		&i.MediumTags,
+		&i.SocialLinks,
+		&i.AvatarS3Key,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HeadlineImageUrls,
+		&i.Visibility,
+		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
 
 const listPublicProfiles = `-- name: ListPublicProfiles :many
-SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token FROM artist_profiles
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles
 WHERE visibility = 'public'
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -171,6 +342,9 @@ func (q *Queries) ListPublicProfiles(ctx context.Context, arg ListPublicProfiles
 			&i.HeadlineImageUrls,
 			&i.Visibility,
 			&i.PreviewToken,
+			&i.ClaimToken,
+			&i.ClaimedAt,
+			&i.CreatedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -187,7 +361,7 @@ UPDATE artist_profiles
 SET preview_token = replace(gen_random_uuid()::text, '-', ''),
     updated_at    = now()
 WHERE user_id = $1
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
 `
 
 func (q *Queries) RotateArtistProfilePreviewToken(ctx context.Context, userID pgtype.UUID) (ArtistProfile, error) {
@@ -208,6 +382,9 @@ func (q *Queries) RotateArtistProfilePreviewToken(ctx context.Context, userID pg
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
@@ -217,7 +394,7 @@ UPDATE artist_profiles
 SET visibility = $2,
     updated_at = now()
 WHERE user_id = $1
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
 `
 
 type SetArtistProfileVisibilityParams struct {
@@ -243,6 +420,48 @@ func (q *Queries) SetArtistProfileVisibility(ctx context.Context, arg SetArtistP
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
+const setProspectClaimToken = `-- name: SetProspectClaimToken :one
+UPDATE artist_profiles
+SET claim_token = $2,
+    updated_at  = now()
+WHERE id = $1
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
+`
+
+type SetProspectClaimTokenParams struct {
+	ID         pgtype.UUID `db:"id" json:"id"`
+	ClaimToken *string     `db:"claim_token" json:"claim_token"`
+}
+
+// Sets a unique claim token on a prospect profile. Called during prospect creation.
+func (q *Queries) SetProspectClaimToken(ctx context.Context, arg SetProspectClaimTokenParams) (ArtistProfile, error) {
+	row := q.db.QueryRow(ctx, setProspectClaimToken, arg.ID, arg.ClaimToken)
+	var i ArtistProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.LocationLabel,
+		&i.ShowLocation,
+		&i.MediumTags,
+		&i.SocialLinks,
+		&i.AvatarS3Key,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HeadlineImageUrls,
+		&i.Visibility,
+		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
@@ -260,7 +479,7 @@ SET display_name        = $2,
     visibility          = $10,
     updated_at          = now()
 WHERE id = $1
-RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by
 `
 
 type UpdateArtistProfileParams struct {
@@ -305,6 +524,9 @@ func (q *Queries) UpdateArtistProfile(ctx context.Context, arg UpdateArtistProfi
 		&i.HeadlineImageUrls,
 		&i.Visibility,
 		&i.PreviewToken,
+		&i.ClaimToken,
+		&i.ClaimedAt,
+		&i.CreatedBy,
 	)
 	return i, err
 }
