@@ -354,6 +354,20 @@ type CollectionImage struct {
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type Endorsement struct {
+	ID               pgtype.UUID        `db:"id" json:"id"`
+	EndorserID       pgtype.UUID        `db:"endorser_id" json:"endorser_id"`
+	EndorseeID       pgtype.UUID        `db:"endorsee_id" json:"endorsee_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	FestivalID       pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Body             *string            `db:"body" json:"body"`
+	Skills           []string           `db:"skills" json:"skills"`
+	HiddenByEndorsee bool               `db:"hidden_by_endorsee" json:"hidden_by_endorsee"`
+	ModerationStatus string             `db:"moderation_status" json:"moderation_status"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Festival struct {
 	ID            pgtype.UUID        `db:"id" json:"id"`
 	OrganiserID   pgtype.UUID        `db:"organiser_id" json:"organiser_id"`

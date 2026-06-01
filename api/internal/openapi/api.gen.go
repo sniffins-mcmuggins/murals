@@ -86,6 +86,42 @@ func (e CollectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for CreateEndorsementRequestKind.
+const (
+	CreateEndorsementRequestKindOrganiser CreateEndorsementRequestKind = "organiser"
+	CreateEndorsementRequestKindPeer      CreateEndorsementRequestKind = "peer"
+)
+
+// Valid indicates whether the value is a known member of the CreateEndorsementRequestKind enum.
+func (e CreateEndorsementRequestKind) Valid() bool {
+	switch e {
+	case CreateEndorsementRequestKindOrganiser:
+		return true
+	case CreateEndorsementRequestKindPeer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EndorsementResponseKind.
+const (
+	EndorsementResponseKindOrganiser EndorsementResponseKind = "organiser"
+	EndorsementResponseKindPeer      EndorsementResponseKind = "peer"
+)
+
+// Valid indicates whether the value is a known member of the EndorsementResponseKind enum.
+func (e EndorsementResponseKind) Valid() bool {
+	switch e {
+	case EndorsementResponseKindOrganiser:
+		return true
+	case EndorsementResponseKindPeer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FestivalAppearanceStatus.
 const (
 	Live FestivalAppearanceStatus = "live"
@@ -369,6 +405,18 @@ type CreateCollectionRequest struct {
 	Name        string  `json:"name"`
 }
 
+// CreateEndorsementRequest defines model for CreateEndorsementRequest.
+type CreateEndorsementRequest struct {
+	Body       *string                      `json:"body,omitempty"`
+	EndorseeId openapi_types.UUID           `json:"endorsee_id"`
+	FestivalId *openapi_types.UUID          `json:"festival_id,omitempty"`
+	Kind       CreateEndorsementRequestKind `json:"kind"`
+	Skills     *[]string                    `json:"skills,omitempty"`
+}
+
+// CreateEndorsementRequestKind defines model for CreateEndorsementRequest.Kind.
+type CreateEndorsementRequestKind string
+
 // CreateProfileRequest defines model for CreateProfileRequest.
 type CreateProfileRequest struct {
 	DisplayName string `json:"displayName"`
@@ -397,6 +445,29 @@ type CriterionScore struct {
 	MyScore     *int     `json:"my_score,omitempty"`
 	ScoreCount  *int     `json:"score_count,omitempty"`
 }
+
+// EndorsementListResponse defines model for EndorsementListResponse.
+type EndorsementListResponse struct {
+	Endorsements []EndorsementResponse `json:"endorsements"`
+}
+
+// EndorsementResponse defines model for EndorsementResponse.
+type EndorsementResponse struct {
+	Body                *string                 `json:"body,omitempty"`
+	CreatedAt           time.Time               `json:"created_at"`
+	EndorserAvatarS3Key *string                 `json:"endorser_avatar_s3_key,omitempty"`
+	EndorserDisplayName *string                 `json:"endorser_display_name,omitempty"`
+	EndorserId          openapi_types.UUID      `json:"endorser_id"`
+	FestivalId          *openapi_types.UUID     `json:"festival_id,omitempty"`
+	FestivalName        *string                 `json:"festival_name,omitempty"`
+	HiddenByEndorsee    bool                    `json:"hidden_by_endorsee"`
+	Id                  openapi_types.UUID      `json:"id"`
+	Kind                EndorsementResponseKind `json:"kind"`
+	Skills              []string                `json:"skills"`
+}
+
+// EndorsementResponseKind defines model for EndorsementResponse.Kind.
+type EndorsementResponseKind string
 
 // Festival defines model for Festival.
 type Festival struct {
@@ -563,6 +634,11 @@ type ScoreRequest struct {
 type ScoreResponse struct {
 	ApplicationId openapi_types.UUID `json:"application_id"`
 	Score         int                `json:"score"`
+}
+
+// SetEndorsementVisibilityRequest defines model for SetEndorsementVisibilityRequest.
+type SetEndorsementVisibilityRequest struct {
+	Hidden bool `json:"hidden"`
 }
 
 // SignupRequest defines model for SignupRequest.
@@ -810,6 +886,12 @@ type AttachCollectionImageJSONRequestBody = AttachImageRequest
 // ReorderCollectionImagesJSONRequestBody defines body for ReorderCollectionImages for application/json ContentType.
 type ReorderCollectionImagesJSONRequestBody = ReorderImagesRequest
 
+// CreateEndorsementJSONRequestBody defines body for CreateEndorsement for application/json ContentType.
+type CreateEndorsementJSONRequestBody = CreateEndorsementRequest
+
+// SetEndorsementVisibilityJSONRequestBody defines body for SetEndorsementVisibility for application/json ContentType.
+type SetEndorsementVisibilityJSONRequestBody = SetEndorsementVisibilityRequest
+
 // PostFestivalsJSONRequestBody defines body for PostFestivals for application/json ContentType.
 type PostFestivalsJSONRequestBody PostFestivalsJSONBody
 
@@ -911,6 +993,18 @@ type ServerInterface interface {
 	// Remove an image from a collection
 	// (DELETE /collections/{collectionID}/images/{imageID})
 	DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID)
+	// Create or update an endorsement
+	// (POST /endorsements)
+	CreateEndorsement(w http.ResponseWriter, r *http.Request)
+	// List all endorsements received (endorsee management view)
+	// (GET /endorsements/received)
+	ListReceivedEndorsements(w http.ResponseWriter, r *http.Request)
+	// Withdraw an endorsement (endorser only)
+	// (DELETE /endorsements/{endorsementID})
+	DeleteEndorsement(w http.ResponseWriter, r *http.Request, endorsementID openapi_types.UUID)
+	// Show or hide an endorsement (endorsee only)
+	// (PATCH /endorsements/{endorsementID}/visibility)
+	SetEndorsementVisibility(w http.ResponseWriter, r *http.Request, endorsementID openapi_types.UUID)
 	// List my festivals
 	// (GET /festivals)
 	GetFestivals(w http.ResponseWriter, r *http.Request)
@@ -1043,6 +1137,9 @@ type ServerInterface interface {
 	// List collections for an artist profile
 	// (GET /profiles/{profileID}/collections)
 	ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
+	// List public endorsements for an artist profile
+	// (GET /profiles/{profileID}/endorsements)
+	ListProfileEndorsements(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
 	// List an artist's public festival appearances
 	// (GET /profiles/{profileID}/festivals)
 	ListArtistFestivals(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
@@ -1148,6 +1245,30 @@ func (_ Unimplemented) ReorderCollectionImages(w http.ResponseWriter, r *http.Re
 // Remove an image from a collection
 // (DELETE /collections/{collectionID}/images/{imageID})
 func (_ Unimplemented) DeleteCollectionImage(w http.ResponseWriter, r *http.Request, collectionID openapi_types.UUID, imageID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create or update an endorsement
+// (POST /endorsements)
+func (_ Unimplemented) CreateEndorsement(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List all endorsements received (endorsee management view)
+// (GET /endorsements/received)
+func (_ Unimplemented) ListReceivedEndorsements(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Withdraw an endorsement (endorser only)
+// (DELETE /endorsements/{endorsementID})
+func (_ Unimplemented) DeleteEndorsement(w http.ResponseWriter, r *http.Request, endorsementID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Show or hide an endorsement (endorsee only)
+// (PATCH /endorsements/{endorsementID}/visibility)
+func (_ Unimplemented) SetEndorsementVisibility(w http.ResponseWriter, r *http.Request, endorsementID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1412,6 +1533,12 @@ func (_ Unimplemented) GetProfile(w http.ResponseWriter, r *http.Request, profil
 // List collections for an artist profile
 // (GET /profiles/{profileID}/collections)
 func (_ Unimplemented) ListCollections(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List public endorsements for an artist profile
+// (GET /profiles/{profileID}/endorsements)
+func (_ Unimplemented) ListProfileEndorsements(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1804,6 +1931,118 @@ func (siw *ServerInterfaceWrapper) DeleteCollectionImage(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteCollectionImage(w, r, collectionID, imageID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateEndorsement operation middleware
+func (siw *ServerInterfaceWrapper) CreateEndorsement(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEndorsement(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReceivedEndorsements operation middleware
+func (siw *ServerInterfaceWrapper) ListReceivedEndorsements(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReceivedEndorsements(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteEndorsement operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEndorsement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "endorsementID" -------------
+	var endorsementID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "endorsementID", chi.URLParam(r, "endorsementID"), &endorsementID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "endorsementID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEndorsement(w, r, endorsementID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetEndorsementVisibility operation middleware
+func (siw *ServerInterfaceWrapper) SetEndorsementVisibility(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "endorsementID" -------------
+	var endorsementID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "endorsementID", chi.URLParam(r, "endorsementID"), &endorsementID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "endorsementID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetEndorsementVisibility(w, r, endorsementID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3161,6 +3400,32 @@ func (siw *ServerInterfaceWrapper) ListCollections(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListProfileEndorsements operation middleware
+func (siw *ServerInterfaceWrapper) ListProfileEndorsements(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "profileID" -------------
+	var profileID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "profileID", chi.URLParam(r, "profileID"), &profileID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListProfileEndorsements(w, r, profileID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListArtistFestivals operation middleware
 func (siw *ServerInterfaceWrapper) ListArtistFestivals(w http.ResponseWriter, r *http.Request) {
 
@@ -3476,6 +3741,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Delete(options.BaseURL+"/collections/{collectionID}/images/{imageID}", wrapper.DeleteCollectionImage)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/endorsements", wrapper.CreateEndorsement)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/endorsements/received", wrapper.ListReceivedEndorsements)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/endorsements/{endorsementID}", wrapper.DeleteEndorsement)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/endorsements/{endorsementID}/visibility", wrapper.SetEndorsementVisibility)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/festivals", wrapper.GetFestivals)
 	})
 	r.Group(func(r chi.Router) {
@@ -3606,6 +3883,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}/collections", wrapper.ListCollections)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/profiles/{profileID}/endorsements", wrapper.ListProfileEndorsements)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}/festivals", wrapper.ListArtistFestivals)
@@ -4372,6 +4652,296 @@ type DeleteCollectionImage404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response DeleteCollectionImage404ApplicationProblemPlusJSONResponse) VisitDeleteCollectionImageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEndorsementRequestObject struct {
+	Body *CreateEndorsementJSONRequestBody
+}
+
+type CreateEndorsementResponseObject interface {
+	VisitCreateEndorsementResponse(w http.ResponseWriter) error
+}
+
+type CreateEndorsement201JSONResponse EndorsementResponse
+
+func (response CreateEndorsement201JSONResponse) VisitCreateEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEndorsement400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEndorsement400ApplicationProblemPlusJSONResponse) VisitCreateEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEndorsement401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEndorsement401ApplicationProblemPlusJSONResponse) VisitCreateEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEndorsement403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEndorsement403ApplicationProblemPlusJSONResponse) VisitCreateEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEndorsement404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEndorsement404ApplicationProblemPlusJSONResponse) VisitCreateEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEndorsement422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEndorsement422ApplicationProblemPlusJSONResponse) VisitCreateEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReceivedEndorsementsRequestObject struct {
+}
+
+type ListReceivedEndorsementsResponseObject interface {
+	VisitListReceivedEndorsementsResponse(w http.ResponseWriter) error
+}
+
+type ListReceivedEndorsements200JSONResponse EndorsementListResponse
+
+func (response ListReceivedEndorsements200JSONResponse) VisitListReceivedEndorsementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReceivedEndorsements401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListReceivedEndorsements401ApplicationProblemPlusJSONResponse) VisitListReceivedEndorsementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReceivedEndorsements404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListReceivedEndorsements404ApplicationProblemPlusJSONResponse) VisitListReceivedEndorsementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEndorsementRequestObject struct {
+	EndorsementID openapi_types.UUID `json:"endorsementID"`
+}
+
+type DeleteEndorsementResponseObject interface {
+	VisitDeleteEndorsementResponse(w http.ResponseWriter) error
+}
+
+type DeleteEndorsement204Response struct {
+}
+
+func (response DeleteEndorsement204Response) VisitDeleteEndorsementResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteEndorsement401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEndorsement401ApplicationProblemPlusJSONResponse) VisitDeleteEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEndorsement403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEndorsement403ApplicationProblemPlusJSONResponse) VisitDeleteEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEndorsement404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEndorsement404ApplicationProblemPlusJSONResponse) VisitDeleteEndorsementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEndorsementVisibilityRequestObject struct {
+	EndorsementID openapi_types.UUID `json:"endorsementID"`
+	Body          *SetEndorsementVisibilityJSONRequestBody
+}
+
+type SetEndorsementVisibilityResponseObject interface {
+	VisitSetEndorsementVisibilityResponse(w http.ResponseWriter) error
+}
+
+type SetEndorsementVisibility200JSONResponse EndorsementResponse
+
+func (response SetEndorsementVisibility200JSONResponse) VisitSetEndorsementVisibilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEndorsementVisibility401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SetEndorsementVisibility401ApplicationProblemPlusJSONResponse) VisitSetEndorsementVisibilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEndorsementVisibility403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetEndorsementVisibility403ApplicationProblemPlusJSONResponse) VisitSetEndorsementVisibilityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEndorsementVisibility404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetEndorsementVisibility404ApplicationProblemPlusJSONResponse) VisitSetEndorsementVisibilityResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6965,6 +7535,28 @@ func (response ListCollections200JSONResponse) VisitListCollectionsResponse(w ht
 	return err
 }
 
+type ListProfileEndorsementsRequestObject struct {
+	ProfileID openapi_types.UUID `json:"profileID"`
+}
+
+type ListProfileEndorsementsResponseObject interface {
+	VisitListProfileEndorsementsResponse(w http.ResponseWriter) error
+}
+
+type ListProfileEndorsements200JSONResponse EndorsementListResponse
+
+func (response ListProfileEndorsements200JSONResponse) VisitListProfileEndorsementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListArtistFestivalsRequestObject struct {
 	ProfileID openapi_types.UUID `json:"profileID"`
 }
@@ -7178,6 +7770,18 @@ type StrictServerInterface interface {
 	// Remove an image from a collection
 	// (DELETE /collections/{collectionID}/images/{imageID})
 	DeleteCollectionImage(ctx context.Context, request DeleteCollectionImageRequestObject) (DeleteCollectionImageResponseObject, error)
+	// Create or update an endorsement
+	// (POST /endorsements)
+	CreateEndorsement(ctx context.Context, request CreateEndorsementRequestObject) (CreateEndorsementResponseObject, error)
+	// List all endorsements received (endorsee management view)
+	// (GET /endorsements/received)
+	ListReceivedEndorsements(ctx context.Context, request ListReceivedEndorsementsRequestObject) (ListReceivedEndorsementsResponseObject, error)
+	// Withdraw an endorsement (endorser only)
+	// (DELETE /endorsements/{endorsementID})
+	DeleteEndorsement(ctx context.Context, request DeleteEndorsementRequestObject) (DeleteEndorsementResponseObject, error)
+	// Show or hide an endorsement (endorsee only)
+	// (PATCH /endorsements/{endorsementID}/visibility)
+	SetEndorsementVisibility(ctx context.Context, request SetEndorsementVisibilityRequestObject) (SetEndorsementVisibilityResponseObject, error)
 	// List my festivals
 	// (GET /festivals)
 	GetFestivals(ctx context.Context, request GetFestivalsRequestObject) (GetFestivalsResponseObject, error)
@@ -7310,6 +7914,9 @@ type StrictServerInterface interface {
 	// List collections for an artist profile
 	// (GET /profiles/{profileID}/collections)
 	ListCollections(ctx context.Context, request ListCollectionsRequestObject) (ListCollectionsResponseObject, error)
+	// List public endorsements for an artist profile
+	// (GET /profiles/{profileID}/endorsements)
+	ListProfileEndorsements(ctx context.Context, request ListProfileEndorsementsRequestObject) (ListProfileEndorsementsResponseObject, error)
 	// List an artist's public festival appearances
 	// (GET /profiles/{profileID}/festivals)
 	ListArtistFestivals(ctx context.Context, request ListArtistFestivalsRequestObject) (ListArtistFestivalsResponseObject, error)
@@ -7773,6 +8380,120 @@ func (sh *strictHandler) DeleteCollectionImage(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteCollectionImageResponseObject); ok {
 		if err := validResponse.VisitDeleteCollectionImageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateEndorsement operation middleware
+func (sh *strictHandler) CreateEndorsement(w http.ResponseWriter, r *http.Request) {
+	var request CreateEndorsementRequestObject
+
+	var body CreateEndorsementJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateEndorsement(ctx, request.(CreateEndorsementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateEndorsement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateEndorsementResponseObject); ok {
+		if err := validResponse.VisitCreateEndorsementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReceivedEndorsements operation middleware
+func (sh *strictHandler) ListReceivedEndorsements(w http.ResponseWriter, r *http.Request) {
+	var request ListReceivedEndorsementsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReceivedEndorsements(ctx, request.(ListReceivedEndorsementsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReceivedEndorsements")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReceivedEndorsementsResponseObject); ok {
+		if err := validResponse.VisitListReceivedEndorsementsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteEndorsement operation middleware
+func (sh *strictHandler) DeleteEndorsement(w http.ResponseWriter, r *http.Request, endorsementID openapi_types.UUID) {
+	var request DeleteEndorsementRequestObject
+
+	request.EndorsementID = endorsementID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteEndorsement(ctx, request.(DeleteEndorsementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteEndorsement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteEndorsementResponseObject); ok {
+		if err := validResponse.VisitDeleteEndorsementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetEndorsementVisibility operation middleware
+func (sh *strictHandler) SetEndorsementVisibility(w http.ResponseWriter, r *http.Request, endorsementID openapi_types.UUID) {
+	var request SetEndorsementVisibilityRequestObject
+
+	request.EndorsementID = endorsementID
+
+	var body SetEndorsementVisibilityJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetEndorsementVisibility(ctx, request.(SetEndorsementVisibilityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetEndorsementVisibility")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetEndorsementVisibilityResponseObject); ok {
+		if err := validResponse.VisitSetEndorsementVisibilityResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -9025,6 +9746,32 @@ func (sh *strictHandler) ListCollections(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListCollectionsResponseObject); ok {
 		if err := validResponse.VisitListCollectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListProfileEndorsements operation middleware
+func (sh *strictHandler) ListProfileEndorsements(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID) {
+	var request ListProfileEndorsementsRequestObject
+
+	request.ProfileID = profileID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListProfileEndorsements(ctx, request.(ListProfileEndorsementsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListProfileEndorsements")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListProfileEndorsementsResponseObject); ok {
+		if err := validResponse.VisitListProfileEndorsementsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

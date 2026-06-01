@@ -862,6 +862,83 @@ components:
         preview_url:
           type: string
 
+    EndorsementResponse:
+      type: object
+      required: [id, kind, endorser_id, skills, hidden_by_endorsee, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [peer, organiser]
+        endorser_id:
+          type: string
+          format: uuid
+        endorser_display_name:
+          type: string
+          nullable: true
+        endorser_avatar_s3_key:
+          type: string
+          nullable: true
+        festival_id:
+          type: string
+          format: uuid
+          nullable: true
+        festival_name:
+          type: string
+          nullable: true
+        body:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+        hidden_by_endorsee:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    EndorsementListResponse:
+      type: object
+      required: [endorsements]
+      properties:
+        endorsements:
+          type: array
+          items:
+            $ref: "#/components/schemas/EndorsementResponse"
+
+    CreateEndorsementRequest:
+      type: object
+      required: [endorsee_id, kind]
+      properties:
+        endorsee_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [peer, organiser]
+        festival_id:
+          type: string
+          format: uuid
+          nullable: true
+        body:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+
+    SetEndorsementVisibilityRequest:
+      type: object
+      required: [hidden]
+      properties:
+        hidden:
+          type: boolean
+
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -1459,6 +1536,139 @@ paths:
                   $ref: "#/components/schemas/FestivalAppearance"
         "400":
           $ref: "#/components/responses/BadRequest"
+
+  /profiles/{profileID}/endorsements:
+    get:
+      operationId: listProfileEndorsements
+      summary: List public endorsements for an artist profile
+      tags: [artist]
+      parameters:
+        - name: profileID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Public endorsements (moderation_status=ok, hidden_by_endorsee=false), organiser-first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndorsementListResponse"
+
+  /endorsements:
+    post:
+      operationId: createEndorsement
+      summary: Create or update an endorsement
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEndorsementRequest"
+      responses:
+        "201":
+          description: Endorsement created or updated (upserts on repeat endorser+endorsee pair).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndorsementResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /endorsements/received:
+    get:
+      operationId: listReceivedEndorsements
+      summary: List all endorsements received (endorsee management view)
+      description: Returns all endorsements received by the authenticated artist, including hidden ones. For the endorsee's own management page.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All received endorsements including hidden ones.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndorsementListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /endorsements/{endorsementID}:
+    delete:
+      operationId: deleteEndorsement
+      summary: Withdraw an endorsement (endorser only)
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: endorsementID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Endorsement withdrawn.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /endorsements/{endorsementID}/visibility:
+    patch:
+      operationId: setEndorsementVisibility
+      summary: Show or hide an endorsement (endorsee only)
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: endorsementID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetEndorsementVisibilityRequest"
+      responses:
+        "200":
+          description: Updated endorsement.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndorsementResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /collections:
     post:

@@ -73,6 +73,8 @@ describe('ArtistPage', () => {
     mockGet
       .mockResolvedValueOnce(make404Response() as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never)
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
 
     await expect(
       ArtistPage({ params: Promise.resolve({ id: 'nonexistent-uuid' }) }),
@@ -86,6 +88,7 @@ describe('ArtistPage', () => {
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([mockCollection]) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
 
     const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
@@ -103,6 +106,7 @@ describe('ArtistPage', () => {
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([mockCollection]) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
 
     const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
@@ -118,6 +122,7 @@ describe('ArtistPage', () => {
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
 
     const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
@@ -130,6 +135,7 @@ describe('ArtistPage', () => {
       .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never)
       .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
 
     await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
 
