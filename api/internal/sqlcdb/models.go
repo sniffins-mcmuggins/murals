@@ -311,6 +311,15 @@ type ArtistProfile struct {
 	CreatedBy         pgtype.UUID        `db:"created_by" json:"created_by"`
 }
 
+type BetaFeedback struct {
+	ID        pgtype.UUID        `db:"id" json:"id"`
+	UserID    pgtype.UUID        `db:"user_id" json:"user_id"`
+	Kind      string             `db:"kind" json:"kind"`
+	Body      string             `db:"body" json:"body"`
+	AdminNote *string            `db:"admin_note" json:"admin_note"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type BetaInvite struct {
 	ID        pgtype.UUID        `db:"id" json:"id"`
 	Code      string             `db:"code" json:"code"`

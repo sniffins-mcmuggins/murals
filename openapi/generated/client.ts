@@ -1460,6 +1460,7 @@ export interface components {
             /** Format: email */
             email: string;
             is_admin: boolean;
+            is_beta: boolean;
             /** Format: date-time */
             created_at: string;
         };

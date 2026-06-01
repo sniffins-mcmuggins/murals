@@ -28,3 +28,32 @@ RETURNING *;
 INSERT INTO waitlist_requests (email)
 VALUES ($1)
 ON CONFLICT (email) DO NOTHING;
+
+-- name: ListBetaInvites :many
+SELECT * FROM beta_invites ORDER BY created_at DESC;
+
+-- name: ListBetaInvitesByCreator :many
+SELECT * FROM beta_invites WHERE created_by = $1 ORDER BY created_at DESC;
+
+-- name: CountBetaInvitesByCreator :one
+SELECT COUNT(*)::int FROM beta_invites WHERE created_by = $1;
+
+-- name: ListBetaInviteesByInviter :many
+SELECT id, email, beta_cohort, created_at
+FROM users
+WHERE invited_by = $1
+ORDER BY created_at ASC;
+
+-- name: CreateBetaFeedback :one
+INSERT INTO beta_feedback (user_id, kind, body)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: ListBetaFeedbackByUser :many
+SELECT * FROM beta_feedback WHERE user_id = $1 ORDER BY created_at DESC;
+
+-- name: ListAllBetaFeedback :many
+SELECT * FROM beta_feedback ORDER BY created_at DESC;
+
+-- name: UpdateBetaFeedbackNote :one
+UPDATE beta_feedback SET admin_note = $2 WHERE id = $1 RETURNING *;

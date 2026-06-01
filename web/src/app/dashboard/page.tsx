@@ -2,6 +2,8 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 
 import { requireAuth } from '@/lib/auth-server'
+import { BetaFeedbackWidget } from '@/components/BetaFeedbackWidget'
+import { BetaInviteCard } from '@/components/BetaInviteCard'
 
 const API_URL =
   process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
@@ -25,6 +27,19 @@ type Festival = {
 type Summary = {
   artist_profile: ArtistProfile | null
   festivals: Festival[]
+  is_beta: boolean
+}
+
+type BetaInvite = {
+  code: string
+  link: string
+  used_count: number
+  max_uses: number
+}
+
+type MyInvitesResponse = {
+  invites: BetaInvite[]
+  remaining_quota: number
 }
 
 async function fetchSummary(sessionCookie: string): Promise<Summary> {
@@ -38,17 +53,41 @@ async function fetchSummary(sessionCookie: string): Promise<Summary> {
   return res.json() as Promise<Summary>
 }
 
+async function fetchMyInvites(sessionCookie: string): Promise<MyInvitesResponse> {
+  const res = await fetch(`${API_URL}/beta/me/invites`, {
+    headers: { Cookie: `session=${sessionCookie}` },
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    return { invites: [], remaining_quota: 0 }
+  }
+  return res.json() as Promise<MyInvitesResponse>
+}
+
 export default async function DashboardPage() {
   await requireAuth()
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get('session')?.value ?? ''
   const summary = await fetchSummary(sessionCookie)
 
+  let betaInvites: BetaInvite[] = []
+  let betaRemaining = 0
+  if (summary.is_beta) {
+    const betaData = await fetchMyInvites(sessionCookie)
+    betaInvites = betaData.invites
+    betaRemaining = betaData.remaining_quota
+  }
+
   return (
     <div className="min-h-screen bg-offwhite">
       <header className="border-b border-light bg-warm">
-        <div className="max-w-4xl mx-auto px-6 py-5">
+        <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
           <span className="font-serif text-xl text-ink">Render</span>
+          {summary.is_beta && (
+            <span className="font-mono text-[10px] uppercase tracking-widest text-amber bg-ink px-2 py-0.5 rounded">
+              Founding member
+            </span>
+          )}
         </div>
       </header>
 
@@ -146,6 +185,16 @@ export default async function DashboardPage() {
             </div>
           )}
         </section>
+
+        {summary.is_beta && (
+          <>
+            <BetaInviteCard
+              initialInvites={betaInvites}
+              initialRemaining={betaRemaining}
+            />
+            <BetaFeedbackWidget />
+          </>
+        )}
       </main>
     </div>
   )

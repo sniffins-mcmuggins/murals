@@ -11,6 +11,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countBetaInvitesByCreator = `-- name: CountBetaInvitesByCreator :one
+SELECT COUNT(*)::int FROM beta_invites WHERE created_by = $1
+`
+
+func (q *Queries) CountBetaInvitesByCreator(ctx context.Context, createdBy pgtype.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countBetaInvitesByCreator, createdBy)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const createBetaFeedback = `-- name: CreateBetaFeedback :one
+INSERT INTO beta_feedback (user_id, kind, body)
+VALUES ($1, $2, $3)
+RETURNING id, user_id, kind, body, admin_note, created_at
+`
+
+type CreateBetaFeedbackParams struct {
+	UserID pgtype.UUID `db:"user_id" json:"user_id"`
+	Kind   string      `db:"kind" json:"kind"`
+	Body   string      `db:"body" json:"body"`
+}
+
+func (q *Queries) CreateBetaFeedback(ctx context.Context, arg CreateBetaFeedbackParams) (BetaFeedback, error) {
+	row := q.db.QueryRow(ctx, createBetaFeedback, arg.UserID, arg.Kind, arg.Body)
+	var i BetaFeedback
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.Body,
+		&i.AdminNote,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createBetaInvite = `-- name: CreateBetaInvite :one
 INSERT INTO beta_invites (code, created_by, max_uses, cohort, expires_at)
 VALUES ($1, $2, $3, $4, $5)
@@ -112,6 +149,173 @@ func (q *Queries) GetBetaInviteByCode(ctx context.Context, code string) (BetaInv
 	return i, err
 }
 
+const listAllBetaFeedback = `-- name: ListAllBetaFeedback :many
+SELECT id, user_id, kind, body, admin_note, created_at FROM beta_feedback ORDER BY created_at DESC
+`
+
+func (q *Queries) ListAllBetaFeedback(ctx context.Context) ([]BetaFeedback, error) {
+	rows, err := q.db.Query(ctx, listAllBetaFeedback)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BetaFeedback
+	for rows.Next() {
+		var i BetaFeedback
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Body,
+			&i.AdminNote,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBetaFeedbackByUser = `-- name: ListBetaFeedbackByUser :many
+SELECT id, user_id, kind, body, admin_note, created_at FROM beta_feedback WHERE user_id = $1 ORDER BY created_at DESC
+`
+
+func (q *Queries) ListBetaFeedbackByUser(ctx context.Context, userID pgtype.UUID) ([]BetaFeedback, error) {
+	rows, err := q.db.Query(ctx, listBetaFeedbackByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BetaFeedback
+	for rows.Next() {
+		var i BetaFeedback
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Body,
+			&i.AdminNote,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBetaInviteesByInviter = `-- name: ListBetaInviteesByInviter :many
+SELECT id, email, beta_cohort, created_at
+FROM users
+WHERE invited_by = $1
+ORDER BY created_at ASC
+`
+
+type ListBetaInviteesByInviterRow struct {
+	ID         pgtype.UUID        `db:"id" json:"id"`
+	Email      string             `db:"email" json:"email"`
+	BetaCohort *string            `db:"beta_cohort" json:"beta_cohort"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBetaInviteesByInviter(ctx context.Context, invitedBy pgtype.UUID) ([]ListBetaInviteesByInviterRow, error) {
+	rows, err := q.db.Query(ctx, listBetaInviteesByInviter, invitedBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBetaInviteesByInviterRow
+	for rows.Next() {
+		var i ListBetaInviteesByInviterRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.BetaCohort,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBetaInvites = `-- name: ListBetaInvites :many
+SELECT id, code, created_by, max_uses, used_count, cohort, expires_at, created_at FROM beta_invites ORDER BY created_at DESC
+`
+
+func (q *Queries) ListBetaInvites(ctx context.Context) ([]BetaInvite, error) {
+	rows, err := q.db.Query(ctx, listBetaInvites)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BetaInvite
+	for rows.Next() {
+		var i BetaInvite
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.CreatedBy,
+			&i.MaxUses,
+			&i.UsedCount,
+			&i.Cohort,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBetaInvitesByCreator = `-- name: ListBetaInvitesByCreator :many
+SELECT id, code, created_by, max_uses, used_count, cohort, expires_at, created_at FROM beta_invites WHERE created_by = $1 ORDER BY created_at DESC
+`
+
+func (q *Queries) ListBetaInvitesByCreator(ctx context.Context, createdBy pgtype.UUID) ([]BetaInvite, error) {
+	rows, err := q.db.Query(ctx, listBetaInvitesByCreator, createdBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BetaInvite
+	for rows.Next() {
+		var i BetaInvite
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.CreatedBy,
+			&i.MaxUses,
+			&i.UsedCount,
+			&i.Cohort,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const redeemBetaInvite = `-- name: RedeemBetaInvite :one
 UPDATE beta_invites
 SET used_count = used_count + 1
@@ -135,6 +339,29 @@ func (q *Queries) RedeemBetaInvite(ctx context.Context, code string) (BetaInvite
 		&i.UsedCount,
 		&i.Cohort,
 		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateBetaFeedbackNote = `-- name: UpdateBetaFeedbackNote :one
+UPDATE beta_feedback SET admin_note = $2 WHERE id = $1 RETURNING id, user_id, kind, body, admin_note, created_at
+`
+
+type UpdateBetaFeedbackNoteParams struct {
+	ID        pgtype.UUID `db:"id" json:"id"`
+	AdminNote *string     `db:"admin_note" json:"admin_note"`
+}
+
+func (q *Queries) UpdateBetaFeedbackNote(ctx context.Context, arg UpdateBetaFeedbackNoteParams) (BetaFeedback, error) {
+	row := q.db.QueryRow(ctx, updateBetaFeedbackNote, arg.ID, arg.AdminNote)
+	var i BetaFeedback
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.Body,
+		&i.AdminNote,
 		&i.CreatedAt,
 	)
 	return i, err

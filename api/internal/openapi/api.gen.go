@@ -624,6 +624,7 @@ type User struct {
 	Email     openapi_types.Email `json:"email"`
 	Id        openapi_types.UUID  `json:"id"`
 	IsAdmin   bool                `json:"is_admin"`
+	IsBeta    bool                `json:"is_beta"`
 }
 
 // BadRequest RFC 7807 problem details object returned on all error responses.
