@@ -14,3 +14,14 @@ export async function forcePublish(db: Client, userId: string): Promise<void> {
     [userId],
   )
 }
+
+// forceGrant inserts an access_grants row for the given user so they pass
+// billing.CanPublish. Use only in tests that are NOT testing the grant flow.
+// Uses the userId as granted_by (self-grant shortcut — valid FK, test-only).
+export async function forceGrant(db: Client, userId: string, plan = 'artist_basic'): Promise<void> {
+  await db.query(
+    `INSERT INTO access_grants (user_id, plan, valid_until, granted_by)
+     VALUES ($1, $2, now() + interval '30 days', $1)`,
+    [userId, plan],
+  )
+}

@@ -1,6 +1,6 @@
 # artist Spec
 **Path:** `api/internal/artist/`
-**Last updated:** 2026-05-31
+**Last updated:** 2026-06-01
 
 ## Contract
 - CRUD for artist profiles: create, get-mine, update, public-get (by profile ID)
@@ -11,6 +11,8 @@
 - Visibility gating: `GET /profiles/{profileID}` — 404 for non-public profiles
 - Preview sharing: `GET /profiles/preview/{token}` — returns any profile (draft or public) matching the `preview_token`; no auth required; token is the secret
 - Preview token rotation: `POST /profiles/me/preview-token/rotate` — generates a new token, invalidating any previously shared preview links; owner-only
+- Publish: `POST /profiles/me/publish` — flips draft → public, gated on `billing.CanPublish`; 402 if not entitled
+- Unpublish: `POST /profiles/me/unpublish` — flips public → draft; always allowed
 
 ## Boundaries
 - Does NOT own subscription/entitlement logic — calls `billing.CanPublish` to check publish eligibility
@@ -20,7 +22,7 @@
 ## Key Decisions
 - **One profile per user**: `CreateProfileHandler` enforces uniqueness via DB constraint; calling it twice returns 409
 - **Visibility states**: `draft` (owner only) and `public` (world-readable). No intermediate state.
-- **Publish gate**: `PATCH /profiles/me` with `visibility: public` calls `billing.CanPublish` — fails with 403 if the user has no active subscription or grant
+- **Publish gate**: `PATCH /profiles/me` with `visibility: public` calls `billing.CanPublish` — returns 402 (not 403) if the user has no active subscription or grant. The canonical publish actions are `POST /profiles/me/publish` and `POST /profiles/me/unpublish` — prefer these over the PATCH visibility field.
 - **Collections have `display_order`**: default `0`; ordered by `(display_order, created_at)`. Tests that assert creation order MUST call the reorder endpoint first — two rows created in the same millisecond under parallel load have a non-deterministic natural order
 - **Images have a two-step flow**: presign (→ `image` package), PUT to MinIO (→ client), confirm (→ `image` package), then attach to collection. The `artist` package only handles attach + set-cover
 - **Downgrade behaviour**: data exceeding a plan limit is locked (not deleted) when an artist downgrades
@@ -36,6 +38,7 @@
 
 ## AI Context
 - `profile.go`: profile CRUD + visibility management + publish gate + `RotatePreviewTokenHandler` + `PreviewByTokenHandler`
+- `publish.go`: `PublishHandler`, `UnpublishHandler` — thin wrappers around `SetArtistProfileVisibility` query + billing gate
 - `collection.go`: collection CRUD + reorder
 - `collection_image.go`: image attach/reorder/delete/set-cover — reads `s3_key` from the confirmed image record
 - `qr.go`: QR code generation — uses `github.com/skip2/go-qrcode`; output is PNG bytes returned directly
@@ -44,4 +47,5 @@
 - Analytics: `profile.go` fires a `profile_view` event on public reads — this calls into the analytics package; do not remove it accidentally when refactoring the public GET handler
 
 ## Changelog
+2026-06-01 — E15.3: publish/unpublish endpoints, preview_token in ArtistProfile response, PublishBar web component
 2026-05-31 — initial spec

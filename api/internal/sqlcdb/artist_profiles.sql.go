@@ -212,6 +212,41 @@ func (q *Queries) RotateArtistProfilePreviewToken(ctx context.Context, userID pg
 	return i, err
 }
 
+const setArtistProfileVisibility = `-- name: SetArtistProfileVisibility :one
+UPDATE artist_profiles
+SET visibility = $2,
+    updated_at = now()
+WHERE user_id = $1
+RETURNING id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token
+`
+
+type SetArtistProfileVisibilityParams struct {
+	UserID     pgtype.UUID `db:"user_id" json:"user_id"`
+	Visibility string      `db:"visibility" json:"visibility"`
+}
+
+func (q *Queries) SetArtistProfileVisibility(ctx context.Context, arg SetArtistProfileVisibilityParams) (ArtistProfile, error) {
+	row := q.db.QueryRow(ctx, setArtistProfileVisibility, arg.UserID, arg.Visibility)
+	var i ArtistProfile
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.LocationLabel,
+		&i.ShowLocation,
+		&i.MediumTags,
+		&i.SocialLinks,
+		&i.AvatarS3Key,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HeadlineImageUrls,
+		&i.Visibility,
+		&i.PreviewToken,
+	)
+	return i, err
+}
+
 const updateArtistProfile = `-- name: UpdateArtistProfile :one
 UPDATE artist_profiles
 SET display_name        = $2,

@@ -286,11 +286,14 @@ type ArtistProfile struct {
 	Id                openapi_types.UUID `json:"id"`
 
 	// LocationLabel City/region. Only present if show_location is true (public response).
-	LocationLabel *string            `json:"location_label,omitempty"`
-	MediumTags    []string           `json:"medium_tags"`
-	SocialLinks   map[string]string  `json:"social_links"`
-	UpdatedAt     time.Time          `json:"updated_at"`
-	UserId        openapi_types.UUID `json:"user_id"`
+	LocationLabel *string  `json:"location_label,omitempty"`
+	MediumTags    []string `json:"medium_tags"`
+
+	// PreviewToken Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses.
+	PreviewToken *string            `json:"preview_token,omitempty"`
+	SocialLinks  map[string]string  `json:"social_links"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+	UserId       openapi_types.UUID `json:"user_id"`
 
 	// Visibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
 	Visibility ArtistProfileVisibility `json:"visibility"`
@@ -984,9 +987,15 @@ type ServerInterface interface {
 	// Get aggregated analytics for the authenticated artist's profile
 	// (GET /profiles/me/analytics)
 	GetMyAnalytics(w http.ResponseWriter, r *http.Request)
+	// Publish own artist profile (draft → public)
+	// (POST /profiles/me/publish)
+	PublishProfile(w http.ResponseWriter, r *http.Request)
 	// Get a branded QR code (PNG) for the authenticated artist's public profile
 	// (GET /profiles/me/qr)
 	GetMyProfileQR(w http.ResponseWriter, r *http.Request)
+	// Unpublish own artist profile (public → draft)
+	// (POST /profiles/me/unpublish)
+	UnpublishProfile(w http.ResponseWriter, r *http.Request)
 	// Get public artist profile
 	// (GET /profiles/{profileID})
 	GetProfile(w http.ResponseWriter, r *http.Request, profileID openapi_types.UUID)
@@ -1329,9 +1338,21 @@ func (_ Unimplemented) GetMyAnalytics(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Publish own artist profile (draft → public)
+// (POST /profiles/me/publish)
+func (_ Unimplemented) PublishProfile(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Get a branded QR code (PNG) for the authenticated artist's public profile
 // (GET /profiles/me/qr)
 func (_ Unimplemented) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Unpublish own artist profile (public → draft)
+// (POST /profiles/me/unpublish)
+func (_ Unimplemented) UnpublishProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2953,6 +2974,28 @@ func (siw *ServerInterfaceWrapper) GetMyAnalytics(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// PublishProfile operation middleware
+func (siw *ServerInterfaceWrapper) PublishProfile(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PublishProfile(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMyProfileQR operation middleware
 func (siw *ServerInterfaceWrapper) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
 
@@ -2966,6 +3009,28 @@ func (siw *ServerInterfaceWrapper) GetMyProfileQR(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMyProfileQR(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnpublishProfile operation middleware
+func (siw *ServerInterfaceWrapper) UnpublishProfile(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnpublishProfile(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3456,7 +3521,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/profiles/me/analytics", wrapper.GetMyAnalytics)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/profiles/me/publish", wrapper.PublishProfile)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/me/qr", wrapper.GetMyProfileQR)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/profiles/me/unpublish", wrapper.UnpublishProfile)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/{profileID}", wrapper.GetProfile)
@@ -6510,6 +6581,76 @@ func (response GetMyAnalytics404ApplicationProblemPlusJSONResponse) VisitGetMyAn
 	return err
 }
 
+type PublishProfileRequestObject struct {
+}
+
+type PublishProfileResponseObject interface {
+	VisitPublishProfileResponse(w http.ResponseWriter) error
+}
+
+type PublishProfile200JSONResponse ArtistProfile
+
+func (response PublishProfile200JSONResponse) VisitPublishProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishProfile401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PublishProfile401ApplicationProblemPlusJSONResponse) VisitPublishProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishProfile402JSONResponse struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (response PublishProfile402JSONResponse) VisitPublishProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(402)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishProfile404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PublishProfile404ApplicationProblemPlusJSONResponse) VisitPublishProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMyProfileQRRequestObject struct {
 }
 
@@ -6558,6 +6699,59 @@ type GetMyProfileQR404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetMyProfileQR404ApplicationProblemPlusJSONResponse) VisitGetMyProfileQRResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnpublishProfileRequestObject struct {
+}
+
+type UnpublishProfileResponseObject interface {
+	VisitUnpublishProfileResponse(w http.ResponseWriter) error
+}
+
+type UnpublishProfile200JSONResponse ArtistProfile
+
+func (response UnpublishProfile200JSONResponse) VisitUnpublishProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnpublishProfile401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UnpublishProfile401ApplicationProblemPlusJSONResponse) VisitUnpublishProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnpublishProfile404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnpublishProfile404ApplicationProblemPlusJSONResponse) VisitUnpublishProfileResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6956,9 +7150,15 @@ type StrictServerInterface interface {
 	// Get aggregated analytics for the authenticated artist's profile
 	// (GET /profiles/me/analytics)
 	GetMyAnalytics(ctx context.Context, request GetMyAnalyticsRequestObject) (GetMyAnalyticsResponseObject, error)
+	// Publish own artist profile (draft → public)
+	// (POST /profiles/me/publish)
+	PublishProfile(ctx context.Context, request PublishProfileRequestObject) (PublishProfileResponseObject, error)
 	// Get a branded QR code (PNG) for the authenticated artist's public profile
 	// (GET /profiles/me/qr)
 	GetMyProfileQR(ctx context.Context, request GetMyProfileQRRequestObject) (GetMyProfileQRResponseObject, error)
+	// Unpublish own artist profile (public → draft)
+	// (POST /profiles/me/unpublish)
+	UnpublishProfile(ctx context.Context, request UnpublishProfileRequestObject) (UnpublishProfileResponseObject, error)
 	// Get public artist profile
 	// (GET /profiles/{profileID})
 	GetProfile(ctx context.Context, request GetProfileRequestObject) (GetProfileResponseObject, error)
@@ -8532,6 +8732,30 @@ func (sh *strictHandler) GetMyAnalytics(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// PublishProfile operation middleware
+func (sh *strictHandler) PublishProfile(w http.ResponseWriter, r *http.Request) {
+	var request PublishProfileRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PublishProfile(ctx, request.(PublishProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PublishProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PublishProfileResponseObject); ok {
+		if err := validResponse.VisitPublishProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMyProfileQR operation middleware
 func (sh *strictHandler) GetMyProfileQR(w http.ResponseWriter, r *http.Request) {
 	var request GetMyProfileQRRequestObject
@@ -8549,6 +8773,30 @@ func (sh *strictHandler) GetMyProfileQR(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMyProfileQRResponseObject); ok {
 		if err := validResponse.VisitGetMyProfileQRResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnpublishProfile operation middleware
+func (sh *strictHandler) UnpublishProfile(w http.ResponseWriter, r *http.Request) {
+	var request UnpublishProfileRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnpublishProfile(ctx, request.(UnpublishProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnpublishProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnpublishProfileResponseObject); ok {
+		if err := validResponse.VisitUnpublishProfileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
