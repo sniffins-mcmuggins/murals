@@ -64,7 +64,7 @@ test('V01 — Organiser Setup', async ({ page }) => {
         { id: 'f5', type: 'select', label: 'Do you have public liability insurance?', options: ['Yes', 'No', 'In progress'], required: true },
         { id: 'f6', type: 'select', label: 'Full festival availability (10–17 October)?', options: ['Full period', 'Partial — specify below'], required: true },
         { id: 'f7', type: 'select', label: 'Previous outdoor mural experience', options: ['Yes', 'No'], required: false },
-        { id: 'f8', type: 'textarea', label: 'Anything else you'd like to tell us?', required: false },
+        { id: 'f8', type: 'textarea', label: "Anything else you'd like to tell us?", required: false },
       ],
     },
     headers: { 'Content-Type': 'application/json' },
