@@ -315,22 +315,34 @@ func main() {
 	}
 }
 
-// buildMailer wires up SES if configured, otherwise returns NoopMailer for
-// local dev. When SES_REQUIRED=true any error in this chain (missing config,
-// init failure) is fatal — see SESRequired in config.go for the why.
+// buildMailer wires up the email sender. Priority order:
+//  1. SMTP (local dev via Mailpit) — used when SMTP_HOST is set.
+//  2. SES (production) — used when SES_FROM_EMAIL and AWS_REGION are set.
+//  3. NoopMailer — fallback for local dev without either configured.
+//
+// When SES_REQUIRED=true any error in the SES chain (missing config, init
+// failure) is fatal — see SESRequired in config.go for the why.
 func buildMailer(ctx context.Context, cfg config.Config) auth.EmailSender {
+	// Local dev: SMTP_HOST set → route through Mailpit (or any SMTP relay).
+	// Production never sets SMTP_HOST, so this branch is never taken in prod.
+	if cfg.SMTPHost != "" {
+		slog.Info("using SMTP mailer", "host", cfg.SMTPHost, "port", cfg.SMTPPort)
+		return email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPFrom)
+	}
+
+	// Production: SES.
 	if cfg.SESFromEmail == "" || cfg.AWSRegion == "" {
 		if cfg.SESRequired {
-			slog.Error("SES_REQUIRED=true but SES_FROM_EMAIL or AWS_REGION is missing")
+			slog.Error("SES not configured but SES_REQUIRED=true — exiting")
 			os.Exit(1)
 		}
-		slog.Warn("SES not configured — using NoopMailer (password reset emails disabled)")
+		slog.Warn("SES not configured — using NoopMailer (email disabled)")
 		return auth.NoopMailer{}
 	}
 	sender, err := email.NewSender(ctx, cfg.AWSRegion, cfg.SESFromEmail)
 	if err != nil {
 		if cfg.SESRequired {
-			slog.Error("SES init failed and SES_REQUIRED=true", "err", err)
+			slog.Error("SES init failed and SES_REQUIRED=true — exiting", "err", err)
 			os.Exit(1)
 		}
 		slog.Warn("SES init failed — falling back to NoopMailer", "err", err)
