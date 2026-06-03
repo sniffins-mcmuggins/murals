@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { slowType, pause, highlight, scrollTo } from "./helpers.js";
-import { verifyEmailViaMailpit } from "./mailpit.js";
 import * as path from "path";
 import * as fs from "fs";
 
 const API = process.env.API_URL ?? "http://localhost:8080";
+const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
 
 const GABE_BIO =
   "South-West muralist. Bold colour, mythological themes, outdoor work.";
@@ -20,23 +20,44 @@ test("V05 — Artist Journey", async ({ page }) => {
   const email = `gabe-${suffix}@demo.art`;
   const password = "demo-password-2027";
 
-  // ── 1. Sign up ───────────────────────────────────────────────────────────────
+  // ── 1. Sign up with Google ────────────────────────────────────────────────────
+  // Intercept the Google OAuth redirect before it leaves the browser.
+  // Behind the scenes we create a real account and set the session cookie,
+  // so the rest of the demo runs against a live user — the viewer just sees
+  // the signup page → click "Continue with Google" → land on dashboard.
+  await page.route(`${API}/auth/oauth/google`, async (route) => {
+    await page.request.post(`${API}/auth/signup`, {
+      data: { email, password },
+      headers: { "Content-Type": "application/json" },
+    });
+    await page.request.post(`${API}/_test/verify-email`, {
+      data: { email },
+      headers: { "Content-Type": "application/json" },
+    });
+    const loginRes = await page.request.post(`${API}/auth/login`, {
+      data: { email, password },
+      headers: { "Content-Type": "application/json" },
+    });
+    const { token } = await loginRes.json();
+    await page.context().addCookies([{
+      name: "session",
+      value: token,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    }]);
+    await route.fulfill({
+      status: 302,
+      headers: { Location: `${BASE_URL}/dashboard` },
+    });
+  });
+
   await page.goto("/signup");
   await pause(1200);
-  await slowType(page.locator("#email"), email);
-  await slowType(page.locator("#password"), password);
+  await highlight(page, 'a[href*="oauth/google"]');
   await pause(800);
-  await highlight(page, "button[type=submit]");
-  await page.click("button[type=submit]");
-  // Signup stays on /signup and shows "Check your inbox" — no redirect to /login.
-  await expect(page.getByText(/check your inbox/i)).toBeVisible({ timeout: 10000 });
-  await pause(1200);
-
-  // ── 2. Verify email via Mailpit ───────────────────────────────────────────────
-  // Opens Mailpit web UI at localhost:8025 — inbox is visible on screen.
-  // Clicks the verification email, then navigates to the verify link which
-  // sets the session cookie and redirects straight to /dashboard.
-  await verifyEmailViaMailpit(page, email);
+  await page.click('a[href*="oauth/google"]');
   await expect(page).toHaveURL("/dashboard", { timeout: 25000 });
   await pause(1500);
 
@@ -111,7 +132,34 @@ test("V05 — Artist Journey", async ({ page }) => {
   await pause(800);
   await page.locator("input[type=file]").setInputFiles(GABE_3);
   await expect(page.locator("img").nth(1)).toBeVisible({ timeout: 30000 });
-  await pause(1500);
+  await pause(1000);
+
+  // Set the first image as the collection cover (off-screen — no UI for this yet).
+  // Without this the collection card on the public profile shows no thumbnail.
+  {
+    const collectionId = page.url().split("/").at(-1)!;
+    const cookies = await page.context().cookies();
+    const token = cookies.find((c) => c.name === "session")?.value ?? "";
+    const imagesRes = await page.request.get(
+      `${API}/collections/${collectionId}/images`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const images: Array<{ s3_key: string }> = await imagesRes.json();
+    if (images.length > 0) {
+      await page.request.patch(`${API}/collections/${collectionId}`, {
+        data: { coverS3Key: images[0].s3_key },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      await page.reload();
+      // Wait for the cover thumbnail to appear in the UI
+      await expect(page.locator('img[alt="Cover"]')).toBeVisible({ timeout: 10000 });
+      await pause(1000);
+    }
+  }
+  await pause(600);
 
   // ── 6. Publish profile ────────────────────────────────────────────────────────
   await page.goto("/profile");

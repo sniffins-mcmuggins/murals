@@ -15,7 +15,7 @@ This table is the living reference. Add rows as new videos are commissioned.
 
 | ID  | Persona    | Title                        | DB approach  | Key moments |
 |-----|------------|------------------------------|--------------|-------------|
-| V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup → Mailpit inbox → verify email → dashboard → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
+| V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup page → "Continue with Google" → dashboard → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
 | V06 | Organiser  | Organiser Full               | Pre-seeded   | Login → festival detail → applications inbox → accept → map pin → decline |
 
 ---
