@@ -55,6 +55,15 @@ export async function createUser(
   })
   if (!signupRes.ok) throw new Error(`Signup failed: ${signupRes.status}`)
 
+  // Bypass email verification for test accounts — the real flow is tested in
+  // e2e/api/email-verification.test.ts and e2e/browser/artist-onboarding.spec.ts.
+  const verifyRes = await fetch(`${API}/_test/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!verifyRes.ok) throw new Error(`Verify failed: ${verifyRes.status}`)
+
   const loginRes = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

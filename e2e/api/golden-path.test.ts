@@ -66,17 +66,25 @@ describe('golden path', () => {
   })
 
   it('1. artist signup + login', async () => {
+    const email = `artist-${suffix}@golden.test`
     const signupRes = await fetch(`${API}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `artist-${suffix}@golden.test`, password: 'testpass123' }),
+      body: JSON.stringify({ email, password: 'testpass123' }),
     })
     expect(signupRes.status).toBe(201)
+
+    const verifyRes = await fetch(`${API}/_test/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    expect(verifyRes.status).toBe(200)
 
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `artist-${suffix}@golden.test`, password: 'testpass123' }),
+      body: JSON.stringify({ email, password: 'testpass123' }),
     })
     expect(loginRes.status).toBe(200)
     const { token } = await loginRes.json()
@@ -160,17 +168,25 @@ describe('golden path', () => {
   })
 
   it('9. organiser signup + login', async () => {
+    const email = `organiser-${suffix}@golden.test`
     const signupRes = await fetch(`${API}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `organiser-${suffix}@golden.test`, password: 'testpass123' }),
+      body: JSON.stringify({ email, password: 'testpass123' }),
     })
     expect(signupRes.status).toBe(201)
+
+    const verifyRes = await fetch(`${API}/_test/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    expect(verifyRes.status).toBe(200)
 
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `organiser-${suffix}@golden.test`, password: 'testpass123' }),
+      body: JSON.stringify({ email, password: 'testpass123' }),
     })
     expect(loginRes.status).toBe(200)
     const { token } = await loginRes.json()
