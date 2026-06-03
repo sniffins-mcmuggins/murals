@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { ApplicationCard } from '@/components/ApplicationCard'
@@ -230,6 +231,19 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     onSuccess: invalidate,
   })
 
+  const reorderMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiClient.POST('/festivals/{festivalID}/applications/reorder', {
+        params: { path: { festivalID: festivalId } },
+        body: { status: 'submitted', ids },
+      })
+      if (res.error) throw new Error('Reorder failed')
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['festival-applications', festivalId] })
+    },
+  })
+
   const handleScore = (applicationId: string, score: number, criterionId = 'overall') => {
     scoreMutation.mutate({ applicationId, score, criterionId })
     if (selectedApp?.id === applicationId) {
@@ -282,16 +296,48 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     if (!over || active.id === over.id) return
 
     const appId = active.id as string
-    const targetColumn = over.id as ColumnKey
     const app = allApps.find(a => a.id === appId)
     if (!app) return
 
+    const activeColumn = getColumn(app, isReleased)
+
+    // Resolve the target column: over.id is either a column key or a card id.
+    const overId = over.id as string
+    let targetColumn: ColumnKey
+    if (overId in COLUMN_META) {
+      targetColumn = overId as ColumnKey
+    } else {
+      const overApp = allApps.find(a => a.id === overId)
+      if (!overApp) return
+      targetColumn = getColumn(overApp, isReleased)
+    }
+
+    // Same column AND dropped on a card → reorder within the column.
+    if (activeColumn === targetColumn && !(overId in COLUMN_META)) {
+      const colApps = columns[activeColumn]
+      const oldIndex = colApps.findIndex(a => a.id === appId)
+      const newIndex = colApps.findIndex(a => a.id === overId)
+      if (oldIndex === -1 || newIndex === -1) return
+
+      const reordered = arrayMove(colApps, oldIndex, newIndex)
+      const reorderedIds = new Set(reordered.map(a => a.id))
+      setLocalApps(prev => {
+        const base = prev ?? allApps
+        const others = base.filter(a => !reorderedIds.has(a.id))
+        return [...others, ...reordered]
+      })
+      reorderMutation.mutate(reordered.map(a => a.id ?? ''))
+      return
+    }
+
+    // Same column but dropped on empty background → no-op.
+    if (activeColumn === targetColumn) return
+
+    // Different column → stage a decision (or clear it).
     const decisionMap: Partial<Record<ColumnKey, string | null>> = {
       accept: 'accept', waitlist: 'waitlist', decline: 'decline',
       undecided: null, shortlisted: null,
     }
-    if (!(targetColumn in decisionMap)) return
-
     stageMutation.mutate({
       appId,
       stagedDecision: decisionMap[targetColumn] ?? null,
@@ -372,6 +418,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
                 count={columns[col].length}
                 headerClass={COLUMN_META[col].headerClass}
                 borderColor={COLUMN_META[col].borderColor}
+                itemIds={columns[col].map(a => a.id ?? '')}
                 isReleased={isReleased}
               >
                 {columns[col].map(app => (

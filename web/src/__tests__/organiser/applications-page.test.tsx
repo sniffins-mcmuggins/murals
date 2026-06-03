@@ -21,6 +21,12 @@ vi.mock('@dnd-kit/core', () => ({
   useDroppable: vi.fn(() => ({ setNodeRef: vi.fn(), isOver: false })),
   useDraggable: vi.fn(() => ({ attributes: {}, listeners: {}, setNodeRef: vi.fn(), transform: null })),
 }))
+vi.mock('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: { children: React.ReactNode }) => children,
+  verticalListSortingStrategy: {},
+  useSortable: () => ({ attributes: {}, listeners: {}, setNodeRef: vi.fn(), transform: null, transition: undefined, isDragging: false }),
+  arrayMove: <T,>(arr: T[]) => arr,
+}))
 
 import { useQuery } from '@tanstack/react-query'
 import ApplicationsReviewPage from '@/app/organiser/festivals/[id]/applications/page'
