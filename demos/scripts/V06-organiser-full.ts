@@ -58,7 +58,7 @@ test('V06 — Organiser: Staged Decisions', async ({ page }) => {
 
   // ── 3. Open applications — 3 cards in Undecided, Release button disabled ─────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
-  await expect(page.getByText('Undecided')).toBeVisible({ timeout: 8000 })
+  await expect(page.locator('.grid-cols-5')).toBeVisible({ timeout: 8000 })
   await pause(1500)
 
   // Show that Release is disabled + hint text visible
