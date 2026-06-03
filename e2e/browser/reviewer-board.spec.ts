@@ -73,13 +73,14 @@ test.describe('reviewer board', () => {
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
       await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
-      // Decision controls absent from DOM
-      await expect(page.getByRole('button', { name: 'Accept', exact: true })).not.toBeVisible()
-      await expect(page.getByRole('button', { name: 'Waitlist', exact: true })).not.toBeVisible()
-      await expect(page.getByRole('button', { name: 'Decline', exact: true })).not.toBeVisible()
-      // Drag handle absent
-      await expect(page.getByLabel('Drag to reorder')).not.toBeVisible()
-      // Star score control present
+      // Reviewer board is read-only: no staging buttons, no release, no drag handle
+      await expect(page.getByRole('button', { name: '✓ Accept' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: '~ Waitlist' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: '✗ Decline' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: /Release/ })).toHaveCount(0)
+      await expect(page.getByLabel('Drag to reorder')).toHaveCount(0)
+      // Scoring IS available — open the slide-over and confirm the 1–5 star control
+      await page.getByRole('button', { name: 'Score', exact: true }).click()
       await expect(page.getByLabel('Score 1')).toBeVisible()
       await expect(page.getByLabel('Score 5')).toBeVisible()
     } finally {
@@ -102,22 +103,19 @@ test.describe('reviewer board', () => {
     const { ctx, page } = await loginAs(browser, reviewerEmail, reviewerPassword, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
-      await expect(page.getByLabel('Score 4')).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
 
-      // Avg badge should NOT be visible before scoring
-      const avgBadge = page.locator('text=/★.*·.*[0-9]/')
-      await expect(avgBadge).not.toBeVisible()
+      // Open the slide-over. Panel average is hidden until THIS reviewer scores.
+      await page.getByRole('button', { name: 'Score', exact: true }).click()
+      await expect(page.getByText(/Panel average/i)).toHaveCount(0)
 
-      // Click 4th star to score
+      // Score 4 → my_score set, panel average unlocks (avg of reviewer2=2 and me=4)
       await page.getByLabel('Score 4').click()
-      await page.waitForTimeout(500)
-
-      // Avg badge now visible on the card (my_score != null, score_count >= 1)
-      await expect(avgBadge.first()).toBeVisible({ timeout: 5_000 })
-
-      // Open slide-over and verify avg section appears
-      await page.locator('text=Applicant').first().click()
       await expect(page.getByText(/Panel average/i)).toBeVisible({ timeout: 5_000 })
+
+      // ...and the card carries an average badge once the slide-over is closed
+      await page.keyboard.press('Escape')
+      await expect(page.getByText(/★ \d/).first()).toBeVisible({ timeout: 5_000 })
     } finally {
       await ctx.close()
     }
@@ -127,14 +125,13 @@ test.describe('reviewer board', () => {
     const { ctx, page } = await loginAs(browser, reviewerEmail, reviewerPassword, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
-      await page.waitForLoadState('networkidle')
-      // Stars should reflect the score of 4 from test 2
-      // Check the 4th star is filled (amber) and 5th is not
-      const star4 = page.getByLabel('Score 4')
-      const star5 = page.getByLabel('Score 5')
-      await expect(star4).toBeVisible({ timeout: 10_000 })
-      // Avg badge still visible (my_score persisted)
-      await expect(page.locator('text=/★.*·.*[0-9]/').first()).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+      // Scored in test 2 → card shows "Edit score" and the average badge persists across reload
+      await expect(page.getByRole('button', { name: 'Edit score' })).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByText(/★ \d/).first()).toBeVisible()
+      // Open and confirm my score persisted as 4 / 5
+      await page.getByRole('button', { name: 'Edit score' }).click()
+      await expect(page.getByText('4 / 5 · click to change')).toBeVisible({ timeout: 5_000 })
     } finally {
       await ctx.close()
     }
@@ -144,12 +141,11 @@ test.describe('reviewer board', () => {
     const { ctx, page } = await loginAs(browser, reviewerEmail, reviewerPassword, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
-      await expect(page.getByLabel('Score 2')).toBeVisible({ timeout: 10_000 })
-      // Change score from 4 to 2
+      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+      // Open the (already scored) slide-over and change the score from 4 to 2
+      await page.getByRole('button', { name: 'Edit score' }).click()
       await page.getByLabel('Score 2').click()
-      await page.waitForTimeout(500)
-      // Avg badge still visible
-      await expect(page.locator('text=/★.*·.*[0-9]/').first()).toBeVisible()
+      await expect(page.getByText('2 / 5 · click to change')).toBeVisible({ timeout: 5_000 })
     } finally {
       await ctx.close()
     }
@@ -175,8 +171,10 @@ test.describe('reviewer board', () => {
     const { ctx, page } = await loginAs(browser, dual.email, dual.password, baseURL)
     try {
       await page.goto(`/organiser/festivals/${dualFestId}/applications`)
-      // COI: their own application is hidden → empty state
-      await expect(page.getByText('No applications here.')).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+      // COI: their own application is hidden → no card for them, columns show the empty placeholder
+      await expect(page.getByText(`Dual ${dualSuffix}`)).toHaveCount(0)
+      await expect(page.getByText('empty').first()).toBeVisible({ timeout: 10_000 })
     } finally {
       await ctx.close()
     }

@@ -49,16 +49,24 @@ test('organiser declines an application via the UI', async ({ browser }) => {
   const { ctx, page } = await loginAs(browser, organiser.email, organiser.password, baseURL)
   try {
     await page.goto(`/organiser/festivals/${festivalId}/applications`)
-    // Pending tab is active by default — wait for the Decline action button to appear
-    await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeVisible({ timeout: 10_000 })
+    // Kanban board: the submitted application starts in the Undecided column
+    await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(`Decline Artist ${suffix}`)).toBeVisible({ timeout: 10_000 })
 
-    await page.getByRole('button', { name: 'Decline', exact: true }).click()
+    // Open the card → stage a Decline decision in the slide-over → close
+    await page.getByText(`Decline Artist ${suffix}`).first().click()
+    await page.getByRole('button', { name: '✗ Decline' }).click()
+    await page.keyboard.press('Escape')
 
-    // After declining, the application leaves the Pending tab
-    await expect(page.getByText('No applications here.')).toBeVisible({ timeout: 10_000 })
-    // Switch to the Declined tab and confirm the application landed there
-    await page.getByRole('button', { name: /^Declined/ }).click()
-    await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible({ timeout: 5_000 })
+    // Release the staged decision — finalises status to declined
+    await page.getByRole('button', { name: /Release/ }).click()
+    await page.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Yes, release' }).click()
+    await expect(page.getByText('Decisions released')).toBeVisible({ timeout: 10_000 })
+
+    // Reopen the card and confirm the finalised status is "declined"
+    await page.getByText(`Decline Artist ${suffix}`).first().click()
+    await expect(page.getByText('declined', { exact: true })).toBeVisible({ timeout: 5_000 })
   } finally {
     await ctx.close()
   }

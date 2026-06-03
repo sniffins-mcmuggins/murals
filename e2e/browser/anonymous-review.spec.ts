@@ -88,7 +88,8 @@ test.describe('anonymous review', () => {
       // Shows anonymous placeholder, not real name
       await expect(page.getByText('Anonymous artist')).toBeVisible()
       await expect(page.getByText(`Real Artist ${suffix}`)).not.toBeVisible()
-      await expect(page.getByText(/Score to reveal/i)).toBeVisible()
+      // Identity stays hidden until the reviewer scores — the Score control is the reveal gate
+      await expect(page.getByRole('button', { name: 'Score', exact: true })).toBeVisible()
     } finally {
       await ctx.close()
     }
@@ -122,14 +123,13 @@ test.describe('anonymous review', () => {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
       await expect(page.getByText('Anonymous artist')).toBeVisible({ timeout: 10_000 })
 
-      // Click 3rd star to score
+      // Open the slide-over and score 3 — scoring reveals the real identity (API flips identity_hidden)
+      await page.getByRole('button', { name: 'Score', exact: true }).click()
       await page.getByLabel('Score 3').click()
-      await page.waitForTimeout(800)
 
-      // Real name now visible
-      await expect(page.getByText(`Reveal Artist ${suffix}`)).toBeVisible({ timeout: 5_000 })
+      // Real name now visible on the revealed card/panel; placeholder gone
+      await expect(page.getByText(`Reveal Artist ${suffix}`).first()).toBeVisible({ timeout: 10_000 })
       await expect(page.getByText('Anonymous artist')).not.toBeVisible()
-      await expect(page.getByText(/Score to reveal/i)).not.toBeVisible()
     } finally {
       await ctx.close()
     }

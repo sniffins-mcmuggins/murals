@@ -79,7 +79,10 @@ test.describe('reviewer management', () => {
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
       await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
-      await expect(page.getByRole('button', { name: 'Accept', exact: true })).not.toBeVisible()
+      // Read-only board: no staging buttons, but scoring is available
+      await expect(page.getByRole('button', { name: '✓ Accept' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Score', exact: true })).toBeVisible()
+      await page.getByRole('button', { name: 'Score', exact: true }).click()
       await expect(page.getByLabel('Score 1')).toBeVisible()
     } finally {
       await ctx.close()

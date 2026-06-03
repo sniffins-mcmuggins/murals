@@ -83,12 +83,20 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
 
   try {
     await organiserPage.goto(`/organiser/festivals/${festivalId}/applications`)
-    // Pending tab is active by default — wait for the Accept action button to appear
-    await expect(organiserPage.getByRole('button', { name: 'Accept', exact: true })).toBeVisible({ timeout: 10_000 })
+    // Kanban board: the submitted application starts in the Undecided column
+    await expect(organiserPage.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+    await expect(organiserPage.getByText(`E2E Artist ${suffix}`)).toBeVisible({ timeout: 10_000 })
 
-    await organiserPage.getByRole('button', { name: 'Accept', exact: true }).click()
-    // After accepting, the application leaves Pending — tab shows empty state
-    await expect(organiserPage.getByText('No applications here.')).toBeVisible({ timeout: 10_000 })
+    // Open the card → stage an Accept decision in the slide-over → close
+    await organiserPage.getByText(`E2E Artist ${suffix}`).first().click()
+    await organiserPage.getByRole('button', { name: '✓ Accept' }).click()
+    await organiserPage.keyboard.press('Escape')
+
+    // Release the staged decision — finalises status to accepted + notifies the artist
+    await organiserPage.getByRole('button', { name: /Release/ }).click()
+    await organiserPage.getByRole('checkbox').check()
+    await organiserPage.getByRole('button', { name: 'Yes, release' }).click()
+    await expect(organiserPage.getByText('Decisions released')).toBeVisible({ timeout: 10_000 })
 
     // ── Map editor: create spot and assign artist ────────────────────────────────
     await organiserPage.goto(`/organiser/festivals/${festivalId}/map`)

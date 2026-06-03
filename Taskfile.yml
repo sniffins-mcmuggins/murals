@@ -54,7 +54,10 @@ tasks:
   e2e:clean:
     desc: "Full clean e2e run — wipe stack + volumes, fresh start, run all tests, always tear down"
     cmds:
-      - task: down
+      # -v wipes the db/minio volumes so db:migrate runs against a clean schema.
+      # Without it a drifted volume (version recorded but tables missing) makes
+      # db:migrate a silent no-op and the stack serves a broken schema.
+      - docker compose -f {{.COMPOSE_FILE}} down -v -t 2
       - docker compose -f {{.COMPOSE_FILE}} up -d --build
       - defer: { task: down }
       - task: db:migrate

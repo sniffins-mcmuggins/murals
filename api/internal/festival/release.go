@@ -75,10 +75,23 @@ func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.H
 			return
 		}
 
-		// Send notification emails to all affected artists
+		// Per-application side effects. Accepted artists become festival_artists so
+		// they're assignable on the map and visible on the public roster — this
+		// mirrors AcceptApplicationHandler, which the staged-decision flow replaces.
+		// AddFestivalArtist is an upsert, so re-release is harmless. Decline/waitlist
+		// touch no festival_artists row, matching the direct handlers.
 		for _, app := range released {
-			status := string(app.Status)
-			sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, status)
+			if app.Status == sqlcdb.ApplicationStatusAccepted {
+				if _, err := q.AddFestivalArtist(r.Context(), sqlcdb.AddFestivalArtistParams{
+					FestivalID: festUUID,
+					ArtistID:   app.ArtistID,
+					Status:     sqlcdb.FestivalArtistStatusAccepted,
+				}); err != nil {
+					httperr.InternalServerError(w)
+					return
+				}
+			}
+			sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, string(app.Status))
 		}
 
 		w.Header().Set("Content-Type", "application/json")

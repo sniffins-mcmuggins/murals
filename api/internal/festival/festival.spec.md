@@ -22,12 +22,14 @@
 - **Spots are independent of applications**: a spot can be pre-created without an application; `spots.application_id` is nullable
 - **Route registration order matters**: literal sub-paths (e.g. `/applications/reorder`) MUST be registered before parameterised routes (e.g. `/applications/{applicationID}`) in chi — see api-handler-checklist rule
 - **Reviewer anonymity**: panellist usernames in review UI are hidden from organisers until the round closes — stored in DB, masked in response
+- **Staged decisions + bulk release**: organisers stage `accept`/`waitlist`/`decline` per application (`applications.staged_decision`), then `release-decisions` finalises them all at once and sets `festivals.decisions_released_at`. This replaces the per-application accept/decline buttons in the UI; the direct `accept`/`decline`/`waitlist` endpoints still exist for the API
 
 ## Invariants
 - Public `GetHandler` returns 404 for any festival with status NOT IN (`open`, `live`) — anonymous callers must never see `draft` or `closed` festivals
 - An artist may only have one active (non-withdrawn) application per festival
 - `spots.application_id` uniqueness: a confirmed application can only be assigned to one spot
 - Reorder endpoints (`/applications/reorder`, `/spots/reorder`) MUST be registered before their `/{id}` siblings in chi
+- Finalising an `accept` (via either `AcceptApplicationHandler` or `release-decisions`) MUST upsert a `festival_artists` row with status `accepted` — that row is what makes an artist assignable on the map and visible on the public roster. `decline`/`waitlist` create no such row
 
 ## AI Context
 - `festival.go`: festival CRUD — `GetHandler` contains the public-status gate
@@ -38,8 +40,10 @@
 - `form.go`: dynamic application form builder
 - `map.go`: `GetMapDataHandler` — public endpoint returning spot locations + artist previews for the Leaflet map
 - `appearances.go`: `POST /appearances` wires confirmed application → artist profile for public display
+- `release.go`: `ReleaseDecisionsHandler` — bulk-finalises staged decisions; upserts `festival_artists` for each accept (mirrors `AcceptApplicationHandler`) and notifies every affected artist
 - `access.go`: the organiser-ownership check — used by most handlers to confirm the caller owns the festival
 - `testhelpers_test.go`: shared test helpers (festival/application setup) — check this before writing new tests to avoid duplication
 
 ## Changelog
 2026-05-31 — initial spec
+2026-06-03 — documented staged-decisions + bulk release (E22); recorded the invariant that finalising an accept (direct or via release) upserts a `festival_artists` row, after fixing `ReleaseDecisionsHandler` which omitted it
