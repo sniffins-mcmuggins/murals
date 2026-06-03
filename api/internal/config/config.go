@@ -23,7 +23,12 @@ type Config struct {
 	// SESRequired makes a missing/broken SES configuration a fatal startup
 	// error. Set in production so we never silently fall back to NoopMailer
 	// and lock users out of password reset.
-	SESRequired        bool
+	SESRequired bool
+	// SMTP sender — used for local dev (Mailpit). When SMTPHost is set,
+	// buildMailer uses SMTPSender instead of SES so no AWS credentials are needed.
+	SMTPHost           string
+	SMTPPort           string
+	SMTPFrom           string
 	GoogleClientID     string
 	GoogleClientSecret string
 	APIPublicBase      string // public URL of this API (used for OAuth redirect_uri)
@@ -79,6 +84,9 @@ func Load() Config {
 		AWSRegion:                     env("AWS_REGION", "eu-west-2"),
 		SESFromEmail:                  env("SES_FROM_EMAIL", ""),
 		SESRequired:                   envBool("SES_REQUIRED", false),
+		SMTPHost:                      env("SMTP_HOST", ""),
+		SMTPPort:                      env("SMTP_PORT", "1025"),
+		SMTPFrom:                      env("SMTP_FROM", "noreply@painttrace.art"),
 		GoogleClientID:                env("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:            env("GOOGLE_CLIENT_SECRET", ""),
 		APIPublicBase:                 env("API_PUBLIC_BASE", "http://localhost:8080"),
