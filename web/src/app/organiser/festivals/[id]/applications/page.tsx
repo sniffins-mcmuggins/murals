@@ -56,6 +56,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
   const [localApps, setLocalApps] = useState<Application[] | null>(null)
   const [showReleaseModal, setShowReleaseModal] = useState(false)
+  const [releaseConfirmed, setReleaseConfirmed] = useState(false)
   const queryClient = useQueryClient()
 
   const applicationsQuery = useQuery({
@@ -159,10 +160,16 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     },
     onSuccess: () => {
       setShowReleaseModal(false)
+      setReleaseConfirmed(false)
       queryClient.invalidateQueries({ queryKey: ['festival-applications', festivalId] })
       queryClient.invalidateQueries({ queryKey: ['festival', festivalId] })
     },
   })
+
+  const closeReleaseModal = () => {
+    setShowReleaseModal(false)
+    setReleaseConfirmed(false)
+  }
 
   const patchMutation = useMutation({
     mutationFn: async ({ id, shortlisted, reviewFlag }: { id: string; shortlisted: boolean; reviewFlag: boolean }) => {
@@ -399,20 +406,31 @@ function KanbanView({ festivalId }: { festivalId: string }) {
         <div className="fixed inset-0 bg-ink/40 z-50 flex items-center justify-center">
           <div className="bg-offwhite rounded-xl p-8 max-w-sm w-full mx-4 shadow-xl">
             <h2 className="font-serif text-2xl text-ink mb-2">Release decisions?</h2>
-            <p className="font-sans text-sm text-mid mb-6">
-              Send decisions to {stagedCount} {stagedCount === 1 ? 'artist' : 'artists'}? This can&apos;t be undone — all artists will be notified by email at the same time.
+            <p className="font-sans text-sm text-mid mb-5">
+              Decisions will be sent to {stagedCount} {stagedCount === 1 ? 'artist' : 'artists'} simultaneously. This cannot be undone.
             </p>
+            <label className="flex items-start gap-3 cursor-pointer mb-6">
+              <input
+                type="checkbox"
+                checked={releaseConfirmed}
+                onChange={e => setReleaseConfirmed(e.target.checked)}
+                className="mt-0.5 accent-amber h-4 w-4 flex-shrink-0"
+              />
+              <span className="font-sans text-sm text-ink">
+                I understand all {stagedCount} {stagedCount === 1 ? 'artist' : 'artists'} will be notified at the same time and this cannot be undone
+              </span>
+            </label>
             <div className="flex gap-3 justify-end">
               <button
-                onClick={() => setShowReleaseModal(false)}
+                onClick={closeReleaseModal}
                 className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80"
               >
                 Cancel
               </button>
               <button
                 onClick={() => releaseMutation.mutate()}
-                disabled={releaseMutation.isPending}
-                className="font-sans text-sm font-bold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+                disabled={!releaseConfirmed || releaseMutation.isPending}
+                className="font-sans text-sm font-bold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {releaseMutation.isPending ? 'Sending…' : 'Yes, release'}
               </button>

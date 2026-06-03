@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 vi.mock('@/lib/api', () => ({ apiClient: { GET: vi.fn(), POST: vi.fn(), PATCH: vi.fn() } }))
 vi.mock('next/link', () => ({
@@ -181,6 +181,34 @@ describe('Organiser ApplicationsReviewPage', () => {
       const releaseBtn = screen.getByRole('button', { name: /Release.*2.*decisions/ })
       expect(releaseBtn).not.toBeDisabled()
     })
+  })
+
+  it('confirmation modal requires checkbox before Yes release is enabled', async () => {
+    const applications = [
+      createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
+    ]
+    mockUseQuery
+      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+
+    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
+
+    await waitFor(() => {
+      screen.getByRole('button', { name: /Release.*decisions/ })
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Release.*decisions/ }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Release decisions?')).toBeInTheDocument()
+    })
+
+    const confirmBtn = screen.getByRole('button', { name: 'Yes, release' })
+    expect(confirmBtn).toBeDisabled()  // disabled until checkbox is ticked
+
+    fireEvent.click(screen.getByRole('checkbox'))
+    expect(confirmBtn).not.toBeDisabled()  // enabled after checkbox
   })
 
   it('shows empty state when no applications', async () => {

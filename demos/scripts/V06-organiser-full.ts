@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { pause, highlight, slowType } from './helpers.js'
 
-// Drag a card (identified by artist name) into a kanban column (0=Undecided, 1=Shortlisted, 2=Accept, 3=Waitlist, 4=Decline).
-// Uses page.evaluate to get viewport-relative coordinates — reliable with dnd-kit pointer events.
+// Drag a card (identified by artist name) into a kanban column.
+// Column indices: 0=Undecided, 1=Shortlisted, 2=Accept, 3=Waitlist, 4=Decline
 async function dragCardToColumn(page: Page, artistName: string, colIndex: number): Promise<void> {
   const from = await page.evaluate((name: string) => {
     const handles = Array.from(document.querySelectorAll<HTMLElement>('button[aria-label="Drag to reorder"]'))
@@ -56,16 +56,16 @@ test('V06 — Organiser: Staged Decisions', async ({ page }) => {
   await pause(1200)
   const festivalId = page.url().split('/').at(-1)!
 
-  // ── 3. Open applications kanban ──────────────────────────────────────────────
+  // ── 3. Open applications — 3 cards in Undecided, Release button disabled ─────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
   await expect(page.getByText('Undecided')).toBeVisible({ timeout: 8000 })
   await pause(1500)
 
-  // Briefly scroll right so viewer sees all 5 columns, then return
+  // Show that Release is disabled + hint text visible
   await page.keyboard.press('End')
-  await pause(1000)
+  await pause(600)
   await page.keyboard.press('Home')
-  await pause(1200)
+  await pause(1000)
 
   // ── 4. Drag Kit Harrow → Accept ──────────────────────────────────────────────
   await dragCardToColumn(page, 'Kit Harrow', 2)
@@ -73,29 +73,33 @@ test('V06 — Organiser: Staged Decisions', async ({ page }) => {
   // ── 5. Drag Yuki Tanaka → Waitlist ───────────────────────────────────────────
   await dragCardToColumn(page, 'Yuki Tanaka', 3)
 
-  // ── 6. Drag Tomás Cruz → Decline ────────────────────────────────────────────
+  // ── 6. Drag Tomás Cruz → Decline — Release button enables ────────────────────
   await dragCardToColumn(page, 'Tomás Cruz', 4)
-  await pause(1200)
+  // All 3 are staged — Release button should now be enabled
+  await expect(page.getByRole('button', { name: /Release 3 decisions/ })).not.toBeDisabled({ timeout: 4000 })
+  await pause(1500)
 
-  // ── 7. Release decisions ─────────────────────────────────────────────────────
-  // Header now shows "3 staged" — highlight and click the Release button
+  // ── 7. Open confirmation modal ───────────────────────────────────────────────
   await highlight(page, 'button:has-text("decisions")')
-  await page.getByRole('button', { name: /Release.*decisions/i }).click()
-
-  // Confirmation modal
+  await page.getByRole('button', { name: /Release 3 decisions/ }).click()
   await expect(page.getByText('Release decisions?')).toBeVisible({ timeout: 5000 })
-  await pause(2200)
+  await pause(1800)  // let viewer read the modal; "Yes, release" is disabled
 
+  // ── 8. Check the confirmation checkbox ───────────────────────────────────────
+  await page.getByRole('checkbox').check()
+  await pause(1000)  // "Yes, release" is now enabled
+
+  // ── 9. Confirm — release fires ───────────────────────────────────────────────
   await highlight(page, 'button:has-text("Yes, release")')
   await page.getByRole('button', { name: 'Yes, release' }).click()
 
-  // ── 8. Post-release banner ───────────────────────────────────────────────────
+  // ── 10. Post-release banner ──────────────────────────────────────────────────
   await expect(page.getByText('Decisions released')).toBeVisible({ timeout: 8000 })
   await pause(1200)
 
-  // Scroll right to show the Accept/Waitlist/Decline columns with "Notified ✓"
+  // Scroll right to show the Accept / Waitlist / Decline columns with "Notified ✓"
   await page.keyboard.press('End')
-  await pause(2000)
+  await pause(1800)
   await page.keyboard.press('Home')
   await pause(2000)
 })
