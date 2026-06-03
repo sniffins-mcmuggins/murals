@@ -15,7 +15,8 @@ import (
 )
 
 // PatchApplicationHandler handles PATCH /festivals/{festivalID}/applications/{applicationID}.
-// Accepts { "shortlisted": bool, "review_flag": bool } — both fields always required.
+// Accepts { "shortlisted": bool, "review_flag": bool, "staged_decision": string|null }.
+// staged_decision if provided must be "accept", "waitlist", "decline" or null (to clear).
 func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -55,18 +56,28 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var req struct {
-			Shortlisted bool `json:"shortlisted"`
-			ReviewFlag  bool `json:"review_flag"`
+			Shortlisted    bool    `json:"shortlisted"`
+			ReviewFlag     bool    `json:"review_flag"`
+			StagedDecision *string `json:"staged_decision"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
 			return
 		}
 
+		if req.StagedDecision != nil {
+			valid := map[string]bool{"accept": true, "waitlist": true, "decline": true}
+			if !valid[*req.StagedDecision] {
+				httperr.BadRequest(w, "staged_decision must be accept, waitlist, or decline")
+				return
+			}
+		}
+
 		updated, err := q.UpdateApplicationFlags(r.Context(), sqlcdb.UpdateApplicationFlagsParams{
-			ID:          appUUID,
-			Shortlisted: req.Shortlisted,
-			ReviewFlag:  req.ReviewFlag,
+			ID:             appUUID,
+			Shortlisted:    req.Shortlisted,
+			ReviewFlag:     req.ReviewFlag,
+			StagedDecision: req.StagedDecision,
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {

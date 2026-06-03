@@ -27,20 +27,12 @@ interface Props {
   formFields: FormField[]
   festivalId: string
   onClose: () => void
-  onAccept: (id: string) => void
-  onDecline: (id: string) => void
-  onWaitlist: (id: string) => void
+  onStage: (id: string, decision: string | null) => void
   onScore: (id: string, score: number, criterionId?: string) => void
   isReviewer: boolean
   isPending: boolean
   criteria: ReviewCriterion[]
-}
-
-const ACTION_TRANSITIONS: Record<string, string[]> = {
-  submitted: ['accept', 'waitlist', 'decline'],
-  accepted: ['decline'],
-  waitlisted: ['accept', 'decline'],
-  declined: [],
+  isReleased: boolean
 }
 
 function initials(name: string): string {
@@ -49,7 +41,7 @@ function initials(name: string): string {
 
 export function ApplicationSlideOver({
   application, formFields, festivalId, onClose,
-  onAccept, onDecline, onWaitlist, onScore, isReviewer, isPending, criteria,
+  onStage, onScore, isReviewer, isPending, criteria, isReleased,
 }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -66,7 +58,6 @@ export function ApplicationSlideOver({
   const name = isAnonymous ? 'Anonymous artist' : (artist?.display_name ?? 'Unknown Artist')
   const answers = (application.answers ?? {}) as Record<string, string>
   const notes = (application.notes ?? []) as ApplicationNote[]
-  const actions = ACTION_TRANSITIONS[application.status ?? ''] ?? []
   const id = application.id ?? ''
   const myScore = application.my_score
   const avgScore = application.avg_score
@@ -114,27 +105,54 @@ export function ApplicationSlideOver({
             </div>
           )}
 
-          {/* Actions — owner only */}
-          {!isReviewer && actions.length > 0 && (
-            <div className="flex gap-2">
-              {actions.includes('accept') && (
-                <button onClick={() => onAccept(id)} disabled={isPending}
-                  className="font-sans text-sm font-semibold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50">
-                  Accept
+          {/* Staged decision selector — owner only, pre-release */}
+          {!isReviewer && !isReleased && (
+            <div>
+              <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
+              <div className="flex gap-2 flex-wrap">
+                {(['accept', 'waitlist', 'decline'] as const).map(decision => {
+                  const isActive = application.staged_decision === decision
+                  const styles: Record<string, string> = {
+                    accept: isActive ? 'bg-green-100 border-green-400 text-green-800' : 'border-light text-mid hover:border-green-300',
+                    waitlist: isActive ? 'bg-amber/20 border-amber text-ink' : 'border-light text-mid hover:border-amber',
+                    decline: isActive ? 'bg-red-100 border-red-400 text-clay' : 'border-light text-mid hover:border-red-300',
+                  }
+                  return (
+                    <button
+                      key={decision}
+                      onClick={() => onStage(id, isActive ? null : decision)}
+                      disabled={isPending}
+                      className={`font-sans text-xs border px-3 py-1.5 rounded-lg capitalize transition-colors disabled:opacity-50 ${styles[decision]}`}
+                    >
+                      {decision === 'accept' ? '✓ Accept' : decision === 'waitlist' ? '~ Waitlist' : '✗ Decline'}
+                    </button>
+                  )
+                })}
+              </div>
+              {application.staged_decision && (
+                <button
+                  onClick={() => onStage(id, null)}
+                  disabled={isPending}
+                  className="font-mono text-xs text-mid hover:text-ink mt-1 disabled:opacity-50"
+                >
+                  Unstage
                 </button>
               )}
-              {actions.includes('waitlist') && (
-                <button onClick={() => onWaitlist(id)} disabled={isPending}
-                  className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                  Waitlist
-                </button>
-              )}
-              {actions.includes('decline') && (
-                <button onClick={() => onDecline(id)} disabled={isPending}
-                  className="font-sans text-sm text-clay border border-clay/30 px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                  Decline
-                </button>
-              )}
+            </div>
+          )}
+
+          {/* Post-release status badge — owner only */}
+          {!isReviewer && isReleased && (
+            <div>
+              <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
+              <span className={`font-mono text-xs uppercase tracking-widest px-2 py-1 rounded ${
+                application.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                application.status === 'waitlisted' ? 'bg-amber/20 text-ink' :
+                application.status === 'declined' ? 'bg-red-100 text-clay' :
+                'bg-warm text-mid'
+              }`}>
+                {application.status}
+              </span>
             </div>
           )}
 

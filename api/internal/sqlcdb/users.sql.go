@@ -281,6 +281,25 @@ func (q *Queries) LinkOAuthToUser(ctx context.Context, arg LinkOAuthToUserParams
 	return i, err
 }
 
+const setEmailVerified = `-- name: SetEmailVerified :exec
+UPDATE users SET email_verified = true WHERE id = $1
+`
+
+func (q *Queries) SetEmailVerified(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setEmailVerified, id)
+	return err
+}
+
+const setEmailVerifiedByEmail = `-- name: SetEmailVerifiedByEmail :exec
+UPDATE users SET email_verified = true WHERE email = $1
+`
+
+// Used by the /_test/verify-email backdoor endpoint only.
+func (q *Queries) SetEmailVerifiedByEmail(ctx context.Context, email string) error {
+	_, err := q.db.Exec(ctx, setEmailVerifiedByEmail, email)
+	return err
+}
+
 const setMFAEnabled = `-- name: SetMFAEnabled :one
 UPDATE users
 SET mfa_enabled = $2, mfa_secret = $3
@@ -349,20 +368,4 @@ func (q *Queries) UpsertUserByEmail(ctx context.Context, email string) (User, er
 		&i.EmailVerified,
 	)
 	return i, err
-}
-
-const setEmailVerified = `-- name: SetEmailVerified :exec
-UPDATE users SET email_verified = true WHERE id = $1`
-
-func (q *Queries) SetEmailVerified(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, setEmailVerified, id)
-	return err
-}
-
-const setEmailVerifiedByEmail = `-- name: SetEmailVerifiedByEmail :exec
-UPDATE users SET email_verified = true WHERE email = $1`
-
-func (q *Queries) SetEmailVerifiedByEmail(ctx context.Context, email string) error {
-	_, err := q.db.Exec(ctx, setEmailVerifiedByEmail, email)
-	return err
 }

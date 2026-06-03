@@ -212,11 +212,13 @@ func main() {
 
 		// Review
 		r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(pool))
+		// Literal sub-paths must be registered before /{applicationID} — chi matches top-to-bottom.
+		r.Post("/festivals/{festivalID}/applications/reorder", festival.ReorderApplicationsHandler(pool))
+		r.Post("/festivals/{festivalID}/applications/release-decisions", festival.ReleaseDecisionsHandler(pool, mailer))
 		r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(pool, mailer))
 		r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(pool, mailer))
 		r.Post("/festivals/{festivalID}/applications/{applicationID}/waitlist", festival.WaitlistApplicationHandler(pool, mailer))
 		r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(pool))
-		r.Post("/festivals/{festivalID}/applications/reorder", festival.ReorderApplicationsHandler(pool))
 		r.Post("/festivals/{festivalID}/applications/{applicationID}/notes", festival.AddApplicationNoteHandler(pool))
 
 		// Reviewer management — owner only (handler-level check).

@@ -27,6 +27,7 @@ SELECT
   a.rank,
   a.shortlisted,
   a.review_flag,
+  a.staged_decision,
   a.answers,
   a.created_at,
   a.updated_at,
@@ -41,7 +42,7 @@ ORDER BY a.rank ASC, a.created_at ASC;
 
 -- name: UpdateApplicationFlags :one
 UPDATE applications
-SET shortlisted = $2, review_flag = $3, updated_at = now()
+SET shortlisted = $2, review_flag = $3, staged_decision = $4, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
@@ -56,3 +57,36 @@ JOIN artist_profiles ap ON ap.id = a.artist_id
 WHERE a.form_id = $1
   AND ap.user_id IS DISTINCT FROM $2
 ORDER BY a.rank ASC, a.created_at ASC;
+
+-- name: CountSubmittedUndecidedByFestival :one
+-- Returns the number of submitted applications with no staged_decision for a festival.
+-- Used to guard release: if count > 0, the release is rejected.
+SELECT COUNT(*)::int AS count
+FROM applications a
+JOIN application_forms f ON a.form_id = f.id
+WHERE f.festival_id = $1
+  AND a.status = 'submitted'
+  AND a.staged_decision IS NULL;
+
+-- name: ListStagedApplicationsByFestival :many
+SELECT a.*
+FROM applications a
+JOIN application_forms f ON a.form_id = f.id
+WHERE f.festival_id = $1
+  AND a.staged_decision IS NOT NULL;
+
+-- name: ReleaseDecisionsForFestival :many
+UPDATE applications a
+SET
+  status = CASE a.staged_decision
+    WHEN 'accept'   THEN 'accepted'::application_status
+    WHEN 'waitlist' THEN 'waitlisted'::application_status
+    WHEN 'decline'  THEN 'declined'::application_status
+  END,
+  staged_decision = NULL,
+  updated_at = now()
+FROM application_forms f
+WHERE a.form_id = f.id
+  AND f.festival_id = $1
+  AND a.staged_decision IS NOT NULL
+RETURNING a.*;
