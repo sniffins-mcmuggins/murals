@@ -16,7 +16,7 @@ This table is the living reference. Add rows as new videos are commissioned.
 | ID  | Persona    | Title                        | DB approach  | Key moments |
 |-----|------------|------------------------------|--------------|-------------|
 | V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup page → "Continue with Google" → dashboard → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
-| V06 | Organiser  | Organiser Full               | Pre-seeded   | Login → festival detail → applications inbox → accept → map pin → decline |
+| V06 | Organiser  | Organiser: Staged Decisions   | Pre-seeded (all submitted) | Login → CPF 2027 festival → kanban inbox (all Undecided) → drag Kit Harrow to Accept, Yuki Tanaka to Waitlist, Tomás Cruz to Decline → Release 3 decisions → confirmation modal → post-release banner |
 
 ---
 
@@ -97,13 +97,19 @@ highlight(page, selector)            // brief amber outline to draw the eye
 8. Fill form (mural concept, wall size, medium, portfolio links, insurance, availability)
 9. Submit → confirmation screen
 
-#### V06 — Organiser Full (~30s)
+#### V06 — Organiser: Staged Decisions (~40s)
 1. Log in as Marcus Webb (pre-seeded)
-2. Navigate to CPF 2027 festival detail — scroll through it
-3. Navigate to applications inbox — pending queue visible
-4. Accept Kit Harrow → card moves out of pending
-5. View festival map → Kit's pin appears
-6. Back to inbox → decline Tomás Cruz
+2. Navigate to CPF 2027 festival detail
+3. Open applications — kanban shows all artists in Undecided column
+4. Drag Kit Harrow → ✓ Accept column
+5. Drag Yuki Tanaka → ~ Waitlist column
+6. Drag Tomás Cruz → ✗ Decline column
+7. Header shows "3 staged" — click "Release 3 decisions →"
+8. Confirmation modal — pause for viewer to read, then confirm
+9. Post-release banner: "Decisions released · artists notified by email"
+10. Columns show Accepted/Waitlisted/Declined with "Notified ✓" badges
+
+**Seed requirement:** All 12 applications must be `submitted` at recording time (no pre-accepted/declined). Run `task demo:seed` to reset. The seed's `artistSeed` slice should have all entries set to `status: "submitted"` — update `demos/seed/main.go` before recording.
 
 ---
 
