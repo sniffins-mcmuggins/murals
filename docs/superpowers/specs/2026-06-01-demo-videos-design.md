@@ -16,7 +16,7 @@ This table is the living reference. Add rows as new videos are commissioned.
 | ID  | Persona    | Title                        | DB approach  | Key moments |
 |-----|------------|------------------------------|--------------|-------------|
 | V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup page → "Continue with Google" → dashboard → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
-| V06 | Organiser  | Organiser: Staged Decisions   | Pre-seeded (3 submitted) | Login → CPF 2027 festival → kanban (3 in Undecided, Release disabled) → drag Kit Harrow to Accept, Yuki Tanaka to Waitlist, Tomás Cruz to Decline → Release button enables → modal → tick "I understand" checkbox → Yes release → post-release banner |
+| V06 | Organiser  | Organiser: Staged Decisions   | Pre-seeded (5 submitted) | Login → CPF 2027 festival → kanban (5 in Undecided, Release disabled) → reorder cards within Undecided to rank them → drag to Accept/Waitlist/Decline → Release button enables → modal → tick "I understand" checkbox → Yes release → post-release banner |
 
 ---
 
@@ -58,12 +58,14 @@ demos/
 - V05 creates a fresh throwaway email (`gabe-{timestamp}@demo.art`) to show the real signup flow. The content typed mirrors Lady Gabe's real bio/links for visual consistency.
 
 ### Application seed data (for V06)
-3 applications from fictional artists against CPF 2027, all `submitted`:
+5 applications from fictional artists against CPF 2027, all `submitted`:
 - Kit Harrow (spray paint, large wall)
 - Yuki Tanaka (brush, small wall)
 - Tomás Cruz (mixed media, medium wall)
+- Amara Diallo (spray paint, large wall)
+- Rosa Vane (brush, medium wall)
 
-Keeping the count at 3 means the viewer watches all three get staged and the Release button enable live — the key demo moment.
+5 cards in one column gives enough material to show within-column ranking (drag to reorder) before deciding, and the viewer still watches every card get staged and the Release button enable live.
 
 ### `task demo:seed`
 Runs `demos/seed/main.go` which:
@@ -99,15 +101,15 @@ highlight(page, selector)            // brief amber outline to draw the eye
 8. Fill form (mural concept, wall size, medium, portfolio links, insurance, availability)
 9. Submit → confirmation screen
 
-#### V06 — Organiser: Staged Decisions (~45s)
+#### V06 — Organiser: Staged Decisions (~55s)
 1. Log in as Marcus Webb (pre-seeded)
 2. Navigate to CPF 2027 festival detail
-3. Open applications — kanban shows 3 cards in Undecided; Release button disabled + "3 still undecided" hint
-4. Drag Kit Harrow → ✓ Accept column
-5. Drag Yuki Tanaka → ~ Waitlist column
-6. Drag Tomás Cruz → ✗ Decline column — Release button enables ("Release 3 decisions →")
-7. Pause to show Release button now active
-8. Click "Release 3 decisions →" — modal opens; "Yes, release" is disabled
+3. Open applications — kanban shows 5 cards in Undecided; Release button disabled + "5 still need a decision" hint
+4. Rank within the Undecided column: drag Rosa Vane up onto Kit Harrow, then Amara Diallo up onto Yuki Tanaka (within-column reorder, persists rank)
+5. Drag Rosa Vane → ✓ Accept, Kit Harrow → ✓ Accept
+6. Drag Amara Diallo → ~ Waitlist, Yuki Tanaka → ~ Waitlist
+7. Drag Tomás Cruz → ✗ Decline — Release button enables ("Release 5 decisions →")
+8. Click "Release 5 decisions →" — modal opens; "Yes, release" is disabled
 9. Tick "I understand…" checkbox — "Yes, release" enables
 10. Click "Yes, release"
 11. Post-release banner: "Decisions released · artists notified by email"

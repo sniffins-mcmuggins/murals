@@ -37,6 +37,41 @@ async function dragCardToColumn(page: Page, artistName: string, colIndex: number
   await pause(900)
 }
 
+// Reorder within a column: drag one card's handle onto another card (same column).
+// Dropping over a card in the same column triggers a rank reorder, not a decision.
+async function dragCardOntoCard(page: Page, fromName: string, toName: string): Promise<void> {
+  const coords = await page.evaluate(({ from, to }: { from: string; to: string }) => {
+    const cardOf = (name: string): HTMLElement | null => {
+      const handles = Array.from(document.querySelectorAll<HTMLElement>('button[aria-label="Drag to reorder"]'))
+      for (const handle of handles) {
+        const card = (handle.closest('[class*="rounded-lg"]') ?? handle.parentElement) as HTMLElement | null
+        if (card?.textContent?.includes(name)) return card
+      }
+      return null
+    }
+    const fromCard = cardOf(from)
+    const toCard = cardOf(to)
+    if (!fromCard || !toCard) return null
+    const fh = fromCard.querySelector<HTMLElement>('button[aria-label="Drag to reorder"]')!.getBoundingClientRect()
+    const tr = toCard.getBoundingClientRect()
+    return {
+      from: { x: fh.left + fh.width / 2, y: fh.top + fh.height / 2 },
+      to: { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 },
+    }
+  }, { from: fromName, to: toName })
+
+  if (!coords) throw new Error(`dragCardOntoCard: could not find "${fromName}" or "${toName}"`)
+
+  await page.mouse.move(coords.from.x, coords.from.y)
+  await pause(200)
+  await page.mouse.down()
+  await pause(500)
+  await page.mouse.move(coords.to.x, coords.to.y, { steps: 25 })
+  await pause(350)
+  await page.mouse.up()
+  await pause(900)
+}
+
 test('V06 — Organiser: Staged Decisions', async ({ page }) => {
   // ── 1. Log in as Marcus Webb ─────────────────────────────────────────────────
   await page.goto('/login')
@@ -56,44 +91,50 @@ test('V06 — Organiser: Staged Decisions', async ({ page }) => {
   await pause(1200)
   const festivalId = page.url().split('/').at(-1)!
 
-  // ── 3. Open applications — 3 cards in Undecided, Release button disabled ─────
+  // ── 3. Open applications — 5 cards in Undecided, Release button disabled ─────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
   await expect(page.locator('.grid-cols-5')).toBeVisible({ timeout: 8000 })
   await pause(1500)
 
-  // Show that Release is disabled + hint text visible
+  // Show that Release is disabled + "still need a decision" hint visible
   await page.keyboard.press('End')
   await pause(600)
   await page.keyboard.press('Home')
-  await pause(1000)
+  await pause(1200)
 
-  // ── 4. Drag Kit Harrow → Accept ──────────────────────────────────────────────
-  await dragCardToColumn(page, 'Kit Harrow', 2)
+  // ── 4. Rank candidates within the Undecided column before deciding ───────────
+  // Drag a strong candidate up to the top of the pile, then a second one up.
+  await dragCardOntoCard(page, 'Rosa Vane', 'Kit Harrow')
+  await pause(600)
+  await dragCardOntoCard(page, 'Amara Diallo', 'Yuki Tanaka')
+  await pause(1200)
 
-  // ── 5. Drag Yuki Tanaka → Waitlist ───────────────────────────────────────────
-  await dragCardToColumn(page, 'Yuki Tanaka', 3)
+  // ── 5. Make decisions — drag each card to its column ─────────────────────────
+  await dragCardToColumn(page, 'Rosa Vane', 2)   // Accept (top-ranked)
+  await dragCardToColumn(page, 'Kit Harrow', 2)  // Accept
+  await dragCardToColumn(page, 'Amara Diallo', 3) // Waitlist
+  await dragCardToColumn(page, 'Yuki Tanaka', 3)  // Waitlist
+  await dragCardToColumn(page, 'Tomás Cruz', 4)   // Decline
 
-  // ── 6. Drag Tomás Cruz → Decline — Release button enables ────────────────────
-  await dragCardToColumn(page, 'Tomás Cruz', 4)
-  // All 3 are staged — Release button should now be enabled
-  await expect(page.getByRole('button', { name: /Release 3 decisions/ })).not.toBeDisabled({ timeout: 4000 })
+  // All 5 are staged — Release button should now be enabled
+  await expect(page.getByRole('button', { name: /Release 5 decisions/ })).not.toBeDisabled({ timeout: 4000 })
   await pause(1500)
 
-  // ── 7. Open confirmation modal ───────────────────────────────────────────────
+  // ── 6. Open confirmation modal ───────────────────────────────────────────────
   await highlight(page, 'button:has-text("decisions")')
-  await page.getByRole('button', { name: /Release 3 decisions/ }).click()
+  await page.getByRole('button', { name: /Release 5 decisions/ }).click()
   await expect(page.getByText('Release decisions?')).toBeVisible({ timeout: 5000 })
   await pause(1800)  // let viewer read the modal; "Yes, release" is disabled
 
-  // ── 8. Check the confirmation checkbox ───────────────────────────────────────
+  // ── 7. Check the confirmation checkbox ───────────────────────────────────────
   await page.getByRole('checkbox').check()
   await pause(1000)  // "Yes, release" is now enabled
 
-  // ── 9. Confirm — release fires ───────────────────────────────────────────────
+  // ── 8. Confirm — release fires ───────────────────────────────────────────────
   await highlight(page, 'button:has-text("Yes, release")')
   await page.getByRole('button', { name: 'Yes, release' }).click()
 
-  // ── 10. Post-release banner ──────────────────────────────────────────────────
+  // ── 9. Post-release banner ───────────────────────────────────────────────────
   await expect(page.getByText('Decisions released')).toBeVisible({ timeout: 8000 })
   await pause(1200)
 

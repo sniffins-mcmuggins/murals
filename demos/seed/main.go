@@ -49,6 +49,10 @@ var artistSeed = []fictionalArtist{
 		"Cherry blossom and oak — a conversation between Japanese and British flora.", "Small (up to 4m²)", "submitted", 0, 0},
 	{"Tomás Cruz", "tomas@demo-artist.art", "Geometric abstraction in public spaces.", "Mixed media",
 		"Fractured geometry reflecting Cheltenham's Regency architecture.", "Medium (4–20m²)", "submitted", 0, 0},
+	{"Amara Diallo", "amara@demo-artist.art", "Celebrating West African cultural heritage through colour.", "Spray paint",
+		"Kente patterns adapted for a Cheltenham townhouse gable end.", "Large (20m²+)", "submitted", 0, 0},
+	{"Rosa Vane", "rosa@demo-artist.art", "Community portraiture and local history.", "Brush",
+		"Portraits of five unsung figures from Cheltenham's history.", "Medium (4–20m²)", "submitted", 0, 0},
 }
 
 func main() {
