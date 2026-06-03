@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { slowType, pause, highlight, scrollTo } from "./helpers.js";
+import { verifyEmailViaMailpit } from "./mailpit.js";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -27,14 +28,15 @@ test("V05 — Artist Journey", async ({ page }) => {
   await pause(800);
   await highlight(page, "button[type=submit]");
   await page.click("button[type=submit]");
-  await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
-  await pause(600);
+  // Signup stays on /signup and shows "Check your inbox" — no redirect to /login.
+  await expect(page.getByText(/check your inbox/i)).toBeVisible({ timeout: 10000 });
+  await pause(1200);
 
-  // ── 2. Log in ─────────────────────────────────────────────────────────────────
-  await slowType(page.locator("#email"), email);
-  await slowType(page.locator("#password"), password);
-  await highlight(page, "button[type=submit]");
-  await page.click("button[type=submit]");
+  // ── 2. Verify email via Mailpit ───────────────────────────────────────────────
+  // Opens Mailpit web UI at localhost:8025 — inbox is visible on screen.
+  // Clicks the verification email, then navigates to the verify link which
+  // sets the session cookie and redirects straight to /dashboard.
+  await verifyEmailViaMailpit(page, email);
   await expect(page).toHaveURL("/dashboard", { timeout: 25000 });
   await pause(1500);
 
