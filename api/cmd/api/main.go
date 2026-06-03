@@ -123,12 +123,15 @@ func main() {
 		r.Post("/auth/mfa/verify", auth.TOTPVerifyHandler(pool, cfg.TOTPEncryptionKey, cfg.JWTSecret))
 		r.Post("/promo/redeem", admin.RedeemPromoHandler(pool))
 		r.Post("/waitlist", beta.WaitlistHandler(pool))
+		r.Post("/auth/resend-verification", auth.ResendVerificationHandler(pool, mailer, cfg.WebPublicBase))
 	})
 
 	r.Post("/auth/signup", auth.SignupHandler(pool, cfg, mailer))
+	r.Get("/auth/verify-email", auth.VerifyEmailHandler(pool, cfg.JWTSecret))
 	// Test-only probe: POST /_test/beta/signup runs SignupHandler with BetaMode=true.
 	// Allows e2e tests to exercise the invite-gated signup path without BETA_MODE=true in the stack.
 	r.Post("/_test/beta/signup", auth.SignupHandler(pool, config.Config{BetaMode: true, WebPublicBase: cfg.WebPublicBase}, mailer))
+	r.Post("/_test/verify-email", auth.VerifyEmailTestHandler(pool))
 
 	// MFA enrolment — requires an authenticated session (the auth middleware gate is sufficient).
 	r.Post("/auth/mfa/enroll", auth.TOTPEnrollHandler(pool, cfg.TOTPEncryptionKey))
