@@ -158,7 +158,9 @@ func sendVerificationEmailWork(pool *pgxpool.Pool, mailer EmailSender, webBase, 
 
 // VerifyEmailTestHandler handles POST /_test/verify-email.
 // Sets email_verified = true for the given email directly in the DB,
-// bypassing the token flow. Only registered outside production.
+// bypassing the token flow. Like all /_test/ routes, production safety
+// relies on the deployment never exposing this path publicly (e.g. via
+// ingress path rules), not a code-level guard.
 func VerifyEmailTestHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -170,6 +172,7 @@ func VerifyEmailTestHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		email := strings.ToLower(strings.TrimSpace(req.Email))
 		q := sqlcdb.New(pool)
+		// SetEmailVerifiedByEmail is a no-op (affects 0 rows) for unknown emails.
 		if err := q.SetEmailVerifiedByEmail(r.Context(), email); err != nil {
 			httperr.InternalServerError(w)
 			return

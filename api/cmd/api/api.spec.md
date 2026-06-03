@@ -1,6 +1,6 @@
 # api/cmd/api Spec
 **Path:** `api/cmd/api/`
-**Last updated:** 2026-05-31
+**Last updated:** 2026-06-03
 
 ## Contract
 - Entry point for the Go API server
@@ -20,7 +20,7 @@
 - **`SES_REQUIRED` pattern**: `buildMailer` exits with `os.Exit(1)` if SES init fails when `SES_REQUIRED=true` — see prod-fail-loud rule
 - **OAuth providers are conditionally registered**: Google and Apple route pairs are only registered when the respective client ID env vars are set — prevents 404s in environments where OAuth isn't configured
 - **Rate-limited group covers login, forgot-password, MFA verify, promo redeem, waitlist**: these share one `auth.RateLimitMiddleware` call — adding a new endpoint that needs rate limiting goes in this group
-- **`/_test/` probe endpoints**: two test-only routes exist for e2e verification — `/_test/billing/pro-only` (exercises `RequirePlan`) and `/_test/beta/gated` (exercises `beta.Gate` unconditionally regardless of `BETA_MODE`); these expose no real functionality and must not be removed
+- **`/_test/` probe endpoints**: test-only routes registered **unconditionally** (no build tag or env guard) — production safety relies entirely on the deployment never exposing `/_test/*` paths publicly (e.g. via ingress/ALB path rules), not a code-level guard. Current routes: `/_test/billing/pro-only` (exercises `RequirePlan`), `/_test/beta/gated` (exercises `beta.Gate` unconditionally regardless of `BETA_MODE`), `/_test/beta/signup` (bypasses beta waitlist), `/_test/verify-email` (marks email verified without a token). Do not remove these — they are load-bearing for e2e tests. When adding a new `/_test/` route, document it here and ensure the deployment blocks the path prefix.
 - **Billing webhook CSRF posture**: the session cookie is `SameSite=Lax`, which blocks cross-site form POSTs. Do not relax to `SameSiteNoneMode` without adding a CSRF token.
 
 ## Invariants
@@ -35,7 +35,8 @@
 - `corsMiddleware`: allowlist-based CORS — add new production origins to `CORS_ALLOWED_ORIGINS` env var, not here
 - `warnIfStripeMisconfigured`: logs warnings for blank price IDs at startup — add new price IDs here when adding billing endpoints
 - When adding a new route: check the middleware group, check literal-before-param ordering, check if it needs an e2e probe
-- `/_test/` routes: test probes — `/_test/billing/pro-only` and `/_test/beta/gated`; keep them, they're load-bearing for e2e billing and beta gate tests
+- `/_test/` routes: all registered unconditionally — `/_test/billing/pro-only`, `/_test/beta/gated`, `/_test/beta/signup`, `/_test/verify-email`; keep them, they're load-bearing for e2e tests. Production safety is deployment-level (block `/_test/*` at the ingress), not code-level.
 
 ## Changelog
 2026-05-31 — initial spec
+2026-06-03 — document all /_test/ routes, clarify production safety model (deployment-level, not code-level)
