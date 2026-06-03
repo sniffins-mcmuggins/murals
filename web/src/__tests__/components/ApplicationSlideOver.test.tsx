@@ -36,12 +36,11 @@ const baseProps = {
   festivalId: 'fest-1',
   formFields: [{ id: 'q1', label: 'Tell us about your work', type: 'text', required: true }],
   onClose: noop,
-  onAccept: noop,
-  onDecline: noop,
-  onWaitlist: noop,
+  onStage: noop,
   onScore: noop,
   isPending: false,
   criteria: [],
+  isReleased: false,
 }
 
 describe('ApplicationSlideOver — owner mode (isReviewer=false)', () => {

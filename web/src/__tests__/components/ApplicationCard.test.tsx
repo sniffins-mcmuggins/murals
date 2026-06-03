@@ -3,17 +3,16 @@ import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ApplicationCard } from '@/components/ApplicationCard'
 
-vi.mock('@dnd-kit/sortable', () => ({
-  useSortable: () => ({
+vi.mock('@dnd-kit/core', () => ({
+  useDraggable: () => ({
     attributes: {},
     listeners: {},
     setNodeRef: () => {},
     transform: null,
-    transition: undefined,
     isDragging: false,
   }),
 }))
-vi.mock('@dnd-kit/utilities', () => ({ CSS: { Transform: { toString: () => '' } } }))
+vi.mock('@dnd-kit/utilities', () => ({ CSS: { Translate: { toString: () => '' } } }))
 
 const baseApp = {
   id: 'app-1',
@@ -35,68 +34,73 @@ const baseApp = {
 
 const noop = () => {}
 
+const defaultOwnerProps = {
+  onSelect: noop,
+  onToggleShortlist: noop,
+  onScore: noop,
+  isReviewer: false,
+  isPending: false,
+  criteria: [],
+  isDraggable: true,
+  columnKey: 'undecided',
+  isReleased: false,
+}
+
 describe('ApplicationCard — owner mode (isReviewer=false)', () => {
-  it('shows drag handle, flag buttons, and action buttons', () => {
-    render(<ApplicationCard application={baseApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={false} isPending={false} criteria={[]} />)
+  it('shows drag handle and shortlist button', () => {
+    render(<ApplicationCard application={baseApp} {...defaultOwnerProps} />)
     expect(screen.getByLabelText('Drag to reorder')).toBeInTheDocument()
     expect(screen.getByTitle('Shortlist')).toBeInTheDocument()
-    expect(screen.getByTitle('Flag for review')).toBeInTheDocument()
-    expect(screen.getByText('Accept')).toBeInTheDocument()
   })
 
-  it('shows avg badge when score_count > 0 and my_score != null', () => {
+  it('shows avg badge when score_count > 0 and avg_score != null', () => {
     const app = { ...baseApp, avg_score: 3.5, score_count: 2, my_score: 4 }
-    render(<ApplicationCard application={app} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={false} isPending={false} criteria={[]} />)
-    expect(screen.getByText(/★.*3\.5.*·.*2/)).toBeInTheDocument()
+    render(<ApplicationCard application={app} {...defaultOwnerProps} />)
+    expect(screen.getByText(/★.*3\.5/)).toBeInTheDocument()
   })
 
-  it('hides avg badge when my_score is null', () => {
-    const app = { ...baseApp, avg_score: 3.5, score_count: 2, my_score: null }
-    render(<ApplicationCard application={app} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={false} isPending={false} criteria={[]} />)
+  it('hides avg badge when score_count is 0', () => {
+    const app = { ...baseApp, avg_score: 3.5, score_count: 0, my_score: null }
+    render(<ApplicationCard application={app} {...defaultOwnerProps} />)
     expect(screen.queryByText(/3\.5/)).not.toBeInTheDocument()
+  })
+
+  it('does not show drag handle when isDraggable=false', () => {
+    render(<ApplicationCard application={baseApp} {...defaultOwnerProps} isDraggable={false} />)
+    expect(screen.queryByLabelText('Drag to reorder')).not.toBeInTheDocument()
+  })
+
+  it('does not show shortlist button when isReleased=true', () => {
+    render(<ApplicationCard application={baseApp} {...defaultOwnerProps} isReleased={true} columnKey="accept" />)
+    expect(screen.queryByTitle('Shortlist')).not.toBeInTheDocument()
   })
 })
 
 describe('ApplicationCard — reviewer mode (isReviewer=true)', () => {
-  it('hides drag handle, flag buttons, and action buttons', () => {
-    render(<ApplicationCard application={baseApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} criteria={[]} />)
+  const reviewerProps = { ...defaultOwnerProps, isReviewer: true, isDraggable: false }
+
+  it('hides drag handle and shortlist button', () => {
+    render(<ApplicationCard application={baseApp} {...reviewerProps} />)
     expect(screen.queryByLabelText('Drag to reorder')).not.toBeInTheDocument()
     expect(screen.queryByTitle('Shortlist')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Flag for review')).not.toBeInTheDocument()
-    expect(screen.queryByText('Accept')).not.toBeInTheDocument()
   })
 
-  it('shows star score control when unscored', () => {
-    render(<ApplicationCard application={baseApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} criteria={[]} />)
-    expect(screen.getByLabelText('Score 1')).toBeInTheDocument()
-    expect(screen.getByLabelText('Score 5')).toBeInTheDocument()
+  it('shows "Score" button when unscored', () => {
+    render(<ApplicationCard application={baseApp} {...reviewerProps} />)
+    expect(screen.getByRole('button', { name: /^Score$/ })).toBeInTheDocument()
   })
 
-  it('calls onScore when a star is clicked', () => {
-    const onScore = vi.fn()
-    render(<ApplicationCard application={baseApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={onScore} isReviewer={true} isPending={false} criteria={[]} />)
-    fireEvent.click(screen.getByLabelText('Score 4'))
-    expect(onScore).toHaveBeenCalledWith('app-1', 4)
+  it('shows "Edit score" button when already scored', () => {
+    const app = { ...baseApp, my_score: 4 }
+    render(<ApplicationCard application={app} {...reviewerProps} />)
+    expect(screen.getByRole('button', { name: /Edit score/ })).toBeInTheDocument()
   })
 
-  it('shows avg badge after scoring (my_score != null)', () => {
-    const app = { ...baseApp, avg_score: 4.0, score_count: 1, my_score: 4 }
-    render(<ApplicationCard application={app} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} criteria={[]} />)
-    expect(screen.getByText(/★.*4\.0.*·.*1/)).toBeInTheDocument()
+  it('calls onSelect when Score button is clicked', () => {
+    const onSelect = vi.fn()
+    render(<ApplicationCard application={baseApp} {...reviewerProps} onSelect={onSelect} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Score$/ }))
+    expect(onSelect).toHaveBeenCalledWith(baseApp)
   })
 })
 
@@ -108,58 +112,29 @@ describe('ApplicationCard — anonymous mode (identity_hidden=true)', () => {
   }
 
   it('shows "Anonymous artist" placeholder name', () => {
-    render(<ApplicationCard application={anonApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} criteria={[]} />)
+    render(<ApplicationCard application={anonApp} {...defaultOwnerProps} />)
     expect(screen.getByText('Anonymous artist')).toBeInTheDocument()
-  })
-
-  it('shows "Score to reveal identity" hint', () => {
-    render(<ApplicationCard application={anonApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} criteria={[]} />)
-    expect(screen.getByText(/Score to reveal/i)).toBeInTheDocument()
   })
 
   it('shows real name when identity_hidden=false', () => {
     const revealedApp = { ...anonApp, identity_hidden: false, artist: { ...baseApp.artist, display_name: 'Rosa Vane' } }
-    render(<ApplicationCard application={revealedApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false} criteria={[]} />)
+    render(<ApplicationCard application={revealedApp} {...defaultOwnerProps} />)
     expect(screen.getByText('Rosa Vane')).toBeInTheDocument()
-    expect(screen.queryByText(/Score to reveal/i)).not.toBeInTheDocument()
   })
 })
 
-describe('ApplicationCard — rubric mode (criteria configured)', () => {
-  const rubricApp = {
-    ...baseApp,
-    criterion_scores: [
-      { criterion_id: 'art', label: 'Artistic Quality', min: 1, max: 5, avg_score: null, score_count: 0, my_score: null },
-      { criterion_id: 'feas', label: 'Feasibility', min: 1, max: 5, avg_score: null, score_count: 0, my_score: null },
-    ],
-  }
-  const criteria = [
-    { id: 'art', label: 'Artistic Quality', min: 1, max: 5 },
-    { id: 'feas', label: 'Feasibility', min: 1, max: 5 },
-  ]
-
-  it('shows "Score →" button instead of inline stars when criteria are configured', () => {
-    render(<ApplicationCard application={rubricApp} onSelect={noop} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false}
-      criteria={criteria} />)
-    expect(screen.getByRole('button', { name: /Score/i })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Score 1')).not.toBeInTheDocument()
+describe('ApplicationCard — column background colours', () => {
+  it('applies green background for accept column', () => {
+    const { container } = render(
+      <ApplicationCard application={baseApp} {...defaultOwnerProps} columnKey="accept" />
+    )
+    expect(container.firstChild).toHaveClass('bg-green-50')
   })
 
-  it('calls onSelect when "Score →" button is clicked', () => {
-    const onSelect = vi.fn()
-    render(<ApplicationCard application={rubricApp} onSelect={onSelect} onAccept={noop}
-      onDecline={noop} onWaitlist={noop} onToggleShortlist={noop}
-      onToggleReviewFlag={noop} onScore={noop} isReviewer={true} isPending={false}
-      criteria={criteria} />)
-    fireEvent.click(screen.getByRole('button', { name: /Score/i }))
-    expect(onSelect).toHaveBeenCalledWith(rubricApp)
+  it('applies warm background for undecided column', () => {
+    const { container } = render(
+      <ApplicationCard application={baseApp} {...defaultOwnerProps} columnKey="undecided" />
+    )
+    expect(container.firstChild).toHaveClass('bg-warm')
   })
 })

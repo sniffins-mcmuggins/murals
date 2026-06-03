@@ -27,20 +27,12 @@ interface Props {
   formFields: FormField[]
   festivalId: string
   onClose: () => void
-  onAccept: (id: string) => void
-  onDecline: (id: string) => void
-  onWaitlist: (id: string) => void
+  onStage: (id: string, decision: string | null) => void
   onScore: (id: string, score: number, criterionId?: string) => void
   isReviewer: boolean
   isPending: boolean
   criteria: ReviewCriterion[]
-}
-
-const ACTION_TRANSITIONS: Record<string, string[]> = {
-  submitted: ['accept', 'waitlist', 'decline'],
-  accepted: ['decline'],
-  waitlisted: ['accept', 'decline'],
-  declined: [],
+  isReleased: boolean
 }
 
 function initials(name: string): string {
@@ -49,7 +41,7 @@ function initials(name: string): string {
 
 export function ApplicationSlideOver({
   application, formFields, festivalId, onClose,
-  onAccept, onDecline, onWaitlist, onScore, isReviewer, isPending, criteria,
+  onStage, onScore, isReviewer, isPending, criteria, isReleased,
 }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -66,7 +58,6 @@ export function ApplicationSlideOver({
   const name = isAnonymous ? 'Anonymous artist' : (artist?.display_name ?? 'Unknown Artist')
   const answers = (application.answers ?? {}) as Record<string, string>
   const notes = (application.notes ?? []) as ApplicationNote[]
-  const actions = ACTION_TRANSITIONS[application.status ?? ''] ?? []
   const id = application.id ?? ''
   const myScore = application.my_score
   const avgScore = application.avg_score
@@ -114,27 +105,25 @@ export function ApplicationSlideOver({
             </div>
           )}
 
-          {/* Actions — owner only */}
-          {!isReviewer && actions.length > 0 && (
+          {/* Staged decision actions — owner only, pre-release */}
+          {!isReviewer && !isReleased && (
             <div className="flex gap-2">
-              {actions.includes('accept') && (
-                <button onClick={() => onAccept(id)} disabled={isPending}
-                  className="font-sans text-sm font-semibold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50">
-                  Accept
-                </button>
-              )}
-              {actions.includes('waitlist') && (
-                <button onClick={() => onWaitlist(id)} disabled={isPending}
-                  className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                  Waitlist
-                </button>
-              )}
-              {actions.includes('decline') && (
-                <button onClick={() => onDecline(id)} disabled={isPending}
-                  className="font-sans text-sm text-clay border border-clay/30 px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                  Decline
-                </button>
-              )}
+              <button onClick={() => onStage(id, 'accept')} disabled={isPending}
+                className="font-sans text-sm font-semibold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50">
+                Accept
+              </button>
+              <button onClick={() => onStage(id, 'waitlist')} disabled={isPending}
+                className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
+                Waitlist
+              </button>
+              <button onClick={() => onStage(id, 'decline')} disabled={isPending}
+                className="font-sans text-sm text-clay border border-clay/30 px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
+                Decline
+              </button>
+              <button onClick={() => onStage(id, null)} disabled={isPending}
+                className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
+                Undecide
+              </button>
             </div>
           )}
 
