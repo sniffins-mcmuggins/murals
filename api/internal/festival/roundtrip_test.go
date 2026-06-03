@@ -28,7 +28,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}))
+	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}, auth.NoopMailer{}))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Get("/me", auth.MeHandler(db))
 

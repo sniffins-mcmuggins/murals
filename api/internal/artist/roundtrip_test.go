@@ -24,7 +24,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}))
+	r.Post("/auth/signup", auth.SignupHandler(db, config.Config{}, auth.NoopMailer{}))
 	r.Post("/auth/login", auth.LoginHandler(db, testSecret))
 	r.Post("/profiles", artist.CreateProfileHandler(db))
 	r.Get("/profiles/me", artist.GetMyProfileHandler(db))

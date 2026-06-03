@@ -25,7 +25,7 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, password string) (cookie *ht
 	sr := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", strings.NewReader(signupBody))
 	sr.Header.Set("Content-Type", "application/json")
 	sw := httptest.NewRecorder()
-	auth.SignupHandler(db, config.Config{}).ServeHTTP(sw, sr)
+	auth.SignupHandler(db, config.Config{}, auth.NoopMailer{}).ServeHTTP(sw, sr)
 	if sw.Code != http.StatusCreated {
 		t.Fatalf("signup failed: %d %s", sw.Code, sw.Body.String())
 	}

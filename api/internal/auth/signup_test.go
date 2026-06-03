@@ -25,7 +25,7 @@ func ptr[T any](v T) *T { return &v }
 func TestSignupHandler_Success(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 
 	body := `{"email":"alice@example.com","password":"hunter2hunter"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", bytes.NewBufferString(body))
@@ -48,7 +48,7 @@ func TestSignupHandler_Success(t *testing.T) {
 func TestSignupHandler_DuplicateEmail(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 
 	body := `{"email":"bob@example.com","password":"hunter2hunter"}`
 	for i := range 2 {
@@ -67,7 +67,7 @@ func TestSignupHandler_DuplicateEmail(t *testing.T) {
 func TestSignupHandler_WeakPassword(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 
 	body := `{"email":"carol@example.com","password":"short"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", bytes.NewBufferString(body))
@@ -82,7 +82,7 @@ func TestSignupHandler_WeakPassword(t *testing.T) {
 func TestSignupHandler_InvalidEmail(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 
 	body := `{"email":"notanemail","password":"hunter2hunter"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", bytes.NewBufferString(body))
@@ -98,7 +98,7 @@ func TestSignup_BetaModeOn_NoInviteCode_Returns403(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	cfg := config.Config{BetaMode: true}
-	handler := auth.SignupHandler(db, cfg)
+	handler := auth.SignupHandler(db, cfg, auth.NoopMailer{})
 
 	body := `{"email":"nobeta@test.com","password":"password123"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", strings.NewReader(body))
@@ -112,7 +112,7 @@ func TestSignup_BetaModeOn_InvalidInviteCode_Returns403(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	cfg := config.Config{BetaMode: true}
-	handler := auth.SignupHandler(db, cfg)
+	handler := auth.SignupHandler(db, cfg, auth.NoopMailer{})
 
 	body := `{"email":"badinvite@test.com","password":"password123","invite_code":"nonexistent-code"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup", strings.NewReader(body))
@@ -136,7 +136,7 @@ func TestSignupHandler_ClaimProfile(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 	body := `{"email":"claimer@e2e.test","password":"password123","claim_token":"testclaimtoken123"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup",
 		bytes.NewBufferString(body))
@@ -166,7 +166,7 @@ func TestSignupHandler_ClaimAlreadyClaimed(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 	body := `{"email":"latecomer@e2e.test","password":"password123","claim_token":"alreadyclaimedtoken"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup",
 		bytes.NewBufferString(body))
@@ -184,7 +184,7 @@ func TestSignupHandler_ClaimBadToken(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
-	handler := auth.SignupHandler(db, config.Config{})
+	handler := auth.SignupHandler(db, config.Config{}, auth.NoopMailer{})
 	body := `{"email":"badtoken@e2e.test","password":"password123","claim_token":"nosuchtoken"}`
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/auth/signup",
 		bytes.NewBufferString(body))
@@ -221,7 +221,7 @@ func TestSignup_BetaModeOn_ValidInvite_SetsBetaFields(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := config.Config{BetaMode: true}
-	handler := auth.SignupHandler(db, cfg)
+	handler := auth.SignupHandler(db, cfg, auth.NoopMailer{})
 
 	testEmail := "newbeta-" + uuid.NewString()[:8] + "@test.com"
 	body := `{"email":"` + testEmail + `","password":"password123","invite_code":"` + invite.Code + `"}`
