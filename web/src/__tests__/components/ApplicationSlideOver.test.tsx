@@ -72,6 +72,14 @@ describe('ApplicationSlideOver — owner mode (isReviewer=false)', () => {
     expect(onStage).toHaveBeenCalledWith('app-1', null)
   })
 
+  it('clicking active decision pill unstages it', () => {
+    const onStage = vi.fn()
+    const app = { ...baseApp, staged_decision: 'accept' as const }
+    render(<ApplicationSlideOver {...baseProps} application={app} isReviewer={false} isReleased={false} onStage={onStage} />)
+    fireEvent.click(screen.getByText('✓ Accept'))
+    expect(onStage).toHaveBeenCalledWith('app-1', null)
+  })
+
   it('shows status badge when post-release', () => {
     const appWithStatus = { ...baseApp, status: 'accepted' as const }
     render(<ApplicationSlideOver {...baseProps} application={appWithStatus} isReviewer={false} isReleased={true} />)
