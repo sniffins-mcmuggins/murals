@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import * as path from 'path'
 import { Client } from 'pg'
 import { forcePublish } from '../fixtures/db-helpers.js'
+import { verifyEmailViaMailpit } from '../fixtures/mailpit.js'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
 const DB_URL = process.env.DATABASE_URL ?? 'postgres://render:render@localhost:5432/render'
@@ -19,13 +20,14 @@ test('artist onboarding: signup → profile → collection → upload → public
   // Role defaults to "Artist" — no change needed
   await page.click('button[type=submit]')
 
-  // Signup redirects to /login?registered=1
-  await expect(page).toHaveURL(/\/login/)
+  // Signup stays on /signup and shows "Check your inbox" success state.
+  await expect(page.getByText(/check your inbox/i)).toBeVisible()
 
-  // ── 2. Log in via UI ─────────────────────────────────────────────────────────
-  await page.fill('#email', email)
-  await page.fill('#password', password)
-  await page.click('button[type=submit]')
+  // ── 2. Verify email via Mailpit ───────────────────────────────────────────────
+  // Opens Mailpit web UI (visible in demo videos), shows the inbox,
+  // then navigates to the verify link which logs the user in and
+  // redirects to /dashboard.
+  await verifyEmailViaMailpit(page, email)
   await expect(page).toHaveURL('/dashboard')
 
   // ── 3. Navigate to Profile and fill in details ────────────────────────────────
