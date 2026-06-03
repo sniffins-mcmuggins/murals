@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { pause, highlight, scrollTo, slowType } from './helpers.js'
 
-test('V02 — Organiser Review', async ({ page }) => {
+test('V06 — Organiser Full', async ({ page }) => {
   // ── 1. Log in as Marcus ───────────────────────────────────────────────────────
   await page.goto('/login')
   await pause(800)
@@ -19,32 +19,34 @@ test('V02 — Organiser Review', async ({ page }) => {
   await page.getByText('Cheltenham Paint Festival 2027').click()
   await pause(1200)
 
-  // ── 3. Open applications page ────────────────────────────────────────────────
-  // The URL is now /organiser/festivals/{id} — extract ID, go to applications
+  // ── 3. Browse the festival detail — shows status, dates, form fields ──────────
   const festivalId = page.url().split('/').at(-1)!
+  await page.keyboard.press('End')
+  await pause(1500)
+  await page.keyboard.press('Home')
+  await pause(1000)
+
+  // ── 4. Open applications inbox ───────────────────────────────────────────────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
-  // Tabs are plain <button> elements (not ARIA tabs); Pending is active by default
   await expect(page.getByRole('button', { name: /Pending/ })).toBeVisible({ timeout: 8000 })
   await pause(1500)
 
-  // ── 4. Review Kit Harrow — Accept inline ─────────────────────────────────────
-  // Applications show inline Accept/Waitlist/Decline buttons on each card
+  // ── 5. Accept Kit Harrow ─────────────────────────────────────────────────────
   const kitItem = page.locator('li').filter({ hasText: 'Kit Harrow' })
   await expect(kitItem).toBeVisible({ timeout: 6000 })
   await pause(800)
-  // Scroll to and highlight the Accept button on Kit's card
   await scrollTo(page, 'li:has-text("Kit Harrow") button:has-text("Accept")')
   await highlight(page, 'li:has-text("Kit Harrow") button:has-text("Accept")')
   await kitItem.getByRole('button', { name: 'Accept' }).click()
   await pause(1500)
 
-  // ── 5. Navigate to festival map — Kit's pin now visible ───────────────────────
+  // ── 6. View festival map — Kit's pin now visible ──────────────────────────────
   await page.goto(`/organiser/festivals/${festivalId}/map`)
   await pause(2000)
   await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10000 })
   await pause(2500)
 
-  // ── 6. Back to applications — decline Tomás Cruz ─────────────────────────────
+  // ── 7. Back to inbox — decline Tomás Cruz ────────────────────────────────────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
   await expect(page.getByRole('button', { name: /Pending/ })).toBeVisible({ timeout: 8000 })
   await pause(600)
@@ -57,7 +59,6 @@ test('V02 — Organiser Review', async ({ page }) => {
   await tomasItem.getByRole('button', { name: 'Decline' }).click()
   await pause(1000)
 
-  // Handle optional confirmation dialog
   const confirmBtn = page.getByRole('button', { name: /confirm|yes/i })
   if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
     await confirmBtn.click()

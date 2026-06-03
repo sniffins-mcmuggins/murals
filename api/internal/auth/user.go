@@ -12,20 +12,22 @@ import (
 
 // userResponse is the JSON shape returned for a user in all auth endpoints.
 type userResponse struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	IsAdmin   bool   `json:"is_admin"`
-	IsBeta    bool   `json:"is_beta"`
-	CreatedAt string `json:"created_at"`
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	IsAdmin       bool   `json:"is_admin"`
+	IsBeta        bool   `json:"is_beta"`
+	EmailVerified bool   `json:"email_verified"`
+	CreatedAt     string `json:"created_at"`
 }
 
 func toUserResponse(u sqlcdb.User) userResponse {
 	return userResponse{
-		ID:        u.ID.String(),
-		Email:     u.Email,
-		IsAdmin:   u.IsAdmin,
-		IsBeta:    u.IsBeta,
-		CreatedAt: u.CreatedAt.Time.Format(time.RFC3339),
+		ID:            u.ID.String(),
+		Email:         u.Email,
+		IsAdmin:       u.IsAdmin,
+		IsBeta:        u.IsBeta,
+		EmailVerified: u.EmailVerified,
+		CreatedAt:     u.CreatedAt.Time.Format(time.RFC3339),
 	}
 }
 

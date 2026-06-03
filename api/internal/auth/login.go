@@ -54,6 +54,16 @@ func LoginHandler(pool *pgxpool.Pool, jwtSecret string) http.HandlerFunc {
 			return
 		}
 
+		if !user.EmailVerified {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"code":    "email_not_verified",
+				"message": "Check your inbox to verify your email.",
+			})
+			return
+		}
+
 		// MFA-gated branch: don't issue a session token yet. Return a short-lived
 		// mfa_pending token the client must exchange via POST /auth/mfa/verify.
 		if user.MfaEnabled {

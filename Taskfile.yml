@@ -86,15 +86,11 @@ tasks:
     cmd: bash run.sh
 
   demo:all:
-    desc: "Seed DB then record all four videos in sequence"
+    desc: "Seed DB then record combined videos (V05 artist journey + V06 organiser full)"
     cmds:
       - task: demo:seed
       - task: demo:record
-        vars: { V: V01 }
+        vars: { V: V05 }
       - task: demo:record
-        vars: { V: V02 }
-      - task: demo:record
-        vars: { V: V03 }
-      - task: demo:record
-        vars: { V: V04 }
+        vars: { V: V06 }
       - task: demo:convert

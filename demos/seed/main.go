@@ -132,13 +132,15 @@ func main() {
 		ladyGabeEmail, pwHash).Scan(&gabeUserID); err != nil {
 		log.Fatalf("insert ladygabe user: %v", err)
 	}
+	const gabeAvatarURL = "https://images.squarespace-cdn.com/content/v1/5a1c1f68f9a61edc99dee15f/f5c6bfe7-76c5-4b2c-b758-ca6619212ac6/LadyGabe-ExhibitionPortraits-EBP-15.jpg"
+	const gabeHeadlineURL = "https://images.squarespace-cdn.com/content/v1/5a1c1f68f9a61edc99dee15f/1731342884036-2U79DU9SMFAB1VTGV0I2/20241009_133146~2_Original.jpeg"
 	if err := conn.QueryRow(ctx,
-		`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility)
+		`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility, avatar_s3_key, headline_image_urls)
 		 VALUES ($1, 'Lady Gabe',
-		   'South-West based muralist. Bold colour, mythological themes, outdoor work across the UK.',
+		   'South-West muralist. Bold colour, mythological themes, outdoor work.',
 		   '{"instagram":"https://instagram.com/ladygabeart","website":"https://ladygabe.com"}',
-		   'public') RETURNING id`,
-		gabeUserID).Scan(&gabeProfileID); err != nil {
+		   'public', $2, $3) RETURNING id`,
+		gabeUserID, gabeAvatarURL, []string{gabeHeadlineURL}).Scan(&gabeProfileID); err != nil {
 		log.Fatalf("insert ladygabe profile: %v", err)
 	}
 	if _, err := conn.Exec(ctx,
@@ -147,7 +149,29 @@ func main() {
 		gabeUserID, adminID); err != nil {
 		log.Fatalf("insert ladygabe grant: %v", err)
 	}
-	fmt.Printf("  artist:    %s (profile public)\n", ladyGabeEmail)
+
+	gabeImages := []string{
+		"https://images.squarespace-cdn.com/content/v1/5a1c1f68f9a61edc99dee15f/1731342884036-2U79DU9SMFAB1VTGV0I2/20241009_133146~2_Original.jpeg",
+		"https://images.squarespace-cdn.com/content/v1/5a1c1f68f9a61edc99dee15f/1775241018774-8GA6LVJ6LGNRK5BBNIXY/20260320_163113.jpg",
+		"https://images.squarespace-cdn.com/content/v1/5a1c1f68f9a61edc99dee15f/1775242742143-HJ7AFW2P7Y6IZNBLDNDC/20260320_163557.jpg",
+		"https://images.squarespace-cdn.com/content/v1/5a1c1f68f9a61edc99dee15f/1775241051717-NE5SYET937YXZ4YV3ET9/20260320_163458.jpg",
+	}
+	var gabeCollID string
+	if err := conn.QueryRow(ctx,
+		`INSERT INTO collections (artist_profile_id, name, cover_s3_key, display_order)
+		 VALUES ($1, 'Murals 2027', $2, 0) RETURNING id`,
+		gabeProfileID, gabeImages[0]).Scan(&gabeCollID); err != nil {
+		log.Fatalf("insert ladygabe collection: %v", err)
+	}
+	for i, imgURL := range gabeImages {
+		if _, err := conn.Exec(ctx,
+			`INSERT INTO collection_images (collection_id, s3_key, cdn_url, display_order)
+			 VALUES ($1, $2, $3, $4)`,
+			gabeCollID, fmt.Sprintf("external/lady-gabe-%d", i+1), imgURL, i); err != nil {
+			log.Fatalf("insert ladygabe image %d: %v", i+1, err)
+		}
+	}
+	fmt.Printf("  artist:    %s (profile public, %d images)\n", ladyGabeEmail, len(gabeImages))
 
 	type seededArtist struct {
 		profileID string
@@ -248,5 +272,42 @@ func main() {
 		}
 	}
 	fmt.Printf("  festival_spots: %d\n", spotNumber-1)
+
+	// Seed portfolio collections for accepted artists using real CPF mural photos
+	cpfImages := []string{
+		"https://static.wixstatic.com/media/6d7a7a_59acbe0d8b894210aa57848285c919c6~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_3196dbda7c534044bd0bf0a327c82920~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_5b32f3466e964b98804afe4dfef92f2d~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_2ea09f026caf443dab1a7fb7e54a0476~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_823f76b215b14ac4b13d2fa8a1be73f0~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_6c929c75d82e4e5aa933e5674a0296b4~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_7826721c02e3490d9d014f35aa329588~mv2.jpg",
+		"https://static.wixstatic.com/media/6d7a7a_4bb66caea30b4e418e3b341b6cd813f7~mv2.jpg",
+	}
+	cpfIdx := 0
+	for _, s := range seeded {
+		if s.a.status != "accepted" {
+			continue
+		}
+		img1 := cpfImages[cpfIdx%len(cpfImages)]
+		img2 := cpfImages[(cpfIdx+1)%len(cpfImages)]
+		cpfIdx += 2
+		var collID string
+		if err := conn.QueryRow(ctx,
+			`INSERT INTO collections (artist_profile_id, name, cover_s3_key, display_order)
+			 VALUES ($1, 'Portfolio', $2, 0) RETURNING id`,
+			s.profileID, img1).Scan(&collID); err != nil {
+			log.Fatalf("insert collection for %s: %v", s.a.name, err)
+		}
+		for j, imgURL := range []string{img1, img2} {
+			if _, err := conn.Exec(ctx,
+				`INSERT INTO collection_images (collection_id, s3_key, cdn_url, display_order)
+				 VALUES ($1, $2, $3, $4)`,
+				collID, fmt.Sprintf("external/cpf-%d", cpfIdx-1+j), imgURL, j); err != nil {
+				log.Fatalf("insert image for %s: %v", s.a.name, err)
+			}
+		}
+	}
+	fmt.Println("  accepted artist portfolios seeded")
 	fmt.Println("Demo seed complete ✓")
 }

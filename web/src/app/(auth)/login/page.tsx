@@ -42,6 +42,11 @@ function LoginForm() {
         return
       }
 
+      if (response.status === 403) {
+        setError('Please verify your email before signing in. Check your inbox.')
+        return
+      }
+
       if (!response.ok) {
         setError('Something went wrong. Please try again.')
         return

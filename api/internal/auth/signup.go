@@ -33,7 +33,7 @@ type signupResponse struct {
 // SignupHandler handles POST /auth/signup.
 // Under BETA_MODE a valid invite_code is required; redemption and user
 // creation happen in a single DB transaction.
-func SignupHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
+func SignupHandler(pool *pgxpool.Pool, cfg config.Config, mailer EmailSender) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req signupRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -52,7 +52,7 @@ func SignupHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 		}
 
 		if cfg.BetaMode {
-			signupBeta(w, r, pool, req)
+			signupBeta(w, r, pool, req, mailer, cfg.WebPublicBase)
 			return
 		}
 
@@ -95,6 +95,8 @@ func SignupHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 			claimedProfileID = cid
 		}
 
+		SendVerificationEmail(pool, mailer, cfg.WebPublicBase, user.Email)
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(signupResponse{
@@ -104,7 +106,7 @@ func SignupHandler(pool *pgxpool.Pool, cfg config.Config) http.HandlerFunc {
 	}
 }
 
-func signupBeta(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, req signupRequest) {
+func signupBeta(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, req signupRequest, mailer EmailSender, webBase string) {
 	if req.InviteCode == "" {
 		httperr.Write(w, http.StatusForbidden, "Forbidden", "invite code required during beta")
 		return
@@ -176,6 +178,8 @@ func signupBeta(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, req 
 		}
 		claimedProfileID = cid
 	}
+
+	SendVerificationEmail(pool, mailer, webBase, user.Email)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

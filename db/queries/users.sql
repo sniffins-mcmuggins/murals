@@ -19,8 +19,8 @@ LIMIT 1;
 -- first-login callbacks for the same OAuth identity will both succeed; the
 -- second one returns the row inserted by the first (no unique-violation 500).
 -- The DO UPDATE clause is a no-op write to make RETURNING * return a row.
-INSERT INTO users (email, password_hash, oauth_provider, oauth_subject)
-VALUES ($1, NULL, $2, $3)
+INSERT INTO users (email, password_hash, oauth_provider, oauth_subject, email_verified)
+VALUES ($1, NULL, $2, $3, true)
 ON CONFLICT (oauth_provider, oauth_subject) WHERE oauth_provider IS NOT NULL
 DO UPDATE SET oauth_provider = EXCLUDED.oauth_provider
 RETURNING *;
@@ -59,3 +59,10 @@ INSERT INTO users (email)
 VALUES ($1)
 ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
 RETURNING *;
+
+-- name: SetEmailVerified :exec
+UPDATE users SET email_verified = true WHERE id = $1;
+
+-- name: SetEmailVerifiedByEmail :exec
+-- Used by the /_test/verify-email backdoor endpoint only.
+UPDATE users SET email_verified = true WHERE email = $1;

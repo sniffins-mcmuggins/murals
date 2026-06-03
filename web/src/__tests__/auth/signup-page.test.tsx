@@ -50,7 +50,7 @@ describe('SignupPage', () => {
     expect(link).toHaveAttribute('href', '/login')
   })
 
-  it('redirects to /login?registered=1 on successful signup', async () => {
+  it('shows "Check your inbox" success state on successful signup', async () => {
     mockPost.mockResolvedValueOnce({
       data: fakeUser,
       response: { ok: true, status: 201 },
@@ -71,8 +71,10 @@ describe('SignupPage', () => {
           role: 'artist',
         },
       })
-      expect(mockPush).toHaveBeenCalledWith('/login?registered=1')
+      expect(screen.getByText(/check your inbox/i)).toBeInTheDocument()
+      expect(screen.getByText('bob@example.com')).toBeInTheDocument()
     })
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('shows "Email already registered" on 409', async () => {

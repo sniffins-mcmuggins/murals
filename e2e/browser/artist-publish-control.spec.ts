@@ -14,7 +14,16 @@ async function signupAndLogin(
   await page.fill('#email', email)
   await page.fill('#password', password)
   await page.click('button[type=submit]')
-  await expect(page).toHaveURL(/\/login/)
+  // Signup now shows "Check your inbox" — email verification required.
+  await expect(page.getByText(/check your inbox/i)).toBeVisible()
+  // Bypass email verification via test endpoint so we can log in immediately.
+  const verifyRes = await fetch(`${API}/_test/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!verifyRes.ok) throw new Error(`Verify failed: ${verifyRes.status}`)
+  await page.goto('/login')
   await page.fill('#email', email)
   await page.fill('#password', password)
   await page.click('button[type=submit]')

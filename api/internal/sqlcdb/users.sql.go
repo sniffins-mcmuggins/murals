@@ -12,11 +12,11 @@ import (
 )
 
 const createOAuthUser = `-- name: CreateOAuthUser :one
-INSERT INTO users (email, password_hash, oauth_provider, oauth_subject)
-VALUES ($1, NULL, $2, $3)
+INSERT INTO users (email, password_hash, oauth_provider, oauth_subject, email_verified)
+VALUES ($1, NULL, $2, $3, true)
 ON CONFLICT (oauth_provider, oauth_subject) WHERE oauth_provider IS NOT NULL
 DO UPDATE SET oauth_provider = EXCLUDED.oauth_provider
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 type CreateOAuthUserParams struct {
@@ -48,6 +48,7 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -55,7 +56,7 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash)
 VALUES ($1, $2)
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 type CreateUserParams struct {
@@ -82,6 +83,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -90,7 +92,7 @@ const disableMFA = `-- name: DisableMFA :one
 UPDATE users
 SET mfa_enabled = false, mfa_secret = NULL
 WHERE id = $1
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -112,12 +114,13 @@ func (q *Queries) DisableMFA(ctx context.Context, id pgtype.UUID) (User, error) 
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via FROM users WHERE email = $1 LIMIT 1
+SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -139,12 +142,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via FROM users WHERE id = $1 LIMIT 1
+SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -166,12 +170,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByOAuth = `-- name: GetUserByOAuth :one
-SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via FROM users
+SELECT id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified FROM users
 WHERE oauth_provider = $1 AND oauth_subject = $2
 LIMIT 1
 `
@@ -200,6 +205,7 @@ func (q *Queries) GetUserByOAuth(ctx context.Context, arg GetUserByOAuthParams) 
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -208,7 +214,7 @@ const incrementSessionVersion = `-- name: IncrementSessionVersion :one
 UPDATE users
 SET session_version = session_version + 1
 WHERE id = $1
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 // Invalidates all outstanding JWTs for this user by bumping session_version.
@@ -233,6 +239,7 @@ func (q *Queries) IncrementSessionVersion(ctx context.Context, id pgtype.UUID) (
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -241,7 +248,7 @@ const linkOAuthToUser = `-- name: LinkOAuthToUser :one
 UPDATE users
 SET oauth_provider = $2, oauth_subject = $3
 WHERE id = $1
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 type LinkOAuthToUserParams struct {
@@ -269,6 +276,7 @@ func (q *Queries) LinkOAuthToUser(ctx context.Context, arg LinkOAuthToUserParams
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -277,7 +285,7 @@ const setMFAEnabled = `-- name: SetMFAEnabled :one
 UPDATE users
 SET mfa_enabled = $2, mfa_secret = $3
 WHERE id = $1
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 type SetMFAEnabledParams struct {
@@ -305,6 +313,7 @@ func (q *Queries) SetMFAEnabled(ctx context.Context, arg SetMFAEnabledParams) (U
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -313,7 +322,7 @@ const upsertUserByEmail = `-- name: UpsertUserByEmail :one
 INSERT INTO users (email)
 VALUES ($1)
 ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 // Idempotent invite target. New rows are passwordless (valid for invitees /
@@ -337,6 +346,23 @@ func (q *Queries) UpsertUserByEmail(ctx context.Context, email string) (User, er
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
+}
+
+const setEmailVerified = `-- name: SetEmailVerified :exec
+UPDATE users SET email_verified = true WHERE id = $1`
+
+func (q *Queries) SetEmailVerified(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setEmailVerified, id)
+	return err
+}
+
+const setEmailVerifiedByEmail = `-- name: SetEmailVerifiedByEmail :exec
+UPDATE users SET email_verified = true WHERE email = $1`
+
+func (q *Queries) SetEmailVerifiedByEmail(ctx context.Context, email string) error {
+	_, err := q.db.Exec(ctx, setEmailVerifiedByEmail, email)
+	return err
 }
