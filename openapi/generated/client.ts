@@ -1256,6 +1256,8 @@ export interface paths {
                     "application/json": {
                         shortlisted: boolean;
                         review_flag: boolean;
+                        /** @enum {string|null} */
+                        staged_decision?: "accept" | "waitlist" | "decline" | null;
                     };
                 };
             };
@@ -1303,6 +1305,56 @@ export interface paths {
             responses: {
                 /** @description Reordered */
                 204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/applications/release-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release all staged decisions and notify artists */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Decisions released */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            released?: number;
+                        };
+                    };
+                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                /** @description Decisions already released */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1787,6 +1839,11 @@ export interface components {
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+            /**
+             * Format: date-time
+             * @description Set once when Release Decisions is triggered; null until then
+             */
+            decisions_released_at?: string | null;
         };
         /** @description A publicly-visible festival an artist is appearing at. */
         FestivalAppearance: {
@@ -1860,6 +1917,11 @@ export interface components {
             rank?: number;
             shortlisted?: boolean;
             review_flag?: boolean;
+            /**
+             * @description Organiser's staged decision — null until dragged to a column
+             * @enum {string|null}
+             */
+            staged_decision?: "accept" | "waitlist" | "decline" | null;
             answers?: Record<string, never>;
             /** Format: date-time */
             created_at?: string;

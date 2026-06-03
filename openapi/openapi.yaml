@@ -439,6 +439,11 @@ components:
         updated_at:
           type: string
           format: date-time
+        decisions_released_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set once when Release Decisions is triggered; null until then
 
     FestivalAppearance:
       type: object
@@ -560,6 +565,11 @@ components:
           type: boolean
         review_flag:
           type: boolean
+        staged_decision:
+          type: string
+          nullable: true
+          enum: [accept, waitlist, decline]
+          description: Organiser's staged decision — null until dragged to a column
         answers:
           type: object
         created_at:
@@ -2472,6 +2482,10 @@ paths:
                   type: boolean
                 review_flag:
                   type: boolean
+                staged_decision:
+                  type: string
+                  nullable: true
+                  enum: [accept, waitlist, decline]
       responses:
         "200":
           description: Flags updated
@@ -2511,6 +2525,38 @@ paths:
       responses:
         "204":
           description: Reordered
+
+  /festivals/{festivalID}/applications/release-decisions:
+    post:
+      tags: [festivals]
+      summary: Release all staged decisions and notify artists
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: festivalID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Decisions released
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  released:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Decisions already released
 
   /festivals/{festivalID}/applications/{applicationID}/notes:
     post:

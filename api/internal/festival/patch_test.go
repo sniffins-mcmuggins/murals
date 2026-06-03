@@ -94,6 +94,25 @@ func TestPatchApplicationStagedDecision(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app2))
 	_ = resp.Body.Close()
 	assert.Nil(t, app2["staged_decision"])
+
+	// Invalid staged_decision value should reject
+	body = `{"shortlisted":false,"review_flag":false,"staged_decision":"invalid"}`
+	resp = doRequest(t, srv, "PATCH",
+		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
+		body, sc.orgToken)
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	// Omitting staged_decision should preserve prior value
+	body = `{"shortlisted":true,"review_flag":false}`
+	resp = doRequest(t, srv, "PATCH",
+		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
+		body, sc.orgToken)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var app3 map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app3))
+	_ = resp.Body.Close()
+	assert.Nil(t, app3["staged_decision"]) // should still be null from the previous request
 }
 
 func TestReorderApplications(t *testing.T) {

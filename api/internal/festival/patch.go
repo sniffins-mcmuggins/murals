@@ -15,7 +15,8 @@ import (
 )
 
 // PatchApplicationHandler handles PATCH /festivals/{festivalID}/applications/{applicationID}.
-// Accepts { "shortlisted": bool, "review_flag": bool } — both fields always required.
+// Accepts { "shortlisted": bool, "review_flag": bool, "staged_decision": string|null }.
+// staged_decision if provided must be "accept", "waitlist", "decline" or null (to clear).
 func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
