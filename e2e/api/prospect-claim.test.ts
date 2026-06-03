@@ -45,6 +45,11 @@ async function signupAndLogin(email: string, password = 'testpass123') {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   })
+  const verifyRes = await fetch(`${API}/_test/verify-email`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!verifyRes.ok) throw new Error(`Verify failed: ${verifyRes.status}`)
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -172,6 +177,12 @@ describe('E15.4 — prospect profiles + claim-on-signup', () => {
     const body = await res.json()
     expect(body.claimed_profile_id ?? body.user?.claimed_profile_id).toBeTruthy()
 
+    const verifyClaimRes = await fetch(`${API}/_test/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    if (!verifyClaimRes.ok) throw new Error(`Verify claimer failed: ${verifyClaimRes.status}`)
     const loginRes = await fetch(`${API}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

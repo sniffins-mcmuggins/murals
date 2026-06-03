@@ -48,6 +48,12 @@ async function signupAndLogin(email: string, password = 'testpass123') {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   })
+  const verifyRes = await fetch(`${API}/_test/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!verifyRes.ok) throw new Error(`Verify failed: ${verifyRes.status}`)
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
