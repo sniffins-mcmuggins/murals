@@ -105,25 +105,54 @@ export function ApplicationSlideOver({
             </div>
           )}
 
-          {/* Staged decision actions — owner only, pre-release */}
+          {/* Staged decision selector — owner only, pre-release */}
           {!isReviewer && !isReleased && (
-            <div className="flex gap-2">
-              <button onClick={() => onStage(id, 'accept')} disabled={isPending}
-                className="font-sans text-sm font-semibold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50">
-                Accept
-              </button>
-              <button onClick={() => onStage(id, 'waitlist')} disabled={isPending}
-                className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                Waitlist
-              </button>
-              <button onClick={() => onStage(id, 'decline')} disabled={isPending}
-                className="font-sans text-sm text-clay border border-clay/30 px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                Decline
-              </button>
-              <button onClick={() => onStage(id, null)} disabled={isPending}
-                className="font-sans text-sm text-mid border border-light px-4 py-2 rounded-lg hover:opacity-80 disabled:opacity-50">
-                Undecide
-              </button>
+            <div>
+              <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
+              <div className="flex gap-2 flex-wrap">
+                {(['accept', 'waitlist', 'decline'] as const).map(decision => {
+                  const isActive = application.staged_decision === decision
+                  const styles: Record<string, string> = {
+                    accept: isActive ? 'bg-green-100 border-green-400 text-green-800' : 'border-light text-mid hover:border-green-300',
+                    waitlist: isActive ? 'bg-amber/20 border-amber text-ink' : 'border-light text-mid hover:border-amber',
+                    decline: isActive ? 'bg-red-100 border-red-400 text-clay' : 'border-light text-mid hover:border-red-300',
+                  }
+                  return (
+                    <button
+                      key={decision}
+                      onClick={() => onStage(id, isActive ? null : decision)}
+                      disabled={isPending}
+                      className={`font-sans text-xs border px-3 py-1.5 rounded-lg capitalize transition-colors disabled:opacity-50 ${styles[decision]}`}
+                    >
+                      {decision === 'accept' ? '✓ Accept' : decision === 'waitlist' ? '~ Waitlist' : '✗ Decline'}
+                    </button>
+                  )
+                })}
+              </div>
+              {application.staged_decision && (
+                <button
+                  onClick={() => onStage(id, null)}
+                  disabled={isPending}
+                  className="font-mono text-xs text-mid hover:text-ink mt-1 disabled:opacity-50"
+                >
+                  Unstage
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Post-release status badge — owner only */}
+          {!isReviewer && isReleased && (
+            <div>
+              <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
+              <span className={`font-mono text-xs uppercase tracking-widest px-2 py-1 rounded ${
+                application.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                application.status === 'waitlisted' ? 'bg-amber/20 text-ink' :
+                application.status === 'declined' ? 'bg-red-100 text-clay' :
+                'bg-warm text-mid'
+              }`}>
+                {application.status}
+              </span>
             </div>
           )}
 

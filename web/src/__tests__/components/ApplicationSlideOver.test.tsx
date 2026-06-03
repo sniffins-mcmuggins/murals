@@ -44,11 +44,39 @@ const baseProps = {
 }
 
 describe('ApplicationSlideOver — owner mode (isReviewer=false)', () => {
-  it('shows action buttons', () => {
-    render(<ApplicationSlideOver {...baseProps} application={baseApp} isReviewer={false} />)
-    expect(screen.getByText('Accept')).toBeInTheDocument()
-    expect(screen.getByText('Waitlist')).toBeInTheDocument()
-    expect(screen.getByText('Decline')).toBeInTheDocument()
+  it('shows decision selector buttons when pre-release', () => {
+    render(<ApplicationSlideOver {...baseProps} application={baseApp} isReviewer={false} isReleased={false} />)
+    expect(screen.getByText('✓ Accept')).toBeInTheDocument()
+    expect(screen.getByText('~ Waitlist')).toBeInTheDocument()
+    expect(screen.getByText('✗ Decline')).toBeInTheDocument()
+  })
+
+  it('toggles decision on click', () => {
+    const onStage = vi.fn()
+    render(<ApplicationSlideOver {...baseProps} application={baseApp} isReviewer={false} isReleased={false} onStage={onStage} />)
+    fireEvent.click(screen.getByText('✓ Accept'))
+    expect(onStage).toHaveBeenCalledWith('app-1', 'accept')
+  })
+
+  it('shows Unstage button when a decision is staged', () => {
+    const appWithStaged = { ...baseApp, staged_decision: 'accept' as const }
+    render(<ApplicationSlideOver {...baseProps} application={appWithStaged} isReviewer={false} isReleased={false} />)
+    expect(screen.getByText('Unstage')).toBeInTheDocument()
+  })
+
+  it('calls onStage with null when clicking Unstage', () => {
+    const onStage = vi.fn()
+    const appWithStaged = { ...baseApp, staged_decision: 'accept' as const }
+    render(<ApplicationSlideOver {...baseProps} application={appWithStaged} isReviewer={false} isReleased={false} onStage={onStage} />)
+    fireEvent.click(screen.getByText('Unstage'))
+    expect(onStage).toHaveBeenCalledWith('app-1', null)
+  })
+
+  it('shows status badge when post-release', () => {
+    const appWithStatus = { ...baseApp, status: 'accepted' as const }
+    render(<ApplicationSlideOver {...baseProps} application={appWithStatus} isReviewer={false} isReleased={true} />)
+    expect(screen.getByText('accepted')).toBeInTheDocument()
+    expect(screen.queryByText('✓ Accept')).not.toBeInTheDocument()
   })
 
   it('hides avg score when my_score is null', () => {
