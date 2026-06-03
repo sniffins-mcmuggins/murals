@@ -15,12 +15,8 @@ This table is the living reference. Add rows as new videos are commissioned.
 
 | ID  | Persona    | Title                        | DB approach  | Key moments |
 |-----|------------|------------------------------|--------------|-------------|
-| V01 | Organiser  | Setting Up a Festival        | From scratch | Signup → create festival → build application form → go live |
-| V02 | Organiser  | Reviewing Applications       | Pre-seeded   | Log in → inbox of applications → review → accept/decline → artist pinned to map |
-| V03 | Artist     | Signing Up & Building a Profile | From scratch | Signup → fill bio + links → upload portfolio image → publish profile |
-| V04 | Artist     | Applying to a Festival       | Pre-seeded   | Log in → find CPF 2027 → complete application form → submit |
-| V05 | Artist     | Artist Journey (combined)    | From scratch + pre-seeded CPF 2027 | Signup → profile → image upload → publish → apply to CPF 2027 → submit. Supersedes V03+V04 — one session, no second login. |
-| V06 | Organiser  | Organiser Full (combined)    | Pre-seeded   | Login → festival detail/form browse → applications inbox → accept → map pin → decline. Supersedes V01+V02 — one session, no setup login. |
+| V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
+| V06 | Organiser  | Organiser Full               | Pre-seeded   | Login → festival detail → applications inbox → accept → map pin → decline |
 
 ---
 
@@ -29,14 +25,12 @@ This table is the living reference. Add rows as new videos are commissioned.
 ```
 demos/
   seed/
-    demo.sql        ← pre-seeded data (demo organiser, demo artist, festival, applications)
-    seed.go         ← thin Go script: drops demo accounts, re-runs demo.sql against the live DB
+    main.go         ← idempotent seed: drops and re-inserts all demo accounts, festival, applications, images
   scripts/
-    V01-organiser-setup.ts
-    V02-organiser-review.ts
-    V03-artist-signup.ts
-    V04-artist-apply.ts
+    V05-artist-journey.ts
+    V06-organiser-full.ts
     helpers.ts      ← slowType, pause, highlight, scrollTo
+  fixtures/         ← committed image files used during recording (Lady Gabe + CPF murals)
   output/           ← gitignored, MP4s land here
   playwright.config.ts
   package.json      ← separate from web/ — just playwright + @types/node
@@ -53,31 +47,29 @@ demos/
 - **Password:** `demo-password-2027` (hardcoded in seed, not a real account)
 - **Festival:** Cheltenham Paint Festival 2027 — status `open`, 25 pre-seeded applications
 
-### Demo artist (pre-seeded — used by V02 map pin + V04)
+### Demo artist (pre-seeded — V05 creates a fresh account; V06 map pins link to these profiles)
 - **Name:** Lady Gabe (the primary demo artist persona across all demos and screenshots)
 - **Email:** `ladygabe@demo.art`
 - **Password:** `demo-password-2027`
-- **Profile:** Pre-seeded with bio, social links, and portfolio images sourced from ladygabe.com
-- **Profile status:** `public` at seed time — V04 logs in as this account
+- **Profile:** Pre-seeded with avatar (exhibition portrait), headline image, bio, social links, and portfolio images sourced from ladygabe.com
+- **Profile status:** `public` at seed time
 
-### V03 signup artist (created fresh during recording)
-- V03 uses a fresh throwaway email (`gabe-signup-demo@demo.art`) so it can show the full signup flow without conflicting with the pre-seeded Lady Gabe account. The content typed during V03 mirrors Lady Gabe's real bio/links for visual consistency.
+### V05 signup artist (created fresh during recording)
+- V05 creates a fresh throwaway email (`gabe-{timestamp}@demo.art`) to show the real signup flow. The content typed mirrors Lady Gabe's real bio/links for visual consistency.
 
-### Application seed data (for V02)
-25 applications from fictional artists against CPF 2027. Mix of statuses:
-- 10 `pending` (queue to review)
-- 8 `accepted` (already pinned to map)
-- 4 `rejected`
-- 3 `waitlisted`
-
-Each application includes: proposed work description, wall size preference, medium, portfolio links (3 per artist), public liability insurance confirmation.
+### Application seed data (for V06)
+12 applications from fictional artists against CPF 2027. Mix of statuses:
+- 5 `submitted` (pending review)
+- 4 `accepted` (pinned to map, with real CPF mural photos in their portfolios)
+- 3 `declined`
 
 ### `task demo:seed`
-Runs `demos/seed/seed.go` which:
+Runs `demos/seed/main.go` which:
 1. Deletes any existing rows for the demo emails
 2. Re-inserts organiser + artist accounts (pre-hashed passwords)
-3. Re-inserts festival + applications
-4. Safe to re-run at any time — idempotent
+3. Re-inserts festival, application form, applications, and festival spots
+4. Seeds portfolio images for Lady Gabe and accepted artists from real photo CDN URLs
+5. Safe to re-run at any time — idempotent
 
 ---
 
@@ -94,45 +86,24 @@ highlight(page, selector)            // brief amber outline to draw the eye
 
 ### Per-script flow
 
-#### V01 — Organiser Setup (~2min)
-1. Navigate to `/register` — sign up as new organiser
-2. Slow-type name, email, password
-3. Redirect to organiser dashboard — empty state
-4. Click "Create Festival" → fill: name "Cheltenham Paint Festival 2027", dates, location
-5. Save → go to form builder
-6. Show pre-populated CPF question set, drag one question to reorder
-7. Click "Go Live" → confirmation → festival status becomes `open`
-8. End on festival dashboard showing "0 applications"
+#### V05 — Artist Journey (~80s)
+1. Sign up fresh (`gabe-{timestamp}@demo.art`) → log in → artist dashboard
+2. Profile page: upload avatar (portrait), upload headline photo, type short bio + Instagram
+3. Save profile
+4. Create collection "Murals 2027" → upload 2 Lady Gabe mural photos
+5. Publish profile → status becomes `public`
+6. View public artist page — scroll through avatar, bio, headline image, collection
+7. Navigate to Applications → CPF 2027 open → click Apply
+8. Fill form (mural concept, wall size, medium, portfolio links, insurance, availability)
+9. Submit → confirmation screen
 
-#### V02 — Organiser Review (~2.5min)
-1. Navigate to `/login` — log in as Marcus Webb (pre-seeded)
-2. Dashboard: "CPF 2027 — 10 pending applications"
-3. Click into first application (fictional artist, rich content)
-4. Review: scroll through bio, portfolio links, proposed work
-5. Click "Accept" → acceptance confirmation
-6. Navigate to map → accepted artist's pin appears
-7. Back to inbox → open second application
-8. Click "Decline" → type brief message → confirm
-9. End on inbox showing updated counts
-
-#### V03 — Artist Signup (~2min)
-1. Navigate to `/register` — sign up as fresh artist (email: `gabe-signup-demo@demo.art`)
-2. Slow-type name, email, password
-3. Redirect to artist dashboard — empty profile state
-4. Click "Edit Profile" → fill bio, Instagram, website (Lady Gabe's real content)
-5. Upload one portfolio image
-6. Click "Publish" → profile status becomes `public`
-7. Click "View public profile" → land on public artist profile page
-8. End on the live profile
-
-#### V04 — Artist Apply (~2min)
-1. Navigate to `/login` — log in as Lady Gabe (pre-seeded, profile already public)
-2. Navigate to "Find Festivals" → CPF 2027 listed as open
-3. Click "Apply" → application form
-4. Slow-type each answer: proposed work, medium (spray), wall size, portfolio links
-5. Scroll through remaining questions, fill them
-6. Click "Submit Application" → confirmation screen
-7. End on confirmation: "We'll be in touch"
+#### V06 — Organiser Full (~30s)
+1. Log in as Marcus Webb (pre-seeded)
+2. Navigate to CPF 2027 festival detail — scroll through it
+3. Navigate to applications inbox — pending queue visible
+4. Accept Kit Harrow → card moves out of pending
+5. View festival map → Kit's pin appears
+6. Back to inbox → decline Tomás Cruz
 
 ---
 

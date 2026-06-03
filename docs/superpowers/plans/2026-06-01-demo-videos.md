@@ -336,7 +336,7 @@ func main() {
 		`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility)
 		 VALUES ($1, 'Lady Gabe',
 		   'South-West based muralist. Bold colour, mythological themes, outdoor work across the UK.',
-		   '{"instagram":"https://instagram.com/ladygabeart","website":"https://ladygabe.com"}',
+		   '{"instagram":"https://instagram.com/ladygabe","website":"https://ladygabe.com"}',
 		   'public') RETURNING id`,
 		gabeUserID).Scan(&gabeProfileID); err != nil {
 		log.Fatalf("insert ladygabe profile: %v", err)
@@ -792,7 +792,7 @@ const API = process.env.API_URL ?? 'http://localhost:8080'
 const GABE_BIO =
   'South-West based muralist. Bold colour, mythological themes, outdoor work across the UK. ' +
   'Available for festivals, commissions, and residencies.'
-const GABE_INSTAGRAM = 'https://instagram.com/ladygabeart'
+const GABE_INSTAGRAM = 'https://instagram.com/ladygabe'
 const GABE_WEBSITE = 'https://ladygabe.com'
 
 // Fixture image: a small JPEG used for the portfolio upload step.
@@ -1015,7 +1015,7 @@ test('V04 — Artist Apply', async ({ page }) => {
   // f4 — portfolio links
   await slowType(
     page.locator('textarea').nth(1),
-    'https://ladygabe.com/portfolio\nhttps://instagram.com/ladygabeart\nhttps://vimeo.com/ladygabe',
+    'https://ladygabe.com/portfolio\nhttps://instagram.com/ladygabe\nhttps://vimeo.com/ladygabe',
   )
   await pause(600)
 
