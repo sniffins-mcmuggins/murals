@@ -160,7 +160,7 @@ describe('Organiser ApplicationsReviewPage', () => {
     await waitFor(() => {
       const releaseBtn = screen.getByRole('button', { name: /Release.*decisions/ })
       expect(releaseBtn).toBeDisabled()
-      expect(screen.getByText(/1 still undecided/)).toBeInTheDocument()
+      expect(screen.getByText(/1 still need a decision/)).toBeInTheDocument()
     })
   })
 

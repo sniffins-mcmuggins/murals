@@ -335,7 +335,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
             </button>
             {submittedUndecided > 0 && (
               <p className="font-mono text-xs text-mid">
-                {submittedUndecided} still undecided
+                {submittedUndecided} still need a decision
               </p>
             )}
           </div>
