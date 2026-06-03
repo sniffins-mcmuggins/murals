@@ -87,7 +87,7 @@ func (q *Queries) CreateBetaInvite(ctx context.Context, arg CreateBetaInvitePara
 const createBetaUser = `-- name: CreateBetaUser :one
 INSERT INTO users (email, password_hash, is_beta, beta_cohort, invited_by, invited_via)
 VALUES ($1, $2, true, $3, $4, $5)
-RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via
+RETURNING id, email, password_hash, created_at, oauth_provider, oauth_subject, mfa_enabled, mfa_secret, session_version, stripe_customer_id, is_admin, is_beta, beta_cohort, invited_by, invited_via, email_verified
 `
 
 type CreateBetaUserParams struct {
@@ -125,6 +125,7 @@ func (q *Queries) CreateBetaUser(ctx context.Context, arg CreateBetaUserParams) 
 		&i.BetaCohort,
 		&i.InvitedBy,
 		&i.InvitedVia,
+		&i.EmailVerified,
 	)
 	return i, err
 }

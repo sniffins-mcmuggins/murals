@@ -468,6 +468,7 @@ type User struct {
 	BetaCohort       *string            `db:"beta_cohort" json:"beta_cohort"`
 	InvitedBy        pgtype.UUID        `db:"invited_by" json:"invited_by"`
 	InvitedVia       pgtype.UUID        `db:"invited_via" json:"invited_via"`
+	EmailVerified    bool               `db:"email_verified" json:"email_verified"`
 }
 
 type WaitlistRequest struct {
