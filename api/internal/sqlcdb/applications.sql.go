@@ -15,7 +15,7 @@ import (
 const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (form_id, artist_id, answers)
 VALUES ($1, $2, $3)
-RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag
+RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision
 `
 
 type CreateApplicationParams struct {
@@ -38,12 +38,13 @@ func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationPa
 		&i.Rank,
 		&i.Shortlisted,
 		&i.ReviewFlag,
+		&i.StagedDecision,
 	)
 	return i, err
 }
 
 const getApplicationByFormAndArtist = `-- name: GetApplicationByFormAndArtist :one
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE form_id = $1 AND artist_id = $2
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision FROM applications WHERE form_id = $1 AND artist_id = $2
 `
 
 type GetApplicationByFormAndArtistParams struct {
@@ -65,12 +66,13 @@ func (q *Queries) GetApplicationByFormAndArtist(ctx context.Context, arg GetAppl
 		&i.Rank,
 		&i.Shortlisted,
 		&i.ReviewFlag,
+		&i.StagedDecision,
 	)
 	return i, err
 }
 
 const getApplicationByID = `-- name: GetApplicationByID :one
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE id = $1
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision FROM applications WHERE id = $1
 `
 
 func (q *Queries) GetApplicationByID(ctx context.Context, id pgtype.UUID) (Application, error) {
@@ -87,12 +89,13 @@ func (q *Queries) GetApplicationByID(ctx context.Context, id pgtype.UUID) (Appli
 		&i.Rank,
 		&i.Shortlisted,
 		&i.ReviewFlag,
+		&i.StagedDecision,
 	)
 	return i, err
 }
 
 const listApplicationsByArtist = `-- name: ListApplicationsByArtist :many
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE artist_id = $1 ORDER BY created_at DESC
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision FROM applications WHERE artist_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.UUID) ([]Application, error) {
@@ -115,6 +118,7 @@ func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.
 			&i.Rank,
 			&i.Shortlisted,
 			&i.ReviewFlag,
+			&i.StagedDecision,
 		); err != nil {
 			return nil, err
 		}
@@ -127,7 +131,7 @@ func (q *Queries) ListApplicationsByArtist(ctx context.Context, artistID pgtype.
 }
 
 const listApplicationsByForm = `-- name: ListApplicationsByForm :many
-SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag FROM applications WHERE form_id = $1 ORDER BY created_at ASC
+SELECT id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision FROM applications WHERE form_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListApplicationsByForm(ctx context.Context, formID pgtype.UUID) ([]Application, error) {
@@ -150,6 +154,7 @@ func (q *Queries) ListApplicationsByForm(ctx context.Context, formID pgtype.UUID
 			&i.Rank,
 			&i.Shortlisted,
 			&i.ReviewFlag,
+			&i.StagedDecision,
 		); err != nil {
 			return nil, err
 		}
@@ -236,7 +241,7 @@ func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID p
 }
 
 const listApplicationsByFormWithArtistExcludingReviewer = `-- name: ListApplicationsByFormWithArtistExcludingReviewer :many
-SELECT a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label
+SELECT a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, a.staged_decision, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label
 FROM applications a
 JOIN artist_profiles ap ON ap.id = a.artist_id
 WHERE a.form_id = $1
@@ -250,20 +255,21 @@ type ListApplicationsByFormWithArtistExcludingReviewerParams struct {
 }
 
 type ListApplicationsByFormWithArtistExcludingReviewerRow struct {
-	ID            pgtype.UUID        `db:"id" json:"id"`
-	FormID        pgtype.UUID        `db:"form_id" json:"form_id"`
-	ArtistID      pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	Status        ApplicationStatus  `db:"status" json:"status"`
-	Answers       json.RawMessage    `db:"answers" json:"answers"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	Rank          int32              `db:"rank" json:"rank"`
-	Shortlisted   bool               `db:"shortlisted" json:"shortlisted"`
-	ReviewFlag    bool               `db:"review_flag" json:"review_flag"`
-	DisplayName   string             `db:"display_name" json:"display_name"`
-	AvatarS3Key   *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
-	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
-	LocationLabel *string            `db:"location_label" json:"location_label"`
+	ID             pgtype.UUID        `db:"id" json:"id"`
+	FormID         pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID       pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status         ApplicationStatus  `db:"status" json:"status"`
+	Answers        json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Rank           int32              `db:"rank" json:"rank"`
+	Shortlisted    bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag     bool               `db:"review_flag" json:"review_flag"`
+	StagedDecision *string            `db:"staged_decision" json:"staged_decision"`
+	DisplayName    string             `db:"display_name" json:"display_name"`
+	AvatarS3Key    *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	MediumTags     []string           `db:"medium_tags" json:"medium_tags"`
+	LocationLabel  *string            `db:"location_label" json:"location_label"`
 }
 
 // Reviewer-scoped: hides the application belonging to the reviewer ($2 = user_id).
@@ -287,6 +293,7 @@ func (q *Queries) ListApplicationsByFormWithArtistExcludingReviewer(ctx context.
 			&i.Rank,
 			&i.Shortlisted,
 			&i.ReviewFlag,
+			&i.StagedDecision,
 			&i.DisplayName,
 			&i.AvatarS3Key,
 			&i.MediumTags,
@@ -302,21 +309,116 @@ func (q *Queries) ListApplicationsByFormWithArtistExcludingReviewer(ctx context.
 	return items, nil
 }
 
+const listStagedApplicationsByFestival = `-- name: ListStagedApplicationsByFestival :many
+SELECT a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, a.staged_decision
+FROM applications a
+JOIN application_forms f ON a.form_id = f.id
+WHERE f.festival_id = $1
+  AND a.staged_decision IS NOT NULL
+`
+
+func (q *Queries) ListStagedApplicationsByFestival(ctx context.Context, festivalID pgtype.UUID) ([]Application, error) {
+	rows, err := q.db.Query(ctx, listStagedApplicationsByFestival, festivalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.FormID,
+			&i.ArtistID,
+			&i.Status,
+			&i.Answers,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Rank,
+			&i.Shortlisted,
+			&i.ReviewFlag,
+			&i.StagedDecision,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const releaseDecisionsForFestival = `-- name: ReleaseDecisionsForFestival :many
+UPDATE applications a
+SET
+  status = CASE a.staged_decision
+    WHEN 'accept'   THEN 'accepted'::application_status
+    WHEN 'waitlist' THEN 'waitlisted'::application_status
+    WHEN 'decline'  THEN 'declined'::application_status
+  END,
+  staged_decision = NULL,
+  updated_at = now()
+FROM application_forms f
+WHERE a.form_id = f.id
+  AND f.festival_id = $1
+  AND a.staged_decision IS NOT NULL
+RETURNING a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, a.staged_decision
+`
+
+func (q *Queries) ReleaseDecisionsForFestival(ctx context.Context, festivalID pgtype.UUID) ([]Application, error) {
+	rows, err := q.db.Query(ctx, releaseDecisionsForFestival, festivalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.FormID,
+			&i.ArtistID,
+			&i.Status,
+			&i.Answers,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Rank,
+			&i.Shortlisted,
+			&i.ReviewFlag,
+			&i.StagedDecision,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateApplicationFlags = `-- name: UpdateApplicationFlags :one
 UPDATE applications
-SET shortlisted = $2, review_flag = $3, updated_at = now()
+SET shortlisted = $2, review_flag = $3, staged_decision = $4, updated_at = now()
 WHERE id = $1
-RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag
+RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision
 `
 
 type UpdateApplicationFlagsParams struct {
-	ID          pgtype.UUID `db:"id" json:"id"`
-	Shortlisted bool        `db:"shortlisted" json:"shortlisted"`
-	ReviewFlag  bool        `db:"review_flag" json:"review_flag"`
+	ID             pgtype.UUID `db:"id" json:"id"`
+	Shortlisted    bool        `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag     bool        `db:"review_flag" json:"review_flag"`
+	StagedDecision *string     `db:"staged_decision" json:"staged_decision"`
 }
 
 func (q *Queries) UpdateApplicationFlags(ctx context.Context, arg UpdateApplicationFlagsParams) (Application, error) {
-	row := q.db.QueryRow(ctx, updateApplicationFlags, arg.ID, arg.Shortlisted, arg.ReviewFlag)
+	row := q.db.QueryRow(ctx, updateApplicationFlags,
+		arg.ID,
+		arg.Shortlisted,
+		arg.ReviewFlag,
+		arg.StagedDecision,
+	)
 	var i Application
 	err := row.Scan(
 		&i.ID,
@@ -329,6 +431,7 @@ func (q *Queries) UpdateApplicationFlags(ctx context.Context, arg UpdateApplicat
 		&i.Rank,
 		&i.Shortlisted,
 		&i.ReviewFlag,
+		&i.StagedDecision,
 	)
 	return i, err
 }
@@ -348,7 +451,7 @@ func (q *Queries) UpdateApplicationRank(ctx context.Context, arg UpdateApplicati
 }
 
 const updateApplicationStatus = `-- name: UpdateApplicationStatus :one
-UPDATE applications SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag
+UPDATE applications SET status = $2, updated_at = now() WHERE id = $1 RETURNING id, form_id, artist_id, status, answers, created_at, updated_at, rank, shortlisted, review_flag, staged_decision
 `
 
 type UpdateApplicationStatusParams struct {
@@ -370,6 +473,7 @@ func (q *Queries) UpdateApplicationStatus(ctx context.Context, arg UpdateApplica
 		&i.Rank,
 		&i.Shortlisted,
 		&i.ReviewFlag,
+		&i.StagedDecision,
 	)
 	return i, err
 }

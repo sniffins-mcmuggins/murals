@@ -250,16 +250,17 @@ type AnalyticsEvent struct {
 }
 
 type Application struct {
-	ID          pgtype.UUID        `db:"id" json:"id"`
-	FormID      pgtype.UUID        `db:"form_id" json:"form_id"`
-	ArtistID    pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	Status      ApplicationStatus  `db:"status" json:"status"`
-	Answers     json.RawMessage    `db:"answers" json:"answers"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	Rank        int32              `db:"rank" json:"rank"`
-	Shortlisted bool               `db:"shortlisted" json:"shortlisted"`
-	ReviewFlag  bool               `db:"review_flag" json:"review_flag"`
+	ID             pgtype.UUID        `db:"id" json:"id"`
+	FormID         pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID       pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status         ApplicationStatus  `db:"status" json:"status"`
+	Answers        json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Rank           int32              `db:"rank" json:"rank"`
+	Shortlisted    bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag     bool               `db:"review_flag" json:"review_flag"`
+	StagedDecision *string            `db:"staged_decision" json:"staged_decision"`
 }
 
 type ApplicationForm struct {
@@ -354,6 +355,15 @@ type CollectionImage struct {
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type EmailVerificationToken struct {
+	ID        pgtype.UUID        `db:"id" json:"id"`
+	UserID    pgtype.UUID        `db:"user_id" json:"user_id"`
+	TokenHash string             `db:"token_hash" json:"token_hash"`
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type Endorsement struct {
 	ID               pgtype.UUID        `db:"id" json:"id"`
 	EndorserID       pgtype.UUID        `db:"endorser_id" json:"endorser_id"`
@@ -369,18 +379,19 @@ type Endorsement struct {
 }
 
 type Festival struct {
-	ID            pgtype.UUID        `db:"id" json:"id"`
-	OrganiserID   pgtype.UUID        `db:"organiser_id" json:"organiser_id"`
-	Name          string             `db:"name" json:"name"`
-	Slug          string             `db:"slug" json:"slug"`
-	Description   string             `db:"description" json:"description"`
-	LocationLabel string             `db:"location_label" json:"location_label"`
-	StartDate     pgtype.Date        `db:"start_date" json:"start_date"`
-	EndDate       pgtype.Date        `db:"end_date" json:"end_date"`
-	Status        FestivalStatus     `db:"status" json:"status"`
-	DeletedAt     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  pgtype.UUID        `db:"id" json:"id"`
+	OrganiserID         pgtype.UUID        `db:"organiser_id" json:"organiser_id"`
+	Name                string             `db:"name" json:"name"`
+	Slug                string             `db:"slug" json:"slug"`
+	Description         string             `db:"description" json:"description"`
+	LocationLabel       string             `db:"location_label" json:"location_label"`
+	StartDate           pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate             pgtype.Date        `db:"end_date" json:"end_date"`
+	Status              FestivalStatus     `db:"status" json:"status"`
+	DeletedAt           pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DecisionsReleasedAt pgtype.Timestamptz `db:"decisions_released_at" json:"decisions_released_at"`
 }
 
 type FestivalArtist struct {
