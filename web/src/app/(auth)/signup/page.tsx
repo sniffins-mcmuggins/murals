@@ -1,15 +1,13 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 
 type Role = 'artist' | 'organiser'
 
 export default function SignupPage() {
-  const router = useRouter()
-
   const searchParams = useSearchParams()
 
   const [email, setEmail] = useState('')
@@ -19,6 +17,9 @@ export default function SignupPage() {
   const [claimToken, setClaimToken] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [verified, setVerified] = useState(false)
+  const [resendPending, setResendPending] = useState(false)
+  const [resendDone, setResendDone] = useState(false)
 
   useEffect(() => {
     const code = searchParams.get('invite')
@@ -41,7 +42,7 @@ export default function SignupPage() {
         ...(claimToken ? { claim_token: claimToken } : {}),
       }
 
-      const { response, data } = await apiClient.POST('/auth/signup', {
+      const { response } = await apiClient.POST('/auth/signup', {
         body,
       })
 
@@ -65,16 +66,54 @@ export default function SignupPage() {
         return
       }
 
-      if (data?.claimed_profile_id) {
-        router.push('/login?registered=1&claim=1')
-      } else {
-        router.push('/login?registered=1')
-      }
+      setVerified(true)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setPending(false)
     }
+  }
+
+  async function handleResend() {
+    setResendPending(true)
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      setResendDone(true)
+    } finally {
+      setResendPending(false)
+    }
+  }
+
+  if (verified) {
+    return (
+      <main className="min-h-screen bg-warm flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-offwhite border border-light rounded-2xl p-8 shadow-sm text-center">
+          <h1 className="font-serif text-3xl text-ink mb-2">Check your inbox</h1>
+          <p className="font-sans text-mid text-sm mb-6">
+            We sent a verification link to <strong>{email}</strong>. Click it to activate your account.
+          </p>
+          {resendDone ? (
+            <p className="font-sans text-sm text-mid">Verification email resent.</p>
+          ) : (
+            <p className="font-sans text-sm text-mid">
+              Didn&apos;t get it?{' '}
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendPending}
+                className="text-ink underline underline-offset-2 disabled:opacity-50"
+              >
+                {resendPending ? 'Sending…' : 'Resend verification email'}
+              </button>
+            </p>
+          )}
+        </div>
+      </main>
+    )
   }
 
   return (
