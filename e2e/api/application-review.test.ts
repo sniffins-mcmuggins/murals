@@ -328,3 +328,131 @@ describe('application review workflow', () => {
     })
   })
 })
+
+// ── Staged decisions ─────────────────────────────────────────────────────────
+
+describe('staged decisions', () => {
+  const suffix = `staged-${Date.now()}`
+  let org: OrganiserSetup
+  let artist: ArtistSetup
+  let festivalId: string
+  let applicationId: string
+
+  beforeAll(async () => {
+    org = await createOrganiser(`${suffix}-org`)
+    artist = await createArtist(`${suffix}-art`)
+    await createProfile(artist.token, { displayName: `Staged Artist ${suffix}` })
+    const fest = await createFestival(org.token, {
+      name: `Staged Fest ${suffix}`,
+      slug: suffix,
+    })
+    festivalId = fest.festivalId
+    await upsertForm(org.token, festivalId)
+    await setFestivalStatus(org.token, festivalId, 'open')
+    const app = await submitApplication(artist.token, festivalId)
+    applicationId = app.applicationId
+  })
+
+  it('stages a decision via PATCH and returns it in the list', async () => {
+    const patchRes = await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
+      method: 'PATCH',
+      headers: json(org.token),
+      body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+    })
+    expect(patchRes.status).toBe(200)
+    const patched = await patchRes.json()
+    expect(patched.staged_decision).toBe('accept')
+    expect(patched.status).toBe('submitted') // status unchanged until release
+
+    const listRes = await fetch(`${API}/festivals/${festivalId}/applications`, {
+      headers: auth(org.token),
+    })
+    const apps = await listRes.json()
+    const found = apps.find((a: { id: string }) => a.id === applicationId)
+    expect(found.staged_decision).toBe('accept')
+  })
+
+  it('clears a staged decision by patching null', async () => {
+    const res = await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
+      method: 'PATCH',
+      headers: json(org.token),
+      body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: null }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.staged_decision).toBeNull()
+  })
+
+  it('releases decisions: bulk updates status, clears staged_decision', async () => {
+    // Stage again before releasing
+    await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
+      method: 'PATCH',
+      headers: json(org.token),
+      body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+    })
+
+    const releaseRes = await fetch(
+      `${API}/festivals/${festivalId}/applications/release-decisions`,
+      {
+        method: 'POST',
+        headers: auth(org.token),
+      },
+    )
+    expect(releaseRes.status).toBe(200)
+    const body = await releaseRes.json()
+    expect(body.released).toBe(1)
+
+    // Verify application status updated and staged_decision cleared
+    const listRes = await fetch(`${API}/festivals/${festivalId}/applications`, {
+      headers: auth(org.token),
+    })
+    const apps = await listRes.json()
+    const app = apps.find((a: { id: string }) => a.id === applicationId)
+    expect(app.status).toBe('accepted')
+    expect(app.staged_decision).toBeNull()
+  })
+
+  it('returns 409 on second release attempt', async () => {
+    const res = await fetch(
+      `${API}/festivals/${festivalId}/applications/release-decisions`,
+      {
+        method: 'POST',
+        headers: auth(org.token),
+      },
+    )
+    expect(res.status).toBe(409)
+  })
+
+  it('decisions_released_at is set on the festival after release', async () => {
+    const res = await fetch(`${API}/festivals/${festivalId}`, {
+      headers: auth(org.token),
+    })
+    const fest = await res.json()
+    expect(fest.decisions_released_at).not.toBeNull()
+    expect(typeof fest.decisions_released_at).toBe('string')
+  })
+
+  it('rejects invalid staged_decision value with 400', async () => {
+    const freshSuffix = `staged-bad-${Date.now()}`
+    const org2 = await createOrganiser(`${freshSuffix}-org`)
+    const artist2 = await createArtist(`${freshSuffix}-art`)
+    await createProfile(artist2.token, { displayName: `Bad Artist ${freshSuffix}` })
+    const fest2 = await createFestival(org2.token, {
+      name: `Bad Fest ${freshSuffix}`,
+      slug: freshSuffix,
+    })
+    await upsertForm(org2.token, fest2.festivalId)
+    await setFestivalStatus(org2.token, fest2.festivalId, 'open')
+    const app2 = await submitApplication(artist2.token, fest2.festivalId)
+
+    const res = await fetch(
+      `${API}/festivals/${fest2.festivalId}/applications/${app2.applicationId}`,
+      {
+        method: 'PATCH',
+        headers: json(org2.token),
+        body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'invalid' }),
+      },
+    )
+    expect(res.status).toBe(400)
+  })
+})
