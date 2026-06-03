@@ -1360,6 +1360,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                422: components["responses"]["UnprocessableEntity"];
             };
         };
         delete?: never;

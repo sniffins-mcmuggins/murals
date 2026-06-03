@@ -12,6 +12,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countSubmittedUndecidedByFestival = `-- name: CountSubmittedUndecidedByFestival :one
+SELECT COUNT(*)::int AS count
+FROM applications a
+JOIN application_forms f ON a.form_id = f.id
+WHERE f.festival_id = $1
+  AND a.status = 'submitted'
+  AND a.staged_decision IS NULL
+`
+
+// Returns the number of submitted applications with no staged_decision for a festival.
+// Used to guard release: if count > 0, the release is rejected.
+func (q *Queries) CountSubmittedUndecidedByFestival(ctx context.Context, festivalID pgtype.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countSubmittedUndecidedByFestival, festivalID)
+	var count int32
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (form_id, artist_id, answers)
 VALUES ($1, $2, $3)

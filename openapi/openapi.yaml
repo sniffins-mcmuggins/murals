@@ -2557,6 +2557,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Decisions already released
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 
   /festivals/{festivalID}/applications/{applicationID}/notes:
     post:

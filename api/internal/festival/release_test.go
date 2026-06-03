@@ -49,6 +49,21 @@ func TestReleaseDecisions_BulkUpdatesStatusAndPreventsRerelease(t *testing.T) {
 	_ = resp2.Body.Close()
 }
 
+func TestReleaseDecisions_RejectsWhenUndecidedAppsExist(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupReviewScenario(t, db)
+
+	srv := buildReleaseTestServer(t, db)
+
+	// Do NOT stage the application — attempt release immediately
+	resp := doRequest(t, srv, "POST",
+		"/festivals/"+sc.festID+"/applications/release-decisions",
+		"", sc.orgToken)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	_ = resp.Body.Close()
+}
+
 func TestReleaseDecisions_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

@@ -58,6 +58,16 @@ WHERE a.form_id = $1
   AND ap.user_id IS DISTINCT FROM $2
 ORDER BY a.rank ASC, a.created_at ASC;
 
+-- name: CountSubmittedUndecidedByFestival :one
+-- Returns the number of submitted applications with no staged_decision for a festival.
+-- Used to guard release: if count > 0, the release is rejected.
+SELECT COUNT(*)::int AS count
+FROM applications a
+JOIN application_forms f ON a.form_id = f.id
+WHERE f.festival_id = $1
+  AND a.status = 'submitted'
+  AND a.staged_decision IS NULL;
+
 -- name: ListStagedApplicationsByFestival :many
 SELECT a.*
 FROM applications a

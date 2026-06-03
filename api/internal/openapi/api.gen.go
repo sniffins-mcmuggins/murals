@@ -5520,6 +5520,22 @@ func (response PostFestivalsFestivalIDApplicationsReleaseDecisions409Response) V
 	return nil
 }
 
+type PostFestivalsFestivalIDApplicationsReleaseDecisions422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response PostFestivalsFestivalIDApplicationsReleaseDecisions422ApplicationProblemPlusJSONResponse) VisitPostFestivalsFestivalIDApplicationsReleaseDecisionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PostFestivalsFestivalIDApplicationsReorderRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 	Body       *PostFestivalsFestivalIDApplicationsReorderJSONRequestBody

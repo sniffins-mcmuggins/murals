@@ -432,6 +432,27 @@ describe('staged decisions', () => {
     expect(typeof fest.decisions_released_at).toBe('string')
   })
 
+  it('returns 422 when releasing with undecided submitted applications', async () => {
+    const freshSuffix = `staged-undecided-${Date.now()}`
+    const org3 = await createOrganiser(`${freshSuffix}-org`)
+    const artist3 = await createArtist(`${freshSuffix}-art`)
+    await createProfile(artist3.token, { displayName: `Undecided Artist ${freshSuffix}` })
+    const fest3 = await createFestival(org3.token, {
+      name: `Undecided Fest ${freshSuffix}`,
+      slug: freshSuffix,
+    })
+    await upsertForm(org3.token, fest3.festivalId)
+    await setFestivalStatus(org3.token, fest3.festivalId, 'open')
+    await submitApplication(artist3.token, fest3.festivalId)
+
+    // Attempt release without staging any decisions
+    const res = await fetch(
+      `${API}/festivals/${fest3.festivalId}/applications/release-decisions`,
+      { method: 'POST', headers: auth(org3.token) },
+    )
+    expect(res.status).toBe(422)
+  })
+
   it('rejects invalid staged_decision value with 400', async () => {
     const freshSuffix = `staged-bad-${Date.now()}`
     const org2 = await createOrganiser(`${freshSuffix}-org`)

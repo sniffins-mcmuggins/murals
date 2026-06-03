@@ -265,6 +265,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
   }, [allApps, isReleased])
 
   const stagedCount = allApps.filter(a => a.staged_decision != null).length
+  const submittedUndecided = allApps.filter(a => a.status === 'submitted' && !a.staged_decision).length
 
   const sensors = useSensors(useSensor(PointerSensor))
 
@@ -317,13 +318,20 @@ function KanbanView({ festivalId }: { festivalId: string }) {
           )}
         </div>
         {!isReviewer && !isReleased && (
-          <button
-            onClick={() => setShowReleaseModal(true)}
-            disabled={stagedCount === 0}
-            className="font-sans text-sm font-bold bg-amber text-ink px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Release {stagedCount > 0 ? `${stagedCount} ` : ''}decisions →
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={() => setShowReleaseModal(true)}
+              disabled={submittedUndecided > 0 || stagedCount === 0}
+              className="font-sans text-sm font-bold bg-amber text-ink px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Release {stagedCount > 0 ? `${stagedCount} ` : ''}decisions →
+            </button>
+            {submittedUndecided > 0 && (
+              <p className="font-mono text-xs text-mid">
+                {submittedUndecided} still undecided
+              </p>
+            )}
+          </div>
         )}
       </div>
 

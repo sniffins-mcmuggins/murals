@@ -46,6 +46,17 @@ func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.H
 			return
 		}
 
+		// Guard: all submitted applications must have a staged decision before release.
+		undecided, err := q.CountSubmittedUndecidedByFestival(r.Context(), festUUID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		if undecided > 0 {
+			httperr.UnprocessableEntity(w, "all submitted applications must have a staged decision before releasing")
+			return
+		}
+
 		// Mark festival as released first (returns no rows if already released → 409)
 		_, err = q.SetFestivalDecisionsReleasedAt(r.Context(), festUUID)
 		if err != nil {

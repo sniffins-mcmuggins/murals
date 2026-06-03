@@ -144,7 +144,27 @@ describe('Organiser ApplicationsReviewPage', () => {
     })
   })
 
-  it('shows Release button enabled when decisions are staged', async () => {
+  it('shows Release button disabled when some apps are staged but others still undecided', async () => {
+    const applications = [
+      createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
+      createMockApplication('app-2', 'artist-2', { staged_decision: null, shortlisted: false }),
+    ]
+    mockUseQuery
+      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+
+    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
+
+    await waitFor(() => {
+      const releaseBtn = screen.getByRole('button', { name: /Release.*decisions/ })
+      expect(releaseBtn).toBeDisabled()
+      expect(screen.getByText(/1 still undecided/)).toBeInTheDocument()
+    })
+  })
+
+  it('shows Release button enabled when all submitted apps have staged decisions', async () => {
     const applications = [
       createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
       createMockApplication('app-2', 'artist-2', { staged_decision: 'decline', shortlisted: false }),
