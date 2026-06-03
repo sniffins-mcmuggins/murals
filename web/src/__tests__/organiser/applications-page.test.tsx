@@ -9,11 +9,18 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@tanstack/react-query', () => ({
   useQuery: vi.fn(),
-  useMutation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false, isError: false }),
+  useMutation: vi.fn((config: { mutationFn?: (v: unknown) => unknown }) => ({
+    mutate: (vars: unknown) => { config.mutationFn?.(vars) },
+    isPending: false,
+    isError: false,
+  })),
   useQueryClient: vi.fn().mockReturnValue({ invalidateQueries: vi.fn() }),
 }))
 vi.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children }: { children: React.ReactNode }) => React.createElement('div', {}, children),
+  DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd?: (e: unknown) => void }) => {
+    ;(globalThis as Record<string, unknown>).__onDragEnd = onDragEnd
+    return React.createElement('div', {}, children)
+  },
   DragEndEvent: class {},
   PointerSensor: class {},
   useSensor: vi.fn(),
@@ -21,12 +28,15 @@ vi.mock('@dnd-kit/core', () => ({
   useDroppable: vi.fn(() => ({ setNodeRef: vi.fn(), isOver: false })),
   useDraggable: vi.fn(() => ({ attributes: {}, listeners: {}, setNodeRef: vi.fn(), transform: null })),
 }))
-vi.mock('@dnd-kit/sortable', () => ({
-  SortableContext: ({ children }: { children: React.ReactNode }) => children,
-  verticalListSortingStrategy: {},
-  useSortable: () => ({ attributes: {}, listeners: {}, setNodeRef: vi.fn(), transform: null, transition: undefined, isDragging: false }),
-  arrayMove: <T,>(arr: T[]) => arr,
-}))
+vi.mock('@dnd-kit/sortable', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dnd-kit/sortable')>()
+  return {
+    SortableContext: ({ children }: { children: React.ReactNode }) => children,
+    verticalListSortingStrategy: {},
+    useSortable: () => ({ attributes: {}, listeners: {}, setNodeRef: vi.fn(), transform: null, transition: undefined, isDragging: false }),
+    arrayMove: actual.arrayMove,
+  }
+})
 
 import { useQuery } from '@tanstack/react-query'
 import ApplicationsReviewPage from '@/app/organiser/festivals/[id]/applications/page'
@@ -264,6 +274,38 @@ describe('Organiser ApplicationsReviewPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Decisions released')).toBeInTheDocument()
       expect(screen.getByText('read-only')).toBeInTheDocument()
+    })
+  })
+
+  it('fires the reorder endpoint when a card is dragged within its column', async () => {
+    const { apiClient } = await import('@/lib/api')
+    ;(apiClient.POST as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {}, error: null })
+
+    const applications = [
+      createMockApplication('app-1', 'artist-1', { staged_decision: null, shortlisted: false }),
+      createMockApplication('app-2', 'artist-2', { staged_decision: null, shortlisted: false }),
+    ]
+    mockUseQuery
+      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+
+    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
+
+    await waitFor(() => {
+      expect((globalThis as Record<string, unknown>).__onDragEnd).toBeDefined()
+    })
+
+    // Both apps are in Undecided. Drag app-1 onto app-2 (same column → reorder).
+    const onDragEnd = (globalThis as Record<string, unknown>).__onDragEnd as (e: unknown) => void
+    onDragEnd({ active: { id: 'app-1' }, over: { id: 'app-2' } })
+
+    await waitFor(() => {
+      const calls = (apiClient.POST as ReturnType<typeof vi.fn>).mock.calls
+      const reorderCall = calls.find(c => c[0] === '/festivals/{festivalID}/applications/reorder')
+      expect(reorderCall).toBeDefined()
+      expect(reorderCall?.[1]?.body?.ids).toEqual(['app-2', 'app-1'])
     })
   })
 })
