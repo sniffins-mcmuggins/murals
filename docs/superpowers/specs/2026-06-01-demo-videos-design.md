@@ -19,6 +19,8 @@ This table is the living reference. Add rows as new videos are commissioned.
 | V02 | Organiser  | Reviewing Applications       | Pre-seeded   | Log in → inbox of applications → review → accept/decline → artist pinned to map |
 | V03 | Artist     | Signing Up & Building a Profile | From scratch | Signup → fill bio + links → upload portfolio image → publish profile |
 | V04 | Artist     | Applying to a Festival       | Pre-seeded   | Log in → find CPF 2027 → complete application form → submit |
+| V05 | Artist     | Artist Journey (combined)    | From scratch + pre-seeded CPF 2027 | Signup → profile → image upload → publish → apply to CPF 2027 → submit. Supersedes V03+V04 — one session, no second login. |
+| V06 | Organiser  | Organiser Full (combined)    | Pre-seeded   | Login → festival detail/form browse → applications inbox → accept → map pin → decline. Supersedes V01+V02 — one session, no setup login. |
 
 ---
 
