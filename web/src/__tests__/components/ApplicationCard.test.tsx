@@ -12,6 +12,16 @@ vi.mock('@dnd-kit/core', () => ({
     isDragging: false,
   }),
 }))
+vi.mock('@dnd-kit/sortable', () => ({
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
+    isDragging: false,
+  }),
+}))
 vi.mock('@dnd-kit/utilities', () => ({ CSS: { Translate: { toString: () => '' } } }))
 
 const baseApp = {
