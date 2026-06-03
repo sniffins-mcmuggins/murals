@@ -29,6 +29,9 @@ services:
       LOGIN_RATE_LIMIT_BURST: "${LOGIN_RATE_LIMIT_BURST:-200}"
       BETA_MODE: "${BETA_MODE:-false}"
       SITE_BASE_URL: "${SITE_BASE_URL:-http://localhost:3000}"
+      SMTP_HOST: "mailpit"
+      SMTP_PORT: "1025"
+      SMTP_FROM: "noreply@painttrace.art"
       STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
       STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-whsec_test}"
       STRIPE_ARTIST_BASIC_ANNUAL_PRICE_ID: "${STRIPE_ARTIST_BASIC_ANNUAL_PRICE_ID:-}"
@@ -46,6 +49,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     restart: unless-stopped
 
   # ── WEB ────────────────────────────────────────────────────────────────────
@@ -133,6 +138,14 @@ services:
         echo 'MinIO bucket ready'
       "
     restart: "no"
+
+  # ── MAILPIT (local email catcher) ──────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"   # SMTP — api sends here
+      - "8025:8025"   # Web UI + REST API — demos and e2e tests read here
+    restart: unless-stopped
 
   # ── PROMETHEUS ─────────────────────────────────────────────────────────────
   prometheus:
