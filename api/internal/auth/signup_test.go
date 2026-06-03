@@ -41,6 +41,7 @@ func TestSignupHandler_Success(t *testing.T) {
 	require.True(t, ok, "response must have a 'user' object")
 	assert.Equal(t, "alice@example.com", user["email"])
 	assert.Equal(t, false, user["is_admin"])
+	assert.Equal(t, false, user["email_verified"])
 	assert.Nil(t, user["password_hash"], "password_hash must not appear in response")
 	assert.Nil(t, resp["claimed_profile_id"], "claimed_profile_id must be absent when no claim_token sent")
 }

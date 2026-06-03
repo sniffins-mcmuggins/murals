@@ -16,6 +16,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
 	imagehandler "github.com/sniffins-mcmuggins/render/api/internal/image"
+	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -67,6 +68,10 @@ func TestImageUploadRoundTrip(t *testing.T) {
 		`{"email":"roundtrip@example.com","password":"hunter2hunter","role":"artist"}`, "")
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "signup")
 	_ = resp.Body.Close()
+
+	// Unit tests bypass email verification — the real flow is tested in e2e/api/email-verification.test.ts
+	q := sqlcdb.New(db)
+	require.NoError(t, q.SetEmailVerifiedByEmail(t.Context(), "roundtrip@example.com"))
 
 	// 2. Log in, extract JWT
 	resp = apiReq("POST", "/auth/login", //nolint:bodyclose // body closed inside decodeJSON

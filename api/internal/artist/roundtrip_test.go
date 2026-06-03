@@ -15,6 +15,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/artist"
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
+	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -95,6 +96,10 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 		`{"email":"roundtrip@example.com","password":"hunter2hunter","role":"artist"}`, "")
 	assertStatus(resp, http.StatusCreated)
 	_ = resp.Body.Close()
+
+	// Unit tests bypass email verification — the real flow is tested in e2e/api/email-verification.test.ts
+	q := sqlcdb.New(db)
+	require.NoError(t, q.SetEmailVerifiedByEmail(t.Context(), "roundtrip@example.com"))
 
 	// 2. Log in
 	loginResp := do("POST", "/auth/login", //nolint:bodyclose // body closed inside decodeJSON

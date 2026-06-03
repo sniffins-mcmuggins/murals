@@ -14,6 +14,7 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/config"
+	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -28,6 +29,12 @@ func signupAndLogin(t *testing.T, db *pgxpool.Pool, password string) (cookie *ht
 	auth.SignupHandler(db, config.Config{}, auth.NoopMailer{}).ServeHTTP(sw, sr)
 	if sw.Code != http.StatusCreated {
 		t.Fatalf("signup failed: %d %s", sw.Code, sw.Body.String())
+	}
+
+	// Unit tests bypass email verification — the real flow is tested in e2e/api/email-verification.test.ts
+	q := sqlcdb.New(db)
+	if err := q.SetEmailVerifiedByEmail(t.Context(), email); err != nil {
+		t.Fatalf("set email verified: %v", err)
 	}
 
 	loginBody := fmt.Sprintf(`{"email":%q,"password":%q}`, email, password)

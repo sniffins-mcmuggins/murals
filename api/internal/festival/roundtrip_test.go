@@ -111,6 +111,10 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	assertStatus(resp, http.StatusCreated)
 	_ = resp.Body.Close()
 
+	// Unit tests bypass email verification — the real flow is tested in e2e/api/email-verification.test.ts
+	q := sqlcdb.New(db)
+	require.NoError(t, q.SetEmailVerifiedByEmail(t.Context(), "rtorg@example.com"))
+
 	// 2. Log in as organiser
 	loginResp := do("POST", "/auth/login",
 		`{"email":"rtorg@example.com","password":"hunter2hunter"}`, "")
@@ -161,6 +165,9 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 		`{"email":"rtartist@example.com","password":"hunter2hunter"}`, "")
 	assertStatus(resp, http.StatusCreated)
 	_ = resp.Body.Close()
+
+	// Unit tests bypass email verification — the real flow is tested in e2e/api/email-verification.test.ts
+	require.NoError(t, q.SetEmailVerifiedByEmail(t.Context(), "rtartist@example.com"))
 
 	// 9. Log in as artist
 	artistLogin := do("POST", "/auth/login",
@@ -213,7 +220,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	assert.Len(t, mapData["pins"].([]any), 0, "expected 0 pins (no pin coordinates set)")
 
 	// 16. Assign a pin via festival_spots (artist already accepted in step 13)
-	q := sqlcdb.New(db)
+	q = sqlcdb.New(db)
 	lat := pgtype.Numeric{}
 	require.NoError(t, lat.Scan("51.900740"))
 	lng := pgtype.Numeric{}

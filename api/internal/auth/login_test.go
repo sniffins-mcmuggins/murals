@@ -38,6 +38,10 @@ func createTestUser(t *testing.T, db *pgxpool.Pool, password string) string {
 	if err != nil {
 		t.Fatalf("create test user: %v", err)
 	}
+	// Unit tests bypass email verification — the real flow is tested in e2e/api/email-verification.test.ts
+	if err = q.SetEmailVerifiedByEmail(t.Context(), email); err != nil {
+		t.Fatalf("set email verified: %v", err)
+	}
 	return email
 }
 
