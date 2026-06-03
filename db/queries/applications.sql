@@ -27,6 +27,7 @@ SELECT
   a.rank,
   a.shortlisted,
   a.review_flag,
+  a.staged_decision,
   a.answers,
   a.created_at,
   a.updated_at,

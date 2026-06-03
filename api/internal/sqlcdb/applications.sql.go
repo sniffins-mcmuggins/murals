@@ -175,6 +175,7 @@ SELECT
   a.rank,
   a.shortlisted,
   a.review_flag,
+  a.staged_decision,
   a.answers,
   a.created_at,
   a.updated_at,
@@ -189,20 +190,21 @@ ORDER BY a.rank ASC, a.created_at ASC
 `
 
 type ListApplicationsByFormWithArtistRow struct {
-	ID            pgtype.UUID        `db:"id" json:"id"`
-	FormID        pgtype.UUID        `db:"form_id" json:"form_id"`
-	ArtistID      pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	Status        ApplicationStatus  `db:"status" json:"status"`
-	Rank          int32              `db:"rank" json:"rank"`
-	Shortlisted   bool               `db:"shortlisted" json:"shortlisted"`
-	ReviewFlag    bool               `db:"review_flag" json:"review_flag"`
-	Answers       json.RawMessage    `db:"answers" json:"answers"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	DisplayName   string             `db:"display_name" json:"display_name"`
-	AvatarS3Key   *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
-	MediumTags    []string           `db:"medium_tags" json:"medium_tags"`
-	LocationLabel *string            `db:"location_label" json:"location_label"`
+	ID             pgtype.UUID        `db:"id" json:"id"`
+	FormID         pgtype.UUID        `db:"form_id" json:"form_id"`
+	ArtistID       pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	Status         ApplicationStatus  `db:"status" json:"status"`
+	Rank           int32              `db:"rank" json:"rank"`
+	Shortlisted    bool               `db:"shortlisted" json:"shortlisted"`
+	ReviewFlag     bool               `db:"review_flag" json:"review_flag"`
+	StagedDecision *string            `db:"staged_decision" json:"staged_decision"`
+	Answers        json.RawMessage    `db:"answers" json:"answers"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisplayName    string             `db:"display_name" json:"display_name"`
+	AvatarS3Key    *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	MediumTags     []string           `db:"medium_tags" json:"medium_tags"`
+	LocationLabel  *string            `db:"location_label" json:"location_label"`
 }
 
 func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID pgtype.UUID) ([]ListApplicationsByFormWithArtistRow, error) {
@@ -222,6 +224,7 @@ func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID p
 			&i.Rank,
 			&i.Shortlisted,
 			&i.ReviewFlag,
+			&i.StagedDecision,
 			&i.Answers,
 			&i.CreatedAt,
 			&i.UpdatedAt,
