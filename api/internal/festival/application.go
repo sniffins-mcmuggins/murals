@@ -54,6 +54,7 @@ type applicationResponse struct {
 	Rank            int32            `json:"rank"`
 	Shortlisted     bool             `json:"shortlisted"`
 	ReviewFlag      bool             `json:"review_flag"`
+	StagedDecision  *string          `json:"staged_decision"`
 	Answers         json.RawMessage  `json:"answers"`
 	CreatedAt       string           `json:"created_at"`
 	UpdatedAt       string           `json:"updated_at"`
@@ -75,6 +76,7 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 		Rank:            a.Rank,
 		Shortlisted:     a.Shortlisted,
 		ReviewFlag:      a.ReviewFlag,
+		StagedDecision:  a.StagedDecision,
 		Answers:         a.Answers,
 		CreatedAt:       a.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:       a.UpdatedAt.Time.Format(time.RFC3339),
@@ -91,16 +93,17 @@ func toEnrichedResponse(
 		mediumTags = []string{}
 	}
 	return applicationResponse{
-		ID:          row.ID.String(),
-		FormID:      row.FormID.String(),
-		ArtistID:    row.ArtistID.String(),
-		Status:      string(row.Status),
-		Rank:        row.Rank,
-		Shortlisted: row.Shortlisted,
-		ReviewFlag:  row.ReviewFlag,
-		Answers:     row.Answers,
-		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
+		ID:             row.ID.String(),
+		FormID:         row.FormID.String(),
+		ArtistID:       row.ArtistID.String(),
+		Status:         string(row.Status),
+		Rank:           row.Rank,
+		Shortlisted:    row.Shortlisted,
+		ReviewFlag:     row.ReviewFlag,
+		StagedDecision: row.StagedDecision,
+		Answers:        row.Answers,
+		CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:      row.UpdatedAt.Time.Format(time.RFC3339),
 		Artist: &artistSummary{
 			DisplayName:   row.DisplayName,
 			AvatarS3Key:   row.AvatarS3Key,
@@ -118,16 +121,17 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 		mediumTags = []string{}
 	}
 	return applicationResponse{
-		ID:          row.ID.String(),
-		FormID:      row.FormID.String(),
-		ArtistID:    row.ArtistID.String(),
-		Status:      string(row.Status),
-		Rank:        row.Rank,
-		Shortlisted: row.Shortlisted,
-		ReviewFlag:  row.ReviewFlag,
-		Answers:     row.Answers,
-		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
+		ID:             row.ID.String(),
+		FormID:         row.FormID.String(),
+		ArtistID:       row.ArtistID.String(),
+		Status:         string(row.Status),
+		Rank:           row.Rank,
+		Shortlisted:    row.Shortlisted,
+		ReviewFlag:     row.ReviewFlag,
+		StagedDecision: row.StagedDecision,
+		Answers:        row.Answers,
+		CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:      row.UpdatedAt.Time.Format(time.RFC3339),
 		Artist: &artistSummary{
 			DisplayName:   row.DisplayName,
 			AvatarS3Key:   row.AvatarS3Key,

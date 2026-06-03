@@ -61,6 +61,41 @@ func TestPatchApplicationFlags_ForbiddenForNonOwner(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
+func TestPatchApplicationStagedDecision(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupReviewScenario(t, db)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Patch("/festivals/{festivalID}/applications/{applicationID}",
+		festival.PatchApplicationHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Stage as accept
+	body := `{"shortlisted":false,"review_flag":false,"staged_decision":"accept"}`
+	resp := doRequest(t, srv, "PATCH",
+		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
+		body, sc.orgToken)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var app map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app))
+	_ = resp.Body.Close()
+	assert.Equal(t, "accept", app["staged_decision"])
+
+	// Clear staged decision
+	body = `{"shortlisted":false,"review_flag":false,"staged_decision":null}`
+	resp = doRequest(t, srv, "PATCH",
+		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
+		body, sc.orgToken)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var app2 map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app2))
+	_ = resp.Body.Close()
+	assert.Nil(t, app2["staged_decision"])
+}
+
 func TestReorderApplications(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
