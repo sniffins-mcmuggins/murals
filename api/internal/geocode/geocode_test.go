@@ -32,6 +32,7 @@ func nominatimStub(t *testing.T) *httptest.Server {
 }
 
 func TestSearch_ReturnsResults(t *testing.T) {
+	t.Parallel()
 	srv := nominatimStub(t)
 	defer srv.Close()
 
@@ -54,6 +55,7 @@ func TestSearch_ReturnsResults(t *testing.T) {
 }
 
 func TestSearch_EmptyResultsForUnknownQuery(t *testing.T) {
+	t.Parallel()
 	srv := nominatimStub(t)
 	defer srv.Close()
 
@@ -70,6 +72,7 @@ func TestSearch_EmptyResultsForUnknownQuery(t *testing.T) {
 }
 
 func TestSearch_CachesResults(t *testing.T) {
+	t.Parallel()
 	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
@@ -93,6 +96,7 @@ func TestSearch_CachesResults(t *testing.T) {
 }
 
 func TestSearch_UpstreamError(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -108,6 +112,7 @@ func TestSearch_UpstreamError(t *testing.T) {
 }
 
 func TestSearch_ContextTimeout(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(50 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
