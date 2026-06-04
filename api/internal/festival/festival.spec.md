@@ -30,6 +30,9 @@
 - `spots.application_id` uniqueness: a confirmed application can only be assigned to one spot
 - Reorder endpoints (`/applications/reorder`, `/spots/reorder`) MUST be registered before their `/{id}` siblings in chi
 - Finalising an `accept` (via either `AcceptApplicationHandler` or `release-decisions`) MUST upsert a `festival_artists` row with status `accepted` — that row is what makes an artist assignable on the map and visible on the public roster. `decline`/`waitlist` create no such row
+- A spot may be assigned to any *spot-eligible* artist: a `festival_artists` status=`accepted` row OR an application with `staged_decision = 'accept'` (provisional, pre-release). The guard is `GetSpotEligibleArtist`.
+- `festival_spots.artist_id` may only reference a spot-eligible artist. Revoking eligibility (re-stage to non-accept, un-stage, direct decline/waitlist, or release-as-non-accept) auto-clears the assignment via `ClearSpotAssignmentForArtist`. This keeps declined artists off the public map.
+- **No artist awareness before release.** Nothing artist-facing may reveal an outcome before `release-decisions`: `GET /me/applications` uses `toMyApplicationResponse` (no `staged_decision`/`shortlisted`/`review_flag`/`rank`); `ListPublicFestivalsForArtist`'s spot branch is gated on `status = 'live'`; spot assignment fires no notification.
 
 ## AI Context
 - `festival.go`: festival CRUD — `GetHandler` contains the public-status gate
@@ -43,9 +46,11 @@
 - `release.go`: `ReleaseDecisionsHandler` — bulk-finalises staged decisions; upserts `festival_artists` for each accept (mirrors `AcceptApplicationHandler`) and notifies every affected artist
 - `access.go`: the organiser-ownership check — used by most handlers to confirm the caller owns the festival
 - `testhelpers_test.go`: shared test helpers (festival/application setup) — check this before writing new tests to avoid duplication
-- **`PATCH /spots/{id}` is a full replace:** `UpdateSpotHandler` overwrites `w3w`, `width_m`, `height_m`, and `notes` from the request body — a missing or `null` value clears the column. Any partial update (e.g. drag-to-reposition) must resend the spot's current values for all four fields. Handler at `spots.go:254`.
+- **`PATCH /spots/{id}` is a full replace of mutable fields** — partial updates (e.g. drag) must resend `w3w`/`width_m`/`height_m`/`notes` or they're cleared.
+- The organiser-facing `ListApplicationsHandler` keeps the full `applicationResponse` (incl. `staged_decision`); only the artist-facing `/me/applications` is trimmed. Don't "unify" them back together.
 
 ## Changelog
 2026-05-31 — initial spec
 2026-06-03 — documented staged-decisions + bulk release (E22); recorded the invariant that finalising an accept (direct or via release) upserts a `festival_artists` row, after fixing `ReleaseDecisionsHandler` which omitted it
 2026-06-04 — E23: noted PATCH /spots full-replace invariant; click-to-place already shipped; release→festival_artist gap closed in f1a2264
+2026-06-04 — E23: pre-release spot eligibility + auto-clear invariant; no-artist-awareness (trimmed /me/applications, gated appearances); PATCH /spots full-replace note.
