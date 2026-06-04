@@ -12,8 +12,9 @@ the (already-merged) acceptance → placement → public-map flow with an end-to
 The original #243 gap — bulk `release-decisions` not creating `festival_artist` rows —
 **was already fixed** in commit `f1a2264` (`release.go:83-93` upserts `festival_artists`
 for accepts). Click-to-place a spot **already ships** (`MapEditorClient` +
-`MapClickCapture`). So this epic adds three map-editor UX features, one end-to-end test,
-and an updated organiser demo video.
+`MapClickCapture`). So this epic adds map-editor UX features, a pre-release assignment
+workflow with drag-and-drop, an organiser-facing assignment summary, one end-to-end
+test, and an updated organiser demo video.
 
 E23 is **retitled** from *"Spot assignment as a deliberate post-acceptance step (release
 doesn't create festival_artist)"* to **"Spot assignment & map-editor placement
@@ -35,11 +36,29 @@ superpowers"** to reflect the real remaining scope.
   injected `*http.Client` / local test server in Go) so CI never depends on the live
   public endpoint.
 - **Everything folds into E23** as sub-tasks (per user); not a separate epic.
+- **Pre-release spot assignment is allowed.** An organiser can assign a wall to an
+  artist who is a *provisional* accept (`applications.staged_decision = 'accept'`), before
+  `release-decisions`. This lets venue logistics proceed in parallel with review.
+- **Auto-clear on revocation (silent).** When an assigned artist stops being a (provisional
+  or final) accept — staged to decline/waitlist, un-staged, or declined/waitlisted directly
+  — their spot assignment is silently cleared (the spot's location/dimensions/notes are
+  kept; only the artist link is removed). No confirmation prompt, to keep kanban triage fast.
+- **Zero artist awareness before release (hard rule).** Until `release-decisions` fires, an
+  artist must learn *nothing* about any outcome — not via email, not via the public site,
+  and **not via any API endpoint they can query directly** (the "techie artist" threat
+  model). This applies to acceptance, provisional decisions, shortlisting, rank, and spot
+  assignment. Spot assignment in particular fires **no notification** and exposes nothing
+  artist-queryable. See the leak-vector audit in E23.6.
+- **Drag-and-drop assignment uses native HTML5 DnD** (not @dnd-kit), because the primary
+  drop target is a Leaflet-rendered map pin; native drop events hit-test cleanly against
+  the map canvas. The kanban's @dnd-kit usage is unrelated and untouched.
+- **No kanban spot badge.** Considered and cut — the dashboard assignment summary answers
+  "who's unassigned" more directly, without adding a field to the applications API.
 
 ## Out of scope (YAGNI)
 
 Satellite/aerial base layer, wall photos per spot, spot status beyond assigned/empty,
-CSV bulk import, full what3words API integration.
+CSV bulk import, full what3words API integration, kanban-card spot badges.
 
 ---
 
@@ -116,8 +135,84 @@ CSV bulk import, full what3words API integration.
 
 - Extend `demos/scripts/V06-organiser-full.ts` to show: open map editor →
   **search an address to recenter** → click to place spots → **drag to fine-tune** →
-  **assign accepted artists to spots** → show them on the public map.
+  **drag an artist card onto a pin to assign** → show them on the public map.
 - Re-record `demos/output/V06.mp4`.
+
+### E23.6 — Pre-release spot eligibility + orphan-pin invariant (API/DB)
+
+This is the foundational data-layer change that makes pre-release assignment safe.
+
+**Widened eligibility.** "Spot-eligible artist" becomes: an artist with a
+`festival_artists` status=`accepted` row **OR** an application with
+`staged_decision = 'accept'` for this festival.
+
+- `GetUnassignedAcceptedArtists` → replaced by `GetUnassignedSpotEligibleArtists`
+  (UNION of released accepts + provisional accepts, minus those already on a spot).
+  This feeds the map editor's pool and the dashboard summary.
+- New `GetSpotEligibleArtist` (returns a row iff eligible) replaces
+  `GetAcceptedArtistForFestival` as the guard in `SetSpotArtistHandler`.
+
+**Why not create `festival_artists` early instead?** Because that row also drives the
+public artist roster (`ListPublicFestivalsForArtist`) on `open` festivals — creating it
+pre-release would publish "appearing at X" before decisions are announced. Eligibility
+must be a *check*, not an early row.
+
+**Auto-clear invariant.** New `ClearSpotAssignmentForArtist(festivalID, artistID)`
+(`UPDATE festival_spots SET artist_id = NULL WHERE festival_id=$1 AND artist_id=$2`),
+called from every path that revokes accept-status:
+- `patch.go` — when `staged_decision` is set to non-`accept` or cleared to null
+- `WaitlistApplicationHandler`, `DeclineApplicationHandler` (`review.go`) — direct revocation
+- `release.go` — a release-time sweep clearing spots for any artist who didn't finalize
+  as `accepted` (belt-and-suspenders)
+
+**Artist-awareness leak vectors — all three must be closed:**
+
+1. **Public map** (`GetFestivalMapPins`, `festival_spots.sql:88`) joins on
+   `fs.artist_id IS NOT NULL` with no status check. Safe because the map only renders
+   `live` festivals (post-release), by which point the auto-clear + release sweep
+   guarantee every pin is a final accept.
+2. **Public artist appearances** (`ListPublicFestivalsForArtist`, `festival_artists.sql`)
+   has an `EXISTS festival_spots` branch matching `open` OR `live` festivals — so a
+   pre-release spot assignment on an `open` festival would leak the acceptance on the
+   artist's public profile **immediately**. **Fix:** gate that spot branch on
+   `f.status = 'live'`, so pre-release assignments never surface publicly.
+3. **Artist's own `GET /me/applications`** (`my_applications.go` → `toApplicationResponse`,
+   `application.go:79`) — a **pre-existing leak**, not caused by this feature but in scope
+   for the no-awareness rule. It returns `staged_decision` (the organiser's provisional
+   decision), plus `shortlisted`, `review_flag`, and `rank` — all internal review signals.
+   A techie artist hitting this endpoint sees their outcome before release. **Fix:** give
+   the artist-facing endpoint a dedicated `toMyApplicationResponse` exposing only
+   `{ id, form_id, status, answers, created_at, updated_at }` — never the review/decision
+   fields. Status stays `submitted` until release, so it leaks nothing. The organiser-facing
+   `ListApplicationsHandler` keeps the full response (organisers are allowed to see it).
+
+**No notification on spot assignment.** `SetSpotArtistHandler` takes no `mailer` and sends
+nothing today — drag-and-drop assignment (E23.7) MUST preserve that. No code path triggered
+by assignment may email or otherwise signal the artist.
+
+### E23.7 — Drag-and-drop artist assignment (web)
+
+- Map editor gains an **unassigned-artists rail** beside the map, fed by the widened pool.
+- Artist cards are native-`draggable`; `dragstart` carries the `artist_id` via
+  `dataTransfer`.
+- **Two drop targets**, both calling existing `PUT /spots/{id}/artist`:
+  1. **A map pin** — `onDrop` on `.leaflet-container`; convert the drop point with
+     `map.mouseEventToContainerPoint`, find the nearest spot marker within ~35px via
+     `map.latLngToContainerPoint`, assign. Miss → no-op.
+  2. **A sidebar spot-list item** — robust fallback + accessibility.
+- The existing `SpotPanel` artist dropdown stays for keyboard users.
+
+### E23.8 — Organiser assignment summary (web)
+
+- A **Spot assignments** section on `web/src/app/organiser/festivals/[id]/page.tsx`,
+  consuming the existing `GET /festivals/{id}/spots` (no new API):
+  ```
+  Spot assignments                 [ Map editor · 1 unassigned → ]
+    Kit Harrow      Spot 3 ✓
+    Amara Diallo    Spot 1 ✓
+    Rosa Vane       unassigned ⚠
+  ```
+- "N unassigned" count badge on the Map editor link.
 
 ---
 
@@ -162,17 +257,30 @@ them (existing, `release.go`).
 
 ## Spec-maintenance impact
 
-- **`api/internal/festival/festival.spec.md`** — add an **AI Context** note: `PATCH
-  /spots/{id}` is a full replace of mutable fields; partial updates must resend
-  `w3w`/`width_m`/`height_m`/`notes`. No contract change to spots.
+- **`api/internal/festival/festival.spec.md`** — add to **AI Context**: `PATCH /spots/{id}`
+  is a full replace of mutable fields; partial updates must resend
+  `w3w`/`width_m`/`height_m`/`notes`. Add to **Invariants**:
+  - a `festival_spots.artist_id` may only reference a *spot-eligible* artist (released
+    accept OR `staged_decision = 'accept'`); revoking eligibility auto-clears the
+    assignment.
+  - the public artist-appearances query (`ListPublicFestivalsForArtist`) must not surface
+    pre-release spot assignments — its `festival_spots` branch is gated on `status = 'live'`.
+  - update the existing spot-assignment line: the guard now allows provisional accepts, not
+    only `festival_artists` accepts.
+  - **no artist awareness before release:** the artist-facing `GET /me/applications` MUST NOT
+    expose `staged_decision`, `shortlisted`, `review_flag`, or `rank` (use
+    `toMyApplicationResponse`); spot assignment fires no notification and exposes nothing
+    artist-queryable.
 - **`api/internal/geocode`** — thin one-handler package → no colocated spec; add it to
   CLAUDE.md's "Packages without specs" list.
-- No web spec changes (organiser map editor isn't separately specced).
+- No web spec changes (organiser map editor and festival detail page aren't separately
+  specced beyond `dashboard.spec.md`, which already covers the editor's `ssr:false` /
+  `spot-panel` invariants).
 
 ## Kanban / issue wiring
 
 - Retitle #243 to "[E23] Spot assignment & map-editor placement superpowers".
 - Update #243 body: note the original gap is closed (`f1a2264`); list E23.1–E23.5 as a
   checklist.
-- Create sub-issues E23.1–E23.5, `addSubIssue` each to #243, apply `area:` + `priority:p1`
+- Create sub-issues E23.1–E23.8, `addSubIssue` each to #243, apply `area:` + `priority:p1`
   labels, add to board (Ready/Backlog).

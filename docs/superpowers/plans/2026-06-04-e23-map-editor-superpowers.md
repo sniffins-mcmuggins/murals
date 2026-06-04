@@ -22,12 +22,24 @@
 | Modify | `api/cmd/api/main.go` | Register `GET /geocode/search` |
 | Modify | `openapi/openapi.yaml` | `GeocodeSuggestion` schema + `/geocode/search` path |
 | (auto) | `openapi/generated/client.ts`, `api/internal/openapi/` | Regenerated after yaml edit |
-| Modify | `web/src/app/organiser/festivals/[id]/map/MapEditorClient.tsx` | Search box + draggable markers + deep-links |
+| Modify | `web/src/app/organiser/festivals/[id]/map/MapEditorClient.tsx` | Search box + draggable markers + deep-links + drag-drop artist rail |
 | Modify | `e2e/fixtures/helpers.ts` | `stageDecision` + `releaseDecisions` helpers |
-| Modify | `e2e/browser/map-pin-edit.spec.ts` | Full flow + search stub + drag tests |
-| Modify | `demos/scripts/V06-organiser-full.ts` | Extend with map-editor section |
-| Modify | `api/internal/festival/festival.spec.md` | AI Context note: PATCH is full-replace |
+| Modify | `e2e/browser/map-pin-edit.spec.ts` | Full flow + search stub + drag tests + drag-drop assign |
+| Modify | `demos/scripts/V06-organiser-full.ts` | Extend with map-editor section (drag-drop assign) |
+| Modify | `api/internal/festival/festival.spec.md` | AI Context + Invariants: PATCH full-replace, eligibility, no-awareness |
 | Modify | `CLAUDE.md` | Add `geocode` to packages-without-specs list |
+| **Part 2 — assignment workflow** | | |
+| Modify | `db/queries/festival_spots.sql` | `GetUnassignedSpotEligibleArtists`, `ClearSpotAssignmentForArtist` |
+| Modify | `db/queries/festival_artists.sql` | `GetSpotEligibleArtist`; gate appearances spot-branch on `live` |
+| (auto) | `api/internal/sqlcdb/*.sql.go` | Regenerated via `task db:generate` |
+| Modify | `api/internal/festival/spots.go` | Switch pool query + relax assignment guard |
+| Modify | `api/internal/festival/patch.go` | Clear spot when staged_decision ≠ accept |
+| Modify | `api/internal/festival/waitlist.go`, `review.go` | Clear spot on waitlist/decline |
+| Modify | `api/internal/festival/release.go` | Release-time spot-clear sweep for non-accepts |
+| Modify | `api/internal/festival/my_applications.go`, `application.go` | `toMyApplicationResponse` (no review fields) |
+| Modify | `openapi/openapi.yaml` | `MyApplication` schema; `/me/applications` returns it |
+| Modify | `web/src/app/organiser/festivals/[id]/page.tsx` | Spot-assignment summary section |
+| Create | `e2e/api/spot-assignment-privacy.test.ts` | Pre-release assign + orphan-clear + no-awareness |
 
 ---
 
@@ -1371,28 +1383,28 @@ The V06 script currently ends at step 9 (post-release banner). Extend it to navi
 
   If no artists are pre-accepted in the seed (they're seeded as "submitted" for the kanban demo), the map-editor section of V06 will show an empty dropdown. To fix this, the seed needs at least one artist accepted before V06 runs, OR the video records the full flow: kanban → release → map editor. Since V06 already does the release (steps 1–9), the accepted artists will be in the pool by step 14. This should work correctly since the script is sequential.
 
-- [ ] **Step 12.3: Record the video**
+- [ ] **Step 12.3: Do NOT record yet — recording is deferred to Task 21**
+
+  The assignment portion of this script (step 14, `selectOption`) will be **replaced by
+  drag-and-drop** in Task 21 once the drag-drop rail (Task 18) exists, and the single
+  recording happens there. Commit the script edits now; record later.
 
   ```bash
-  # Record (produces .webm in demos/output/raw/V06/)
-  cd demos && npm run record -- V06-organiser-full.ts
-
-  # Convert webm → mp4
-  cd demos && bash run.sh
+  git add demos/scripts/V06-organiser-full.ts
+  git commit -m "demo(V06): stage map-editor section (search, place, drag-reposition)"
   ```
 
-  The output goes to `demos/output/V06.mp4`.
-
-- [ ] **Step 12.4: Commit**
-
-  ```bash
-  git add demos/scripts/V06-organiser-full.ts demos/output/V06.mp4
-  git commit -m "demo(V06): extend organiser video with map editor — search, place, drag, assign"
-  ```
+> **Note:** Step 12.4 (final commit with `V06.mp4`) is folded into Task 21 after the
+> recording is made. Nothing else to commit here beyond the script staged in Step 12.3.
 
 ---
 
-## Task 13: Spec and docs maintenance + kanban wiring
+## Task 13: Spec and docs maintenance + kanban wiring (Part 1)
+
+> **Scope:** This task covers the **Part 1** docs only (geocode + PATCH full-replace note,
+> E23.1–E23.5 issues). The Part 2 invariants (eligibility, no-awareness) and E23.6–E23.8
+> issues are handled in **Task 22**. Step 13.6 (full e2e) verifies Part 1; Task 22 re-runs
+> it for the whole epic.
 
 **Files:**
 - Modify: `api/internal/festival/festival.spec.md`
@@ -1531,14 +1543,1240 @@ The V06 script currently ends at step 9 (post-release banner). Extend it to navi
 
 ---
 
+# Part 2 — Pre-release assignment workflow
+
+> **Execution order:** Do Part 2 tasks **after** Part 1, **in order**. The web drag-drop
+> (Task 18) and the demo recording (Task 21) depend on the API foundation (Tasks 14–17).
+>
+> **TDD is mandatory for every Go change in this part** (user requirement). Each API task
+> writes a failing Go test first (`testutil.NewDB`, `testutil.CreateUser`,
+> `testutil.DoRequest` — see `.claude/rules/go-testing.md`), runs it red, implements, runs
+> it green. Every `Test*` starts with `t.Parallel()`. Run Go tests with
+> `cd api && go test ./internal/festival/... -race -count=1` (or `task api:test`).
+
+## Task 14: DB query layer — eligibility, clear, guard (additive)
+
+**Files:**
+- Modify: `db/queries/festival_spots.sql`
+- Modify: `db/queries/festival_artists.sql`
+- Auto: `api/internal/sqlcdb/*.sql.go`
+
+These are **additive** SQL queries — nothing calls them yet, so the build stays green.
+They are exercised (and thus tested) by the handler tests in Tasks 15–17.
+
+- [ ] **Step 14.1: Add the widened pool query to `festival_spots.sql`**
+
+  Add (do not delete `GetUnassignedAcceptedArtists` yet — Task 15 removes it):
+
+  ```sql
+  -- name: GetUnassignedSpotEligibleArtists :many
+  -- Artists eligible to be placed on a spot: released accepts (festival_artists) OR
+  -- provisional accepts (applications.staged_decision = 'accept'), minus those already
+  -- assigned a spot. Feeds the map editor pool and the dashboard summary.
+  SELECT elig.artist_id, elig.name
+  FROM (
+      SELECT fa.artist_id, ap.display_name AS name
+      FROM festival_artists fa
+      JOIN artist_profiles ap ON ap.id = fa.artist_id
+      WHERE fa.festival_id = $1 AND fa.status = 'accepted'
+      UNION
+      SELECT a.artist_id, ap.display_name AS name
+      FROM applications a
+      JOIN application_forms af ON af.id = a.form_id
+      JOIN artist_profiles ap ON ap.id = a.artist_id
+      WHERE af.festival_id = $1 AND a.staged_decision = 'accept'
+  ) elig
+  WHERE NOT EXISTS (
+      SELECT 1 FROM festival_spots fs
+      WHERE fs.festival_id = $1 AND fs.artist_id = elig.artist_id
+  )
+  ORDER BY elig.name;
+  ```
+
+- [ ] **Step 14.2: Add the clear-assignment query to `festival_spots.sql`**
+
+  ```sql
+  -- name: ClearSpotAssignmentForArtist :exec
+  -- Removes an artist from any spot they hold in this festival (the spot itself,
+  -- with its location/dimensions/notes, is preserved). Called whenever an artist
+  -- stops being a spot-eligible accept.
+  UPDATE festival_spots
+  SET artist_id = NULL, updated_at = now()
+  WHERE festival_id = $1 AND artist_id = $2;
+  ```
+
+- [ ] **Step 14.3: Add the eligibility guard query to `festival_artists.sql`**
+
+  ```sql
+  -- name: GetSpotEligibleArtist :one
+  -- Returns the artist_id iff the artist is spot-eligible for this festival:
+  -- a released accept OR a provisional accept (staged_decision = 'accept').
+  -- Used as the assignment guard in SetSpotArtistHandler. ErrNoRows => not eligible.
+  SELECT @artist_id::uuid AS artist_id
+  WHERE EXISTS (
+      SELECT 1 FROM festival_artists fa
+      WHERE fa.festival_id = @festival_id AND fa.artist_id = @artist_id
+        AND fa.status = 'accepted'
+  )
+  OR EXISTS (
+      SELECT 1 FROM applications a
+      JOIN application_forms af ON af.id = a.form_id
+      WHERE af.festival_id = @festival_id AND a.artist_id = @artist_id
+        AND a.staged_decision = 'accept'
+  );
+  ```
+
+- [ ] **Step 14.4: Regenerate sqlc and verify build**
+
+  ```bash
+  task db:generate
+  cd api && go build ./...
+  ```
+
+  Expected: regenerates `api/internal/sqlcdb/`; build exits 0 (new funcs unused but valid).
+  Confirm the generated funcs exist:
+
+  ```bash
+  grep -l "GetUnassignedSpotEligibleArtists\|ClearSpotAssignmentForArtist" api/internal/sqlcdb/festival_spots.sql.go
+  grep -l "GetSpotEligibleArtist" api/internal/sqlcdb/festival_artists.sql.go
+  ```
+
+- [ ] **Step 14.5: Commit**
+
+  ```bash
+  git add db/queries/ api/internal/sqlcdb/
+  git commit -m "feat(db): spot-eligibility, clear-assignment, eligibility-guard queries"
+  ```
+
+---
+
+## Task 15: Widen the spot pool + relax the assignment guard (TDD)
+
+**Files:**
+- Test: `api/internal/festival/spots_test.go`
+- Modify: `api/internal/festival/spots.go`
+- Modify: `db/queries/festival_spots.sql`, `db/queries/festival_artists.sql` (remove now-dead queries)
+
+- [ ] **Step 15.1: Write the failing tests**
+
+  Add to `api/internal/festival/spots_test.go` (imports: `chi`, `auth`, `festival`,
+  `sqlcdb`, `testutil`, `httptest`, `net/http`, `encoding/json`, `require` — match the
+  file's existing import block):
+
+  ```go
+  func TestSpots_ProvisionalAcceptIsSpotEligible(t *testing.T) {
+  	t.Parallel()
+  	db := testutil.NewDB(t)
+
+  	orgID, orgToken, _ := testutil.CreateUser(t, db)
+  	artistUserID, _, _ := testutil.CreateUser(t, db)
+
+  	festID, _ := createTestFestival(t, db, orgID, "open")
+  	createTestApplicationForm(t, db, festID)
+  	profileID := createTestArtistProfile(t, db, artistUserID, "Prov Artist")
+  	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+  	// Stage 'accept' WITHOUT releasing — no festival_artists row exists.
+  	dec := "accept"
+  	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+  		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+  	})
+  	require.NoError(t, err)
+
+  	r := chi.NewRouter()
+  	r.Use(auth.Middleware(db, testSecret))
+  	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(db))
+  	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+  	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+  	srv := httptest.NewServer(r)
+  	t.Cleanup(srv.Close)
+
+  	// Provisional accept appears in the unassigned pool.
+  	resp := testutil.DoRequest(t, srv, "GET", "/festivals/"+festID+"/spots", "", orgToken)
+  	require.Equal(t, http.StatusOK, resp.StatusCode)
+  	var pool struct {
+  		UnassignedArtists []struct {
+  			ArtistID string `json:"artist_id"`
+  		} `json:"unassigned_artists"`
+  	}
+  	require.NoError(t, json.NewDecoder(resp.Body).Decode(&pool))
+  	_ = resp.Body.Close()
+  	require.Len(t, pool.UnassignedArtists, 1)
+  	require.Equal(t, profileID, pool.UnassignedArtists[0].ArtistID)
+
+  	// Create a spot and assign the provisional accept — must succeed (200, not 422).
+  	cr := testutil.DoRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+  	require.Equal(t, http.StatusCreated, cr.StatusCode)
+  	var spot struct {
+  		ID string `json:"id"`
+  	}
+  	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+  	_ = cr.Body.Close()
+
+  	ar := testutil.DoRequest(t, srv, "PUT",
+  		"/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+  		`{"artist_id":"`+profileID+`"}`, orgToken)
+  	require.Equal(t, http.StatusOK, ar.StatusCode, "provisional accept must be assignable pre-release")
+  	_ = ar.Body.Close()
+  }
+
+  func TestSpots_IneligibleArtistRejected(t *testing.T) {
+  	t.Parallel()
+  	db := testutil.NewDB(t)
+
+  	orgID, orgToken, _ := testutil.CreateUser(t, db)
+  	artistUserID, _, _ := testutil.CreateUser(t, db)
+
+  	festID, _ := createTestFestival(t, db, orgID, "open")
+  	createTestApplicationForm(t, db, festID)
+  	profileID := createTestArtistProfile(t, db, artistUserID, "Undecided Artist")
+  	_ = createTestApplicationInFestival(t, db, festID, artistUserID) // submitted, no decision
+
+  	r := chi.NewRouter()
+  	r.Use(auth.Middleware(db, testSecret))
+  	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+  	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+  	srv := httptest.NewServer(r)
+  	t.Cleanup(srv.Close)
+
+  	cr := testutil.DoRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+  	require.Equal(t, http.StatusCreated, cr.StatusCode)
+  	var spot struct {
+  		ID string `json:"id"`
+  	}
+  	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+  	_ = cr.Body.Close()
+
+  	ar := testutil.DoRequest(t, srv, "PUT",
+  		"/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+  		`{"artist_id":"`+profileID+`"}`, orgToken)
+  	require.Equal(t, http.StatusUnprocessableEntity, ar.StatusCode, "undecided artist must not be assignable")
+  	_ = ar.Body.Close()
+  }
+  ```
+
+- [ ] **Step 15.2: Run — expect failure**
+
+  ```bash
+  cd api && go test ./internal/festival/ -race -count=1 -run 'TestSpots_ProvisionalAcceptIsSpotEligible|TestSpots_IneligibleArtistRejected'
+  ```
+
+  Expected: `TestSpots_ProvisionalAcceptIsSpotEligible` FAILS (the old pool query only
+  returns released accepts, so the provisional accept is absent and assignment 422s).
+
+- [ ] **Step 15.3: Switch the handler to the widened queries**
+
+  In `api/internal/festival/spots.go`, in `GetSpotsHandler`, replace:
+
+  ```go
+  		artists, err := q.GetUnassignedAcceptedArtists(r.Context(), festUUID)
+  ```
+
+  with:
+
+  ```go
+  		artists, err := q.GetUnassignedSpotEligibleArtists(r.Context(), festUUID)
+  ```
+
+  The row type changes name but keeps fields `ArtistID` and `Name`, so the loop building
+  `artistResps` is unchanged.
+
+  In `SetSpotArtistHandler`, replace the guard block:
+
+  ```go
+  		// Verify artist is accepted for this festival.
+  		if _, err = q.GetAcceptedArtistForFestival(r.Context(), sqlcdb.GetAcceptedArtistForFestivalParams{
+  			FestivalID: festUUID, ArtistID: artistUUID,
+  		}); err != nil {
+  			if errors.Is(err, pgx.ErrNoRows) {
+  				httperr.UnprocessableEntity(w, "artist is not accepted for this festival")
+  				return
+  			}
+  			httperr.InternalServerError(w)
+  			return
+  		}
+  ```
+
+  with:
+
+  ```go
+  		// Verify the artist is spot-eligible (released accept OR provisional accept).
+  		if _, err = q.GetSpotEligibleArtist(r.Context(), sqlcdb.GetSpotEligibleArtistParams{
+  			FestivalID: festUUID, ArtistID: artistUUID,
+  		}); err != nil {
+  			if errors.Is(err, pgx.ErrNoRows) {
+  				httperr.UnprocessableEntity(w, "artist is not eligible to be placed for this festival")
+  				return
+  			}
+  			httperr.InternalServerError(w)
+  			return
+  		}
+  ```
+
+- [ ] **Step 15.4: Remove the now-dead queries and regenerate**
+
+  `GetUnassignedAcceptedArtists` and `GetAcceptedArtistForFestival` are now unused. Confirm,
+  then delete them from `db/queries/festival_spots.sql` / `db/queries/festival_artists.sql`:
+
+  ```bash
+  grep -rn "GetUnassignedAcceptedArtists\|GetAcceptedArtistForFestival" api/internal/ | grep -v sqlcdb
+  # Expected: no matches outside generated sqlcdb. If any remain, leave the query in place.
+  ```
+
+  If clean, remove both query blocks, then:
+
+  ```bash
+  task db:generate && cd api && go build ./...
+  ```
+
+- [ ] **Step 15.5: Run — expect pass**
+
+  ```bash
+  cd api && go test ./internal/festival/ -race -count=1 -run 'TestSpots_'
+  ```
+
+  Expected: all spots tests PASS (the 2 new + pre-existing). Then `task api:lint`.
+
+- [ ] **Step 15.6: Commit**
+
+  ```bash
+  git add api/internal/festival/spots.go api/internal/festival/spots_test.go db/queries/ api/internal/sqlcdb/
+  git commit -m "feat(festival): allow pre-release spot assignment for provisional accepts"
+  ```
+
+---
+
+## Task 16: Auto-clear spot on revocation (TDD)
+
+**Files:**
+- Test: `api/internal/festival/spots_test.go`
+- Modify: `api/internal/festival/patch.go`, `waitlist.go`, `review.go`, `release.go`
+
+- [ ] **Step 16.1: Write the failing test**
+
+  Add to `spots_test.go`:
+
+  ```go
+  func TestSpots_RestagingAwayFromAcceptClearsSpot(t *testing.T) {
+  	t.Parallel()
+  	db := testutil.NewDB(t)
+
+  	orgID, orgToken, _ := testutil.CreateUser(t, db)
+  	artistUserID, _, _ := testutil.CreateUser(t, db)
+
+  	festID, _ := createTestFestival(t, db, orgID, "open")
+  	createTestApplicationForm(t, db, festID)
+  	profileID := createTestArtistProfile(t, db, artistUserID, "Flip Artist")
+  	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+  	dec := "accept"
+  	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+  		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+  	})
+  	require.NoError(t, err)
+
+  	r := chi.NewRouter()
+  	r.Use(auth.Middleware(db, testSecret))
+  	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+  	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+  	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(db))
+  	r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(db))
+  	srv := httptest.NewServer(r)
+  	t.Cleanup(srv.Close)
+
+  	// Assign the provisional accept to a spot.
+  	cr := testutil.DoRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+  	require.Equal(t, http.StatusCreated, cr.StatusCode)
+  	var spot struct{ ID string `json:"id"` }
+  	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+  	_ = cr.Body.Close()
+  	ar := testutil.DoRequest(t, srv, "PUT", "/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+  		`{"artist_id":"`+profileID+`"}`, orgToken)
+  	require.Equal(t, http.StatusOK, ar.StatusCode)
+  	_ = ar.Body.Close()
+
+  	// Re-stage to decline — the spot assignment must be cleared.
+  	pr := testutil.DoRequest(t, srv, "PATCH", "/festivals/"+festID+"/applications/"+appID,
+  		`{"shortlisted":false,"review_flag":false,"staged_decision":"decline"}`, orgToken)
+  	require.Equal(t, http.StatusOK, pr.StatusCode)
+  	_ = pr.Body.Close()
+
+  	// The spot still exists but is now unassigned.
+  	gr := testutil.DoRequest(t, srv, "GET", "/festivals/"+festID+"/spots", "", orgToken)
+  	require.Equal(t, http.StatusOK, gr.StatusCode)
+  	var body struct {
+  		Spots []struct {
+  			ID       string  `json:"id"`
+  			ArtistID *string `json:"artist_id"`
+  		} `json:"spots"`
+  	}
+  	require.NoError(t, json.NewDecoder(gr.Body).Decode(&body))
+  	_ = gr.Body.Close()
+  	require.Len(t, body.Spots, 1)
+  	require.Nil(t, body.Spots[0].ArtistID, "spot must be cleared after re-staging away from accept")
+  }
+  ```
+
+- [ ] **Step 16.2: Run — expect failure**
+
+  ```bash
+  cd api && go test ./internal/festival/ -race -count=1 -run TestSpots_RestagingAwayFromAcceptClearsSpot
+  ```
+
+  Expected: FAIL — the spot keeps the artist after re-staging to decline.
+
+- [ ] **Step 16.3: Clear in `patch.go`**
+
+  In `api/internal/festival/patch.go`, capture the application (it's currently discarded
+  at line 54):
+
+  ```go
+  		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+  		if !ok {
+  			return
+  		}
+  ```
+
+  Then after the successful `UpdateApplicationFlags` (after line 89, before writing the
+  response), add:
+
+  ```go
+  		// No-awareness invariant: a spot may only belong to a (provisional or final)
+  		// accept. If this application is no longer staged 'accept', clear any spot it holds.
+  		if req.StagedDecision == nil || *req.StagedDecision != "accept" {
+  			if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+  				FestivalID: festUUID, ArtistID: app.ArtistID,
+  			}); err != nil {
+  				httperr.InternalServerError(w)
+  				return
+  			}
+  		}
+  ```
+
+- [ ] **Step 16.4: Clear in the direct waitlist + decline handlers**
+
+  In `api/internal/festival/waitlist.go`, after the successful `UpdateApplicationStatus`
+  (before `sendApplicationNotification`), add:
+
+  ```go
+  		if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+  			FestivalID: festUUID, ArtistID: app.ArtistID,
+  		}); err != nil {
+  			httperr.InternalServerError(w)
+  			return
+  		}
+  ```
+
+  In `api/internal/festival/review.go`, in `DeclineApplicationHandler`, add the identical
+  block after its `UpdateApplicationStatus` and before `sendApplicationNotification`.
+
+- [ ] **Step 16.5: Clear in the release sweep**
+
+  In `api/internal/festival/release.go`, change the per-application loop so non-accepts
+  clear any spot held during a provisional-accept window:
+
+  ```go
+  		for _, app := range released {
+  			if app.Status == sqlcdb.ApplicationStatusAccepted {
+  				if _, err := q.AddFestivalArtist(r.Context(), sqlcdb.AddFestivalArtistParams{
+  					FestivalID: festUUID,
+  					ArtistID:   app.ArtistID,
+  					Status:     sqlcdb.FestivalArtistStatusAccepted,
+  				}); err != nil {
+  					httperr.InternalServerError(w)
+  					return
+  				}
+  			} else {
+  				// Safety net: an artist provisionally assigned a spot, then downgraded,
+  				// must not keep the spot into the live festival.
+  				if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+  					FestivalID: festUUID, ArtistID: app.ArtistID,
+  				}); err != nil {
+  					httperr.InternalServerError(w)
+  					return
+  				}
+  			}
+  			sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, string(app.Status))
+  		}
+  ```
+
+- [ ] **Step 16.6: Run — expect pass**
+
+  ```bash
+  cd api && go test ./internal/festival/ -race -count=1
+  ```
+
+  Expected: all festival tests PASS (new clear test green; `release_test.go`,
+  `waitlist_test.go`, `patch_test.go` still green). Then `task api:lint`.
+
+- [ ] **Step 16.7: Commit**
+
+  ```bash
+  git add api/internal/festival/patch.go api/internal/festival/waitlist.go api/internal/festival/review.go api/internal/festival/release.go api/internal/festival/spots_test.go
+  git commit -m "feat(festival): auto-clear spot assignment when artist loses accept status"
+  ```
+
+---
+
+## Task 17: No artist awareness pre-release (TDD)
+
+Closes the artist-queryable leaks: `/me/applications` exposing review signals, and the
+public appearances query surfacing pre-release spot assignments.
+
+**Files:**
+- Test: `api/internal/festival/my_applications_test.go`, `appearances_test.go`
+- Modify: `api/internal/festival/application.go` (add `toMyApplicationResponse`)
+- Modify: `api/internal/festival/my_applications.go`
+- Modify: `db/queries/festival_artists.sql` (gate appearances spot-branch on `live`)
+- Modify: `openapi/openapi.yaml` (+ codegen)
+
+- [ ] **Step 17.1: Write the failing tests**
+
+  Add to `api/internal/festival/my_applications_test.go`:
+
+  ```go
+  func TestMyApplications_HidesReviewSignals(t *testing.T) {
+  	t.Parallel()
+  	db := testutil.NewDB(t)
+
+  	orgID, _, _ := testutil.CreateUser(t, db)
+  	artistUserID, artistToken, _ := testutil.CreateUser(t, db)
+
+  	festID, _ := createTestFestival(t, db, orgID, "open")
+  	createTestApplicationForm(t, db, festID)
+  	createTestArtistProfile(t, db, artistUserID, "Privacy Artist")
+  	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+  	// Organiser stages 'accept' and shortlists — internal review signals.
+  	dec := "accept"
+  	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+  		ID: pgUUID(t, appID), Shortlisted: true, ReviewFlag: true, StagedDecision: &dec,
+  	})
+  	require.NoError(t, err)
+
+  	handler := auth.Middleware(db, testSecret)(festival.GetMyApplicationsHandler(db))
+  	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me/applications", nil)
+  	r.Header.Set("Authorization", "Bearer "+artistToken)
+  	w := httptest.NewRecorder()
+  	handler.ServeHTTP(w, r)
+
+  	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+  	body := w.Body.String()
+  	// Artist must see status (still 'submitted') but NONE of the review signals.
+  	require.Contains(t, body, `"status":"submitted"`)
+  	require.NotContains(t, body, "staged_decision")
+  	require.NotContains(t, body, "shortlisted")
+  	require.NotContains(t, body, "review_flag")
+  	require.NotContains(t, body, `"rank"`)
+  }
+  ```
+
+  Add to `api/internal/festival/appearances_test.go`:
+
+  ```go
+  func TestAppearances_PreReleaseSpotDoesNotLeak(t *testing.T) {
+  	t.Parallel()
+  	db := testutil.NewDB(t)
+
+  	orgID, _, _ := testutil.CreateUser(t, db)
+  	artistUserID, _, _ := testutil.CreateUser(t, db)
+
+  	festID, _ := createTestFestival(t, db, orgID, "open") // open = under review, not released
+  	createTestApplicationForm(t, db, festID)
+  	profileID := createTestArtistProfile(t, db, artistUserID, "Appear Artist")
+  	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+  	q := sqlcdb.New(db)
+  	dec := "accept"
+  	_, err := q.UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+  		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+  	})
+  	require.NoError(t, err)
+  	// Provisionally assign a spot to this artist on the still-open festival.
+  	lat, _ := numericForTest(t, 51.9)
+  	lng, _ := numericForTest(t, -2.07)
+  	spot, err := q.CreateFestivalSpot(t.Context(), sqlcdb.CreateFestivalSpotParams{
+  		FestivalID: pgUUID(t, festID), Lat: lat, Lng: lng,
+  	})
+  	require.NoError(t, err)
+  	_, err = q.SetFestivalSpotArtist(t.Context(), sqlcdb.SetFestivalSpotArtistParams{
+  		ID: spot.ID, FestivalID: pgUUID(t, festID), ArtistID: pgUUID(t, profileID),
+  	})
+  	require.NoError(t, err)
+
+  	// Public appearances for this artist must NOT include the open festival.
+  	r := chi.NewRouter()
+  	r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(db))
+  	srv := httptest.NewServer(r)
+  	t.Cleanup(srv.Close)
+
+  	resp := testutil.DoRequest(t, srv, "GET", "/profiles/"+profileID+"/festivals", "", "")
+  	require.Equal(t, http.StatusOK, resp.StatusCode)
+  	var appearances []map[string]any
+  	require.NoError(t, json.NewDecoder(resp.Body).Decode(&appearances))
+  	_ = resp.Body.Close()
+  	require.Empty(t, appearances, "a pre-release spot assignment must not surface publicly")
+  }
+  ```
+
+  > **Helper note:** if `spots_test.go` already has a numeric helper, reuse it; otherwise add
+  > a small `numericForTest(t, f float64) (pgtype.Numeric, error)` that wraps
+  > `(&pgtype.Numeric{}).Scan(strconv.FormatFloat(f,'f',-1,64))` — or create the spot via the
+  > `CreateSpotHandler` HTTP route instead (mirrors `TestSpots_*`), avoiding the numeric type.
+
+- [ ] **Step 17.2: Run — expect failure**
+
+  ```bash
+  cd api && go test ./internal/festival/ -race -count=1 -run 'TestMyApplications_HidesReviewSignals|TestAppearances_PreReleaseSpotDoesNotLeak'
+  ```
+
+  Expected: both FAIL — `/me/applications` currently emits `staged_decision` etc., and the
+  appearances query currently matches the open festival via its spot branch.
+
+- [ ] **Step 17.3: Add the artist-safe response and use it**
+
+  In `api/internal/festival/application.go`, add:
+
+  ```go
+  // myApplicationResponse is the artist-facing view of their own application. It
+  // deliberately omits all organiser/review signals (staged_decision, shortlisted,
+  // review_flag, rank, scores, notes) — an artist must learn nothing about the outcome
+  // until decisions are released. `status` stays 'submitted' until release, so it leaks
+  // nothing.
+  type myApplicationResponse struct {
+  	ID        string          `json:"id"`
+  	FormID    string          `json:"form_id"`
+  	ArtistID  string          `json:"artist_id"`
+  	Status    string          `json:"status"`
+  	Answers   json.RawMessage `json:"answers"`
+  	CreatedAt string          `json:"created_at"`
+  	UpdatedAt string          `json:"updated_at"`
+  }
+
+  func toMyApplicationResponse(a sqlcdb.Application) myApplicationResponse {
+  	return myApplicationResponse{
+  		ID:        a.ID.String(),
+  		FormID:    a.FormID.String(),
+  		ArtistID:  a.ArtistID.String(),
+  		Status:    string(a.Status),
+  		Answers:   a.Answers,
+  		CreatedAt: a.CreatedAt.Time.Format(time.RFC3339),
+  		UpdatedAt: a.UpdatedAt.Time.Format(time.RFC3339),
+  	}
+  }
+  ```
+
+  In `api/internal/festival/my_applications.go`, change the response builder:
+
+  ```go
+  		resp := make([]myApplicationResponse, len(apps))
+  		for i, a := range apps {
+  			resp[i] = toMyApplicationResponse(a)
+  		}
+  ```
+
+  And update the empty-profile early return from `[]applicationResponse{}` to
+  `[]myApplicationResponse{}`.
+
+- [ ] **Step 17.4: Gate the appearances spot-branch on `live`**
+
+  In `db/queries/festival_artists.sql`, in `ListPublicFestivalsForArtist`, change the spot
+  `EXISTS` branch to only match live festivals:
+
+  ```sql
+      OR (f.status = 'live' AND EXISTS (
+        SELECT 1 FROM festival_spots fs
+        WHERE fs.festival_id = f.id
+          AND fs.artist_id = $1
+      ))
+  ```
+
+  Then regenerate:
+
+  ```bash
+  task db:generate && cd api && go build ./...
+  ```
+
+- [ ] **Step 17.5: Run — expect pass**
+
+  ```bash
+  cd api && go test ./internal/festival/ -race -count=1
+  ```
+
+  Expected: both new tests PASS; existing `my_applications_test.go` / `appearances_test.go`
+  still green (adjust any existing assertion that expected the old `/me/applications` shape —
+  if a prior test asserted `staged_decision` on that endpoint, it was asserting the leak;
+  update it to assert absence).
+
+- [ ] **Step 17.6: Update OpenAPI + codegen**
+
+  In `openapi/openapi.yaml`, add a `MyApplication` schema (after `Application`):
+
+  ```yaml
+      MyApplication:
+        type: object
+        required: [id, form_id, artist_id, status, answers, created_at, updated_at]
+        properties:
+          id: { type: string, format: uuid }
+          form_id: { type: string, format: uuid }
+          artist_id: { type: string, format: uuid }
+          status: { $ref: "#/components/schemas/ApplicationStatus" }
+          answers: { type: object, additionalProperties: true }
+          created_at: { type: string, format: date-time }
+          updated_at: { type: string, format: date-time }
+  ```
+
+  Change the `/me/applications` response items ref from `Application` to `MyApplication`:
+
+  ```yaml
+                items:
+                  $ref: "#/components/schemas/MyApplication"
+  ```
+
+  Then:
+
+  ```bash
+  task openapi:gen && task web:lint
+  ```
+
+  Expected: codegen succeeds; web type-check passes (the artist applications page only reads
+  `app.status`, so the narrower type is compatible). If the React Native app consumes
+  `/me/applications`, confirm it doesn't reference the removed fields (`grep -rn "staged_decision\|shortlisted" mobile/src` → expected: no artist-facing usage).
+
+- [ ] **Step 17.7: Commit**
+
+  ```bash
+  git add api/internal/festival/application.go api/internal/festival/my_applications.go api/internal/festival/my_applications_test.go api/internal/festival/appearances_test.go db/queries/ api/internal/sqlcdb/ openapi/openapi.yaml openapi/generated/ api/internal/openapi/
+  git commit -m "feat(festival): no artist awareness pre-release — hide review signals + gate appearances"
+  ```
+
+---
+
+## Task 18: Web — drag-and-drop artist rail
+
+**Files:**
+- Modify: `web/src/app/organiser/festivals/[id]/map/MapEditorClient.tsx`
+
+- [ ] **Step 18.1: Add assign mutation + drag-state**
+
+  In `MapEditorClient`, after `dragSpotMutation`, add an assignment mutation:
+
+  ```tsx
+  const assignArtistMutation = useMutation({
+    mutationFn: async ({ spotId, artistId }: { spotId: string; artistId: string }) => {
+      const res = await apiClient.PUT('/festivals/{festivalID}/spots/{spotID}/artist', {
+        params: { path: { festivalID: festivalId, spotID: spotId } },
+        body: { artist_id: artistId },
+      })
+      if (res.error) throw new Error('Failed to assign artist')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['spots', festivalId] }),
+    onError: (e: Error) => setPlaceError(e.message),
+  })
+
+  const [draggingArtistId, setDraggingArtistId] = useState<string | null>(null)
+  ```
+
+- [ ] **Step 18.2: Add a nearest-spot hit-test helper component**
+
+  The map drop needs access to the Leaflet map instance. Add a ref-capturing child inside
+  `<MapContainer>` that records the map, plus the drop logic on the container. Add this
+  component near `MapViewUpdater`:
+
+  ```tsx
+  function MapRefCapture({ onReady }: { onReady: (map: L.Map) => void }) {
+    const map = useMap()
+    useEffect(() => { onReady(map) }, [map, onReady])
+    return null
+  }
+  ```
+
+  In `MapEditorClient`, add `const mapRef = useRef<L.Map | null>(null)` (import `useRef`),
+  and inside `<MapContainer>` add `<MapRefCapture onReady={(m) => { mapRef.current = m }} />`.
+
+- [ ] **Step 18.3: Make the map container a drop target**
+
+  Wrap the map `<div className="border ...">` with native DnD handlers that hit-test the
+  drop point against spot markers:
+
+  ```tsx
+  <div
+    className="border border-light rounded-lg overflow-hidden"
+    style={{ height: '500px' }}
+    onDragOver={(e) => { if (draggingArtistId) e.preventDefault() }}
+    onDrop={(e) => {
+      e.preventDefault()
+      const artistId = e.dataTransfer.getData('text/artist-id') || draggingArtistId
+      const map = mapRef.current
+      if (!artistId || !map) return
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const dropPt = L.point(e.clientX - rect.left, e.clientY - rect.top)
+      // Find the nearest spot marker within 35px.
+      let nearest: { id: string; dist: number } | null = null
+      for (const s of spots) {
+        if (s.lat == null || s.lng == null || !s.id) continue
+        const pt = map.latLngToContainerPoint([s.lat, s.lng])
+        const dist = pt.distanceTo(dropPt)
+        if (dist <= 35 && (!nearest || dist < nearest.dist)) nearest = { id: s.id, dist }
+      }
+      setDraggingArtistId(null)
+      if (nearest) assignArtistMutation.mutate({ spotId: nearest.id, artistId })
+    }}
+  >
+    <MapContainer ...> ... </MapContainer>
+  </div>
+  ```
+
+  (Keep the existing `<MapContainer>` children; only the wrapping `<div>` gains the handlers.)
+
+- [ ] **Step 18.4: Render the unassigned-artist rail**
+
+  Add a third column to the editor layout (after the map column, inside the
+  `flex gap-6` row), listing the pool as draggable cards:
+
+  ```tsx
+  <div className="w-56 flex-shrink-0">
+    <h2 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">
+      Unassigned · {unassignedArtists.length}
+    </h2>
+    <ul className="space-y-1" data-testid="artist-rail">
+      {unassignedArtists.map(a => (
+        <li
+          key={a.artist_id}
+          draggable
+          onDragStart={(e) => {
+            if (a.artist_id) {
+              e.dataTransfer.setData('text/artist-id', a.artist_id)
+              setDraggingArtistId(a.artist_id)
+            }
+          }}
+          onDragEnd={() => setDraggingArtistId(null)}
+          className="cursor-grab active:cursor-grabbing bg-warm border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink hover:border-amber"
+        >
+          {a.name}
+        </li>
+      ))}
+      {unassignedArtists.length === 0 && (
+        <li className="font-sans text-xs text-mid">All placed 🎉</li>
+      )}
+    </ul>
+    <p className="font-sans text-xs text-mid mt-2">Drag a name onto a pin to assign.</p>
+  </div>
+  ```
+
+- [ ] **Step 18.5: Type-check + manual test**
+
+  ```bash
+  task web:lint
+  ```
+
+  Manual: with a released (or provisionally-accepted) artist in the pool, drag a card onto a
+  pin → it assigns (card leaves the rail, pin turns terracotta). Drop on empty map → no-op.
+
+- [ ] **Step 18.6: Commit**
+
+  ```bash
+  git add web/src/app/organiser/festivals/\[id\]/map/MapEditorClient.tsx
+  git commit -m "feat(web): drag artist cards from rail onto map pins to assign"
+  ```
+
+---
+
+## Task 19: Web — organiser assignment summary
+
+**Files:**
+- Modify: `web/src/app/organiser/festivals/[id]/page.tsx`
+
+- [ ] **Step 19.1: Add a Spot assignments section**
+
+  This page is a Server Component. Add a small `'use client'` component that fetches
+  `/festivals/{id}/spots` and renders the summary, then render it on the page. Create
+  `web/src/app/organiser/festivals/[id]/SpotAssignmentSummary.tsx`:
+
+  ```tsx
+  'use client'
+
+  import Link from 'next/link'
+  import { useQuery } from '@tanstack/react-query'
+  import { apiClient } from '@/lib/api'
+  import type { components } from '@render/api-client'
+
+  type FestivalSpotsResponse = components['schemas']['FestivalSpotsResponse']
+
+  export function SpotAssignmentSummary({ festivalId }: { festivalId: string }) {
+    const { data } = useQuery({
+      queryKey: ['spots', festivalId],
+      queryFn: async () => {
+        const res = await apiClient.GET('/festivals/{festivalID}/spots', {
+          params: { path: { festivalID: festivalId } },
+        })
+        if (res.error) throw new Error('Failed to load spots')
+        return res.data as FestivalSpotsResponse
+      },
+    })
+
+    const spots = data?.spots ?? []
+    const unassigned = data?.unassigned_artists ?? []
+    const assigned = spots.filter(s => s.artist_id)
+
+    return (
+      <section className="mt-8" data-testid="spot-assignment-summary">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-serif text-2xl text-ink">Spot assignments</h2>
+          <Link href={`/organiser/festivals/${festivalId}/map`}
+            className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink">
+            Map editor{unassigned.length > 0 ? ` · ${unassigned.length} unassigned` : ''} →
+          </Link>
+        </div>
+        <ul className="space-y-1">
+          {assigned.map(s => (
+            <li key={s.id} className="flex justify-between font-sans text-sm">
+              <span className="text-ink">{s.artist_name}</span>
+              <span className="text-mid">Spot {s.number} ✓</span>
+            </li>
+          ))}
+          {unassigned.map(a => (
+            <li key={a.artist_id} className="flex justify-between font-sans text-sm">
+              <span className="text-ink">{a.name}</span>
+              <span className="text-clay">unassigned ⚠</span>
+            </li>
+          ))}
+          {assigned.length === 0 && unassigned.length === 0 && (
+            <li className="font-sans text-sm text-mid">No accepted artists to place yet.</li>
+          )}
+        </ul>
+      </section>
+    )
+  }
+  ```
+
+  In `web/src/app/organiser/festivals/[id]/page.tsx`, import and render
+  `<SpotAssignmentSummary festivalId={...} />` in an appropriate spot (e.g. below the
+  existing festival detail content). Pass the festival id the page already has.
+
+- [ ] **Step 19.2: Type-check + commit**
+
+  ```bash
+  task web:lint
+  git add web/src/app/organiser/festivals/\[id\]/page.tsx web/src/app/organiser/festivals/\[id\]/SpotAssignmentSummary.tsx
+  git commit -m "feat(web): organiser spot-assignment summary on festival page"
+  ```
+
+---
+
+## Task 20: e2e — assignment privacy + drag-drop
+
+**Files:**
+- Create: `e2e/api/spot-assignment-privacy.test.ts`
+- Modify: `e2e/browser/map-pin-edit.spec.ts`
+
+- [ ] **Step 20.1: API-gate privacy test (the "techie artist" threat model)**
+
+  Create `e2e/api/spot-assignment-privacy.test.ts`:
+
+  ```ts
+  import { describe, it, expect } from 'vitest'
+  import {
+    createArtist, createOrganiser, createProfile, createFestival,
+    setFestivalStatus, upsertForm, submitApplication, stageDecision,
+    createSpot, assignArtistToSpot,
+  } from '../fixtures/helpers'
+
+  const API = process.env.API_URL ?? 'http://localhost:8080'
+
+  describe('no artist awareness before release', () => {
+    it('pre-release: artist can be assigned a spot but learns nothing via the API', async () => {
+      const suffix = `privacy-${Date.now()}`
+      const artist = await createArtist(suffix)
+      await createProfile(artist.token, { displayName: `Privacy Artist ${suffix}` })
+      const org = await createOrganiser(suffix)
+      const { festivalId, slug } = await createFestival(org.token, {
+        name: `Privacy Fest ${suffix}`, slug: `privacy-${suffix}`,
+      })
+      await upsertForm(org.token, festivalId)
+      await setFestivalStatus(org.token, festivalId, 'open')
+      const { applicationId } = await submitApplication(artist.token, festivalId)
+
+      // Organiser stages accept (NO release) and assigns a spot pre-release.
+      await stageDecision(org.token, festivalId, applicationId, 'accept')
+      const spotsRes = await fetch(`${API}/festivals/${festivalId}/spots`, {
+        headers: { Authorization: `Bearer ${org.token}` },
+      })
+      const { unassigned_artists } = await spotsRes.json()
+      expect(unassigned_artists.length).toBe(1) // provisional accept is eligible
+      const artistProfileId = unassigned_artists[0].artist_id
+      const { spotId } = await createSpot(org.token, festivalId, 51.9, -2.07)
+      await assignArtistToSpot(org.token, festivalId, spotId, artistProfileId)
+
+      // 1. Artist's own /me/applications leaks no review signal.
+      const mine = await fetch(`${API}/me/applications`, {
+        headers: { Authorization: `Bearer ${artist.token}` },
+      })
+      const mineBody = await mine.text()
+      expect(mine.status).toBe(200)
+      expect(mineBody).toContain('"status":"submitted"')
+      expect(mineBody).not.toContain('staged_decision')
+      expect(mineBody).not.toContain('shortlisted')
+
+      // 2. Public artist appearances don't show the unreleased festival.
+      const appearances = await fetch(`${API}/profiles/${artistProfileId}/festivals`).then(r => r.json())
+      expect(appearances.find((f: { slug: string }) => f.slug === slug)).toBeUndefined()
+
+      // 3. Public map 404s (festival not live).
+      const map = await fetch(`${API}/festivals/slug/${slug}/map`)
+      expect(map.status).toBe(404)
+    })
+
+    it('re-staging away from accept clears the pre-release spot', async () => {
+      const suffix = `clear-${Date.now()}`
+      const artist = await createArtist(suffix)
+      await createProfile(artist.token, { displayName: `Clear Artist ${suffix}` })
+      const org = await createOrganiser(suffix)
+      const { festivalId } = await createFestival(org.token, {
+        name: `Clear Fest ${suffix}`, slug: `clear-${suffix}`,
+      })
+      await upsertForm(org.token, festivalId)
+      await setFestivalStatus(org.token, festivalId, 'open')
+      const { applicationId } = await submitApplication(artist.token, festivalId)
+      await stageDecision(org.token, festivalId, applicationId, 'accept')
+
+      const spotsRes = await fetch(`${API}/festivals/${festivalId}/spots`, {
+        headers: { Authorization: `Bearer ${org.token}` },
+      })
+      const { unassigned_artists } = await spotsRes.json()
+      const artistProfileId = unassigned_artists[0].artist_id
+      const { spotId } = await createSpot(org.token, festivalId, 51.9, -2.07)
+      await assignArtistToSpot(org.token, festivalId, spotId, artistProfileId)
+
+      // Flip to decline → spot must clear.
+      await stageDecision(org.token, festivalId, applicationId, 'decline')
+      const after = await fetch(`${API}/festivals/${festivalId}/spots`, {
+        headers: { Authorization: `Bearer ${org.token}` },
+      }).then(r => r.json())
+      const spot = after.spots.find((s: { id: string }) => s.id === spotId)
+      expect(spot.artist_id).toBeNull()
+    })
+  })
+  ```
+
+- [ ] **Step 20.2: Run the privacy test**
+
+  ```bash
+  npx vitest run e2e/api/spot-assignment-privacy.test.ts
+  ```
+
+  Expected: both tests PASS.
+
+- [ ] **Step 20.3: Browser drag-drop assignment test**
+
+  Add to `e2e/browser/map-pin-edit.spec.ts` (the `stageDecision`/`releaseDecisions` imports
+  from Task 10 are already present):
+
+  ```ts
+  test('drag an artist card onto a pin to assign (pre-release)', async ({ browser }) => {
+    const suffix = `dragdrop-${Date.now()}`
+    const baseURL = process.env.BASE_URL ?? 'http://localhost:3000'
+
+    const artist = await createArtist(suffix)
+    await createProfile(artist.token, { displayName: `DragDrop Artist ${suffix}` })
+    const organiser = await createOrganiser(suffix)
+    const { festivalId } = await createFestival(organiser.token, {
+      name: `DragDrop Fest ${suffix}`, slug: `dragdrop-${suffix}`,
+    })
+    await upsertForm(organiser.token, festivalId)
+    await setFestivalStatus(organiser.token, festivalId, 'open')
+    const { applicationId } = await submitApplication(artist.token, festivalId)
+    // Provisional accept — assignable before release.
+    await stageDecision(organiser.token, festivalId, applicationId, 'accept')
+    // Pre-create a spot to drop onto.
+    await createSpot(organiser.token, festivalId, 51.9007, -2.0783)
+
+    const { ctx, page } = await loginAs(browser, organiser.email, organiser.password, baseURL)
+    try {
+      await page.goto(`/organiser/festivals/${festivalId}/map`)
+      await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByTestId('artist-rail')).toContainText('DragDrop Artist')
+
+      const card = page.getByTestId('artist-rail').getByText(/DragDrop Artist/)
+      const marker = page.locator('.leaflet-marker-icon').first()
+      await expect(marker).toBeVisible({ timeout: 5_000 })
+
+      // Native HTML5 DnD: Playwright's dragTo drives dragstart/dragover/drop.
+      await card.dragTo(marker)
+
+      // Assignment landed: the card leaves the rail.
+      await expect(page.getByTestId('artist-rail')).not.toContainText('DragDrop Artist', { timeout: 5_000 })
+
+      // Confirm server-side.
+      const spots = await fetch(`${API}/festivals/${festivalId}/spots`, {
+        headers: { Authorization: `Bearer ${organiser.token}` },
+      }).then(r => r.json())
+      expect(spots.spots.some((s: { artist_name: string | null }) => s.artist_name?.includes('DragDrop Artist'))).toBe(true)
+    } finally {
+      await ctx.close()
+    }
+  })
+  ```
+
+  > If `card.dragTo(marker)` proves flaky over the Leaflet canvas, fall back to manual
+  > `dispatchEvent` of `dragstart`/`drop` with a `DataTransfer`, or drop onto the sidebar
+  > spot-list item instead of the marker (both are valid drop targets per the design).
+
+- [ ] **Step 20.4: Run + commit**
+
+  ```bash
+  npx playwright test e2e/browser/map-pin-edit.spec.ts -g "drag an artist card"
+  git add e2e/api/spot-assignment-privacy.test.ts e2e/browser/map-pin-edit.spec.ts
+  git commit -m "test(e2e): pre-release assignment privacy + drag-drop assign"
+  ```
+
+---
+
+## Task 21: Finalize + record demo V06
+
+**Files:**
+- Modify: `demos/scripts/V06-organiser-full.ts`
+
+- [ ] **Step 21.1: Replace the dropdown-assignment step with drag-drop**
+
+  In `demos/scripts/V06-organiser-full.ts`, replace the "── 14. Assign an accepted artist"
+  block (the `selectOption` + Save) with a drag from the rail onto a pin:
+
+  ```ts
+    // ── 14. Drag an accepted artist from the rail onto the pin ────────────────
+    await highlight(page, '[data-testid="artist-rail"]')
+    await pause(800)
+    const artistCard = page.getByTestId('artist-rail').getByText(/Kit Harrow/).first()
+    const targetPin = page.locator('.leaflet-marker-icon').last()
+    await artistCard.dragTo(targetPin)
+    await pause(1500)
+  ```
+
+- [ ] **Step 21.2: Record + convert**
+
+  ```bash
+  cd demos && npm run record -- V06-organiser-full.ts
+  cd demos && bash run.sh
+  ```
+
+  Produces `demos/output/V06.mp4`. Watch it back: search recenters, spot placed, marker
+  dragged, artist card dragged onto pin, assignment shown.
+
+- [ ] **Step 21.3: Commit**
+
+  ```bash
+  git add demos/scripts/V06-organiser-full.ts demos/output/V06.mp4
+  git commit -m "demo(V06): drag-drop artist assignment + record"
+  ```
+
+---
+
+## Task 22: Part 2 docs, invariants & kanban finalize
+
+**Files:**
+- Modify: `api/internal/festival/festival.spec.md`
+
+- [ ] **Step 22.1: Update the festival spec Invariants + AI Context**
+
+  In `api/internal/festival/festival.spec.md`:
+
+  Update the existing spot-assignment invariant line (`spots.application_id` / accepted) to:
+
+  ```markdown
+  - A spot may be assigned to any *spot-eligible* artist: a `festival_artists` status=`accepted`
+    row OR an application with `staged_decision = 'accept'` (provisional, pre-release). The
+    guard is `GetSpotEligibleArtist`.
+  ```
+
+  Add to `## Invariants`:
+
+  ```markdown
+  - `festival_spots.artist_id` may only reference a spot-eligible artist. Revoking eligibility
+    (re-stage to non-accept, un-stage, direct decline/waitlist, or release-as-non-accept)
+    auto-clears the assignment via `ClearSpotAssignmentForArtist`. This keeps declined artists
+    off the public map.
+  - **No artist awareness before release.** Nothing artist-facing may reveal an outcome before
+    `release-decisions`: `GET /me/applications` uses `toMyApplicationResponse` (no
+    `staged_decision`/`shortlisted`/`review_flag`/`rank`); `ListPublicFestivalsForArtist`'s
+    spot branch is gated on `status = 'live'`; spot assignment fires no notification.
+  ```
+
+  Add to `## AI Context`:
+
+  ```markdown
+  - `PATCH /spots/{id}` is a full replace of mutable fields — partial updates (e.g. drag) must
+    resend `w3w`/`width_m`/`height_m`/`notes` or they're cleared.
+  - The organiser-facing `ListApplicationsHandler` keeps the full `applicationResponse`
+    (incl. `staged_decision`); only the artist-facing `/me/applications` is trimmed. Don't
+    "unify" them back together.
+  ```
+
+  Add to `## Changelog`:
+
+  ```markdown
+  2026-06-04 — E23: pre-release spot eligibility + auto-clear invariant; no-artist-awareness
+  (trimmed /me/applications, gated appearances); PATCH /spots full-replace note.
+  ```
+
+- [ ] **Step 22.2: Create sub-issues E23.6–E23.8 and wire to #243**
+
+  ```bash
+  gh issue create --repo sniffins-mcmuggins/murals \
+    --title "[E23.6] Pre-release spot eligibility + orphan-pin / no-awareness invariants" \
+    --label "type:task,area:api,area:db,priority:p1" \
+    --body "Widen spot eligibility to provisional accepts; auto-clear on revocation; close artist-awareness leaks (/me/applications, public appearances). See design spec."
+
+  gh issue create --repo sniffins-mcmuggins/murals \
+    --title "[E23.7] Drag-and-drop artist assignment in map editor" \
+    --label "type:task,area:web,priority:p1" \
+    --body "Unassigned-artist rail beside the map; drag cards onto pins to assign. See design spec."
+
+  gh issue create --repo sniffins-mcmuggins/murals \
+    --title "[E23.8] Organiser spot-assignment summary on festival page" \
+    --label "type:task,area:web,priority:p1" \
+    --body "Compact assigned/unassigned summary + count badge on the festival detail page. See design spec."
+  ```
+
+  Wire each as a sub-issue of #243 and add to the board following the same `addSubIssue` /
+  `addProjectV2ItemById` pattern as Task 13 steps 13.4–13.5.
+
+- [ ] **Step 22.3: Run the full suite (whole epic)**
+
+  Stack must be running (`task up`).
+
+  ```bash
+  task api:test
+  task e2e
+  ```
+
+  Expected: all Go tests, API gate tests, and browser specs PASS.
+
+- [ ] **Step 22.4: Commit**
+
+  ```bash
+  git add api/internal/festival/festival.spec.md
+  git commit -m "docs(festival): E23 invariants — spot eligibility, auto-clear, no-awareness"
+  ```
+
+---
+
 ## Done
 
 At this point the branch `e23-map-editor-superpowers` contains:
-- `api/internal/geocode/` — new Nominatim proxy package with unit tests
-- Route `GET /geocode/search` registered and typed in OpenAPI
-- `MapEditorClient` with address search, draggable markers, external map links
-- Browser E2E covering the full release→assign→public-map flow, search stubbing, and drag persistence
-- Demo video V06 extended with the map editor section
-- Spec and kanban updated
 
-Invoke `superpowers:finishing-a-development-branch` to review merge options.
+**Part 1 — map-editor UX**
+- `api/internal/geocode/` — Nominatim proxy package with unit tests; `GET /geocode/search`
+- `MapEditorClient` with address search, draggable markers, external map deep-links
+- Browser E2E: full release→assign→public-map flow, search stub, drag persistence
+
+**Part 2 — assignment workflow**
+- Pre-release spot assignment for provisional accepts (widened eligibility + guard)
+- Auto-clear invariant: a spot never points to a non-accept (patch/waitlist/decline/release)
+- No artist awareness pre-release: trimmed `/me/applications`, gated public appearances,
+  silent assignment — verified by a "techie artist" API-gate test
+- Drag-and-drop artist rail; organiser assignment summary on the festival page
+- Demo video V06 recorded with the full search→place→drag→assign flow
+- `festival.spec.md` invariants updated; E23.1–E23.8 issues created and boarded
+
+All Go API changes were built test-first (TDD). Invoke
+`superpowers:finishing-a-development-branch` to review merge options.
