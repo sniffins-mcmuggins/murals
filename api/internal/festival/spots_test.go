@@ -337,3 +337,154 @@ func TestClearSpotArtist_UnassignsArtist(t *testing.T) {
 	assert.Nil(t, result["artist_id"])
 	assert.Nil(t, result["artist_name"])
 }
+
+func TestSpots_ProvisionalAcceptIsSpotEligible(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, orgToken, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	profileID := createTestArtistProfile(t, db, artistUserID, "Prov Artist")
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+	// Stage 'accept' WITHOUT releasing — no festival_artists row exists.
+	dec := "accept"
+	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(db))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Provisional accept appears in the unassigned pool.
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/spots", "", orgToken)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var pool struct {
+		UnassignedArtists []struct {
+			ArtistID string `json:"artist_id"`
+		} `json:"unassigned_artists"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&pool))
+	_ = resp.Body.Close()
+	require.Len(t, pool.UnassignedArtists, 1)
+	require.Equal(t, profileID, pool.UnassignedArtists[0].ArtistID)
+
+	// Create a spot and assign the provisional accept — must succeed (200, not 422).
+	cr := doRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+	require.Equal(t, http.StatusCreated, cr.StatusCode)
+	var spot struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+	_ = cr.Body.Close()
+
+	ar := doRequest(t, srv, "PUT",
+		"/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+		`{"artist_id":"`+profileID+`"}`, orgToken)
+	require.Equal(t, http.StatusOK, ar.StatusCode, "provisional accept must be assignable pre-release")
+	_ = ar.Body.Close()
+}
+
+func TestSpots_IneligibleArtistRejected(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, orgToken, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	profileID := createTestArtistProfile(t, db, artistUserID, "Undecided Artist")
+	_ = createTestApplicationInFestival(t, db, festID, artistUserID) // submitted, no decision
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	cr := doRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+	require.Equal(t, http.StatusCreated, cr.StatusCode)
+	var spot struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+	_ = cr.Body.Close()
+
+	ar := doRequest(t, srv, "PUT",
+		"/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+		`{"artist_id":"`+profileID+`"}`, orgToken)
+	require.Equal(t, http.StatusUnprocessableEntity, ar.StatusCode, "undecided artist must not be assignable")
+	_ = ar.Body.Close()
+}
+
+func TestSpots_RestagingAwayFromAcceptClearsSpot(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, orgToken, _ := testutil.CreateUser(t, db)
+	artistUserID, _, _ := testutil.CreateUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	profileID := createTestArtistProfile(t, db, artistUserID, "Flip Artist")
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+	dec := "accept"
+	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(db))
+	r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Assign the provisional accept to a spot.
+	cr := testutil.DoRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+	require.Equal(t, http.StatusCreated, cr.StatusCode)
+	var spot struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+	_ = cr.Body.Close()
+	ar := testutil.DoRequest(t, srv, "PUT", "/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+		`{"artist_id":"`+profileID+`"}`, orgToken)
+	require.Equal(t, http.StatusOK, ar.StatusCode)
+	_ = ar.Body.Close()
+
+	// Re-stage to decline — the spot assignment must be cleared.
+	pr := testutil.DoRequest(t, srv, "PATCH", "/festivals/"+festID+"/applications/"+appID,
+		`{"shortlisted":false,"review_flag":false,"staged_decision":"decline"}`, orgToken)
+	require.Equal(t, http.StatusOK, pr.StatusCode)
+	_ = pr.Body.Close()
+
+	// The spot still exists but is now unassigned.
+	gr := testutil.DoRequest(t, srv, "GET", "/festivals/"+festID+"/spots", "", orgToken)
+	require.Equal(t, http.StatusOK, gr.StatusCode)
+	var body struct {
+		Spots []struct {
+			ID       string  `json:"id"`
+			ArtistID *string `json:"artist_id"`
+		} `json:"spots"`
+	}
+	require.NoError(t, json.NewDecoder(gr.Body).Decode(&body))
+	_ = gr.Body.Close()
+	require.Len(t, body.Spots, 1)
+	require.Nil(t, body.Spots[0].ArtistID, "spot must be cleared after re-staging away from accept")
+}

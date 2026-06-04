@@ -51,7 +51,8 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		if _, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID); !ok {
+		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
+		if !ok {
 			return
 		}
 
@@ -86,6 +87,17 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			httperr.InternalServerError(w)
 			return
+		}
+
+		// Invariant: a spot may only belong to a spot-eligible accept.
+		// If this application is no longer staged 'accept', clear any spot it holds.
+		if req.StagedDecision == nil || *req.StagedDecision != "accept" {
+			if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+				FestivalID: festUUID, ArtistID: app.ArtistID,
+			}); err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

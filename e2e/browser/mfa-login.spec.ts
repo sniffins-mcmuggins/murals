@@ -12,13 +12,16 @@ test('A15 — log in with MFA enabled and land on /', async ({ page }) => {
   const artist = await createArtist(Date.now())
   const { secret } = await enrollMFA(artist.token)
 
-  // Confirm. Retry once across a 30s boundary if we straddle one.
+  // Confirm. The server tolerates ±1 TOTP window (±30s), but under load the
+  // test runner's clock can transiently drift further from the API container's
+  // (seen on macOS Docker Desktop when the VM is CPU-saturated), pushing the
+  // generated code outside that window → 401. Retry with a freshly generated
+  // code, spaced out so the clocks re-converge. Never observed on Linux CI,
+  // where host and container share one clock.
   let confirm = await confirmMFA(artist.token, totpCode(secret))
-  if (confirm.status === 401) {
-    confirm = await confirmMFA(
-      artist.token,
-      totpCode(secret, new Date(Date.now() + 1500)),
-    )
+  for (let attempt = 0; attempt < 4 && confirm.status !== 200; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    confirm = await confirmMFA(artist.token, totpCode(secret))
   }
   expect(confirm.status).toBe(200)
 

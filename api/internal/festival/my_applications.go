@@ -35,7 +35,7 @@ func GetMyApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if errors.Is(err, pgx.ErrNoRows) {
 				// Artist has no profile yet — return empty array rather than 404.
 				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode([]applicationResponse{})
+				_ = json.NewEncoder(w).Encode([]myApplicationResponse{})
 				return
 			}
 			httperr.InternalServerError(w)
@@ -48,9 +48,9 @@ func GetMyApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		resp := make([]applicationResponse, len(apps))
+		resp := make([]myApplicationResponse, len(apps))
 		for i, a := range apps {
-			resp[i] = toApplicationResponse(a)
+			resp[i] = toMyApplicationResponse(a)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

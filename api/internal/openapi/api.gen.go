@@ -582,6 +582,13 @@ type FestivalSummary struct {
 	Status string             `json:"status"`
 }
 
+// GeocodeSuggestion defines model for GeocodeSuggestion.
+type GeocodeSuggestion struct {
+	DisplayName string  `json:"display_name"`
+	Lat         float64 `json:"lat"`
+	Lng         float64 `json:"lng"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    openapi_types.Email `json:"email"`
@@ -608,6 +615,17 @@ type MapPin struct {
 	Lng      *float32            `json:"lng,omitempty"`
 	Name     *string             `json:"name,omitempty"`
 	W3w      *string             `json:"w3w,omitempty"`
+}
+
+// MyApplication defines model for MyApplication.
+type MyApplication struct {
+	Answers   map[string]interface{} `json:"answers"`
+	ArtistId  openapi_types.UUID     `json:"artist_id"`
+	CreatedAt time.Time              `json:"created_at"`
+	FormId    openapi_types.UUID     `json:"form_id"`
+	Id        openapi_types.UUID     `json:"id"`
+	Status    ApplicationStatus      `json:"status"`
+	UpdatedAt time.Time              `json:"updated_at"`
 }
 
 // PresignRequest defines model for PresignRequest.
@@ -889,6 +907,12 @@ type SetSpotArtistJSONBody struct {
 	ArtistId openapi_types.UUID `json:"artist_id"`
 }
 
+// GeocodeSearchParams defines parameters for GeocodeSearch.
+type GeocodeSearchParams struct {
+	// Q Search query (address, postcode, landmark)
+	Q string `form:"q" json:"q"`
+}
+
 // GetHealth200JSONResponseBodyStatus defines parameters for GetHealth.
 type GetHealth200JSONResponseBodyStatus string
 
@@ -1150,6 +1174,9 @@ type ServerInterface interface {
 	// Assign an accepted artist to a spot
 	// (PUT /festivals/{festivalID}/spots/{spotID}/artist)
 	SetSpotArtist(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, spotID openapi_types.UUID)
+	// Search for a place by name or postcode (Nominatim proxy)
+	// (GET /geocode/search)
+	GeocodeSearch(w http.ResponseWriter, r *http.Request, params GeocodeSearchParams)
 	// Service health check
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -1507,6 +1534,12 @@ func (_ Unimplemented) ClearSpotArtist(w http.ResponseWriter, r *http.Request, f
 // Assign an accepted artist to a spot
 // (PUT /festivals/{festivalID}/spots/{spotID}/artist)
 func (_ Unimplemented) SetSpotArtist(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, spotID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Search for a place by name or postcode (Nominatim proxy)
+// (GET /geocode/search)
+func (_ Unimplemented) GeocodeSearch(w http.ResponseWriter, r *http.Request, params GeocodeSearchParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3166,6 +3199,47 @@ func (siw *ServerInterfaceWrapper) SetSpotArtist(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// GeocodeSearch operation middleware
+func (siw *ServerInterfaceWrapper) GeocodeSearch(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GeocodeSearchParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GeocodeSearch(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -3937,6 +4011,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/festivals/{festivalID}/spots/{spotID}/artist", wrapper.SetSpotArtist)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/geocode/search", wrapper.GeocodeSearch)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/healthz", wrapper.GetHealth)
@@ -6986,6 +7063,76 @@ func (response SetSpotArtist422ApplicationProblemPlusJSONResponse) VisitSetSpotA
 	return err
 }
 
+type GeocodeSearchRequestObject struct {
+	Params GeocodeSearchParams
+}
+
+type GeocodeSearchResponseObject interface {
+	VisitGeocodeSearchResponse(w http.ResponseWriter) error
+}
+
+type GeocodeSearch200JSONResponse []GeocodeSuggestion
+
+func (response GeocodeSearch200JSONResponse) VisitGeocodeSearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GeocodeSearch400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GeocodeSearch400ApplicationProblemPlusJSONResponse) VisitGeocodeSearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GeocodeSearch401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GeocodeSearch401ApplicationProblemPlusJSONResponse) VisitGeocodeSearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GeocodeSearch429Response struct {
+}
+
+func (response GeocodeSearch429Response) VisitGeocodeSearchResponse(w http.ResponseWriter) error {
+	w.WriteHeader(429)
+	return nil
+}
+
+type GeocodeSearch502Response struct {
+}
+
+func (response GeocodeSearch502Response) VisitGeocodeSearchResponse(w http.ResponseWriter) error {
+	w.WriteHeader(502)
+	return nil
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -7191,7 +7338,7 @@ type GetMyApplicationsResponseObject interface {
 	VisitGetMyApplicationsResponse(w http.ResponseWriter) error
 }
 
-type GetMyApplications200JSONResponse []Application
+type GetMyApplications200JSONResponse []MyApplication
 
 func (response GetMyApplications200JSONResponse) VisitGetMyApplicationsResponse(w http.ResponseWriter) error {
 
@@ -8067,6 +8214,9 @@ type StrictServerInterface interface {
 	// Assign an accepted artist to a spot
 	// (PUT /festivals/{festivalID}/spots/{spotID}/artist)
 	SetSpotArtist(ctx context.Context, request SetSpotArtistRequestObject) (SetSpotArtistResponseObject, error)
+	// Search for a place by name or postcode (Nominatim proxy)
+	// (GET /geocode/search)
+	GeocodeSearch(ctx context.Context, request GeocodeSearchRequestObject) (GeocodeSearchResponseObject, error)
 	// Service health check
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -9578,6 +9728,32 @@ func (sh *strictHandler) SetSpotArtist(w http.ResponseWriter, r *http.Request, f
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetSpotArtistResponseObject); ok {
 		if err := validResponse.VisitSetSpotArtistResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GeocodeSearch operation middleware
+func (sh *strictHandler) GeocodeSearch(w http.ResponseWriter, r *http.Request, params GeocodeSearchParams) {
+	var request GeocodeSearchRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GeocodeSearch(ctx, request.(GeocodeSearchRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GeocodeSearch")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GeocodeSearchResponseObject); ok {
+		if err := validResponse.VisitGeocodeSearchResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

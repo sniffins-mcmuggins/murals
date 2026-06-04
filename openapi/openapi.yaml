@@ -601,6 +601,31 @@ components:
           items:
             $ref: "#/components/schemas/CriterionScore"
 
+    MyApplication:
+      type: object
+      required: [id, form_id, artist_id, status, answers, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        form_id:
+          type: string
+          format: uuid
+        artist_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        answers:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
     ApplicationArtist:
       type: object
       properties:
@@ -727,6 +752,19 @@ components:
           format: uuid
         name:
           type: string
+
+    GeocodeSuggestion:
+      type: object
+      required: [display_name, lat, lng]
+      properties:
+        display_name:
+          type: string
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
 
     FestivalSpotsResponse:
       type: object
@@ -1958,7 +1996,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Application"
+                  $ref: "#/components/schemas/MyApplication"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -1981,6 +2019,39 @@ paths:
                   $ref: "#/components/schemas/FestivalSummary"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /geocode/search:
+    get:
+      operationId: geocodeSearch
+      tags: [geocode]
+      summary: Search for a place by name or postcode (Nominatim proxy)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query (address, postcode, landmark)
+      responses:
+        "200":
+          description: Up to 5 place suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GeocodeSuggestion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: Geocode rate limit exceeded
+        "502":
+          description: Nominatim upstream error or timeout
 
   /festivals:
     post:

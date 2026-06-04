@@ -307,3 +307,25 @@ export async function assignArtistToSpot(
   })
   if (!res.ok) throw new Error(`assignArtistToSpot failed: ${res.status} ${await res.text()}`)
 }
+
+export async function stageDecision(
+  token: string,
+  festivalId: string,
+  applicationId: string,
+  decision: 'accept' | 'waitlist' | 'decline' | null,
+): Promise<void> {
+  const res = await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: decision }),
+  })
+  if (!res.ok) throw new Error(`stageDecision failed: ${res.status} ${await res.text()}`)
+}
+
+export async function releaseDecisions(token: string, festivalId: string): Promise<void> {
+  const res = await fetch(`${API}/festivals/${festivalId}/applications/release-decisions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`releaseDecisions failed: ${res.status} ${await res.text()}`)
+}

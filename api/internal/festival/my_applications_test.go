@@ -13,6 +13,7 @@ import (
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
+	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
 )
 
@@ -136,4 +137,39 @@ func TestGetMyApplications_DoesNotReturnOtherArtistsApplications(t *testing.T) {
 	var apps []map[string]any
 	require.NoError(t, json.Unmarshal(body, &apps))
 	assert.Empty(t, apps, "artist B should see zero applications")
+}
+
+func TestMyApplications_HidesReviewSignals(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, _, _ := testutil.CreateUser(t, db)
+	artistUserID, artistToken, _ := testutil.CreateUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	createTestArtistProfile(t, db, artistUserID, "Privacy Artist")
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+	// Organiser stages 'accept' and shortlists — internal review signals.
+	dec := "accept"
+	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+		ID: pgUUID(t, appID), Shortlisted: true, ReviewFlag: true, StagedDecision: &dec,
+	})
+	require.NoError(t, err)
+
+	handler := auth.Middleware(db, testSecret)(festival.GetMyApplicationsHandler(db))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me/applications", nil)
+	r.Header.Set("Authorization", "Bearer "+artistToken)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	body := w.Body.String()
+	// Artist must see status (still 'submitted') but NONE of the review signals.
+	require.Contains(t, body, `"status":"submitted"`)
+	require.NotContains(t, body, "staged_decision")
+	require.NotContains(t, body, "shortlisted")
+	require.NotContains(t, body, "review_flag")
+	require.NotContains(t, body, `"rank"`)
 }

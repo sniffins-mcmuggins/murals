@@ -354,6 +354,24 @@ expect(after[0].id).toBe(idB)
 
 This applies to any endpoint that orders by a default-zero column combined with `created_at`.
 
+### `toBeVisible` fails on a `truncate` cell that resolves but is "hidden" under load
+
+Symptom: `expect(getByText('X').first()).toBeVisible()` fails with `Received: hidden`, yet the error log shows `N × locator resolved to <div class="… truncate">X</div>` — the element is present in the DOM with the right text, but reports hidden for the full timeout. Flaky: passes locally / in isolation, fails under the full parallel suite (and failed on `main`, not just a feature branch).
+
+Root cause: `truncate` is `overflow:hidden; white-space:nowrap`. When that element sits in a flex cell with `min-w-0` inside a multi-column grid (e.g. the 5-column applications board card, `ApplicationCard.tsx`), the cell can momentarily compute to zero usable width under CI's slower headless layout → zero bounding box → Playwright treats it as hidden, even though the text is rendered. `.first()` makes it worse by always selecting that fragile card over a more robust match.
+
+Fix: assert a non-truncated, top-layer instance of the same text instead of the card cell. For the applications board the slide-over panel renders the name as `<h2>` (`ApplicationSlideOver.tsx`) — `getByRole('heading', { name })` is deterministic (font-serif, `max-w-lg z-50`, never zero-size). Seen in `anonymous-review.spec.ts:98` ("identity revealed" after scoring). Don't reach for `.first()` on body text when a heading/role-scoped locator expresses the same intent.
+
+### `mfa-login` flakes locally (never on CI) — 401 on `/auth/mfa/confirm`
+
+Symptom: `mfa-login.spec.ts` fails on `expect(confirm.status).toBe(200)` with a 401, **only when run locally under the full parallel suite** — `✓` on every Linux CI run.
+
+Root cause: NOT the server. `pquerna/otp`'s `totp.Validate` already defaults to `Skew: 1` (tolerates the previous/current/next 30s window, ±30s). The client generates a code from the **host** clock; the API validates against the **container** clock. On a CPU-saturated macOS Docker Desktop VM the container clock transiently lags the host far enough to push the code outside the ±30s window. Linux CI shares one kernel clock between host and container, so it cannot reproduce.
+
+Diagnose: `H=$(date -u +%s); C=$(docker compose -f infra/docker-compose.yml exec -T api date -u +%s); echo $((H-C))` — a non-trivial delta confirms drift (it self-corrects when load eases, so measure during/after a heavy run).
+
+Fix: this is environmental, not a product or server bug — do NOT change the server skew. Make the test absorb transient drift with a bounded retry that regenerates a fresh code and spaces attempts out (so the clocks re-converge), rather than a single-shot retry. See the `confirmMFA` loop in `mfa-login.spec.ts`. If a 401 persists across several spaced retries, that's a real >30s clock offset worth fixing in the environment.
+
 ## Test data conventions
 
 - **Unique suffixes.** Every spec generates `const suffix = Date.now()` and uses it in emails (`artist-${suffix}@e2e.test`), slugs, names. Don't ever hardcode — the DB persists across runs, so reruns must not collide.

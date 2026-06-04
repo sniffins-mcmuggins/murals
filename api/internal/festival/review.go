@@ -399,6 +399,13 @@ func DeclineApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http
 			return
 		}
 
+		if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+			FestivalID: festUUID, ArtistID: app.ArtistID,
+		}); err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
 		sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, "declined")
 
 		w.Header().Set("Content-Type", "application/json")

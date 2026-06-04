@@ -114,7 +114,7 @@ Every meaningful package has a colocated `<package>.spec.md` describing its cont
 
 ### Packages without specs (thin/generated — not worth maintaining)
 
-`sqlcdb` (auto-generated), `config` (env vars only), `httperr`, `health`, `metrics`, `middleware`, `testutil`, `openapi`.
+`sqlcdb` (auto-generated), `config` (env vars only), `httperr`, `health`, `metrics`, `middleware`, `testutil`, `openapi`, `geocode` (thin proxy, no domain logic).
 
 ## Mission Constraint
 

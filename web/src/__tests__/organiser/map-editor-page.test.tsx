@@ -21,6 +21,7 @@ vi.mock('react-leaflet', () => ({
   Popup: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', { 'data-testid': 'map-popup' }, children),
   useMapEvents: vi.fn(),
+  useMap: vi.fn(() => ({ setView: vi.fn(), latLngToContainerPoint: vi.fn(() => ({ distanceTo: vi.fn(() => 0) })) })),
 }))
 vi.mock('leaflet/dist/leaflet.css', () => ({}))
 vi.mock('leaflet/dist/images/marker-icon.png', () => ({ default: { src: '/marker-icon.png' } }))
