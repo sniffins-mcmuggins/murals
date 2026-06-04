@@ -48,6 +48,10 @@ func WaitlistApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) htt
 			httperr.Forbidden(w)
 			return
 		}
+		if reviewRoundStatus(fest) == reviewOpen {
+			httperr.Conflict(w, "review round in progress — close it to make decisions")
+			return
+		}
 
 		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
 		if !ok {

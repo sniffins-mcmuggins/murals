@@ -32,6 +32,11 @@ describe('festival reviewer / panellist accounts', () => {
     const reviewer = await createArtist(`${SUFFIX}-reviewer`)
     reviewerToken = reviewer.token
     reviewerEmail = reviewer.email
+
+    // Open the review round so reviewers can score in the tests below.
+    // (The dedicated 'review round gating' describe block exercises the
+    // not_started / open / closed transitions on a separate festival.)
+    await fetch(`${API}/festivals/${festivalId}/review/open`, { method: 'POST', headers: auth(orgToken) })
   })
 
   it('unauthenticated → 401 on reviewer + score + me/reviewing endpoints', async () => {

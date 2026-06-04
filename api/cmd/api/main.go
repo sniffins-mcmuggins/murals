@@ -222,6 +222,10 @@ func main() {
 		r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(pool))
 		r.Post("/festivals/{festivalID}/applications/{applicationID}/notes", festival.AddApplicationNoteHandler(pool))
 
+		// Review round open/close — owner only (handler-level check).
+		r.Post("/festivals/{festivalID}/review/open", festival.OpenReviewRoundHandler(pool, mailer, cfg.WebPublicBase))
+		r.Post("/festivals/{festivalID}/review/close", festival.CloseReviewRoundHandler(pool))
+
 		// Reviewer management — owner only (handler-level check).
 		r.Post("/festivals/{festivalID}/reviewers", festival.InviteReviewerHandler(pool, mailer, cfg.WebPublicBase))
 		r.Get("/festivals/{festivalID}/reviewers", festival.ListReviewersHandler(pool))

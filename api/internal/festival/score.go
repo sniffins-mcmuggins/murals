@@ -56,6 +56,19 @@ func ScoreApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Reviewers may only score while the round is open.
+		if role == roleReviewer {
+			fest, err := q.GetFestivalByID(r.Context(), festUUID)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+			if reviewRoundStatus(fest) != reviewOpen {
+				httperr.Conflict(w, "review round is not open")
+				return
+			}
+		}
+
 		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
 		if !ok {
 			return
