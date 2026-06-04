@@ -57,6 +57,26 @@ describe('festival reviewer / panellist accounts', () => {
     expect(res.status).toBe(201)
   })
 
+  // Phase 1 keystone: anonymisation is gone. Even if a legacy anonymous_review
+  // flag is set, reviewers see the real identity before scoring.
+  it('reviewer sees real artist identity before scoring (no anonymisation)', async () => {
+    // Attempt to turn on the legacy flag — after Phase 1 this field is ignored.
+    await fetch(`${API}/festivals/${festivalId}/form`, {
+      method: 'PATCH', headers: json(orgToken),
+      body: JSON.stringify({ anonymous_review: true }),
+    })
+
+    const list = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(reviewerToken) })
+    expect(list.status).toBe(200)
+    const apps = await list.json()
+    const app = apps.find((a: { id: string }) => a.id === appId)
+    expect(app).toBeDefined()
+    // Real name visible pre-score (this reviewer has not scored appId yet at this point).
+    expect(app.artist?.display_name).toBe(`Applicant ${SUFFIX}`)
+    // The identity_hidden field is removed entirely.
+    expect(app.identity_hidden).toBeUndefined()
+  })
+
   it('reviewer sees applications and can score → 200', async () => {
     const list = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(reviewerToken) })
     expect(list.status).toBe(200)
