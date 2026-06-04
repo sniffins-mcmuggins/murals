@@ -127,8 +127,11 @@ test.describe('anonymous review', () => {
       await page.getByRole('button', { name: 'Score', exact: true }).click()
       await page.getByLabel('Score 3').click()
 
-      // Real name now visible on the revealed card/panel; placeholder gone
-      await expect(page.getByText(`Reveal Artist ${suffix}`).first()).toBeVisible({ timeout: 10_000 })
+      // Real name now visible on the revealed panel; placeholder gone.
+      // Assert the slide-over heading (font-serif, top-layer, never truncated) rather
+      // than the board card's `truncate` div — under CI load that flex cell can momentarily
+      // compute to zero width, making the present-but-clipped text report as hidden.
+      await expect(page.getByRole('heading', { name: `Reveal Artist ${suffix}` })).toBeVisible({ timeout: 10_000 })
       await expect(page.getByText('Anonymous artist')).not.toBeVisible()
     } finally {
       await ctx.close()
