@@ -87,7 +87,7 @@ func notifyReviewersRoundOpen(pool *pgxpool.Pool, mailer auth.EmailSender, webBa
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	q := sqlcdb.New(pool)
-	reviewers, err := q.ListFestivalReviewers(ctx, festID)
+	reviewers, err := q.ListAcceptedFestivalReviewers(ctx, festID)
 	if err != nil {
 		slog.Error("review-round open: list reviewers failed", "err", err)
 		return

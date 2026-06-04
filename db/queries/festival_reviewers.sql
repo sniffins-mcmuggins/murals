@@ -14,6 +14,14 @@ JOIN users u ON u.id = fr.user_id
 WHERE fr.festival_id = $1
 ORDER BY fr.created_at ASC;
 
+-- name: ListAcceptedFestivalReviewers :many
+SELECT fr.user_id, u.email, fr.accepted_at, fr.created_at
+FROM festival_reviewers fr
+JOIN users u ON u.id = fr.user_id
+WHERE fr.festival_id = $1
+  AND fr.accepted_at IS NOT NULL
+ORDER BY fr.created_at ASC;
+
 -- name: ListFestivalsForReviewer :many
 SELECT f.id, f.name, f.slug, f.status, f.start_date, f.end_date
 FROM festival_reviewers fr
