@@ -300,15 +300,12 @@ type Application struct {
 	CriterionScores *[]CriterionScore       `json:"criterion_scores,omitempty"`
 	FormId          *openapi_types.UUID     `json:"form_id,omitempty"`
 	Id              *openapi_types.UUID     `json:"id,omitempty"`
-
-	// IdentityHidden True when anonymous_review is on and this reviewer has not yet scored. Always false for owners.
-	IdentityHidden *bool              `json:"identity_hidden,omitempty"`
-	MyScore        *int               `json:"my_score,omitempty"`
-	Notes          *[]ApplicationNote `json:"notes,omitempty"`
-	Rank           *int               `json:"rank,omitempty"`
-	ReviewFlag     *bool              `json:"review_flag,omitempty"`
-	ScoreCount     *int               `json:"score_count,omitempty"`
-	Shortlisted    *bool              `json:"shortlisted,omitempty"`
+	MyScore         *int                    `json:"my_score,omitempty"`
+	Notes           *[]ApplicationNote      `json:"notes,omitempty"`
+	Rank            *int                    `json:"rank,omitempty"`
+	ReviewFlag      *bool                   `json:"review_flag,omitempty"`
+	ScoreCount      *int                    `json:"score_count,omitempty"`
+	Shortlisted     *bool                   `json:"shortlisted,omitempty"`
 
 	// StagedDecision Organiser's staged decision — null until dragged to a column
 	StagedDecision *ApplicationStagedDecision `json:"staged_decision,omitempty"`
@@ -329,8 +326,6 @@ type ApplicationArtist struct {
 
 // ApplicationForm defines model for ApplicationForm.
 type ApplicationForm struct {
-	// AnonymousReview When true, reviewer-scoped responses strip artist identity until the reviewer has scored.
-	AnonymousReview *bool                     `json:"anonymous_review,omitempty"`
 	CloseAt         *time.Time                `json:"close_at,omitempty"`
 	CreatedAt       *time.Time                `json:"created_at,omitempty"`
 	FestivalId      *openapi_types.UUID       `json:"festival_id,omitempty"`
@@ -863,8 +858,7 @@ type SetArtistPinJSONBody struct {
 
 // PatchFestivalsFestivalIDFormJSONBody defines parameters for PatchFestivalsFestivalIDForm.
 type PatchFestivalsFestivalIDFormJSONBody struct {
-	AnonymousReview *bool `json:"anonymous_review,omitempty"`
-	ReviewCriteria  *[]struct {
+	ReviewCriteria *[]struct {
 		Id    *string `json:"id,omitempty"`
 		Label *string `json:"label,omitempty"`
 		Max   *int    `json:"max,omitempty"`

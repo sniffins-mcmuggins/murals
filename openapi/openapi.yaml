@@ -518,9 +518,6 @@ components:
         max_applications:
           type: integer
           nullable: true
-        anonymous_review:
-          type: boolean
-          description: When true, reviewer-scoped responses strip artist identity until the reviewer has scored.
         review_criteria:
           type: array
           items:
@@ -593,9 +590,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ApplicationNote"
-        identity_hidden:
-          type: boolean
-          description: True when anonymous_review is on and this reviewer has not yet scored. Always false for owners.
         criterion_scores:
           type: array
           items:
@@ -2330,8 +2324,6 @@ paths:
             schema:
               type: object
               properties:
-                anonymous_review:
-                  type: boolean
                 review_criteria:
                   type: array
                   items:

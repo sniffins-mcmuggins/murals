@@ -13,7 +13,7 @@ import (
 )
 
 const getApplicationFormByFestivalID = `-- name: GetApplicationFormByFestivalID :one
-SELECT id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, anonymous_review, review_criteria FROM application_forms WHERE festival_id = $1
+SELECT id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, review_criteria FROM application_forms WHERE festival_id = $1
 `
 
 func (q *Queries) GetApplicationFormByFestivalID(ctx context.Context, festivalID pgtype.UUID) (ApplicationForm, error) {
@@ -28,37 +28,6 @@ func (q *Queries) GetApplicationFormByFestivalID(ctx context.Context, festivalID
 		&i.MaxApplications,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.AnonymousReview,
-		&i.ReviewCriteria,
-	)
-	return i, err
-}
-
-const patchFormAnonymousReview = `-- name: PatchFormAnonymousReview :one
-UPDATE application_forms
-SET anonymous_review = $2, updated_at = now()
-WHERE festival_id = $1
-RETURNING id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, anonymous_review, review_criteria
-`
-
-type PatchFormAnonymousReviewParams struct {
-	FestivalID      pgtype.UUID `db:"festival_id" json:"festival_id"`
-	AnonymousReview bool        `db:"anonymous_review" json:"anonymous_review"`
-}
-
-func (q *Queries) PatchFormAnonymousReview(ctx context.Context, arg PatchFormAnonymousReviewParams) (ApplicationForm, error) {
-	row := q.db.QueryRow(ctx, patchFormAnonymousReview, arg.FestivalID, arg.AnonymousReview)
-	var i ApplicationForm
-	err := row.Scan(
-		&i.ID,
-		&i.FestivalID,
-		&i.Fields,
-		&i.OpenAt,
-		&i.CloseAt,
-		&i.MaxApplications,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.AnonymousReview,
 		&i.ReviewCriteria,
 	)
 	return i, err
@@ -68,7 +37,7 @@ const patchFormCriteria = `-- name: PatchFormCriteria :one
 UPDATE application_forms
 SET review_criteria = $2, updated_at = now()
 WHERE festival_id = $1
-RETURNING id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, anonymous_review, review_criteria
+RETURNING id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, review_criteria
 `
 
 type PatchFormCriteriaParams struct {
@@ -88,7 +57,6 @@ func (q *Queries) PatchFormCriteria(ctx context.Context, arg PatchFormCriteriaPa
 		&i.MaxApplications,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.AnonymousReview,
 		&i.ReviewCriteria,
 	)
 	return i, err
@@ -103,7 +71,7 @@ ON CONFLICT (festival_id) DO UPDATE
         close_at         = EXCLUDED.close_at,
         max_applications = EXCLUDED.max_applications,
         updated_at       = now()
-RETURNING id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, anonymous_review, review_criteria
+RETURNING id, festival_id, fields, open_at, close_at, max_applications, created_at, updated_at, review_criteria
 `
 
 type UpsertApplicationFormParams struct {
@@ -132,7 +100,6 @@ func (q *Queries) UpsertApplicationForm(ctx context.Context, arg UpsertApplicati
 		&i.MaxApplications,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.AnonymousReview,
 		&i.ReviewCriteria,
 	)
 	return i, err

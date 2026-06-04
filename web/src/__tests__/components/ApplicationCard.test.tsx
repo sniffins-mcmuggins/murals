@@ -114,25 +114,6 @@ describe('ApplicationCard — reviewer mode (isReviewer=true)', () => {
   })
 })
 
-describe('ApplicationCard — anonymous mode (identity_hidden=true)', () => {
-  const anonApp = {
-    ...baseApp,
-    identity_hidden: true,
-    artist: { display_name: '', medium_tags: ['spray paint'], avatar_s3_key: null, location_label: null },
-  }
-
-  it('shows "Anonymous artist" placeholder name', () => {
-    render(<ApplicationCard application={anonApp} {...defaultOwnerProps} />)
-    expect(screen.getByText('Anonymous artist')).toBeInTheDocument()
-  })
-
-  it('shows real name when identity_hidden=false', () => {
-    const revealedApp = { ...anonApp, identity_hidden: false, artist: { ...baseApp.artist, display_name: 'Rosa Vane' } }
-    render(<ApplicationCard application={revealedApp} {...defaultOwnerProps} />)
-    expect(screen.getByText('Rosa Vane')).toBeInTheDocument()
-  })
-})
-
 describe('ApplicationCard — column background colours', () => {
   it('applies green background for accept column', () => {
     const { container } = render(

@@ -179,7 +179,6 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Assemble final response.
-		isReviewer := role == roleReviewer
 		resp := make([]applicationResponse, len(items))
 		for i, it := range items {
 			a := it.resp
@@ -256,16 +255,6 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				}
 			}
 
-			// Anonymous review stripping (uses a.MyScore which is now set).
-			if shouldAnonymise(isReviewer, form.AnonymousReview, a.MyScore) {
-				a.Artist = &artistSummary{
-					DisplayName:   "",
-					AvatarS3Key:   nil,
-					MediumTags:    a.Artist.MediumTags,
-					LocationLabel: nil,
-				}
-				a.IdentityHidden = true
-			}
 			resp[i] = a
 		}
 

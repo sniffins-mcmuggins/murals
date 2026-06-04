@@ -12,12 +12,6 @@ RETURNING *;
 -- name: GetApplicationFormByFestivalID :one
 SELECT * FROM application_forms WHERE festival_id = $1;
 
--- name: PatchFormAnonymousReview :one
-UPDATE application_forms
-SET anonymous_review = $2, updated_at = now()
-WHERE festival_id = $1
-RETURNING *;
-
 -- name: PatchFormCriteria :one
 UPDATE application_forms
 SET review_criteria = $2, updated_at = now()

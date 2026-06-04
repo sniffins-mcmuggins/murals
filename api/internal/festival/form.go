@@ -114,7 +114,6 @@ type formResponse struct {
 	OpenAt          *string         `json:"open_at,omitempty"`
 	CloseAt         *string         `json:"close_at,omitempty"`
 	MaxApplications *int32          `json:"max_applications,omitempty"`
-	AnonymousReview bool            `json:"anonymous_review"`
 	ReviewCriteria  json.RawMessage `json:"review_criteria"`
 	CreatedAt       string          `json:"created_at"`
 	UpdatedAt       string          `json:"updated_at"`
@@ -130,7 +129,6 @@ func toFormResponse(f sqlcdb.ApplicationForm) formResponse {
 		FestivalID:      f.FestivalID.String(),
 		Fields:          f.Fields,
 		MaxApplications: f.MaxApplications,
-		AnonymousReview: f.AnonymousReview,
 		ReviewCriteria:  criteria,
 		CreatedAt:       f.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:       f.UpdatedAt.Time.Format(time.RFC3339),
@@ -233,7 +231,7 @@ func UpsertFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // GetFormHandler handles GET /festivals/{festivalID}/form. Public.
-// Authenticated festival owners receive the full response including anonymous_review;
+// Authenticated festival owners and reviewers receive the full response including review_criteria;
 // all other callers receive the public response which omits that field.
 func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -256,8 +254,8 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		// Owners and invited reviewers see panel-internal fields (review_criteria,
-		// anonymous_review). The public/artists get the stripped response.
+		// Owners and invited reviewers see panel-internal fields (review_criteria).
+		// The public/artists get the stripped response.
 		if principal, authErr := auth.User(r.Context()); authErr == nil {
 			role, roleErr := resolveFestivalAccess(r.Context(), q, festUUID, principal.UserID)
 			if roleErr == nil && role != roleNone {
@@ -271,8 +269,7 @@ func GetFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // PatchFormHandler handles PATCH /festivals/{festivalID}/form. Owner only.
-// Accepts any subset of { anonymous_review, review_criteria }; unspecified
-// fields are left unchanged.
+// Accepts { review_criteria }; unspecified fields are left unchanged.
 func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -303,8 +300,7 @@ func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var req struct {
-			AnonymousReview *bool             `json:"anonymous_review"`
-			ReviewCriteria  *[]criterionInput `json:"review_criteria"`
+			ReviewCriteria *[]criterionInput `json:"review_criteria"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -320,21 +316,6 @@ func PatchFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			httperr.InternalServerError(w)
 			return
-		}
-
-		if req.AnonymousReview != nil {
-			form, err = q.PatchFormAnonymousReview(r.Context(), sqlcdb.PatchFormAnonymousReviewParams{
-				FestivalID:      festUUID,
-				AnonymousReview: *req.AnonymousReview,
-			})
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					httperr.NotFound(w)
-					return
-				}
-				httperr.InternalServerError(w)
-				return
-			}
 		}
 
 		if req.ReviewCriteria != nil {
