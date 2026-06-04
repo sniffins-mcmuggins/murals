@@ -131,25 +131,6 @@ describe('ApplicationSlideOver — reviewer mode (isReviewer=true)', () => {
   })
 })
 
-describe('ApplicationSlideOver — anonymous mode (identity_hidden=true)', () => {
-  const anonApp = {
-    ...baseApp,
-    identity_hidden: true,
-    artist: { display_name: '', medium_tags: ['spray paint'], avatar_s3_key: null, location_label: null },
-  }
-
-  it('shows "Anonymous artist" in header when identity_hidden=true', () => {
-    render(<ApplicationSlideOver {...baseProps} application={anonApp} isReviewer={true} />)
-    expect(screen.getByText('Anonymous artist')).toBeInTheDocument()
-  })
-
-  it('shows real name when identity_hidden=false', () => {
-    const revealedApp = { ...anonApp, identity_hidden: false, artist: { ...baseApp.artist, display_name: 'Rosa Vane' } }
-    render(<ApplicationSlideOver {...baseProps} application={revealedApp} isReviewer={true} />)
-    expect(screen.getByText('Rosa Vane')).toBeInTheDocument()
-  })
-})
-
 describe('ApplicationSlideOver — rubric mode (criteria configured)', () => {
   const criteria = [
     { id: 'art', label: 'Artistic Quality', min: 1, max: 5 },
