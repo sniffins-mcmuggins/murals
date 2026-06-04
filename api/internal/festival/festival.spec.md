@@ -43,7 +43,9 @@
 - `release.go`: `ReleaseDecisionsHandler` — bulk-finalises staged decisions; upserts `festival_artists` for each accept (mirrors `AcceptApplicationHandler`) and notifies every affected artist
 - `access.go`: the organiser-ownership check — used by most handlers to confirm the caller owns the festival
 - `testhelpers_test.go`: shared test helpers (festival/application setup) — check this before writing new tests to avoid duplication
+- **`PATCH /spots/{id}` is a full replace:** `UpdateSpotHandler` overwrites `w3w`, `width_m`, `height_m`, and `notes` from the request body — a missing or `null` value clears the column. Any partial update (e.g. drag-to-reposition) must resend the spot's current values for all four fields. Handler at `spots.go:254`.
 
 ## Changelog
 2026-05-31 — initial spec
 2026-06-03 — documented staged-decisions + bulk release (E22); recorded the invariant that finalising an accept (direct or via release) upserts a `festival_artists` row, after fixing `ReleaseDecisionsHandler` which omitted it
+2026-06-04 — E23: noted PATCH /spots full-replace invariant; click-to-place already shipped; release→festival_artist gap closed in f1a2264
