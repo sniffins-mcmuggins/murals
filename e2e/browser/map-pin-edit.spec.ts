@@ -318,3 +318,47 @@ test('dragging a marker persists the new position without wiping other fields', 
     await ctx.close()
   }
 })
+
+test('drag an artist card onto a pin to assign (pre-release)', async ({ browser }) => {
+  const suffix = `dragdrop-${Date.now()}`
+  const baseURL = process.env.BASE_URL ?? 'http://localhost:3000'
+
+  const artist = await createArtist(suffix)
+  await createProfile(artist.token, { displayName: `DragDrop Artist ${suffix}` })
+  const organiser = await createOrganiser(suffix)
+  const { festivalId } = await createFestival(organiser.token, {
+    name: `DragDrop Fest ${suffix}`, slug: `dragdrop-${suffix}`,
+  })
+  await upsertForm(organiser.token, festivalId)
+  await setFestivalStatus(organiser.token, festivalId, 'open')
+  const { applicationId } = await submitApplication(artist.token, festivalId)
+  // Provisional accept — assignable before release.
+  await stageDecision(organiser.token, festivalId, applicationId, 'accept')
+  // Pre-create a spot to drop onto.
+  await createSpot(organiser.token, festivalId, 51.9007, -2.0783)
+
+  const { ctx, page } = await loginAs(browser, organiser.email, organiser.password, baseURL)
+  try {
+    await page.goto(`/organiser/festivals/${festivalId}/map`)
+    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('artist-rail')).toContainText('DragDrop Artist')
+
+    const card = page.getByTestId('artist-rail').getByText(/DragDrop Artist/)
+    const marker = page.locator('.leaflet-marker-icon').first()
+    await expect(marker).toBeVisible({ timeout: 5_000 })
+
+    // Native HTML5 DnD: Playwright's dragTo drives dragstart/dragover/drop.
+    await card.dragTo(marker)
+
+    // Assignment landed: the card leaves the rail.
+    await expect(page.getByTestId('artist-rail')).not.toContainText('DragDrop Artist', { timeout: 5_000 })
+
+    // Confirm server-side.
+    const spots = await fetch(`${API}/festivals/${festivalId}/spots`, {
+      headers: { Authorization: `Bearer ${organiser.token}` },
+    }).then(r => r.json())
+    expect(spots.spots.some((s: { artist_name: string | null }) => s.artist_name?.includes('DragDrop Artist'))).toBe(true)
+  } finally {
+    await ctx.close()
+  }
+})
