@@ -75,6 +75,13 @@ test.describe('reviewer management', () => {
     const reviewer = await createArtist(`${suffix}-ro-rev`)
     await inviteReviewer(organiser.token, festivalId, reviewer.email)
 
+    // Open the review round so the reviewer can score
+    const open = await fetch(`${API}/festivals/${festivalId}/review/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${organiser.token}` },
+    })
+    if (!open.ok) throw new Error(`Open round failed: ${open.status}`)
+
     const { ctx, page } = await loginAs(browser, reviewer.email, reviewer.password, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)

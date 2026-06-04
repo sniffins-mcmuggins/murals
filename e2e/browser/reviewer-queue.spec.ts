@@ -54,6 +54,13 @@ test.describe('reviewer queue', () => {
     reviewerEmail = reviewer.email
     reviewerPassword = reviewer.password
     await inviteReviewer(orgToken, festivalId, reviewerEmail)
+
+    // Open the review round so the reviewer can score
+    const open = await fetch(`${API}/festivals/${festivalId}/review/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${orgToken}` },
+    })
+    if (!open.ok) throw new Error(`Open round failed: ${open.status}`)
   })
 
   test('reviewer sees the queue, not the kanban, and can score', async ({ browser }) => {
