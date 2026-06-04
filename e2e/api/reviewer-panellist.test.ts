@@ -100,6 +100,8 @@ describe('festival reviewer / panellist accounts', () => {
     expect(app.review_flag).toBeUndefined()
     expect(app.rank).toBeUndefined()
     expect(app.notes).toBeUndefined()
+    expect(app.status).toBeUndefined()
+    expect(app.updated_at).toBeUndefined()
     // Scoring-relevant fields remain.
     expect(app.artist?.display_name).toBeDefined()
     expect(Array.isArray(app.criterion_scores)).toBe(true)

@@ -96,7 +96,11 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		if len(items) == 0 {
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode([]applicationResponse{})
+			if role == roleReviewer {
+				_ = json.NewEncoder(w).Encode([]reviewerApplicationResponse{})
+			} else {
+				_ = json.NewEncoder(w).Encode([]applicationResponse{})
+			}
 			return
 		}
 
