@@ -272,7 +272,6 @@ type ApplicationForm struct {
 	MaxApplications *int32             `db:"max_applications" json:"max_applications"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	AnonymousReview bool               `db:"anonymous_review" json:"anonymous_review"`
 	ReviewCriteria  json.RawMessage    `db:"review_criteria" json:"review_criteria"`
 }
 
