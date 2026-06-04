@@ -994,7 +994,6 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        anonymous_review?: boolean;
                         review_criteria?: {
                             id?: string;
                             label?: string;
@@ -1909,8 +1908,6 @@ export interface components {
             /** Format: date-time */
             close_at?: string | null;
             max_applications?: number | null;
-            /** @description When true, reviewer-scoped responses strip artist identity until the reviewer has scored. */
-            anonymous_review?: boolean;
             review_criteria?: {
                 id?: string;
                 label?: string;
@@ -1951,8 +1948,6 @@ export interface components {
             my_score?: number | null;
             artist?: components["schemas"]["ApplicationArtist"];
             notes?: components["schemas"]["ApplicationNote"][];
-            /** @description True when anonymous_review is on and this reviewer has not yet scored. Always false for owners. */
-            identity_hidden?: boolean;
             criterion_scores?: components["schemas"]["CriterionScore"][];
         };
         MyApplication: {

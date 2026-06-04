@@ -40,8 +40,7 @@ export function ApplicationCard({
   }
 
   const artist = application.artist as ApplicationArtist | undefined
-  const isAnonymous = application.identity_hidden === true
-  const name = isAnonymous ? 'Anonymous artist' : (artist?.display_name ?? 'Unknown Artist')
+  const name = artist?.display_name ?? 'Unknown Artist'
   const tags = artist?.medium_tags ?? []
   const id = application.id ?? ''
   const myScore = application.my_score
@@ -79,7 +78,7 @@ export function ApplicationCard({
       )}
 
       <div className="w-8 h-8 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold text-xs flex-shrink-0">
-        {isAnonymous ? '?' : initials(name)}
+        {initials(name)}
       </div>
 
       <div className="flex-1 min-w-0">
