@@ -16,7 +16,7 @@ This table is the living reference. Add rows as new videos are commissioned.
 | ID  | Persona    | Title                        | DB approach  | Key moments |
 |-----|------------|------------------------------|--------------|-------------|
 | V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup page → "Continue with Google" → dashboard → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
-| V06 | Organiser  | Organiser: Staged Decisions   | Pre-seeded (5 submitted) | Login → CPF 2027 festival → kanban (5 in Undecided, Release disabled) → reorder cards within Undecided to rank them → drag to Accept/Waitlist/Decline → Release button enables → modal → tick "I understand" checkbox → Yes release → post-release banner |
+| V06 | Organiser  | Organiser: Review Round + Staged Decisions | Pre-seeded (5 submitted + Sophie as accepted reviewer with scores) | Login → CPF 2027 → applications kanban → **Open review round** → decisions locked (drag handles gone) → **Close round** → ★ scores visible on cards → reorder cards by score → drag to Accept/Waitlist/Decline → Release → post-release banner → map editor (geocode search, place spot, drag to position, assign artist) |
 
 ---
 
@@ -59,13 +59,15 @@ demos/
 
 ### Application seed data (for V06)
 5 applications from fictional artists against CPF 2027, all `submitted`:
-- Kit Harrow (spray paint, large wall)
-- Yuki Tanaka (brush, small wall)
-- Tomás Cruz (mixed media, medium wall)
-- Amara Diallo (spray paint, large wall)
-- Rosa Vane (brush, medium wall)
+- Kit Harrow (spray paint, large wall) — Sophie score ★4
+- Yuki Tanaka (brush, small wall) — Sophie score ★3
+- Tomás Cruz (mixed media, medium wall) — Sophie score ★2
+- Amara Diallo (spray paint, large wall) — Sophie score ★5
+- Rosa Vane (brush, medium wall) — Sophie score ★5
 
-5 cards in one column gives enough material to show within-column ranking (drag to reorder) before deciding, and the viewer still watches every card get staged and the Release button enable live.
+Plus **Sophie Park** (`sophie@cpf-reviewer.art`) seeded as an accepted reviewer with pre-scored applications — so the organiser can open the round, close it, and see ★ averages on cards without needing a live reviewer session.
+
+5 cards in one column gives enough material to show within-column ranking (drag to reorder by score) before deciding, and the viewer watches every card get staged and the Release button enable live.
 
 ### `task demo:seed`
 Runs `demos/seed/main.go` which:
@@ -101,21 +103,24 @@ highlight(page, selector)            // brief amber outline to draw the eye
 8. Fill form (mural concept, wall size, medium, portfolio links, insurance, availability)
 9. Submit → confirmation screen
 
-#### V06 — Organiser: Staged Decisions (~55s)
+#### V06 — Organiser: Review Round + Staged Decisions (~75s)
 1. Log in as Marcus Webb (pre-seeded)
 2. Navigate to CPF 2027 festival detail
-3. Open applications — kanban shows 5 cards in Undecided; Release button disabled + "5 still need a decision" hint
-4. Rank within the Undecided column: drag Rosa Vane up onto Kit Harrow, then Amara Diallo up onto Yuki Tanaka (within-column reorder, persists rank)
-5. Drag Rosa Vane → ✓ Accept, Kit Harrow → ✓ Accept
-6. Drag Amara Diallo → ~ Waitlist, Yuki Tanaka → ~ Waitlist
-7. Drag Tomás Cruz → ✗ Decline — Release button enables ("Release 5 decisions →")
-8. Click "Release 5 decisions →" — modal opens; "Yes, release" is disabled
-9. Tick "I understand…" checkbox — "Yes, release" enables
-10. Click "Yes, release"
-11. Post-release banner: "Decisions released · artists notified by email"
-12. Scroll to show Accepted/Waitlisted/Declined columns with "Notified ✓" badges
+3. Open applications — kanban shows 5 cards in Undecided; "Open review round" banner visible
+4. Click **Open review round** → round opens, decisions locked, drag handles disappear
+5. Click **Close round** → "Review round closed · scores final" banner, ★ scores now on cards
+6. Rank within Undecided by score: drag Rosa Vane (★5) up, Amara Diallo (★5) up
+7. Drag Rosa Vane → ✓ Accept, Amara Diallo → ✓ Accept (both ★5)
+8. Drag Kit Harrow → ~ Waitlist (★4), Yuki Tanaka → ~ Waitlist (★3)
+9. Drag Tomás Cruz → ✗ Decline (★2) — Release button enables ("Release 5 decisions →")
+10. Click "Release 5 decisions →" — modal opens; "Yes, release" is disabled
+11. Tick "I understand…" checkbox — "Yes, release" enables
+12. Click "Yes, release"
+13. Post-release banner: "Decisions released · artists notified by email"
+14. Scroll to show Accepted/Waitlisted/Declined columns with "Notified ✓" badges
+15. Navigate to Map Editor → geocode search for Cheltenham → place a spot → drag to position → assign accepted artist from rail
 
-**Seed requirement:** All 12 applications must be `submitted` at recording time (no pre-accepted/declined). Run `task demo:seed` to reset. The seed's `artistSeed` slice should have all entries set to `status: "submitted"` — update `demos/seed/main.go` before recording.
+**Seed requirement:** Run `task demo:seed` to reset. All 5 applications must be `submitted`; Sophie Park (`sophie@cpf-reviewer.art`) seeded as an accepted reviewer with pre-scored applications (★ scores: Rosa 5, Amara 5, Kit 4, Yuki 3, Tomás 2).
 
 ---
 
