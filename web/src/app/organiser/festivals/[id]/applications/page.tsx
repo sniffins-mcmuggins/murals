@@ -353,6 +353,10 @@ function KanbanView({ festivalId }: { festivalId: string }) {
 
   const releasedAt = festivalData?.decisions_released_at
 
+  if (reviewersQuery.isLoading) {
+    return <p className="font-sans text-mid text-sm">Loading…</p>
+  }
+
   if (isReviewer) {
     const festName = (festivalQuery.data as { name?: string } | undefined)?.name ?? 'Festival'
     return (

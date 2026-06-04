@@ -203,11 +203,14 @@ describe('Organiser ApplicationsReviewPage', () => {
     const applications = [
       createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
     ]
+    // mockReturnValue provides the steady-state for re-renders after Once values are exhausted.
+    // Query call order in KanbanView: applications, festival, reviewers, form.
     mockUseQuery
       .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
       .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
       .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
       .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+      .mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
 
     render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
 

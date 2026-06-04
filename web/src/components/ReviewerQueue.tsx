@@ -78,7 +78,7 @@ function ReviewerRow({ app, onSelect, scored, disabled }: {
   const tags = (artist?.medium_tags ?? []).slice(0, 2)
 
   return (
-    <li className={`flex items-center gap-3 p-3 rounded-lg border ${scored ? 'bg-warm border-light' : 'bg-white border-light'}`}>
+    <li className={`flex items-center gap-3 p-3 rounded-lg border ${scored ? 'bg-warm border-light' : 'bg-offwhite border-light'}`}>
       <div className="w-10 h-10 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold text-xs flex-shrink-0">
         {initials(name)}
       </div>
