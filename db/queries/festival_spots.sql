@@ -96,3 +96,34 @@ FROM festival_spots fs
 JOIN artist_profiles ap ON ap.id = fs.artist_id
 WHERE fs.festival_id = $1
   AND fs.artist_id IS NOT NULL;
+
+-- name: GetUnassignedSpotEligibleArtists :many
+-- Artists eligible to be placed on a spot: released accepts (festival_artists) OR
+-- provisional accepts (applications.staged_decision = 'accept'), minus those already
+-- assigned a spot. Feeds the map editor pool and the dashboard summary.
+SELECT elig.artist_id, elig.name
+FROM (
+    SELECT fa.artist_id, ap.display_name AS name
+    FROM festival_artists fa
+    JOIN artist_profiles ap ON ap.id = fa.artist_id
+    WHERE fa.festival_id = $1 AND fa.status = 'accepted'
+    UNION
+    SELECT a.artist_id, ap.display_name AS name
+    FROM applications a
+    JOIN application_forms af ON af.id = a.form_id
+    JOIN artist_profiles ap ON ap.id = a.artist_id
+    WHERE af.festival_id = $1 AND a.staged_decision = 'accept'
+) elig
+WHERE NOT EXISTS (
+    SELECT 1 FROM festival_spots fs
+    WHERE fs.festival_id = $1 AND fs.artist_id = elig.artist_id
+)
+ORDER BY elig.name;
+
+-- name: ClearSpotAssignmentForArtist :exec
+-- Removes an artist from any spot they hold in this festival (the spot itself,
+-- with its location/dimensions/notes, is preserved). Called whenever an artist
+-- stops being a spot-eligible accept.
+UPDATE festival_spots
+SET artist_id = NULL, updated_at = now()
+WHERE festival_id = $1 AND artist_id = $2;

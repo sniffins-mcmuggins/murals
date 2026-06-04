@@ -42,3 +42,20 @@ WHERE f.deleted_at IS NULL
     )
   )
 ORDER BY f.start_date ASC NULLS LAST, f.created_at DESC;
+
+-- name: GetSpotEligibleArtist :one
+-- Returns the artist_id iff the artist is spot-eligible for this festival:
+-- a released accept OR a provisional accept (staged_decision = 'accept').
+-- Used as the assignment guard in SetSpotArtistHandler. ErrNoRows => not eligible.
+SELECT $2::uuid AS artist_id
+WHERE EXISTS (
+    SELECT 1 FROM festival_artists fa
+    WHERE fa.festival_id = $1 AND fa.artist_id = $2
+      AND fa.status = 'accepted'
+)
+OR EXISTS (
+    SELECT 1 FROM applications a
+    JOIN application_forms af ON af.id = a.form_id
+    WHERE af.festival_id = $1 AND a.artist_id = $2
+      AND a.staged_decision = 'accept'
+);

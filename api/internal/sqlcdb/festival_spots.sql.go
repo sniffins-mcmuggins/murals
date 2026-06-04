@@ -44,6 +44,25 @@ func (q *Queries) ClearFestivalSpotArtist(ctx context.Context, arg ClearFestival
 	return i, err
 }
 
+const clearSpotAssignmentForArtist = `-- name: ClearSpotAssignmentForArtist :exec
+UPDATE festival_spots
+SET artist_id = NULL, updated_at = now()
+WHERE festival_id = $1 AND artist_id = $2
+`
+
+type ClearSpotAssignmentForArtistParams struct {
+	FestivalID pgtype.UUID `db:"festival_id" json:"festival_id"`
+	ArtistID   pgtype.UUID `db:"artist_id" json:"artist_id"`
+}
+
+// Removes an artist from any spot they hold in this festival (the spot itself,
+// with its location/dimensions/notes, is preserved). Called whenever an artist
+// stops being a spot-eligible accept.
+func (q *Queries) ClearSpotAssignmentForArtist(ctx context.Context, arg ClearSpotAssignmentForArtistParams) error {
+	_, err := q.db.Exec(ctx, clearSpotAssignmentForArtist, arg.FestivalID, arg.ArtistID)
+	return err
+}
+
 const createFestivalSpot = `-- name: CreateFestivalSpot :one
 INSERT INTO festival_spots (festival_id, number, lat, lng, w3w, width_m, height_m, notes)
 VALUES (
@@ -313,6 +332,55 @@ func (q *Queries) GetUnassignedAcceptedArtists(ctx context.Context, festivalID p
 	var items []GetUnassignedAcceptedArtistsRow
 	for rows.Next() {
 		var i GetUnassignedAcceptedArtistsRow
+		if err := rows.Scan(&i.ArtistID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUnassignedSpotEligibleArtists = `-- name: GetUnassignedSpotEligibleArtists :many
+SELECT elig.artist_id, elig.name
+FROM (
+    SELECT fa.artist_id, ap.display_name AS name
+    FROM festival_artists fa
+    JOIN artist_profiles ap ON ap.id = fa.artist_id
+    WHERE fa.festival_id = $1 AND fa.status = 'accepted'
+    UNION
+    SELECT a.artist_id, ap.display_name AS name
+    FROM applications a
+    JOIN application_forms af ON af.id = a.form_id
+    JOIN artist_profiles ap ON ap.id = a.artist_id
+    WHERE af.festival_id = $1 AND a.staged_decision = 'accept'
+) elig
+WHERE NOT EXISTS (
+    SELECT 1 FROM festival_spots fs
+    WHERE fs.festival_id = $1 AND fs.artist_id = elig.artist_id
+)
+ORDER BY elig.name
+`
+
+type GetUnassignedSpotEligibleArtistsRow struct {
+	ArtistID pgtype.UUID `db:"artist_id" json:"artist_id"`
+	Name     string      `db:"name" json:"name"`
+}
+
+// Artists eligible to be placed on a spot: released accepts (festival_artists) OR
+// provisional accepts (applications.staged_decision = 'accept'), minus those already
+// assigned a spot. Feeds the map editor pool and the dashboard summary.
+func (q *Queries) GetUnassignedSpotEligibleArtists(ctx context.Context, festivalID pgtype.UUID) ([]GetUnassignedSpotEligibleArtistsRow, error) {
+	rows, err := q.db.Query(ctx, getUnassignedSpotEligibleArtists, festivalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUnassignedSpotEligibleArtistsRow
+	for rows.Next() {
+		var i GetUnassignedSpotEligibleArtistsRow
 		if err := rows.Scan(&i.ArtistID, &i.Name); err != nil {
 			return nil, err
 		}
