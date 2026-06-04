@@ -90,6 +90,15 @@ func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.H
 					httperr.InternalServerError(w)
 					return
 				}
+			} else {
+				// Safety net: an artist provisionally assigned a spot, then downgraded,
+				// must not keep the spot into the live festival.
+				if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+					FestivalID: festUUID, ArtistID: app.ArtistID,
+				}); err != nil {
+					httperr.InternalServerError(w)
+					return
+				}
 			}
 			sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, string(app.Status))
 		}
