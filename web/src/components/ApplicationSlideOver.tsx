@@ -33,6 +33,7 @@ interface Props {
   isPending: boolean
   criteria: ReviewCriterion[]
   isReleased: boolean
+  decisionsLocked?: boolean
 }
 
 function initials(name: string): string {
@@ -41,7 +42,7 @@ function initials(name: string): string {
 
 export function ApplicationSlideOver({
   application, formFields, festivalId, onClose,
-  onStage, onScore, isReviewer, isPending, criteria, isReleased,
+  onStage, onScore, isReviewer, isPending, criteria, isReleased, decisionsLocked,
 }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -104,8 +105,8 @@ export function ApplicationSlideOver({
             </div>
           )}
 
-          {/* Staged decision selector — owner only, pre-release */}
-          {!isReviewer && !isReleased && (
+          {/* Staged decision selector — owner only, pre-release, round not open */}
+          {!isReviewer && !isReleased && !decisionsLocked && (
             <div>
               <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
               <div className="flex gap-2 flex-wrap">
