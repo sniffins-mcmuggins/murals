@@ -38,3 +38,20 @@ WHERE id = $1
   AND decisions_released_at IS NULL
   AND deleted_at IS NULL
 RETURNING *;
+
+-- name: OpenReviewRound :one
+UPDATE festivals
+SET review_opened_at = now(), review_closed_at = NULL, updated_at = now()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND review_closed_at IS NULL
+RETURNING *;
+
+-- name: CloseReviewRound :one
+UPDATE festivals
+SET review_closed_at = now(), updated_at = now()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND review_opened_at IS NOT NULL
+  AND review_closed_at IS NULL
+RETURNING *;

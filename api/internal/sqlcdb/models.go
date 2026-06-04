@@ -391,6 +391,8 @@ type Festival struct {
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	DecisionsReleasedAt pgtype.Timestamptz `db:"decisions_released_at" json:"decisions_released_at"`
+	ReviewOpenedAt      pgtype.Timestamptz `db:"review_opened_at" json:"review_opened_at"`
+	ReviewClosedAt      pgtype.Timestamptz `db:"review_closed_at" json:"review_closed_at"`
 }
 
 type FestivalArtist struct {
