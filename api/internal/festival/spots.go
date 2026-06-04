@@ -373,7 +373,7 @@ func SetSpotArtistHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		// Verify the artist is spot-eligible (released accept OR provisional accept).
 		if _, err = q.GetSpotEligibleArtist(r.Context(), sqlcdb.GetSpotEligibleArtistParams{
-			FestivalID: festUUID, Column2: artistUUID,
+			FestivalID: festUUID, ArtistID: artistUUID,
 		}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.UnprocessableEntity(w, "artist is not eligible to be placed for this festival")

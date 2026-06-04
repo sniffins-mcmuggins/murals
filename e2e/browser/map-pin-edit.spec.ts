@@ -350,8 +350,8 @@ test('drag an artist card onto a pin to assign (pre-release)', async ({ browser 
     // Native HTML5 DnD: Playwright's dragTo drives dragstart/dragover/drop.
     await card.dragTo(marker)
 
-    // Assignment landed: the card leaves the rail.
-    await expect(page.getByTestId('artist-rail')).not.toContainText('DragDrop Artist', { timeout: 5_000 })
+    // Assignment landed: the card leaves the rail (rail may disappear entirely when pool is empty).
+    await expect(page.getByTestId('artist-rail').getByText(/DragDrop Artist/)).toHaveCount(0, { timeout: 5_000 })
 
     // Confirm server-side.
     const spots = await fetch(`${API}/festivals/${festivalId}/spots`, {

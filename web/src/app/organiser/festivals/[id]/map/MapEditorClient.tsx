@@ -397,7 +397,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
     onError: (e: Error) => setPlaceError(e.message),
   })
 
-  const [draggingArtistId, setDraggingArtistId] = useState<string | null>(null)
+  const draggingArtistId = useRef<string | null>(null)
   const mapRef = useRef<L.Map | null>(null)
 
   function handleMapClick(lat: number, lng: number) {
@@ -486,6 +486,34 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
               {spots.length} spots · {assignedCount} assigned
             </p>
           )}
+
+          {/* Artist pool — drag cards onto a map pin to assign */}
+          {unassignedArtists.length > 0 && (
+            <div className="mt-6">
+              <h2 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">
+                Unassigned · {unassignedArtists.length}
+              </h2>
+              <ul className="space-y-1" data-testid="artist-rail">
+                {unassignedArtists.map(a => (
+                  <li
+                    key={a.artist_id}
+                    draggable
+                    onDragStart={(e) => {
+                      if (a.artist_id) {
+                        e.dataTransfer.setData('text/artist-id', a.artist_id)
+                        draggingArtistId.current = a.artist_id
+                      }
+                    }}
+                    onDragEnd={() => { draggingArtistId.current = null }}
+                    className="cursor-grab active:cursor-grabbing bg-warm border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink hover:border-amber"
+                  >
+                    {a.name}
+                  </li>
+                ))}
+              </ul>
+              <p className="font-sans text-xs text-mid mt-2">Drag a name onto a pin to assign.</p>
+            </div>
+          )}
         </div>
 
         {/* Map */}
@@ -532,10 +560,10 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
             <div
               className="border border-light rounded-lg overflow-hidden"
               style={{ height: '500px' }}
-              onDragOver={(e) => { if (draggingArtistId) e.preventDefault() }}
+              onDragOver={(e) => { if (e.dataTransfer.types.includes('text/artist-id') || draggingArtistId.current) e.preventDefault() }}
               onDrop={(e) => {
                 e.preventDefault()
-                const artistId = e.dataTransfer.getData('text/artist-id') || draggingArtistId
+                const artistId = e.dataTransfer.getData('text/artist-id') || draggingArtistId.current
                 const map = mapRef.current
                 if (!artistId || !map) return
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -548,7 +576,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                   const dist = pt.distanceTo(dropPt)
                   if (dist <= 35 && (!nearest || dist < nearest.dist)) nearest = { id: s.id, dist }
                 }
-                setDraggingArtistId(null)
+                draggingArtistId.current = null
                 if (nearest) assignArtistMutation.mutate({ spotId: nearest.id, artistId })
               }}
             >
@@ -596,34 +624,6 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
           )}
         </div>
 
-        {/* Artist rail — drag onto a pin to assign */}
-        <div className="w-56 flex-shrink-0">
-          <h2 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">
-            Unassigned · {unassignedArtists.length}
-          </h2>
-          <ul className="space-y-1" data-testid="artist-rail">
-            {unassignedArtists.map(a => (
-              <li
-                key={a.artist_id}
-                draggable
-                onDragStart={(e) => {
-                  if (a.artist_id) {
-                    e.dataTransfer.setData('text/artist-id', a.artist_id)
-                    setDraggingArtistId(a.artist_id)
-                  }
-                }}
-                onDragEnd={() => setDraggingArtistId(null)}
-                className="cursor-grab active:cursor-grabbing bg-warm border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink hover:border-amber"
-              >
-                {a.name}
-              </li>
-            ))}
-            {unassignedArtists.length === 0 && (
-              <li className="font-sans text-xs text-mid">All placed 🎉</li>
-            )}
-          </ul>
-          <p className="font-sans text-xs text-mid mt-2">Drag a name onto a pin to assign.</p>
-        </div>
       </div>
     </div>
   )
