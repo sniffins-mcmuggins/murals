@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import icon from 'leaflet/dist/images/marker-icon.png'
@@ -14,6 +14,7 @@ import type { components } from '@render/api-client'
 type FestivalSpot = components['schemas']['FestivalSpot']
 type FestivalSpotsResponse = components['schemas']['FestivalSpotsResponse']
 type UnassignedArtist = components['schemas']['UnassignedArtist']
+type GeocodeSuggestion = components['schemas']['GeocodeSuggestion']
 
 // Fix default Leaflet icon broken by webpack
 const DefaultIcon = L.icon({
@@ -38,6 +39,16 @@ const TerracottaIcon = L.divIcon({
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 })
+
+// ─── Map view updater ─────────────────────────────────────────────────────────
+
+function MapViewUpdater({ target }: { target: [number, number] | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (target) map.setView(target, 16)
+  }, [target, map])
+  return null
+}
 
 // ─── Map click capture ────────────────────────────────────────────────────────
 
@@ -200,6 +211,40 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
             className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber resize-none" />
         </div>
 
+        <div className="flex flex-wrap gap-3 pt-1 border-t border-light">
+          <a
+            href={
+              spot.w3w
+                ? `https://what3words.com/${spot.w3w}`
+                : `https://what3words.com/${spot.lat},${spot.lng}`
+            }
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-xs text-mid hover:text-ink uppercase tracking-widest"
+            data-testid="link-w3w"
+          >
+            {'///'}w3w
+          </a>
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${spot.lat},${spot.lng}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-xs text-mid hover:text-ink uppercase tracking-widest"
+            data-testid="link-google"
+          >
+            Google Maps
+          </a>
+          <a
+            href={`https://maps.apple.com/?q=${spot.lat},${spot.lng}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-xs text-mid hover:text-ink uppercase tracking-widest"
+            data-testid="link-apple"
+          >
+            Apple Maps
+          </a>
+        </div>
+
         <div>
           <label className="font-sans text-xs text-mid block mb-1">Artist</label>
           <select value={artistId} onChange={e => setArtistId(e.target.value)}
@@ -235,6 +280,39 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
   const [placingSpot, setPlacingSpot] = useState(false)
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState<string | null>(null)
+  const [searchQ, setSearchQ] = useState('')
+  const [searchResults, setSearchResults] = useState<GeocodeSuggestion[]>([])
+  const [mapTarget, setMapTarget] = useState<[number, number] | null>(null)
+  const [searchError, setSearchError] = useState(false)
+
+  useEffect(() => {
+    if (searchQ.trim().length < 3) {
+      setSearchResults([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient.GET('/geocode/search', {
+          params: { query: { q: searchQ.trim() } },
+        })
+        if (res.data) {
+          setSearchResults(res.data as GeocodeSuggestion[])
+          setSearchError(false)
+        }
+      } catch {
+        setSearchResults([])
+        setSearchError(true)
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchQ])
+
+  function handleSelectResult(r: GeocodeSuggestion) {
+    setMapTarget([r.lat, r.lng])
+    setSearchQ('')
+    setSearchResults([])
+    setSearchError(false)
+  }
 
   const spotsQuery = useQuery({
     queryKey: ['spots', festivalId],
@@ -263,6 +341,40 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
       setPlaceError(null)
     },
     onError: (e: Error) => setPlaceError(e.message),
+  })
+
+  const dragSpotMutation = useMutation({
+    mutationFn: async ({
+      spotId,
+      lat,
+      lng,
+      spot,
+    }: {
+      spotId: string
+      lat: number
+      lng: number
+      spot: FestivalSpot
+    }) => {
+      const res = await apiClient.PATCH('/festivals/{festivalID}/spots/{spotID}', {
+        params: { path: { festivalID: festivalId, spotID: spotId } },
+        body: {
+          lat,
+          lng,
+          // Must resend all mutable fields — UpdateSpotHandler is a full replace.
+          // Omitting any of these silently clears the column.
+          w3w: spot.w3w ?? null,
+          width_m: spot.width_m ?? null,
+          height_m: spot.height_m ?? null,
+          notes: spot.notes ?? null,
+        },
+      })
+      if (res.error) throw new Error('Failed to move spot')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['spots', festivalId] }),
+    onError: () => {
+      // Snap the marker back to the server position on failure
+      queryClient.invalidateQueries({ queryKey: ['spots', festivalId] })
+    },
   })
 
   function handleMapClick(lat: number, lng: number) {
@@ -355,6 +467,40 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
 
         {/* Map */}
         <div className="flex-1">
+          {/* Address search — recentres the map, never creates a spot */}
+          <div className="relative mb-3" data-testid="geocode-search">
+            <input
+              type="text"
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+              placeholder="Search address or postcode…"
+              className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
+              aria-label="Search address"
+              aria-autocomplete="list"
+            />
+            {searchError && (
+              <p className="font-sans text-xs text-clay mt-1">Search unavailable</p>
+            )}
+            {searchResults.length > 0 && (
+              <ul
+                role="listbox"
+                className="absolute z-[1000] top-full left-0 right-0 mt-1 bg-offwhite border border-light rounded-lg shadow-lg overflow-hidden"
+                data-testid="geocode-results"
+              >
+                {searchResults.map((r, i) => (
+                  <li key={i} role="option" aria-selected={false}>
+                    <button
+                      onClick={() => handleSelectResult(r)}
+                      className="w-full text-left px-3 py-2 font-sans text-sm text-ink hover:bg-warm truncate"
+                    >
+                      {r.display_name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {spotsQuery.isError && (
             <p role="alert" className="font-sans text-sm text-clay mb-4">Failed to load spots.</p>
           )}
@@ -367,12 +513,20 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
                 <MapClickCapture active={placingSpot} onMapClick={handleMapClick} />
+                <MapViewUpdater target={mapTarget} />
                 {spots.map(s => (
                   <Marker
                     key={s.id}
                     position={[s.lat ?? 0, s.lng ?? 0]}
                     icon={s.artist_id ? TerracottaIcon : AmberIcon}
-                    eventHandlers={{ click: () => setSelectedSpotId(s.id === selectedSpotId ? null : (s.id ?? null)) }}
+                    draggable={!placingSpot}
+                    eventHandlers={{
+                      click: () => setSelectedSpotId(s.id === selectedSpotId ? null : (s.id ?? null)),
+                      dragend: (e) => {
+                        const { lat, lng } = (e.target as L.Marker).getLatLng()
+                        dragSpotMutation.mutate({ spotId: s.id!, lat, lng, spot: s })
+                      },
+                    }}
                   >
                     <Popup>
                       <span className="font-sans text-sm">
