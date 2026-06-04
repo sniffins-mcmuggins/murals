@@ -11,10 +11,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const closeReviewRound = `-- name: CloseReviewRound :one
+UPDATE festivals
+SET review_closed_at = now(), updated_at = now()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND review_opened_at IS NOT NULL
+  AND review_closed_at IS NULL
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+`
+
+func (q *Queries) CloseReviewRound(ctx context.Context, id pgtype.UUID) (Festival, error) {
+	row := q.db.QueryRow(ctx, closeReviewRound, id)
+	var i Festival
+	err := row.Scan(
+		&i.ID,
+		&i.OrganiserID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.LocationLabel,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Status,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
+	)
+	return i, err
+}
+
 const createFestival = `-- name: CreateFestival :one
 INSERT INTO festivals (organiser_id, name, slug, description, location_label, start_date, end_date, status)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
 `
 
 type CreateFestivalParams struct {
@@ -54,12 +87,14 @@ func (q *Queries) CreateFestival(ctx context.Context, arg CreateFestivalParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
 	)
 	return i, err
 }
 
 const getFestivalByID = `-- name: GetFestivalByID :one
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at FROM festivals WHERE id = $1 AND deleted_at IS NULL
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetFestivalByID(ctx context.Context, id pgtype.UUID) (Festival, error) {
@@ -79,12 +114,14 @@ func (q *Queries) GetFestivalByID(ctx context.Context, id pgtype.UUID) (Festival
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
 	)
 	return i, err
 }
 
 const getFestivalBySlug = `-- name: GetFestivalBySlug :one
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at FROM festivals WHERE slug = $1 AND deleted_at IS NULL
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE slug = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetFestivalBySlug(ctx context.Context, slug string) (Festival, error) {
@@ -104,12 +141,14 @@ func (q *Queries) GetFestivalBySlug(ctx context.Context, slug string) (Festival,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
 	)
 	return i, err
 }
 
 const listFestivalsByOrganiser = `-- name: ListFestivalsByOrganiser :many
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at FROM festivals WHERE organiser_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE organiser_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC
 `
 
 func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgtype.UUID) ([]Festival, error) {
@@ -135,6 +174,8 @@ func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgty
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DecisionsReleasedAt,
+			&i.ReviewOpenedAt,
+			&i.ReviewClosedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -147,7 +188,7 @@ func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgty
 }
 
 const listPublicFestivals = `-- name: ListPublicFestivals :many
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC
 `
 
 func (q *Queries) ListPublicFestivals(ctx context.Context, status FestivalStatus) ([]Festival, error) {
@@ -173,6 +214,8 @@ func (q *Queries) ListPublicFestivals(ctx context.Context, status FestivalStatus
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DecisionsReleasedAt,
+			&i.ReviewOpenedAt,
+			&i.ReviewClosedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -184,13 +227,45 @@ func (q *Queries) ListPublicFestivals(ctx context.Context, status FestivalStatus
 	return items, nil
 }
 
+const openReviewRound = `-- name: OpenReviewRound :one
+UPDATE festivals
+SET review_opened_at = now(), review_closed_at = NULL, updated_at = now()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND review_closed_at IS NULL
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+`
+
+func (q *Queries) OpenReviewRound(ctx context.Context, id pgtype.UUID) (Festival, error) {
+	row := q.db.QueryRow(ctx, openReviewRound, id)
+	var i Festival
+	err := row.Scan(
+		&i.ID,
+		&i.OrganiserID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.LocationLabel,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Status,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
+	)
+	return i, err
+}
+
 const setFestivalDecisionsReleasedAt = `-- name: SetFestivalDecisionsReleasedAt :one
 UPDATE festivals
 SET decisions_released_at = now(), updated_at = now()
 WHERE id = $1
   AND decisions_released_at IS NULL
   AND deleted_at IS NULL
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
 `
 
 func (q *Queries) SetFestivalDecisionsReleasedAt(ctx context.Context, id pgtype.UUID) (Festival, error) {
@@ -210,6 +285,8 @@ func (q *Queries) SetFestivalDecisionsReleasedAt(ctx context.Context, id pgtype.
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
 	)
 	return i, err
 }
@@ -234,7 +311,7 @@ SET name           = $2,
     status         = $8,
     updated_at     = now()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
 `
 
 type UpdateFestivalParams struct {
@@ -274,6 +351,8 @@ func (q *Queries) UpdateFestival(ctx context.Context, arg UpdateFestivalParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
 	)
 	return i, err
 }

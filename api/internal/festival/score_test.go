@@ -34,6 +34,7 @@ func TestScore_ReviewerScoresApplication(t *testing.T) {
 	createTestApplicationForm(t, db, festID)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
 	addReviewer(t, db, festID, revID)
+	openReviewRound(t, db, festID)
 	srv := newScoreServer(db)
 	t.Cleanup(srv.Close)
 
@@ -69,6 +70,7 @@ func TestScore_ReviewerCannotScoreOwnApplication(t *testing.T) {
 	createTestApplicationForm(t, db, festID)
 	ownAppID := createTestApplicationInFestival(t, db, festID, revID)
 	addReviewer(t, db, festID, revID)
+	openReviewRound(t, db, festID)
 	srv := newScoreServer(db)
 	t.Cleanup(srv.Close)
 
@@ -92,6 +94,7 @@ func TestScore_ReviewerCanScoreDifferentApplication(t *testing.T) {
 	// but we're scoring the OTHER artist's application
 	otherAppID := createTestApplicationInFestival(t, db, festID, artistID)
 	addReviewer(t, db, festID, revID)
+	openReviewRound(t, db, festID)
 	srv := newScoreServer(db)
 	t.Cleanup(srv.Close)
 

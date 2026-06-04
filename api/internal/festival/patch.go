@@ -50,6 +50,10 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.Forbidden(w)
 			return
 		}
+		if reviewRoundStatus(fest) == reviewOpen {
+			httperr.Conflict(w, "review round in progress — close it to make decisions")
+			return
+		}
 
 		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
 		if !ok {
@@ -134,6 +138,10 @@ func ReorderApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if fest.OrganiserID.String() != principal.UserID {
 			httperr.Forbidden(w)
+			return
+		}
+		if reviewRoundStatus(fest) == reviewOpen {
+			httperr.Conflict(w, "review round in progress — close it to make decisions")
 			return
 		}
 

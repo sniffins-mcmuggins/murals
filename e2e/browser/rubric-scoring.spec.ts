@@ -85,6 +85,13 @@ test.describe('rubric scoring', () => {
       { label: 'Feasibility', min: 1, max: 5 },
     ])
 
+    // Open the review round so the reviewer can score
+    const open2 = await fetch(`${API}/festivals/${festivalId}/review/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${org.token}` },
+    })
+    if (!open2.ok) throw new Error(`Open round failed: ${open2.status}`)
+
     const { ctx, page } = await loginAs(browser, reviewer.email, reviewer.password, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
@@ -121,6 +128,13 @@ test.describe('rubric scoring', () => {
     await setCriteria(org.token, festivalId, [
       { label: 'Artistic Quality', min: 1, max: 5 },
     ])
+
+    // Open the review round so the reviewer can score
+    const open3 = await fetch(`${API}/festivals/${festivalId}/review/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${org.token}` },
+    })
+    if (!open3.ok) throw new Error(`Open round failed: ${open3.status}`)
 
     const { ctx, page } = await loginAs(browser, reviewer.email, reviewer.password, baseURL)
     try {

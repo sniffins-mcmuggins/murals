@@ -310,6 +310,10 @@ func AcceptApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.
 			httperr.Forbidden(w)
 			return
 		}
+		if reviewRoundStatus(fest) == reviewOpen {
+			httperr.Conflict(w, "review round in progress — close it to make decisions")
+			return
+		}
 
 		app, ok := getApplicationForFestival(r.Context(), q, w, festUUID, appUUID)
 		if !ok {
@@ -379,6 +383,10 @@ func DeclineApplicationHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http
 		}
 		if fest.OrganiserID.String() != principal.UserID {
 			httperr.Forbidden(w)
+			return
+		}
+		if reviewRoundStatus(fest) == reviewOpen {
+			httperr.Conflict(w, "review round in progress — close it to make decisions")
 			return
 		}
 

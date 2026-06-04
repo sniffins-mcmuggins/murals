@@ -45,6 +45,10 @@ func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.H
 			httperr.Forbidden(w)
 			return
 		}
+		if reviewRoundStatus(fest) == reviewOpen {
+			httperr.Conflict(w, "review round in progress — close it to make decisions")
+			return
+		}
 
 		// Guard: all submitted applications must have a staged decision before release.
 		undecided, err := q.CountSubmittedUndecidedByFestival(r.Context(), festUUID)

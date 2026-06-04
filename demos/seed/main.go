@@ -17,6 +17,7 @@ const (
 	adminEmail    = "admin@demo.art"
 	marcusEmail   = "marcus@cpf-demo.art"
 	ladyGabeEmail = "ladygabe@demo.art"
+	sophieEmail   = "sophie@cpf-reviewer.art"
 )
 
 var cpfFields = []map[string]any{
@@ -74,7 +75,7 @@ func main() {
 	}
 	pwHash := string(hash)
 
-	demoEmails := []string{adminEmail, marcusEmail, ladyGabeEmail}
+	demoEmails := []string{adminEmail, marcusEmail, ladyGabeEmail, sophieEmail}
 	for _, a := range artistSeed {
 		demoEmails = append(demoEmails, a.email)
 	}
@@ -295,5 +296,54 @@ func main() {
 		}
 	}
 	fmt.Println("  accepted artist portfolios seeded")
+
+	// ── Reviewer: Sophie Park ─────────────────────────────────────────────────────
+	// Sophie is an invited panellist for CPF 2027. Her account is pre-scored so the
+	// V06 organiser demo can show ★ averages on kanban cards after closing the round.
+	var sophieID string
+	if err := conn.QueryRow(ctx,
+		`INSERT INTO users (email, password_hash, is_beta, email_verified)
+		 VALUES ($1, $2, true, true) RETURNING id`,
+		sophieEmail, pwHash).Scan(&sophieID); err != nil {
+		log.Fatalf("insert sophie: %v", err)
+	}
+	// Add as an accepted reviewer (accepted_at = now so she gets emailed when round opens)
+	if _, err := conn.Exec(ctx,
+		`INSERT INTO festival_reviewers (festival_id, user_id, accepted_at)
+		 VALUES ($1, $2, now())`,
+		festivalID, sophieID); err != nil {
+		log.Fatalf("insert sophie reviewer: %v", err)
+	}
+	// Pre-seed Sophie's scores on all 5 submitted applications so averages show on cards
+	sophieScores := map[string]int32{
+		"Kit Harrow":   4,
+		"Yuki Tanaka":  3,
+		"Tomás Cruz":   2,
+		"Amara Diallo": 5,
+		"Rosa Vane":    5,
+	}
+	for _, s := range seeded {
+		score, ok := sophieScores[s.a.name]
+		if !ok {
+			continue
+		}
+		var appID string
+		if err := conn.QueryRow(ctx,
+			`SELECT a.id FROM applications a
+			 JOIN artist_profiles ap ON ap.id = a.artist_id
+			 WHERE ap.display_name = $1 AND a.form_id = $2`,
+			s.a.name, formID).Scan(&appID); err != nil {
+			log.Fatalf("lookup app for %s: %v", s.a.name, err)
+		}
+		if _, err := conn.Exec(ctx,
+			`INSERT INTO application_scores (application_id, reviewer_id, criterion_id, score)
+			 VALUES ($1, $2, 'overall', $3)
+			 ON CONFLICT (application_id, reviewer_id, criterion_id) DO UPDATE SET score = EXCLUDED.score`,
+			appID, sophieID, score); err != nil {
+			log.Fatalf("insert score for %s: %v", s.a.name, err)
+		}
+	}
+	fmt.Printf("  reviewer:  %s (scores seeded for 5 applications)\n", sophieEmail)
+
 	fmt.Println("Demo seed complete ✓")
 }

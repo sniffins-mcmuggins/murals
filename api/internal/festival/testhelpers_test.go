@@ -97,6 +97,14 @@ func addReviewer(t *testing.T, db *pgxpool.Pool, festID, userID string) {
 	require.NoError(t, err)
 }
 
+// openReviewRound opens the review round for a festival so reviewers can score.
+// Required in any test that calls the score endpoint after Phase 3 added the round gate.
+func openReviewRound(t *testing.T, db *pgxpool.Pool, festID string) {
+	t.Helper()
+	_, err := sqlcdb.New(db).OpenReviewRound(context.Background(), pgUUID(t, festID))
+	require.NoError(t, err)
+}
+
 func createTestApplicationInFestival(t *testing.T, pool *pgxpool.Pool, festivalID, userID string) string {
 	t.Helper()
 	q := sqlcdb.New(pool)

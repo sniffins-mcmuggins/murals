@@ -50,6 +50,10 @@ func UnprocessableEntity(w http.ResponseWriter, detail string) {
 	Write(w, http.StatusUnprocessableEntity, "Unprocessable Entity", detail)
 }
 
+func Conflict(w http.ResponseWriter, detail string) {
+	Write(w, http.StatusConflict, "Conflict", detail)
+}
+
 func InternalServerError(w http.ResponseWriter) {
 	Write(w, http.StatusInternalServerError, "Internal Server Error", "an unexpected error occurred")
 }

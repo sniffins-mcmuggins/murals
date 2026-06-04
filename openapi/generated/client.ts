@@ -1385,6 +1385,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/festivals/{festivalID}/review/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open the reviewer scoring round (owner only) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Round opened */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Festival"];
+                    };
+                };
+                /** @description Not the owner */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Round already closed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/festivals/{festivalID}/review/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close the reviewer scoring round (owner only, force-close allowed) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    festivalID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Round closed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Festival"];
+                    };
+                };
+                /** @description Not the owner */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Round is not open */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/festivals/{festivalID}/applications/{applicationID}/notes": {
         parameters: {
             query?: never;
@@ -1861,6 +1965,12 @@ export interface components {
              * @description Set once when Release Decisions is triggered; null until then
              */
             decisions_released_at?: string | null;
+            /** Format: date-time */
+            review_opened_at?: string | null;
+            /** Format: date-time */
+            review_closed_at?: string | null;
+            /** @enum {string} */
+            review_status?: "not_started" | "open" | "closed";
         };
         /** @description A publicly-visible festival an artist is appearing at. */
         FestivalAppearance: {

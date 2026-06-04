@@ -251,6 +251,7 @@ func TestListApplications_CriterionScores_PopulatedAfterScoring(t *testing.T) {
 	setCriteria(t, db, festID, `[{"id":"art","label":"Artistic Quality","min":1,"max":5},{"id":"feas","label":"Feasibility","min":1,"max":5}]`)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
 	addReviewer(t, db, festID, revID)
+	openReviewRound(t, db, festID)
 
 	srv := newReviewListServer(db)
 	t.Cleanup(srv.Close)
@@ -332,6 +333,7 @@ func TestListApplications_TopLevelAvg_IsMeanOfCriterionAverages(t *testing.T) {
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
 	addReviewer(t, db, festID, rev1ID)
 	addReviewer(t, db, festID, rev2ID)
+	openReviewRound(t, db, festID)
 
 	srv := newReviewListServer(db)
 	t.Cleanup(srv.Close)
@@ -367,6 +369,7 @@ func TestListApplications_OrphanedCriterionScores_Omitted(t *testing.T) {
 	setCriteria(t, db, festID, `[{"id":"temp","label":"Temp","min":1,"max":5}]`)
 	appID := createTestApplicationInFestival(t, db, festID, artistID)
 	addReviewer(t, db, festID, revID)
+	openReviewRound(t, db, festID)
 
 	srv := newReviewListServer(db)
 	t.Cleanup(srv.Close)

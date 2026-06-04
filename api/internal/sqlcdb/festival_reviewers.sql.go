@@ -56,6 +56,47 @@ func (q *Queries) GetFestivalReviewer(ctx context.Context, arg GetFestivalReview
 	return i, err
 }
 
+const listAcceptedFestivalReviewers = `-- name: ListAcceptedFestivalReviewers :many
+SELECT fr.user_id, u.email, fr.accepted_at, fr.created_at
+FROM festival_reviewers fr
+JOIN users u ON u.id = fr.user_id
+WHERE fr.festival_id = $1
+  AND fr.accepted_at IS NOT NULL
+ORDER BY fr.created_at ASC
+`
+
+type ListAcceptedFestivalReviewersRow struct {
+	UserID     pgtype.UUID        `db:"user_id" json:"user_id"`
+	Email      string             `db:"email" json:"email"`
+	AcceptedAt pgtype.Timestamptz `db:"accepted_at" json:"accepted_at"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListAcceptedFestivalReviewers(ctx context.Context, festivalID pgtype.UUID) ([]ListAcceptedFestivalReviewersRow, error) {
+	rows, err := q.db.Query(ctx, listAcceptedFestivalReviewers, festivalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAcceptedFestivalReviewersRow
+	for rows.Next() {
+		var i ListAcceptedFestivalReviewersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Email,
+			&i.AcceptedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFestivalReviewers = `-- name: ListFestivalReviewers :many
 SELECT fr.festival_id, fr.user_id, fr.accepted_at, fr.created_at, u.email
 FROM festival_reviewers fr

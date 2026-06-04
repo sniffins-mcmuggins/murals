@@ -40,6 +40,12 @@ describe('rubric scoring', () => {
       })
       expect(inv.status).toBe(201)
     }
+
+    // Open the review round so scoring is permitted
+    const open = await fetch(`${API}/festivals/${festivalId}/review/open`, {
+      method: 'POST', headers: auth(orgToken),
+    })
+    expect(open.status).toBe(200)
   })
 
   it('non-owner cannot PATCH review_criteria → 403', async () => {

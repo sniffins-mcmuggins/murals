@@ -245,6 +245,26 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     },
   })
 
+  const openRoundMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.POST('/festivals/{festivalID}/review/open', {
+        params: { path: { festivalID: festivalId } },
+      })
+      if (res.error) throw new Error('Open failed')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['festival', festivalId] }),
+  })
+
+  const closeRoundMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.POST('/festivals/{festivalID}/review/close', {
+        params: { path: { festivalID: festivalId } },
+      })
+      if (res.error) throw new Error('Close failed')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['festival', festivalId] }),
+  })
+
   const handleScore = (applicationId: string, score: number, criterionId = 'overall') => {
     scoreMutation.mutate({ applicationId, score, criterionId })
     if (selectedApp?.id === applicationId) {
@@ -273,8 +293,10 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     () => localApps ?? applicationsQuery.data ?? [],
     [localApps, applicationsQuery.data],
   )
-  const festivalData = festivalQuery.data as { decisions_released_at?: string | null } | undefined
+  const festivalData = festivalQuery.data as { decisions_released_at?: string | null; review_status?: string } | undefined
   const isReleased = !!(festivalData?.decisions_released_at)
+  const reviewStatus = festivalData?.review_status ?? 'not_started'
+  const roundOpen = reviewStatus === 'open'
 
   const columns = useMemo<Record<ColumnKey, Application[]>>(() => {
     const result: Record<ColumnKey, Application[]> = {
@@ -292,7 +314,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
   const sensors = useSensors(useSensor(PointerSensor))
 
   const handleDragEnd = (event: DragEndEvent) => {
-    if (isReleased) return
+    if (isReleased || roundOpen) return
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -372,7 +394,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
           : <ReviewerQueue
               applications={allApps}
               festivalName={festName}
-              roundOpen={true}
+              roundOpen={roundOpen}
               onSelect={setSelectedApp}
             />}
         <ApplicationSlideOver
@@ -427,6 +449,40 @@ function KanbanView({ festivalId }: { festivalId: string }) {
         )}
       </div>
 
+      {!isReviewer && !isReleased && (
+        <div className="mb-6">
+          {reviewStatus === 'not_started' && (
+            <div className="flex items-center justify-between bg-warm border border-light rounded-lg px-5 py-3">
+              <span className="font-sans text-sm text-mid">Optional: run a reviewer scoring round before making decisions.</span>
+              <button
+                onClick={() => openRoundMutation.mutate()}
+                disabled={openRoundMutation.isPending}
+                className="font-sans text-sm font-bold bg-ink text-offwhite px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+              >
+                Open review round
+              </button>
+            </div>
+          )}
+          {roundOpen && (
+            <div className="flex items-center justify-between bg-ink text-offwhite rounded-lg px-5 py-3">
+              <span className="font-sans text-sm">⏳ Review round <span className="text-amber font-bold">open</span> — decisions are locked until you close it.</span>
+              <button
+                onClick={() => closeRoundMutation.mutate()}
+                disabled={closeRoundMutation.isPending}
+                className="font-sans text-sm font-bold bg-amber text-ink px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+              >
+                Close round
+              </button>
+            </div>
+          )}
+          {reviewStatus === 'closed' && (
+            <div className="bg-warm border border-light rounded-lg px-5 py-2">
+              <span className="font-mono text-xs text-mid uppercase tracking-widest">Review round closed · scores final</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {isReleased && releasedAt && (
         <div className="bg-ink text-offwhite rounded-lg px-5 py-3 mb-6 flex justify-between items-center">
           <div>
@@ -472,7 +528,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
                     isReviewer={isReviewer}
                     isPending={isPending}
                     criteria={criteria}
-                    isDraggable={!isReleased && !isReviewer}
+                    isDraggable={!isReleased && !isReviewer && !roundOpen}
                     columnKey={col}
                     isReleased={isReleased}
                   />
@@ -548,6 +604,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
         isPending={isPending}
         criteria={criteria}
         isReleased={isReleased}
+        decisionsLocked={roundOpen}
       />
     </div>
   )
