@@ -444,6 +444,17 @@ components:
           format: date-time
           nullable: true
           description: Set once when Release Decisions is triggered; null until then
+        review_opened_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_status:
+          type: string
+          enum: [not_started, open, closed]
 
     FestivalAppearance:
       type: object
@@ -2622,6 +2633,53 @@ paths:
           description: Decisions already released
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+
+  /festivals/{festivalID}/review/open:
+    post:
+      summary: Open the reviewer scoring round (owner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: festivalID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Round opened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Festival'
+        '403':
+          description: Not the owner
+        '409':
+          description: Round already closed
+  /festivals/{festivalID}/review/close:
+    post:
+      summary: Close the reviewer scoring round (owner only, force-close allowed)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: festivalID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Round closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Festival'
+        '403':
+          description: Not the owner
+        '409':
+          description: Round is not open
 
   /festivals/{festivalID}/applications/{applicationID}/notes:
     post:

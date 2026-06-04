@@ -143,18 +143,39 @@ func (e EndorsementResponseKind) Valid() bool {
 	}
 }
 
+// Defines values for FestivalReviewStatus.
+const (
+	FestivalReviewStatusClosed     FestivalReviewStatus = "closed"
+	FestivalReviewStatusNotStarted FestivalReviewStatus = "not_started"
+	FestivalReviewStatusOpen       FestivalReviewStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the FestivalReviewStatus enum.
+func (e FestivalReviewStatus) Valid() bool {
+	switch e {
+	case FestivalReviewStatusClosed:
+		return true
+	case FestivalReviewStatusNotStarted:
+		return true
+	case FestivalReviewStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FestivalAppearanceStatus.
 const (
-	Live FestivalAppearanceStatus = "live"
-	Open FestivalAppearanceStatus = "open"
+	FestivalAppearanceStatusLive FestivalAppearanceStatus = "live"
+	FestivalAppearanceStatusOpen FestivalAppearanceStatus = "open"
 )
 
 // Valid indicates whether the value is a known member of the FestivalAppearanceStatus enum.
 func (e FestivalAppearanceStatus) Valid() bool {
 	switch e {
-	case Live:
+	case FestivalAppearanceStatusLive:
 		return true
-	case Open:
+	case FestivalAppearanceStatusOpen:
 		return true
 	default:
 		return false
@@ -517,18 +538,24 @@ type Festival struct {
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
 	// DecisionsReleasedAt Set once when Release Decisions is triggered; null until then
-	DecisionsReleasedAt *time.Time          `json:"decisions_released_at,omitempty"`
-	Description         *string             `json:"description,omitempty"`
-	EndDate             *openapi_types.Date `json:"end_date,omitempty"`
-	Id                  *openapi_types.UUID `json:"id,omitempty"`
-	LocationLabel       *string             `json:"location_label,omitempty"`
-	Name                *string             `json:"name,omitempty"`
-	OrganiserId         *openapi_types.UUID `json:"organiser_id,omitempty"`
-	Slug                *string             `json:"slug,omitempty"`
-	StartDate           *openapi_types.Date `json:"start_date,omitempty"`
-	Status              *FestivalStatus     `json:"status,omitempty"`
-	UpdatedAt           *time.Time          `json:"updated_at,omitempty"`
+	DecisionsReleasedAt *time.Time            `json:"decisions_released_at,omitempty"`
+	Description         *string               `json:"description,omitempty"`
+	EndDate             *openapi_types.Date   `json:"end_date,omitempty"`
+	Id                  *openapi_types.UUID   `json:"id,omitempty"`
+	LocationLabel       *string               `json:"location_label,omitempty"`
+	Name                *string               `json:"name,omitempty"`
+	OrganiserId         *openapi_types.UUID   `json:"organiser_id,omitempty"`
+	ReviewClosedAt      *time.Time            `json:"review_closed_at,omitempty"`
+	ReviewOpenedAt      *time.Time            `json:"review_opened_at,omitempty"`
+	ReviewStatus        *FestivalReviewStatus `json:"review_status,omitempty"`
+	Slug                *string               `json:"slug,omitempty"`
+	StartDate           *openapi_types.Date   `json:"start_date,omitempty"`
+	Status              *FestivalStatus       `json:"status,omitempty"`
+	UpdatedAt           *time.Time            `json:"updated_at,omitempty"`
 }
+
+// FestivalReviewStatus defines model for Festival.ReviewStatus.
+type FestivalReviewStatus string
 
 // FestivalAppearance A publicly-visible festival an artist is appearing at.
 type FestivalAppearance struct {
@@ -1141,6 +1168,12 @@ type ServerInterface interface {
 	// Upsert application form
 	// (PUT /festivals/{festivalID}/form)
 	PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Close the reviewer scoring round (owner only, force-close allowed)
+	// (POST /festivals/{festivalID}/review/close)
+	PostFestivalsFestivalIDReviewClose(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Open the reviewer scoring round (owner only)
+	// (POST /festivals/{festivalID}/review/open)
+	PostFestivalsFestivalIDReviewOpen(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
 	// List reviewers for a festival
 	// (GET /festivals/{festivalID}/reviewers)
 	ListReviewers(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
@@ -1474,6 +1507,18 @@ func (_ Unimplemented) PatchFestivalsFestivalIDForm(w http.ResponseWriter, r *ht
 // Upsert application form
 // (PUT /festivals/{festivalID}/form)
 func (_ Unimplemented) PutFestivalsFestivalIDForm(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Close the reviewer scoring round (owner only, force-close allowed)
+// (POST /festivals/{festivalID}/review/close)
+func (_ Unimplemented) PostFestivalsFestivalIDReviewClose(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Open the reviewer scoring round (owner only)
+// (POST /festivals/{festivalID}/review/open)
+func (_ Unimplemented) PostFestivalsFestivalIDReviewOpen(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2842,6 +2887,70 @@ func (siw *ServerInterfaceWrapper) PutFestivalsFestivalIDForm(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// PostFestivalsFestivalIDReviewClose operation middleware
+func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDReviewClose(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFestivalsFestivalIDReviewClose(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFestivalsFestivalIDReviewOpen operation middleware
+func (siw *ServerInterfaceWrapper) PostFestivalsFestivalIDReviewOpen(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFestivalsFestivalIDReviewOpen(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListReviewers operation middleware
 func (siw *ServerInterfaceWrapper) ListReviewers(w http.ResponseWriter, r *http.Request) {
 
@@ -3978,6 +4087,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/festivals/{festivalID}/form", wrapper.PutFestivalsFestivalIDForm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/festivals/{festivalID}/review/close", wrapper.PostFestivalsFestivalIDReviewClose)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/festivals/{festivalID}/review/open", wrapper.PostFestivalsFestivalIDReviewOpen)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/festivals/{festivalID}/reviewers", wrapper.ListReviewers)
@@ -6366,6 +6481,82 @@ func (response PutFestivalsFestivalIDForm404ApplicationProblemPlusJSONResponse) 
 	return err
 }
 
+type PostFestivalsFestivalIDReviewCloseRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type PostFestivalsFestivalIDReviewCloseResponseObject interface {
+	VisitPostFestivalsFestivalIDReviewCloseResponse(w http.ResponseWriter) error
+}
+
+type PostFestivalsFestivalIDReviewClose200JSONResponse Festival
+
+func (response PostFestivalsFestivalIDReviewClose200JSONResponse) VisitPostFestivalsFestivalIDReviewCloseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDReviewClose403Response struct {
+}
+
+func (response PostFestivalsFestivalIDReviewClose403Response) VisitPostFestivalsFestivalIDReviewCloseResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type PostFestivalsFestivalIDReviewClose409Response struct {
+}
+
+func (response PostFestivalsFestivalIDReviewClose409Response) VisitPostFestivalsFestivalIDReviewCloseResponse(w http.ResponseWriter) error {
+	w.WriteHeader(409)
+	return nil
+}
+
+type PostFestivalsFestivalIDReviewOpenRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type PostFestivalsFestivalIDReviewOpenResponseObject interface {
+	VisitPostFestivalsFestivalIDReviewOpenResponse(w http.ResponseWriter) error
+}
+
+type PostFestivalsFestivalIDReviewOpen200JSONResponse Festival
+
+func (response PostFestivalsFestivalIDReviewOpen200JSONResponse) VisitPostFestivalsFestivalIDReviewOpenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostFestivalsFestivalIDReviewOpen403Response struct {
+}
+
+func (response PostFestivalsFestivalIDReviewOpen403Response) VisitPostFestivalsFestivalIDReviewOpenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
+type PostFestivalsFestivalIDReviewOpen409Response struct {
+}
+
+func (response PostFestivalsFestivalIDReviewOpen409Response) VisitPostFestivalsFestivalIDReviewOpenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(409)
+	return nil
+}
+
 type ListReviewersRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 }
@@ -8181,6 +8372,12 @@ type StrictServerInterface interface {
 	// Upsert application form
 	// (PUT /festivals/{festivalID}/form)
 	PutFestivalsFestivalIDForm(ctx context.Context, request PutFestivalsFestivalIDFormRequestObject) (PutFestivalsFestivalIDFormResponseObject, error)
+	// Close the reviewer scoring round (owner only, force-close allowed)
+	// (POST /festivals/{festivalID}/review/close)
+	PostFestivalsFestivalIDReviewClose(ctx context.Context, request PostFestivalsFestivalIDReviewCloseRequestObject) (PostFestivalsFestivalIDReviewCloseResponseObject, error)
+	// Open the reviewer scoring round (owner only)
+	// (POST /festivals/{festivalID}/review/open)
+	PostFestivalsFestivalIDReviewOpen(ctx context.Context, request PostFestivalsFestivalIDReviewOpenRequestObject) (PostFestivalsFestivalIDReviewOpenResponseObject, error)
 	// List reviewers for a festival
 	// (GET /festivals/{festivalID}/reviewers)
 	ListReviewers(ctx context.Context, request ListReviewersRequestObject) (ListReviewersResponseObject, error)
@@ -9455,6 +9652,58 @@ func (sh *strictHandler) PutFestivalsFestivalIDForm(w http.ResponseWriter, r *ht
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutFestivalsFestivalIDFormResponseObject); ok {
 		if err := validResponse.VisitPutFestivalsFestivalIDFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostFestivalsFestivalIDReviewClose operation middleware
+func (sh *strictHandler) PostFestivalsFestivalIDReviewClose(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request PostFestivalsFestivalIDReviewCloseRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostFestivalsFestivalIDReviewClose(ctx, request.(PostFestivalsFestivalIDReviewCloseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostFestivalsFestivalIDReviewClose")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostFestivalsFestivalIDReviewCloseResponseObject); ok {
+		if err := validResponse.VisitPostFestivalsFestivalIDReviewCloseResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostFestivalsFestivalIDReviewOpen operation middleware
+func (sh *strictHandler) PostFestivalsFestivalIDReviewOpen(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request PostFestivalsFestivalIDReviewOpenRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostFestivalsFestivalIDReviewOpen(ctx, request.(PostFestivalsFestivalIDReviewOpenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostFestivalsFestivalIDReviewOpen")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostFestivalsFestivalIDReviewOpenResponseObject); ok {
+		if err := validResponse.VisitPostFestivalsFestivalIDReviewOpenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
