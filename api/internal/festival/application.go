@@ -111,7 +111,8 @@ func toMyApplicationResponse(a sqlcdb.Application) myApplicationResponse {
 
 // reviewerApplicationResponse is the panellist-facing view. It deliberately
 // omits all organiser decision signals (staged_decision, shortlisted,
-// review_flag, rank, status, notes) — reviewers score blind to decisions.
+// review_flag, rank, status), notes, and updated_at (edit timestamps are
+// organiser-internal) — reviewers score blind to decisions.
 type reviewerApplicationResponse struct {
 	ID              string           `json:"id"`
 	FormID          string           `json:"form_id"`
@@ -125,6 +126,8 @@ type reviewerApplicationResponse struct {
 	CriterionScores []criterionScore `json:"criterion_scores"`
 }
 
+// Fields on applicationResponse that are not copied here are intentionally
+// excluded; any new field must be consciously opted in for the reviewer view.
 func toReviewerApplicationResponse(a applicationResponse) reviewerApplicationResponse {
 	return reviewerApplicationResponse{
 		ID:              a.ID,
