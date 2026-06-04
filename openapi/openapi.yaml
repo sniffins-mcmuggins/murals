@@ -601,6 +601,31 @@ components:
           items:
             $ref: "#/components/schemas/CriterionScore"
 
+    MyApplication:
+      type: object
+      required: [id, form_id, artist_id, status, answers, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        form_id:
+          type: string
+          format: uuid
+        artist_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        answers:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
     ApplicationArtist:
       type: object
       properties:
@@ -1971,7 +1996,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Application"
+                  $ref: "#/components/schemas/MyApplication"
         "401":
           $ref: "#/components/responses/Unauthorized"
 

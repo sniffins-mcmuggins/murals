@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sniffins-mcmuggins/render/api/internal/auth"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 	"github.com/sniffins-mcmuggins/render/api/internal/testutil"
@@ -265,4 +266,55 @@ func TestListArtistFestivals_InvalidProfileID(t *testing.T) {
 	resp := doRequest(t, srv, "GET", "/profiles/not-a-uuid/festivals", "", "")
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	_ = resp.Body.Close()
+}
+
+func TestAppearances_PreReleaseSpotDoesNotLeak(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, orgToken, _ := testutil.CreateUser(t, db)
+	artistUserID, _, _ := testutil.CreateUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	profileID := createTestArtistProfile(t, db, artistUserID, "Appear Artist")
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+	q := sqlcdb.New(db)
+	dec := "accept"
+	_, err := q.UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+	})
+	require.NoError(t, err)
+
+	// Create a spot and assign the provisional accept via the HTTP handlers.
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+	r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	cr := doRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+	require.Equal(t, http.StatusCreated, cr.StatusCode)
+	var spot struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+	_ = cr.Body.Close()
+
+	ar := doRequest(t, srv, "PUT", "/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+		`{"artist_id":"`+profileID+`"}`, orgToken)
+	require.Equal(t, http.StatusOK, ar.StatusCode)
+	_ = ar.Body.Close()
+
+	// Public appearances for this artist must NOT include the open festival
+	// because spot assignments are pre-release (festival is not yet live).
+	resp := doRequest(t, srv, "GET", "/profiles/"+profileID+"/festivals", "", "")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var appearances []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&appearances))
+	_ = resp.Body.Close()
+	require.Empty(t, appearances, "a pre-release spot assignment must not surface publicly")
 }

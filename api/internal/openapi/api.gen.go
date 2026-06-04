@@ -617,6 +617,17 @@ type MapPin struct {
 	W3w      *string             `json:"w3w,omitempty"`
 }
 
+// MyApplication defines model for MyApplication.
+type MyApplication struct {
+	Answers   map[string]interface{} `json:"answers"`
+	ArtistId  openapi_types.UUID     `json:"artist_id"`
+	CreatedAt time.Time              `json:"created_at"`
+	FormId    openapi_types.UUID     `json:"form_id"`
+	Id        openapi_types.UUID     `json:"id"`
+	Status    ApplicationStatus      `json:"status"`
+	UpdatedAt time.Time              `json:"updated_at"`
+}
+
 // PresignRequest defines model for PresignRequest.
 type PresignRequest struct {
 	ContentType PresignRequestContentType `json:"contentType"`
@@ -7327,7 +7338,7 @@ type GetMyApplicationsResponseObject interface {
 	VisitGetMyApplicationsResponse(w http.ResponseWriter) error
 }
 
-type GetMyApplications200JSONResponse []Application
+type GetMyApplications200JSONResponse []MyApplication
 
 func (response GetMyApplications200JSONResponse) VisitGetMyApplicationsResponse(w http.ResponseWriter) error {
 

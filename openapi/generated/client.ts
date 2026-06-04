@@ -1955,6 +1955,22 @@ export interface components {
             identity_hidden?: boolean;
             criterion_scores?: components["schemas"]["CriterionScore"][];
         };
+        MyApplication: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            form_id: string;
+            /** Format: uuid */
+            artist_id: string;
+            status: components["schemas"]["ApplicationStatus"];
+            answers: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
         ApplicationArtist: {
             display_name?: string;
             avatar_s3_key?: string | null;
@@ -3128,7 +3144,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Application"][];
+                    "application/json": components["schemas"]["MyApplication"][];
                 };
             };
             401: components["responses"]["Unauthorized"];

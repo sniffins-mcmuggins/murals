@@ -85,6 +85,31 @@ func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	}
 }
 
+// myApplicationResponse is the artist-facing view of their own application.
+// Deliberately omits all organiser/review signals — artists must learn nothing
+// about the outcome until decisions are released.
+type myApplicationResponse struct {
+	ID        string          `json:"id"`
+	FormID    string          `json:"form_id"`
+	ArtistID  string          `json:"artist_id"`
+	Status    string          `json:"status"`
+	Answers   json.RawMessage `json:"answers"`
+	CreatedAt string          `json:"created_at"`
+	UpdatedAt string          `json:"updated_at"`
+}
+
+func toMyApplicationResponse(a sqlcdb.Application) myApplicationResponse {
+	return myApplicationResponse{
+		ID:        a.ID.String(),
+		FormID:    a.FormID.String(),
+		ArtistID:  a.ArtistID.String(),
+		Status:    string(a.Status),
+		Answers:   a.Answers,
+		CreatedAt: a.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: a.UpdatedAt.Time.Format(time.RFC3339),
+	}
+}
+
 func toEnrichedResponse(
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
 ) applicationResponse {

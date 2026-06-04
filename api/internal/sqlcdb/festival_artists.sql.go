@@ -68,30 +68,30 @@ func (q *Queries) GetAcceptedArtistForFestival(ctx context.Context, arg GetAccep
 }
 
 const getSpotEligibleArtist = `-- name: GetSpotEligibleArtist :one
-SELECT $2::uuid AS artist_id
+SELECT $1::uuid AS artist_id
 WHERE EXISTS (
     SELECT 1 FROM festival_artists fa
-    WHERE fa.festival_id = $1 AND fa.artist_id = $2
+    WHERE fa.festival_id = $2 AND fa.artist_id = $1
       AND fa.status = 'accepted'
 )
 OR EXISTS (
     SELECT 1 FROM applications a
     JOIN application_forms af ON af.id = a.form_id
-    WHERE af.festival_id = $1 AND a.artist_id = $2
+    WHERE af.festival_id = $2 AND a.artist_id = $1
       AND a.staged_decision = 'accept'
 )
 `
 
 type GetSpotEligibleArtistParams struct {
+	ArtistID   pgtype.UUID `db:"artist_id" json:"artist_id"`
 	FestivalID pgtype.UUID `db:"festival_id" json:"festival_id"`
-	Column2    pgtype.UUID `db:"column_2" json:"column_2"`
 }
 
 // Returns the artist_id iff the artist is spot-eligible for this festival:
 // a released accept OR a provisional accept (staged_decision = 'accept').
 // Used as the assignment guard in SetSpotArtistHandler. ErrNoRows => not eligible.
 func (q *Queries) GetSpotEligibleArtist(ctx context.Context, arg GetSpotEligibleArtistParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, getSpotEligibleArtist, arg.FestivalID, arg.Column2)
+	row := q.db.QueryRow(ctx, getSpotEligibleArtist, arg.ArtistID, arg.FestivalID)
 	var artist_id pgtype.UUID
 	err := row.Scan(&artist_id)
 	return artist_id, err
@@ -114,11 +114,11 @@ WHERE f.deleted_at IS NULL
         AND fa.artist_id = $1
         AND fa.status = 'accepted'
     )
-    OR EXISTS (
+    OR (f.status = 'live' AND EXISTS (
       SELECT 1 FROM festival_spots fs
       WHERE fs.festival_id = f.id
         AND fs.artist_id = $1
-    )
+    ))
   )
 ORDER BY f.start_date ASC NULLS LAST, f.created_at DESC
 `
