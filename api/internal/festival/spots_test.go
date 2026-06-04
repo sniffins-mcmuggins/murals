@@ -337,3 +337,93 @@ func TestClearSpotArtist_UnassignsArtist(t *testing.T) {
 	assert.Nil(t, result["artist_id"])
 	assert.Nil(t, result["artist_name"])
 }
+
+func TestSpots_ProvisionalAcceptIsSpotEligible(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, orgToken, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	profileID := createTestArtistProfile(t, db, artistUserID, "Prov Artist")
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
+
+	// Stage 'accept' WITHOUT releasing — no festival_artists row exists.
+	dec := "accept"
+	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(db))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Provisional accept appears in the unassigned pool.
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/spots", "", orgToken)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var pool struct {
+		UnassignedArtists []struct {
+			ArtistID string `json:"artist_id"`
+		} `json:"unassigned_artists"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&pool))
+	_ = resp.Body.Close()
+	require.Len(t, pool.UnassignedArtists, 1)
+	require.Equal(t, profileID, pool.UnassignedArtists[0].ArtistID)
+
+	// Create a spot and assign the provisional accept — must succeed (200, not 422).
+	cr := doRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+	require.Equal(t, http.StatusCreated, cr.StatusCode)
+	var spot struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+	_ = cr.Body.Close()
+
+	ar := doRequest(t, srv, "PUT",
+		"/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+		`{"artist_id":"`+profileID+`"}`, orgToken)
+	require.Equal(t, http.StatusOK, ar.StatusCode, "provisional accept must be assignable pre-release")
+	_ = ar.Body.Close()
+}
+
+func TestSpots_IneligibleArtistRejected(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+
+	orgID, orgToken, _ := createTestUser(t, db)
+	artistUserID, _, _ := createTestUser(t, db)
+
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationForm(t, db, festID)
+	profileID := createTestArtistProfile(t, db, artistUserID, "Undecided Artist")
+	_ = createTestApplicationInFestival(t, db, festID, artistUserID) // submitted, no decision
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(db))
+	r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(db))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	cr := doRequest(t, srv, "POST", "/festivals/"+festID+"/spots", `{"lat":51.9,"lng":-2.07}`, orgToken)
+	require.Equal(t, http.StatusCreated, cr.StatusCode)
+	var spot struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(cr.Body).Decode(&spot))
+	_ = cr.Body.Close()
+
+	ar := doRequest(t, srv, "PUT",
+		"/festivals/"+festID+"/spots/"+spot.ID+"/artist",
+		`{"artist_id":"`+profileID+`"}`, orgToken)
+	require.Equal(t, http.StatusUnprocessableEntity, ar.StatusCode, "undecided artist must not be assignable")
+	_ = ar.Body.Close()
+}
