@@ -32,11 +32,13 @@
 - A spot may be assigned to any *spot-eligible* artist: a `festival_artists` status=`accepted` row OR an application with `staged_decision = 'accept'` (provisional, pre-release). The guard is `GetSpotEligibleArtist`.
 - `festival_spots.artist_id` may only reference a spot-eligible artist. Revoking eligibility (re-stage to non-accept, un-stage, direct decline/waitlist, or release-as-non-accept) auto-clears the assignment via `ClearSpotAssignmentForArtist`. This keeps declined artists off the public map.
 - **No artist awareness before release.** Nothing artist-facing may reveal an outcome before `release-decisions`: `GET /me/applications` uses `toMyApplicationResponse` (no `staged_decision`/`shortlisted`/`review_flag`/`rank`); `ListPublicFestivalsForArtist`'s spot branch is gated on `status = 'live'`; spot assignment fires no notification.
+- Reviewer application responses use `reviewerApplicationResponse` — they MUST omit `staged_decision`, `shortlisted`, `review_flag`, `rank`, `status`, `notes`, and `updated_at`. The organiser receives the full `applicationResponse`. Do not unify these two shapes.
 
 ## AI Context
 - `festival.go`: festival CRUD — `GetHandler` contains the public-status gate
 - `application.go`: application submit/patch/status + most of the review lifecycle
-- `review.go`, `score.go`: reviewer scoring and rubric logic
+- `review.go`: `ListApplicationsHandler` branches the final encode by role — reviewers get `toReviewerApplicationResponse`, owners get `applicationResponse`. The web renders `ReviewerQueue` (not the kanban) for reviewer-role callers.
+- `score.go`: rubric scoring logic
 - `reviewers.go`: panellist account management
 - `spots.go`: map spot assignment
 - `form.go`: dynamic application form builder
@@ -54,3 +56,4 @@
 2026-06-04 — E23: noted PATCH /spots full-replace invariant; click-to-place already shipped; release→festival_artist gap closed in f1a2264
 2026-06-04 — E23: pre-release spot eligibility + auto-clear invariant; no-artist-awareness (trimmed /me/applications, gated appearances); PATCH /spots full-replace note.
 2026-06-04 — Epic 1 Phase 1: removed reviewer identity masking entirely (column, stripping, identity_hidden, toggle, e2e). Reviewers always see full identity.
+2026-06-04 — Epic 1 Phase 2: reviewer-only scoring queue; trimmed reviewerApplicationResponse seals the decision-field leak.

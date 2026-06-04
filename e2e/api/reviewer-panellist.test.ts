@@ -86,6 +86,36 @@ describe('festival reviewer / panellist accounts', () => {
     expect(score.status).toBe(200)
   })
 
+  // Phase 2 leak-seal: the reviewer's application list must NOT carry any
+  // organiser decision data. This is the most important test in this phase.
+  it('reviewer list response omits all decision fields', async () => {
+    const res = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(reviewerToken) })
+    expect(res.status).toBe(200)
+    const apps = await res.json()
+    const app = apps.find((a: { id: string }) => a.id === appId)
+    expect(app).toBeDefined()
+    // Decision fields must be absent from the reviewer shape.
+    expect(app.staged_decision).toBeUndefined()
+    expect(app.shortlisted).toBeUndefined()
+    expect(app.review_flag).toBeUndefined()
+    expect(app.rank).toBeUndefined()
+    expect(app.notes).toBeUndefined()
+    expect(app.status).toBeUndefined()
+    expect(app.updated_at).toBeUndefined()
+    // Scoring-relevant fields remain.
+    expect(app.artist?.display_name).toBeDefined()
+    expect(Array.isArray(app.criterion_scores)).toBe(true)
+  })
+
+  // Owner shape is unchanged — decision fields still present for the organiser.
+  it('owner list response still includes decision fields', async () => {
+    const res = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(orgToken) })
+    const apps = await res.json()
+    const app = apps.find((a: { id: string }) => a.id === appId)
+    expect(app.shortlisted).toBeDefined()
+    expect(Array.isArray(app.notes)).toBe(true)
+  })
+
   // The advisory-boundary canary — the most important test in this suite.
   it('reviewer CANNOT accept / decline / reorder / patch → 403', async () => {
     const accept = await fetch(`${API}/festivals/${festivalId}/applications/${appId}/accept`, { method: 'POST', headers: auth(reviewerToken) })

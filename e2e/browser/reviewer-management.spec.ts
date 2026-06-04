@@ -78,11 +78,12 @@ test.describe('reviewer management', () => {
     const { ctx, page } = await loginAs(browser, reviewer.email, reviewer.password, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
-      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
-      // Read-only board: no staging buttons, but scoring is available
+      // Reviewer sees the queue (h1 = festival name), not the kanban
+      await expect(page.getByRole('heading', { name: `RO Fest ${suffix}`, exact: false })).toBeVisible({ timeout: 10_000 })
+      // Read-only queue: no staging buttons, but scoring is available
       await expect(page.getByRole('button', { name: '✓ Accept' })).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Score', exact: true })).toBeVisible()
-      await page.getByRole('button', { name: 'Score', exact: true }).click()
+      await expect(page.getByRole('button', { name: /Score/i }).first()).toBeVisible()
+      await page.getByRole('button', { name: /Score/i }).first().click()
       await expect(page.getByLabel('Score 1')).toBeVisible()
     } finally {
       await ctx.close()
@@ -113,11 +114,11 @@ test.describe('reviewer management', () => {
 
       // /organiser/reviewing lists the festival
       await expect(page).toHaveURL('/organiser/reviewing')
-      await expect(page.getByText(`Flow Fest ${suffix}`)).toBeVisible()
+      await expect(page.getByText(`Flow Fest ${suffix}`)).toBeVisible({ timeout: 10_000 })
       await page.getByRole('link', { name: 'Go to applications →' }).click()
 
-      // Lands on read-only board
-      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+      // Lands on reviewer queue (h1 = festival name, no kanban)
+      await expect(page.getByRole('heading', { name: `Flow Fest ${suffix}`, exact: false })).toBeVisible({ timeout: 10_000 })
       await expect(page.getByRole('button', { name: 'Accept', exact: true })).not.toBeVisible()
     } finally {
       await ctx.close()

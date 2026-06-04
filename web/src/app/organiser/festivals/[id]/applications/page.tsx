@@ -9,6 +9,7 @@ import { apiClient } from '@/lib/api'
 import { ApplicationCard } from '@/components/ApplicationCard'
 import { ApplicationSlideOver } from '@/components/ApplicationSlideOver'
 import { KanbanColumn } from '@/components/KanbanColumn'
+import { ReviewerQueue } from '@/components/ReviewerQueue'
 import type { components } from '@render/api-client'
 
 type Application = components['schemas']['Application']
@@ -351,6 +352,44 @@ function KanbanView({ festivalId }: { festivalId: string }) {
   const isPending = stageMutation.isPending || patchMutation.isPending || scoreMutation.isPending
 
   const releasedAt = festivalData?.decisions_released_at
+
+  if (reviewersQuery.isLoading) {
+    return <p className="font-sans text-mid text-sm">Loading…</p>
+  }
+
+  if (isReviewer) {
+    const festName = (festivalQuery.data as { name?: string } | undefined)?.name ?? 'Festival'
+    return (
+      <div>
+        <div className="mb-6">
+          <Link href="/organiser/reviewing"
+            className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors">
+            ← Reviewing
+          </Link>
+        </div>
+        {applicationsQuery.isLoading
+          ? <p className="font-sans text-mid text-sm">Loading…</p>
+          : <ReviewerQueue
+              applications={allApps}
+              festivalName={festName}
+              roundOpen={true}
+              onSelect={setSelectedApp}
+            />}
+        <ApplicationSlideOver
+          application={selectedApp}
+          formFields={formFields}
+          festivalId={festivalId}
+          onClose={() => setSelectedApp(null)}
+          onStage={() => {}}
+          onScore={handleScore}
+          isReviewer={true}
+          isPending={isPending}
+          criteria={criteria}
+          isReleased={false}
+        />
+      </div>
+    )
+  }
 
   return (
     <div>

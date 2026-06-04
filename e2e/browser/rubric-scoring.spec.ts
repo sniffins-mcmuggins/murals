@@ -88,7 +88,8 @@ test.describe('rubric scoring', () => {
     const { ctx, page } = await loginAs(browser, reviewer.email, reviewer.password, baseURL)
     try {
       await page.goto(`/organiser/festivals/${festivalId}/applications`)
-      await expect(page.getByRole('heading', { name: 'Applications' })).toBeVisible({ timeout: 10_000 })
+      // Reviewer sees the queue (h1 = festival name)
+      await expect(page.getByRole('heading', { name: `Rubric Fest 2 ${suffix}`, exact: false })).toBeVisible({ timeout: 10_000 })
 
       await expect(page.getByRole('button', { name: /Score/i }).first()).toBeVisible()
       await expect(page.getByLabel('Score 1')).not.toBeVisible()

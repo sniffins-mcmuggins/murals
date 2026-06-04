@@ -109,6 +109,40 @@ func toMyApplicationResponse(a sqlcdb.Application) myApplicationResponse {
 	}
 }
 
+// reviewerApplicationResponse is the panellist-facing view. It deliberately
+// omits all organiser decision signals (staged_decision, shortlisted,
+// review_flag, rank, status), notes, and updated_at (edit timestamps are
+// organiser-internal) — reviewers score blind to decisions.
+type reviewerApplicationResponse struct {
+	ID              string           `json:"id"`
+	FormID          string           `json:"form_id"`
+	ArtistID        string           `json:"artist_id"`
+	Answers         json.RawMessage  `json:"answers"`
+	CreatedAt       string           `json:"created_at"`
+	AvgScore        *float64         `json:"avg_score"`
+	ScoreCount      int32            `json:"score_count"`
+	MyScore         *int32           `json:"my_score"`
+	Artist          *artistSummary   `json:"artist,omitempty"`
+	CriterionScores []criterionScore `json:"criterion_scores"`
+}
+
+// Fields on applicationResponse that are not copied here are intentionally
+// excluded; any new field must be consciously opted in for the reviewer view.
+func toReviewerApplicationResponse(a applicationResponse) reviewerApplicationResponse {
+	return reviewerApplicationResponse{
+		ID:              a.ID,
+		FormID:          a.FormID,
+		ArtistID:        a.ArtistID,
+		Answers:         a.Answers,
+		CreatedAt:       a.CreatedAt,
+		AvgScore:        a.AvgScore,
+		ScoreCount:      a.ScoreCount,
+		MyScore:         a.MyScore,
+		Artist:          a.Artist,
+		CriterionScores: a.CriterionScores,
+	}
+}
+
 func toEnrichedResponse(
 	row sqlcdb.ListApplicationsByFormWithArtistRow,
 ) applicationResponse {
