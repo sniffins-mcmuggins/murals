@@ -29,6 +29,9 @@ type festivalResponse struct {
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
 	DecisionsReleasedAt *string `json:"decisions_released_at,omitempty"`
+	ReviewOpenedAt      *string `json:"review_opened_at,omitempty"`
+	ReviewClosedAt      *string `json:"review_closed_at,omitempty"`
+	ReviewStatus        string  `json:"review_status"`
 }
 
 func toFestivalResponse(f sqlcdb.Festival) festivalResponse {
@@ -54,6 +57,17 @@ func toFestivalResponse(f sqlcdb.Festival) festivalResponse {
 	if f.DecisionsReleasedAt.Valid {
 		s := f.DecisionsReleasedAt.Time.Format(time.RFC3339)
 		resp.DecisionsReleasedAt = &s
+	}
+	resp.ReviewStatus = "not_started"
+	if f.ReviewOpenedAt.Valid {
+		s := f.ReviewOpenedAt.Time.Format(time.RFC3339)
+		resp.ReviewOpenedAt = &s
+		resp.ReviewStatus = "open"
+	}
+	if f.ReviewClosedAt.Valid {
+		s := f.ReviewClosedAt.Time.Format(time.RFC3339)
+		resp.ReviewClosedAt = &s
+		resp.ReviewStatus = "closed"
 	}
 	return resp
 }
