@@ -143,4 +143,71 @@ test('V06 — Organiser: Staged Decisions', async ({ page }) => {
   await pause(1800)
   await page.keyboard.press('Home')
   await pause(2000)
-})
+
+    // ── 10. Navigate to map editor ────────────────────────────────────────────
+    // Click through to the festival dashboard then the Map Editor link
+    await page.goto('/organiser/festivals')
+    await pause(800)
+    await page.getByRole('link', { name: 'Cheltenham Paint Festival 2027' }).first().click()
+    await pause(800)
+    await highlight(page, 'a[href*="/map"]')
+    await page.getByRole('link', { name: /map/i }).click()
+    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 10_000 })
+    await pause(1200)
+
+    // ── 11. Search to recentre on Cheltenham ──────────────────────────────────
+    await highlight(page, '[data-testid="geocode-search"] input')
+    await slowType(page.getByLabel('Search address'), 'Cheltenham')
+    await expect(page.getByTestId('geocode-results')).toBeVisible({ timeout: 5_000 })
+    await pause(800)
+    await page.getByTestId('geocode-results').getByRole('option').first().click()
+    await pause(1500)
+
+    // ── 12. Place a spot by clicking the map ──────────────────────────────────
+    await highlight(page, '[data-testid="add-spot-btn"]')
+    await page.getByTestId('add-spot-btn').click()
+    await pause(600)
+    await page.locator('.leaflet-container').click({ position: { x: 380, y: 280 } })
+    await expect(page.getByTestId('spot-panel')).toBeVisible({ timeout: 5_000 })
+    await pause(1000)
+
+    // ── 13. Drag to fine-tune position ────────────────────────────────────────
+    const marker = page.locator('.leaflet-marker-icon').last()
+    const markerBox = await marker.boundingBox()
+    if (markerBox) {
+      await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2)
+      await pause(400)
+      await page.mouse.down()
+      await pause(500)
+      await page.mouse.move(
+        markerBox.x + markerBox.width / 2 + 30,
+        markerBox.y + markerBox.height / 2 - 20,
+        { steps: 15 },
+      )
+      await pause(400)
+      await page.mouse.up()
+      await pause(900)
+    }
+
+    // ── 14. Assign an accepted artist to the spot ─────────────────────────────
+    await highlight(page, '[data-testid="spot-panel"] select')
+    await page.getByTestId('spot-panel').getByRole('combobox').selectOption({ index: 1 })
+    await pause(600)
+    await highlight(page, '[data-testid="spot-panel"] button:has-text("Save")')
+    await page.getByTestId('spot-panel').getByRole('button', { name: 'Save' }).click()
+    await expect(
+      page.getByTestId('spot-panel').getByRole('button', { name: 'Save' }),
+    ).toBeEnabled({ timeout: 5_000 })
+    await pause(1500)
+
+    // ── 15. Show the external map links ──────────────────────────────────────
+    await highlight(page, '[data-testid="link-w3w"]')
+    await pause(1200)
+    await highlight(page, '[data-testid="link-google"]')
+    await pause(1200)
+
+    // ── 16. Public map — artist appears on the spot ───────────────────────────
+    // (Festival must be live — seed sets it to open; navigate to simulate the view)
+    // Navigate to the public festival page if it's live, otherwise show the map editor result
+    await pause(2000)
+  })
