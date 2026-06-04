@@ -192,7 +192,7 @@ func TestListApplications_Owner_SeesFullIdentity(t *testing.T) {
 
 	ownerID, ownerTok, _ := createTestUser(t, db)
 	artistID, _, _ := createTestUser(t, db)
-	createTestArtistProfile(t, db, artistID, "Real Name 3")
+	createTestArtistProfile(t, db, artistID, "Real Name")
 
 	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
@@ -209,10 +209,13 @@ func TestListApplications_Owner_SeesFullIdentity(t *testing.T) {
 	require.Len(t, list, 1)
 
 	app := list[0]
+	// artist summary must be present and non-nil
+	artist, ok := app["artist"].(map[string]any)
+	require.True(t, ok, "owner must receive a non-nil artist summary")
+	assert.Equal(t, "Real Name", artist["display_name"], "owner always sees real name")
 	_, hasIdentityHidden := app["identity_hidden"]
 	assert.False(t, hasIdentityHidden, "identity_hidden field has been removed and must not appear")
-	artist := app["artist"].(map[string]any)
-	assert.Equal(t, "Real Name 3", artist["display_name"], "owner always sees real name")
+	// location_label is also covered end-to-end by e2e/api/reviewer-panellist.test.ts
 }
 
 // setCriteria patches review_criteria directly via DB (sqlc), bypassing the HTTP handler.

@@ -87,7 +87,7 @@ func TestGetForm_Public(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&formData))
 	_ = resp.Body.Close()
 	_, hasAnon := formData["anonymous_review"]
-	assert.False(t, hasAnon, "anonymous_review field has been removed; must not appear in any form response")
+	assert.False(t, hasAnon, "anonymous_review field has been removed; must not appear in the public form response")
 }
 
 func TestGetForm_NotFound(t *testing.T) {
