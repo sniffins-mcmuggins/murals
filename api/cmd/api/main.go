@@ -25,6 +25,7 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/email"
 	"github.com/sniffins-mcmuggins/render/api/internal/endorsement"
 	"github.com/sniffins-mcmuggins/render/api/internal/festival"
+	"github.com/sniffins-mcmuggins/render/api/internal/geocode"
 	"github.com/sniffins-mcmuggins/render/api/internal/health"
 	"github.com/sniffins-mcmuggins/render/api/internal/image"
 	"github.com/sniffins-mcmuggins/render/api/internal/me"
@@ -236,6 +237,9 @@ func main() {
 		r.Delete("/festivals/{festivalID}/spots/{spotID}", festival.DeleteSpotHandler(pool))
 		r.Put("/festivals/{festivalID}/spots/{spotID}/artist", festival.SetSpotArtistHandler(pool))
 		r.Delete("/festivals/{festivalID}/spots/{spotID}/artist", festival.ClearSpotArtistHandler(pool))
+
+		// Geocode proxy (Nominatim, per-IP rate-limited)
+		r.With(geocode.RateLimitMiddleware).Get("/geocode/search", geocode.SearchHandler(geocode.NewClient(nil)))
 
 		// Billing — webhook first (no auth required; Stripe POSTs directly).
 		// CSRF posture: the session cookie is SameSite=Lax (api/internal/auth/login.go),
