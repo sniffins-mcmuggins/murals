@@ -22,6 +22,7 @@
 - **Spots are independent of applications**: a spot can be pre-created without an application; `spots.application_id` is nullable
 - **Route registration order matters**: literal sub-paths (e.g. `/applications/reorder`) MUST be registered before parameterised routes (e.g. `/applications/{applicationID}`) in chi — see api-handler-checklist rule
 - **Staged decisions + bulk release**: organisers stage `accept`/`waitlist`/`decline` per application (`applications.staged_decision`), then `release-decisions` finalises them all at once and sets `festivals.decisions_released_at`. This replaces the per-application accept/decline buttons in the UI; the direct `accept`/`decline`/`waitlist` endpoints still exist for the API
+- **Review round (open/close)**: an optional pre-kanban sequential gate driven by `festivals.review_opened_at` / `review_closed_at`. While open, reviewers may score and organiser decision endpoints are locked (409 Conflict); closing (force-close allowed anytime) finalises averages and unlocks. Reopen is not supported in v1.
 
 ## Invariants
 - Public `GetHandler` returns 404 for any festival with status NOT IN (`open`, `live`) — unauthenticated callers must never see `draft` or `closed` festivals
@@ -33,12 +34,13 @@
 - `festival_spots.artist_id` may only reference a spot-eligible artist. Revoking eligibility (re-stage to non-accept, un-stage, direct decline/waitlist, or release-as-non-accept) auto-clears the assignment via `ClearSpotAssignmentForArtist`. This keeps declined artists off the public map.
 - **No artist awareness before release.** Nothing artist-facing may reveal an outcome before `release-decisions`: `GET /me/applications` uses `toMyApplicationResponse` (no `staged_decision`/`shortlisted`/`review_flag`/`rank`); `ListPublicFestivalsForArtist`'s spot branch is gated on `status = 'live'`; spot assignment fires no notification.
 - Reviewer application responses use `reviewerApplicationResponse` — they MUST omit `staged_decision`, `shortlisted`, `review_flag`, `rank`, `status`, `notes`, and `updated_at`. The organiser receives the full `applicationResponse`. Do not unify these two shapes.
+- While `reviewRoundStatus(fest) == reviewOpen`: `ScoreApplicationHandler` blocks non-reviewer callers (409); all organiser decision endpoints (`PatchApplicationHandler` staged fields, accept/decline/waitlist, reorder, release-decisions) return 409. `reviewNotStarted` and `reviewClosed` impose no gate — a festival without a round uses the kanban freely.
+- Every owner-only endpoint that mutates application state MUST check `reviewRoundStatus` immediately after ownership confirmation. Grep for `reviewRoundStatus` to find all existing sites before adding a new one. Exception: `AddApplicationNoteHandler` — notes are always allowed during review.
 
 ## AI Context
 - `festival.go`: festival CRUD — `GetHandler` contains the public-status gate
 - `application.go`: application submit/patch/status + most of the review lifecycle
-- `review.go`: `ListApplicationsHandler` branches the final encode by role — reviewers get `toReviewerApplicationResponse`, owners get `applicationResponse`. The web renders `ReviewerQueue` (not the kanban) for reviewer-role callers.
-- `score.go`: rubric scoring logic
+- `review.go`: `ListApplicationsHandler` branches final encode by role; `Accept/Decline/WaitlistApplicationHandler` all carry the decision gate. `score.go`: reviewer round gate (only while open). `review_round.go`: `reviewRoundStatus()` helper + `OpenReviewRoundHandler` / `CloseReviewRoundHandler`; grep `reviewRoundStatus` when adding a new decision endpoint.
 - `reviewers.go`: panellist account management
 - `spots.go`: map spot assignment
 - `form.go`: dynamic application form builder
@@ -57,3 +59,4 @@
 2026-06-04 — E23: pre-release spot eligibility + auto-clear invariant; no-artist-awareness (trimmed /me/applications, gated appearances); PATCH /spots full-replace note.
 2026-06-04 — Epic 1 Phase 1: removed reviewer identity masking entirely (column, stripping, identity_hidden, toggle, e2e). Reviewers always see full identity.
 2026-06-04 — Epic 1 Phase 2: reviewer-only scoring queue; trimmed reviewerApplicationResponse seals the decision-field leak.
+2026-06-04 — Epic 1 Phase 3: review round open/close lifecycle; sequential decision gate (reviewers score only while open; decisions locked while open); reviewers notified on open (accepted only).
