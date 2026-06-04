@@ -184,4 +184,66 @@ describe('festival reviewer / panellist accounts', () => {
     const fests = await res.json()
     expect(fests.some((f: { id: string }) => f.id === festivalId)).toBe(true)
   })
+
+  describe('review round gating', () => {
+    let rOrg: OrganiserSetup
+    let rFest: string
+    let rApp: string
+    let rReviewer: ArtistSetup
+
+    beforeAll(async () => {
+      rOrg = await createOrganiser(`${SUFFIX}-rr-org`)
+      const f = await createFestival(rOrg.token, { name: `RR Fest ${SUFFIX}`, slug: `rr-${SUFFIX}` })
+      rFest = f.festivalId
+      await upsertForm(rOrg.token, rFest)
+      await setFestivalStatus(rOrg.token, rFest, 'open')
+      const applicant = await createArtist(`${SUFFIX}-rr-applicant`)
+      await createProfile(applicant.token, { displayName: `RR Applicant ${SUFFIX}` })
+      rApp = (await submitApplication(applicant.token, rFest)).applicationId
+      rReviewer = await createArtist(`${SUFFIX}-rr-reviewer`)
+      await fetch(`${API}/festivals/${rFest}/reviewers`, {
+        method: 'POST', headers: json(rOrg.token), body: JSON.stringify({ email: rReviewer.email }),
+      })
+    })
+
+    it('reviewer cannot score before the round opens → 409', async () => {
+      const res = await fetch(`${API}/festivals/${rFest}/applications/${rApp}/score`, {
+        method: 'PUT', headers: json(rReviewer.token), body: JSON.stringify({ score: 4 }),
+      })
+      expect(res.status).toBe(409)
+    })
+
+    it('owner opens the round → 200 and review_status=open', async () => {
+      const open = await fetch(`${API}/festivals/${rFest}/review/open`, { method: 'POST', headers: auth(rOrg.token) })
+      expect(open.status).toBe(200)
+      const fest = await (await fetch(`${API}/festivals/${rFest}`, { headers: auth(rOrg.token) })).json()
+      expect(fest.review_status).toBe('open')
+    })
+
+    it('reviewer can score while open; owner CANNOT stage a decision → 409', async () => {
+      const score = await fetch(`${API}/festivals/${rFest}/applications/${rApp}/score`, {
+        method: 'PUT', headers: json(rReviewer.token), body: JSON.stringify({ score: 4 }),
+      })
+      expect(score.status).toBe(200)
+      const stage = await fetch(`${API}/festivals/${rFest}/applications/${rApp}`, {
+        method: 'PATCH', headers: json(rOrg.token), body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+      })
+      expect(stage.status).toBe(409)
+    })
+
+    it('owner closes the round (force-close ok) → kanban unlocks, reviewer scoring 409', async () => {
+      const close = await fetch(`${API}/festivals/${rFest}/review/close`, { method: 'POST', headers: auth(rOrg.token) })
+      expect(close.status).toBe(200)
+      // Decisions now allowed.
+      const stage = await fetch(`${API}/festivals/${rFest}/applications/${rApp}`, {
+        method: 'PATCH', headers: json(rOrg.token), body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+      })
+      expect(stage.status).toBe(200)
+      // Reviewer can no longer score.
+      const score = await fetch(`${API}/festivals/${rFest}/applications/${rApp}/score`, {
+        method: 'PUT', headers: json(rReviewer.token), body: JSON.stringify({ score: 5 }),
+      })
+      expect(score.status).toBe(409)
+    })
+  })
 })
