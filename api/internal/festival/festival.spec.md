@@ -7,7 +7,7 @@
 - Public read: `ListPublicHandler` (status `open` or `live`), `GetMapDataHandler` (slug, status `live`)
 - Application lifecycle: submit, patch, withdraw, waitlist, status transitions
 - Spot management: organiser assigns artists to map spots
-- Review workflow: panellist accounts, rubric scoring, anonymous review, multi-round selection, notes, reorder
+- Review workflow: panellist accounts, rubric scoring, multi-round selection, notes, reorder
 - Appearance tracking: maps confirmed applications to artist profiles for public display
 - Form builder: organiser defines per-festival application questions; artist submits answers
 
@@ -21,11 +21,10 @@
 - **Status machine for applications**: `draft` → `submitted` → `under_review` → `accepted` / `rejected` / `waitlisted` / `withdrawn`
 - **Spots are independent of applications**: a spot can be pre-created without an application; `spots.application_id` is nullable
 - **Route registration order matters**: literal sub-paths (e.g. `/applications/reorder`) MUST be registered before parameterised routes (e.g. `/applications/{applicationID}`) in chi — see api-handler-checklist rule
-- **Reviewer anonymity**: panellist usernames in review UI are hidden from organisers until the round closes — stored in DB, masked in response
 - **Staged decisions + bulk release**: organisers stage `accept`/`waitlist`/`decline` per application (`applications.staged_decision`), then `release-decisions` finalises them all at once and sets `festivals.decisions_released_at`. This replaces the per-application accept/decline buttons in the UI; the direct `accept`/`decline`/`waitlist` endpoints still exist for the API
 
 ## Invariants
-- Public `GetHandler` returns 404 for any festival with status NOT IN (`open`, `live`) — anonymous callers must never see `draft` or `closed` festivals
+- Public `GetHandler` returns 404 for any festival with status NOT IN (`open`, `live`) — unauthenticated callers must never see `draft` or `closed` festivals
 - An artist may only have one active (non-withdrawn) application per festival
 - `spots.application_id` uniqueness: a confirmed application can only be assigned to one spot
 - Reorder endpoints (`/applications/reorder`, `/spots/reorder`) MUST be registered before their `/{id}` siblings in chi
@@ -54,3 +53,4 @@
 2026-06-03 — documented staged-decisions + bulk release (E22); recorded the invariant that finalising an accept (direct or via release) upserts a `festival_artists` row, after fixing `ReleaseDecisionsHandler` which omitted it
 2026-06-04 — E23: noted PATCH /spots full-replace invariant; click-to-place already shipped; release→festival_artist gap closed in f1a2264
 2026-06-04 — E23: pre-release spot eligibility + auto-clear invariant; no-artist-awareness (trimmed /me/applications, gated appearances); PATCH /spots full-replace note.
+2026-06-04 — Epic 1 Phase 1: removed reviewer identity masking entirely (column, stripping, identity_hidden, toggle, e2e). Reviewers always see full identity.
