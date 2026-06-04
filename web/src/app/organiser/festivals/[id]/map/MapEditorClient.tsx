@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -39,6 +39,14 @@ const TerracottaIcon = L.divIcon({
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 })
+
+// ─── Map ref capture ──────────────────────────────────────────────────────────
+
+function MapRefCapture({ onReady }: { onReady: (map: L.Map) => void }) {
+  const map = useMap()
+  useEffect(() => { onReady(map) }, [map, onReady])
+  return null
+}
 
 // ─── Map view updater ─────────────────────────────────────────────────────────
 
@@ -377,6 +385,21 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
     },
   })
 
+  const assignArtistMutation = useMutation({
+    mutationFn: async ({ spotId, artistId }: { spotId: string; artistId: string }) => {
+      const res = await apiClient.PUT('/festivals/{festivalID}/spots/{spotID}/artist', {
+        params: { path: { festivalID: festivalId, spotID: spotId } },
+        body: { artist_id: artistId },
+      })
+      if (res.error) throw new Error('Failed to assign artist')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['spots', festivalId] }),
+    onError: (e: Error) => setPlaceError(e.message),
+  })
+
+  const [draggingArtistId, setDraggingArtistId] = useState<string | null>(null)
+  const mapRef = useRef<L.Map | null>(null)
+
   function handleMapClick(lat: number, lng: number) {
     if (!placingSpot) return
     createSpotMutation.mutate({ lat, lng })
@@ -506,7 +529,29 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
           )}
 
           {!spotsQuery.isLoading && (
-            <div className="border border-light rounded-lg overflow-hidden" style={{ height: '500px' }}>
+            <div
+              className="border border-light rounded-lg overflow-hidden"
+              style={{ height: '500px' }}
+              onDragOver={(e) => { if (draggingArtistId) e.preventDefault() }}
+              onDrop={(e) => {
+                e.preventDefault()
+                const artistId = e.dataTransfer.getData('text/artist-id') || draggingArtistId
+                const map = mapRef.current
+                if (!artistId || !map) return
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                const dropPt = L.point(e.clientX - rect.left, e.clientY - rect.top)
+                // Find the nearest spot marker within 35px.
+                let nearest: { id: string; dist: number } | null = null
+                for (const s of spots) {
+                  if (s.lat == null || s.lng == null || !s.id) continue
+                  const pt = map.latLngToContainerPoint([s.lat, s.lng])
+                  const dist = pt.distanceTo(dropPt)
+                  if (dist <= 35 && (!nearest || dist < nearest.dist)) nearest = { id: s.id, dist }
+                }
+                setDraggingArtistId(null)
+                if (nearest) assignArtistMutation.mutate({ spotId: nearest.id, artistId })
+              }}
+            >
               <MapContainer center={center} zoom={zoom} className="w-full h-full bg-light">
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -514,6 +559,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                 />
                 <MapClickCapture active={placingSpot} onMapClick={handleMapClick} />
                 <MapViewUpdater target={mapTarget} />
+                <MapRefCapture onReady={(m) => { mapRef.current = m }} />
                 {spots.map(s => (
                   <Marker
                     key={s.id}
@@ -548,6 +594,35 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
               onMutated={handleMutated}
             />
           )}
+        </div>
+
+        {/* Artist rail — drag onto a pin to assign */}
+        <div className="w-56 flex-shrink-0">
+          <h2 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">
+            Unassigned · {unassignedArtists.length}
+          </h2>
+          <ul className="space-y-1" data-testid="artist-rail">
+            {unassignedArtists.map(a => (
+              <li
+                key={a.artist_id}
+                draggable
+                onDragStart={(e) => {
+                  if (a.artist_id) {
+                    e.dataTransfer.setData('text/artist-id', a.artist_id)
+                    setDraggingArtistId(a.artist_id)
+                  }
+                }}
+                onDragEnd={() => setDraggingArtistId(null)}
+                className="cursor-grab active:cursor-grabbing bg-warm border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink hover:border-amber"
+              >
+                {a.name}
+              </li>
+            ))}
+            {unassignedArtists.length === 0 && (
+              <li className="font-sans text-xs text-mid">All placed 🎉</li>
+            )}
+          </ul>
+          <p className="font-sans text-xs text-mid mt-2">Drag a name onto a pin to assign.</p>
         </div>
       </div>
     </div>
