@@ -259,6 +259,14 @@ func ListApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		if role == roleReviewer {
+			trimmed := make([]reviewerApplicationResponse, len(resp))
+			for i := range resp {
+				trimmed[i] = toReviewerApplicationResponse(resp[i])
+			}
+			_ = json.NewEncoder(w).Encode(trimmed)
+			return
+		}
 		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
