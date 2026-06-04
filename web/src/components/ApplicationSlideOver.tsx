@@ -245,11 +245,13 @@ export function ApplicationSlideOver({
           )}
 
           {/* Notes */}
-          <ApplicationNotes
-            festivalId={festivalId}
-            applicationId={id}
-            notes={notes}
-          />
+          {!isReviewer && (
+            <ApplicationNotes
+              festivalId={festivalId}
+              applicationId={id}
+              notes={notes}
+            />
+          )}
         </div>
       </div>
     </>
