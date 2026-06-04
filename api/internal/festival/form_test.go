@@ -87,7 +87,7 @@ func TestGetForm_Public(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&formData))
 	_ = resp.Body.Close()
 	_, hasAnon := formData["anonymous_review"]
-	assert.False(t, hasAnon, "public GET /form must not expose anonymous_review")
+	assert.False(t, hasAnon, "anonymous_review field has been removed; must not appear in any form response")
 }
 
 func TestGetForm_NotFound(t *testing.T) {
@@ -108,7 +108,7 @@ func TestGetForm_NotFound(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
-func TestPatchForm_AnonymousReview_RequiresOwner(t *testing.T) {
+func TestPatchForm_RequiresOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	orgID, _, _ := createTestUser(t, db)
@@ -122,13 +122,16 @@ func TestPatchForm_AnonymousReview_RequiresOwner(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"anonymous_review":true}`, otherTok)
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"review_criteria":[]}`, otherTok)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	_ = resp.Body.Close()
 }
 
-func TestPatchForm_AnonymousReview_TogglesOn(t *testing.T) {
+func TestPatchForm_AnonymousReview_FieldIgnored(t *testing.T) {
 	t.Parallel()
+	// anonymous_review has been removed from the schema. Sending it must not
+	// cause an error — the field is silently ignored and the response must
+	// not contain it.
 	db := testutil.NewDB(t)
 	orgID, orgTok, _ := createTestUser(t, db)
 	festID, _ := createTestFestival(t, db, orgID, "draft")
@@ -137,29 +140,19 @@ func TestPatchForm_AnonymousReview_TogglesOn(t *testing.T) {
 	r := chi.NewRouter()
 	r.Use(auth.Middleware(db, testSecret))
 	r.Patch("/festivals/{festivalID}/form", festival.PatchFormHandler(db))
-	r.Get("/festivals/{festivalID}/form", festival.GetFormHandler(db))
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	// Enable anonymous review
 	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"anonymous_review":true}`, orgTok)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var form map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&form))
 	_ = resp.Body.Close()
-	assert.Equal(t, true, form["anonymous_review"])
-
-	// GET does not expose anonymous_review to public
-	get := doRequest(t, srv, "GET", "/festivals/"+festID+"/form", "", "")
-	require.Equal(t, http.StatusOK, get.StatusCode)
-	var form2 map[string]any
-	require.NoError(t, json.NewDecoder(get.Body).Decode(&form2))
-	_ = get.Body.Close()
-	_, hasAnon := form2["anonymous_review"]
-	assert.False(t, hasAnon, "public GET must not expose anonymous_review")
+	_, hasAnon := form["anonymous_review"]
+	assert.False(t, hasAnon, "anonymous_review must not appear in form response")
 }
 
-func TestPatchForm_AnonymousReview_404_NoForm(t *testing.T) {
+func TestPatchForm_NoForm_Returns404(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	orgID, orgTok, _ := createTestUser(t, db)
@@ -172,7 +165,7 @@ func TestPatchForm_AnonymousReview_404_NoForm(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"anonymous_review":true}`, orgTok)
+	resp := doRequest(t, srv, "PATCH", "/festivals/"+festID+"/form", `{"review_criteria":[]}`, orgTok)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	_ = resp.Body.Close()
 }

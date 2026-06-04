@@ -154,7 +154,8 @@ func newReviewListServer(db *pgxpool.Pool) *httptest.Server {
 	return httptest.NewServer(r)
 }
 
-func TestListApplications_AnonymousReview_StripsIdentityForUnscored(t *testing.T) {
+func TestListApplications_Reviewer_AlwaysSeesFullIdentity(t *testing.T) {
+	// anonymous_review has been removed. Reviewers always see artist identity.
 	t.Parallel()
 	db := testutil.NewDB(t)
 
@@ -165,7 +166,6 @@ func TestListApplications_AnonymousReview_StripsIdentityForUnscored(t *testing.T
 
 	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
-	setFormAnonymousReview(t, db, festID, true)
 	createTestApplicationInFestival(t, db, festID, artistID)
 	addReviewer(t, db, festID, revID)
 
@@ -180,51 +180,13 @@ func TestListApplications_AnonymousReview_StripsIdentityForUnscored(t *testing.T
 	require.Len(t, list, 1)
 
 	app := list[0]
-	assert.Equal(t, true, app["identity_hidden"], "identity_hidden must be true before scoring")
+	_, hasIdentityHidden := app["identity_hidden"]
+	assert.False(t, hasIdentityHidden, "identity_hidden field has been removed and must not appear")
 	artist := app["artist"].(map[string]any)
-	assert.Equal(t, "", artist["display_name"], "display_name must be empty string")
-	assert.Nil(t, artist["avatar_s3_key"], "avatar_s3_key must be nil")
-	assert.Nil(t, artist["location_label"], "location_label must be nil")
+	assert.Equal(t, "Real Name", artist["display_name"], "reviewer always sees real artist name")
 }
 
-func TestListApplications_AnonymousReview_RevealsAfterScore(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-
-	ownerID, _, _ := createTestUser(t, db)
-	revID, revTok, _ := createTestUser(t, db)
-	artistID, _, _ := createTestUser(t, db)
-	createTestArtistProfile(t, db, artistID, "Real Name 2")
-
-	festID, _ := createTestFestival(t, db, ownerID, "open")
-	createTestApplicationFormWithFields(t, db, festID, `[]`)
-	setFormAnonymousReview(t, db, festID, true)
-	appID := createTestApplicationInFestival(t, db, festID, artistID)
-	addReviewer(t, db, festID, revID)
-
-	srv := newReviewListServer(db)
-	t.Cleanup(srv.Close)
-
-	// Score the application
-	scoreResp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/applications/"+appID+"/score", `{"score":3}`, revTok)
-	require.Equal(t, http.StatusOK, scoreResp.StatusCode)
-	_ = scoreResp.Body.Close()
-
-	// Now list — identity must be revealed
-	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", revTok)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var list []map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
-	_ = resp.Body.Close()
-	require.Len(t, list, 1)
-
-	app := list[0]
-	assert.Equal(t, false, app["identity_hidden"], "identity_hidden must be false after scoring")
-	artist := app["artist"].(map[string]any)
-	assert.Equal(t, "Real Name 2", artist["display_name"], "real name must be visible after scoring")
-}
-
-func TestListApplications_AnonymousReview_OwnerAlwaysSeesFull(t *testing.T) {
+func TestListApplications_Owner_SeesFullIdentity(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 
@@ -234,7 +196,6 @@ func TestListApplications_AnonymousReview_OwnerAlwaysSeesFull(t *testing.T) {
 
 	festID, _ := createTestFestival(t, db, ownerID, "open")
 	createTestApplicationFormWithFields(t, db, festID, `[]`)
-	setFormAnonymousReview(t, db, festID, true)
 	createTestApplicationInFestival(t, db, festID, artistID)
 
 	srv := newReviewListServer(db)
@@ -248,40 +209,10 @@ func TestListApplications_AnonymousReview_OwnerAlwaysSeesFull(t *testing.T) {
 	require.Len(t, list, 1)
 
 	app := list[0]
-	assert.Equal(t, false, app["identity_hidden"], "owner must never see identity_hidden=true")
+	_, hasIdentityHidden := app["identity_hidden"]
+	assert.False(t, hasIdentityHidden, "identity_hidden field has been removed and must not appear")
 	artist := app["artist"].(map[string]any)
 	assert.Equal(t, "Real Name 3", artist["display_name"], "owner always sees real name")
-}
-
-func TestListApplications_AnonymousReview_OffShowsFullIdentity(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-
-	ownerID, _, _ := createTestUser(t, db)
-	revID, revTok, _ := createTestUser(t, db)
-	artistID, _, _ := createTestUser(t, db)
-	createTestArtistProfile(t, db, artistID, "Real Name 4")
-
-	festID, _ := createTestFestival(t, db, ownerID, "open")
-	createTestApplicationFormWithFields(t, db, festID, `[]`)
-	// anonymous_review is false by default — do NOT call setFormAnonymousReview
-	createTestApplicationInFestival(t, db, festID, artistID)
-	addReviewer(t, db, festID, revID)
-
-	srv := newReviewListServer(db)
-	t.Cleanup(srv.Close)
-
-	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", revTok)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var list []map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
-	_ = resp.Body.Close()
-	require.Len(t, list, 1)
-
-	app := list[0]
-	assert.Equal(t, false, app["identity_hidden"], "identity_hidden must be false when anonymous_review is off")
-	artist := app["artist"].(map[string]any)
-	assert.Equal(t, "Real Name 4", artist["display_name"], "full name visible when anonymous_review is off")
 }
 
 // setCriteria patches review_criteria directly via DB (sqlc), bypassing the HTTP handler.

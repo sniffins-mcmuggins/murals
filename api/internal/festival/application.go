@@ -63,7 +63,6 @@ type applicationResponse struct {
 	MyScore         *int32           `json:"my_score"`
 	Artist          *artistSummary   `json:"artist,omitempty"`
 	Notes           []noteResponse   `json:"notes"`
-	IdentityHidden  bool             `json:"identity_hidden"`
 	CriterionScores []criterionScore `json:"criterion_scores"`
 }
 
@@ -166,13 +165,6 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 		Notes:           []noteResponse{},
 		CriterionScores: []criterionScore{},
 	}
-}
-
-// shouldAnonymise returns true when the caller is a reviewer,
-// the form has anonymous_review enabled, and they haven't scored this application yet.
-// Owner view is never anonymised; reveal happens automatically once my_score is set.
-func shouldAnonymise(isReviewer, anonymousReview bool, myScore *int32) bool {
-	return isReviewer && anonymousReview && myScore == nil
 }
 
 func toNoteResponse(n sqlcdb.ApplicationNote) noteResponse {
