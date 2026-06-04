@@ -189,15 +189,12 @@ test('V06 — Organiser: Staged Decisions', async ({ page }) => {
       await pause(900)
     }
 
-    // ── 14. Assign an accepted artist to the spot ─────────────────────────────
-    await highlight(page, '[data-testid="spot-panel"] select')
-    await page.getByTestId('spot-panel').getByRole('combobox').selectOption({ index: 1 })
-    await pause(600)
-    await highlight(page, '[data-testid="spot-panel"] button:has-text("Save")')
-    await page.getByTestId('spot-panel').getByRole('button', { name: 'Save' }).click()
-    await expect(
-      page.getByTestId('spot-panel').getByRole('button', { name: 'Save' }),
-    ).toBeEnabled({ timeout: 5_000 })
+    // ── 14. Drag an accepted artist from the rail onto the pin ────────────────
+    await highlight(page, '[data-testid="artist-rail"]')
+    await pause(800)
+    const artistCard = page.getByTestId('artist-rail').locator('li').first()
+    const targetPin = page.locator('.leaflet-marker-icon').last()
+    await artistCard.dragTo(targetPin)
     await pause(1500)
 
     // ── 15. Show the external map links ──────────────────────────────────────
