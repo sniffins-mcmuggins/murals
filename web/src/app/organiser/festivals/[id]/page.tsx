@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { ReviewersSection } from './ReviewersSection'
+import { SpotAssignmentSummary } from './SpotAssignmentSummary'
 import type { components } from '@render/api-client'
 
 type Festival = components['schemas']['Festival']
@@ -409,6 +410,9 @@ function FestivalDetail({
 
       {/* Reviewers */}
       <ReviewersSection festivalId={festivalId} />
+
+      {/* Spot assignment summary */}
+      <SpotAssignmentSummary festivalId={festivalId} />
 
       {/* Danger zone */}
       <div className="p-5 border border-light rounded-lg">
