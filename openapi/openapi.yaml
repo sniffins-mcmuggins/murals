@@ -728,6 +728,19 @@ components:
         name:
           type: string
 
+    GeocodeSuggestion:
+      type: object
+      required: [display_name, lat, lng]
+      properties:
+        display_name:
+          type: string
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
     FestivalSpotsResponse:
       type: object
       required: [spots, unassigned_artists]
@@ -1981,6 +1994,39 @@ paths:
                   $ref: "#/components/schemas/FestivalSummary"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /geocode/search:
+    get:
+      operationId: geocodeSearch
+      tags: [geocode]
+      summary: Search for a place by name or postcode (Nominatim proxy)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query (address, postcode, landmark)
+      responses:
+        "200":
+          description: Up to 5 place suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GeocodeSuggestion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: Geocode rate limit exceeded
+        "502":
+          description: Nominatim upstream error or timeout
 
   /festivals:
     post:

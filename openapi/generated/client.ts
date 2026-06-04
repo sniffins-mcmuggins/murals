@@ -641,6 +641,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/geocode/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search for a place by name or postcode (Nominatim proxy) */
+        get: operations["geocodeSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/festivals": {
         parameters: {
             query?: never;
@@ -2002,6 +2019,13 @@ export interface components {
             artist_id: string;
             name: string;
         };
+        GeocodeSuggestion: {
+            display_name: string;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lng: number;
+        };
         FestivalSpotsResponse: {
             spots: components["schemas"]["FestivalSpot"][];
             unassigned_artists: components["schemas"]["UnassignedArtist"][];
@@ -3129,6 +3153,45 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    geocodeSearch: {
+        parameters: {
+            query: {
+                /** @description Search query (address, postcode, landmark) */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 5 place suggestions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeocodeSuggestion"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Geocode rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nominatim upstream error or timeout */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listPublicFestivals: {
