@@ -79,8 +79,12 @@ tasks:
     cmd: go run .
 
   demo:record:
-    desc: "Record one demo video. Usage: task demo:record V=V02"
+    desc: "Re-seed then record one demo video. Usage: task demo:record V=V02"
     dir: demos
+    # Always re-seed first: V06 advances the festival's review round (open →
+    # close → release decisions), so a second run without a reset finds the
+    # board read-only and dies before the kanban drags. Seeding is the reset.
+    deps: [demo:seed]
     cmd: npx playwright test scripts/{{.V}}*.ts --config playwright.config.ts --output=output/raw/{{.V}}
 
   demo:convert:
@@ -89,9 +93,8 @@ tasks:
     cmd: bash run.sh
 
   demo:all:
-    desc: "Seed DB then record combined videos (V05 artist journey + V06 organiser full)"
+    desc: "Record combined videos (V05 artist journey + V06 organiser full). Each re-seeds first."
     cmds:
-      - task: demo:seed
       - task: demo:record
         vars: { V: V05 }
       - task: demo:record
