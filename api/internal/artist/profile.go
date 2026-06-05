@@ -22,20 +22,31 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
+type spotHistoryEntry struct {
+	SpotID       string  `json:"spot_id"`
+	FestivalID   string  `json:"festival_id"`
+	FestivalName string  `json:"festival_name"`
+	FestivalYear *int32  `json:"festival_year"`
+	Lat          float64 `json:"lat"`
+	Lng          float64 `json:"lng"`
+	MuralStatus  string  `json:"mural_status"`
+}
+
 type profileResponse struct {
-	ID                string          `json:"id"`
-	UserID            *string         `json:"user_id"`
-	DisplayName       string          `json:"display_name"`
-	Bio               string          `json:"bio"`
-	Visibility        string          `json:"visibility"`
-	LocationLabel     *string         `json:"location_label,omitempty"`
-	MediumTags        []string        `json:"medium_tags"`
-	SocialLinks       json.RawMessage `json:"social_links"`
-	AvatarS3Key       *string         `json:"avatar_s3_key,omitempty"`
-	HeadlineImageUrls []string        `json:"headline_image_urls"`
-	CreatedAt         string          `json:"created_at"`
-	UpdatedAt         string          `json:"updated_at"`
-	PreviewToken      *string         `json:"preview_token,omitempty"`
+	ID                string             `json:"id"`
+	UserID            *string            `json:"user_id"`
+	DisplayName       string             `json:"display_name"`
+	Bio               string             `json:"bio"`
+	Visibility        string             `json:"visibility"`
+	LocationLabel     *string            `json:"location_label,omitempty"`
+	MediumTags        []string           `json:"medium_tags"`
+	SocialLinks       json.RawMessage    `json:"social_links"`
+	AvatarS3Key       *string            `json:"avatar_s3_key,omitempty"`
+	HeadlineImageUrls []string           `json:"headline_image_urls"`
+	CreatedAt         string             `json:"created_at"`
+	UpdatedAt         string             `json:"updated_at"`
+	PreviewToken      *string            `json:"preview_token,omitempty"`
+	SpotHistory       []spotHistoryEntry `json:"spot_history"`
 }
 
 type profileListResponse struct {
@@ -74,6 +85,7 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 	if !public {
 		resp.PreviewToken = &p.PreviewToken
 	}
+	resp.SpotHistory = []spotHistoryEntry{}
 	return resp
 }
 
@@ -164,8 +176,43 @@ func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		resp := toProfileResponse(profile, true)
+
+		histRows, err := q.GetSpotHistoryForProfile(r.Context(), profile.ID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		spotHistory := make([]spotHistoryEntry, 0, len(histRows))
+		for _, row := range histRows {
+			latF, _ := row.Lat.Float64Value()
+			lngF, _ := row.Lng.Float64Value()
+			var yr *int32
+			switch v := row.FestivalYear.(type) {
+			case int32:
+				if v != 0 {
+					yr = &v
+				}
+			case int64:
+				if v != 0 {
+					i32 := int32(v)
+					yr = &i32
+				}
+			}
+			spotHistory = append(spotHistory, spotHistoryEntry{
+				SpotID:       row.SpotID.String(),
+				FestivalID:   row.FestivalID.String(),
+				FestivalName: row.FestivalName,
+				FestivalYear: yr,
+				Lat:          latF.Float64,
+				Lng:          lngF.Float64,
+				MuralStatus:  row.MuralStatus,
+			})
+		}
+		resp.SpotHistory = spotHistory
+
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(toProfileResponse(profile, true))
+		_ = json.NewEncoder(w).Encode(resp)
 
 		// TODO(visibility): skip analytics event for owner self-view of draft
 		// Fire-and-forget: record profile view. Uses a fresh context so the

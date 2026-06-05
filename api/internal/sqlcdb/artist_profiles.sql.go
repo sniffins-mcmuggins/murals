@@ -306,6 +306,63 @@ func (q *Queries) GetProspectByNameAndCreator(ctx context.Context, arg GetProspe
 	return i, err
 }
 
+const getSpotHistoryForProfile = `-- name: GetSpotHistoryForProfile :many
+SELECT
+    fs.id               AS spot_id,
+    fs.lat,
+    fs.lng,
+    fs.mural_status,
+    f.id                AS festival_id,
+    f.name              AS festival_name,
+    COALESCE(EXTRACT(YEAR FROM f.start_date)::int, 0) AS festival_year
+FROM festival_spots fs
+JOIN festivals f ON f.id = fs.festival_id
+WHERE fs.artist_id = $1
+  AND f.deleted_at IS NULL
+  AND f.status IN ('live', 'closed')
+ORDER BY f.start_date DESC NULLS LAST
+`
+
+type GetSpotHistoryForProfileRow struct {
+	SpotID       pgtype.UUID    `db:"spot_id" json:"spot_id"`
+	Lat          pgtype.Numeric `db:"lat" json:"lat"`
+	Lng          pgtype.Numeric `db:"lng" json:"lng"`
+	MuralStatus  string         `db:"mural_status" json:"mural_status"`
+	FestivalID   pgtype.UUID    `db:"festival_id" json:"festival_id"`
+	FestivalName string         `db:"festival_name" json:"festival_name"`
+	FestivalYear interface{}    `db:"festival_year" json:"festival_year"`
+}
+
+// Returns festival spot placements for a given artist profile.
+// Only includes spots from live or closed festivals (not draft/open).
+func (q *Queries) GetSpotHistoryForProfile(ctx context.Context, artistID pgtype.UUID) ([]GetSpotHistoryForProfileRow, error) {
+	rows, err := q.db.Query(ctx, getSpotHistoryForProfile, artistID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSpotHistoryForProfileRow
+	for rows.Next() {
+		var i GetSpotHistoryForProfileRow
+		if err := rows.Scan(
+			&i.SpotID,
+			&i.Lat,
+			&i.Lng,
+			&i.MuralStatus,
+			&i.FestivalID,
+			&i.FestivalName,
+			&i.FestivalYear,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicProfiles = `-- name: ListPublicProfiles :many
 SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by FROM artist_profiles
 WHERE visibility = 'public'

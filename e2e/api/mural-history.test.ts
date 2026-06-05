@@ -133,8 +133,8 @@ describe('mural history', () => {
     const profileRes = await fetch(`${API}/profiles/me`, { headers: auth(artist.token) })
     const { id: profileId } = await profileRes.json()
 
-    // Check the field exists and is an array even when empty
-    const pubRes = await fetch(`${API}/profiles/${profileId}`)
+    // Owners can see their own draft profiles — no billing needed for this check
+    const pubRes = await fetch(`${API}/profiles/${profileId}`, { headers: auth(artist.token) })
     expect(pubRes.status).toBe(200)
     const pub = await pubRes.json()
     expect(Array.isArray(pub.spot_history)).toBe(true)

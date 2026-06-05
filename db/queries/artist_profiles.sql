@@ -87,3 +87,21 @@ WHERE display_name = $1
   AND created_by   = $2
   AND user_id IS NULL
 LIMIT 1;
+
+-- name: GetSpotHistoryForProfile :many
+-- Returns festival spot placements for a given artist profile.
+-- Only includes spots from live or closed festivals (not draft/open).
+SELECT
+    fs.id               AS spot_id,
+    fs.lat,
+    fs.lng,
+    fs.mural_status,
+    f.id                AS festival_id,
+    f.name              AS festival_name,
+    COALESCE(EXTRACT(YEAR FROM f.start_date)::int, 0) AS festival_year
+FROM festival_spots fs
+JOIN festivals f ON f.id = fs.festival_id
+WHERE fs.artist_id = $1
+  AND f.deleted_at IS NULL
+  AND f.status IN ('live', 'closed')
+ORDER BY f.start_date DESC NULLS LAST;
