@@ -67,7 +67,7 @@ async function stageViaSlideOver(page: Page, artistName: string, decision: 'acce
   await pause(600)
 }
 
-test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
+test('V06 — Organiser: Build Form · Triage · Review · Map', async ({ page }) => {
   // Inject amber cursor dot — visible in the recording on every page.
   await addCursorOverlay(page)
 
@@ -81,43 +81,84 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   await expect(page).toHaveURL('/dashboard', { timeout: 10_000 })
   await pause(1200)
 
-  // ── 2. Navigate to CPF 2027 applications ────────────────────────────────────
+  // ── 2. Open the CPF 2027 festival ────────────────────────────────────────────
   await page.goto('/organiser/festivals')
   await expect(page.getByText('Cheltenham Paint Festival 2027')).toBeVisible({ timeout: 8000 })
   await pause(600)
   await page.getByText('Cheltenham Paint Festival 2027').click()
-  await pause(1000)
+  await expect(page.getByRole('heading', { name: 'Cheltenham Paint Festival 2027' })).toBeVisible({ timeout: 8000 })
+  await pause(800)
   const festivalId = page.url().split('/').at(-1)!
 
+  // ── 3. Build the application form — visual builder + question library ─────────
+  // The organiser shapes the questions artists answer. The builder lets them
+  // add/reorder/remove fields and drop in curated questions in one click.
+  await highlight(page, 'a[href$="/form"]')
+  await page.getByRole('link', { name: 'Edit application form' }).click()
+  await expect(page.getByRole('heading', { name: 'Application form' })).toBeVisible({ timeout: 8000 })
+  await pause(1200)
+  // Open the curated library and append a media-embed question (YouTube / Vimeo /
+  // Sketchfab) so applicants can attach a walkthrough video or 3D mockup.
+  await highlight(page, 'button:has-text("Add from library")')
+  await page.getByRole('button', { name: 'Add from library' }).click()
+  await expect(page.getByTestId('library-panel')).toBeVisible({ timeout: 5000 })
+  await pause(1000)
+  await highlight(page, '[data-testid="library-panel"]')
+  await page.getByTestId('library-panel').getByRole('button', { name: /walkthrough or 3D/i }).first().click()
+  await pause(900)
+  await highlight(page, 'button:has-text("Save form")')
+  await page.getByRole('button', { name: 'Save form' }).click()
+  await expect(page.getByText('Saved ✓')).toBeVisible({ timeout: 5000 })
+  await pause(1500)
+
+  // ── 4. Open the applications board ───────────────────────────────────────────
   await page.goto(`/organiser/festivals/${festivalId}/applications`)
   await expect(page.locator('.grid-cols-5')).toBeVisible({ timeout: 8000 })
   await page.keyboard.press('Home')
   await pause(1000)
 
-  // ── 3. Open the review round ─────────────────────────────────────────────────
+  // ── 5. Quick-select triage — fast shortlist screening pass ───────────────────
+  // A keyboard-driven sweep: → shortlist, ← pass, ↑/↓ navigate, enter for detail.
+  await expect(page.getByTestId('open-triage')).toBeVisible({ timeout: 6000 })
+  await highlight(page, '[data-testid="open-triage"]')
+  await pause(400)
+  await page.getByTestId('open-triage').click()
+  await expect(page.getByTestId('triage-mode')).toBeVisible({ timeout: 5000 })
+  await pause(1400)
+  await page.keyboard.press('ArrowRight') // shortlist + advance
+  await pause(1000)
+  await page.keyboard.press('ArrowRight') // shortlist + advance
+  await pause(1000)
+  await page.keyboard.press('ArrowLeft')  // pass + advance
+  await pause(1000)
+  await page.keyboard.press('Escape')     // back to the board
+  await expect(page.getByTestId('triage-mode')).not.toBeVisible({ timeout: 5000 })
+  await pause(1200)
+
+  // ── 6. Open the review round ─────────────────────────────────────────────────
   await expect(page.getByRole('button', { name: 'Open review round' })).toBeVisible()
-  await pause(800)
+  await pause(600)
   await highlight(page, 'button:has-text("Open review round")')
   await pause(400)
   await page.getByRole('button', { name: 'Open review round' }).click()
   await expect(page.getByText('Review round')).toContainText('open', { timeout: 5_000 })
   await pause(1200)
 
-  // ── 4. Marcus scores two artists while the round is open ─────────────────────
+  // ── 7. Marcus scores two artists while the round is open ─────────────────────
   // Organiser-role can score at any time — decisions are still locked (no drag handles).
   // On the first card, linger on the profile link so viewers see it.
   await scoreViaSlideOver(page, 'Rosa Vane', 5, true)
   await scoreViaSlideOver(page, 'Amara Diallo', 5)
   await pause(800)
 
-  // ── 5. Close the round ───────────────────────────────────────────────────────
+  // ── 8. Close the round ───────────────────────────────────────────────────────
   await highlight(page, 'button:has-text("Close round")')
   await pause(400)
   await page.getByRole('button', { name: 'Close round' }).click()
   await expect(page.getByText('Review round closed · scores final')).toBeVisible({ timeout: 5_000 })
   await pause(1500)
 
-  // ── 6. Make decisions — 3 drags for the hero moves, 1 via slide-over ─────────
+  // ── 9. Make decisions — 3 drags for the hero moves, 1 via slide-over ─────────
   // Rosa and Amara scored highest — drag to Accept for visual impact
   await dragCardToColumn(page, 'Rosa Vane', 2)    // Accept (★ 5)
   await dragCardToColumn(page, 'Amara Diallo', 2) // Accept (★ 5)
@@ -129,7 +170,7 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Release 4 decisions/ })).not.toBeDisabled({ timeout: 4000 })
   await pause(1200)
 
-  // ── 7. Release decisions ─────────────────────────────────────────────────────
+  // ── 10. Release decisions ────────────────────────────────────────────────────
   await highlight(page, 'button:has-text("Release")')
   await page.getByRole('button', { name: /Release 4 decisions/ }).click()
   await expect(page.getByText('Release decisions?')).toBeVisible({ timeout: 5000 })
@@ -145,7 +186,7 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   await page.keyboard.press('Home')
   await pause(1200)
 
-  // ── 8. Map editor ─────────────────────────────────────────────────────────────
+  // ── 11. Map editor — place a spot from an address search ──────────────────────
   await page.goto('/organiser/festivals')
   await pause(600)
   await page.getByRole('link', { name: 'Cheltenham Paint Festival 2027' }).first().click()
@@ -160,19 +201,22 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   await expect(page.getByTestId('geocode-results')).toBeVisible({ timeout: 5_000 })
   await pause(600)
   await page.getByTestId('geocode-results').getByRole('option').first().click()
+  await pause(1000)
+
+  // ── 11b. Draft pin — confirm (and fine-tune) before it becomes a spot ─────────
+  // Selecting a result recentres the map AND drops a draggable dashed draft pin.
+  // The organiser nudges it to the exact wall, then confirms.
+  await expect(page.getByTestId('draft-pin-confirm')).toBeVisible({ timeout: 5000 })
+  await highlight(page, '[data-testid="draft-pin-confirm"]')
   await pause(1200)
-
-  await highlight(page, '[data-testid="add-spot-btn"]')
-  await page.getByTestId('add-spot-btn').click()
-  await pause(400)
-  await page.locator('.leaflet-container').click({ position: { x: 380, y: 280 } })
+  await highlight(page, '[data-testid="confirm-draft-spot"]')
+  await page.getByTestId('confirm-draft-spot').click()
   await expect(page.getByTestId('spot-panel')).toBeVisible({ timeout: 5_000 })
-  await pause(800)
+  await pause(900)
 
-  // ── 8b. Spot panel — external map deep-links (E23.3) ──────────────────────────
-  // Clicking the map creates the spot immediately and opens its panel — no form
-  // to fill. We just showcase the one-tap navigation links crews use on the day:
-  // What3Words / Google Maps / Apple Maps (these fall back to the pin's lat/lng).
+  // ── 11c. Spot panel — external map deep-links ─────────────────────────────────
+  // The one-tap navigation links crews use on the day: What3Words / Google / Apple
+  // (these fall back to the pin's lat/lng).
   await highlight(page, '[data-testid="link-w3w"]')
   await highlight(page, '[data-testid="link-google"]')
   await highlight(page, '[data-testid="link-apple"]')
@@ -198,7 +242,7 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   await artistCard.dragTo(targetPin)
   await pause(2000)
 
-  // ── 9. Spot-assignment summary on the festival page (E23.8) ───────────────────
+  // ── 12. Spot-assignment summary on the festival page ──────────────────────────
   // Back on the festival overview, the organiser sees an at-a-glance roll-up of
   // which accepted artists have a spot and which are still unassigned.
   await page.goto(`/organiser/festivals/${festivalId}`)

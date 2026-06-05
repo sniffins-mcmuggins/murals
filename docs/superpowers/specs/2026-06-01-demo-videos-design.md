@@ -103,25 +103,20 @@ highlight(page, selector)            // brief amber outline to draw the eye
 8. Fill form (mural concept, wall size, medium, portfolio links, insurance, availability)
 9. Submit → confirmation screen
 
-#### V06 — Organiser: Review Round + Staged Decisions (~75s)
+#### V06 — Organiser: Build Form · Triage · Review · Map (~110s)
 1. Log in as Marcus Webb (pre-seeded)
-2. Navigate to CPF 2027 festival detail
-3. Open applications — kanban shows 5 cards in Undecided; "Open review round" banner visible
-4. Click **Open review round** → round opens, decisions locked, drag handles disappear
-5. Click **Close round** → "Review round closed · scores final" banner, ★ scores now on cards
-6. Rank within Undecided by score: drag Rosa Vane (★5) up, Amara Diallo (★5) up
-7. Drag Rosa Vane → ✓ Accept, Amara Diallo → ✓ Accept (both ★5)
-8. Drag Kit Harrow → ~ Waitlist (★4), Yuki Tanaka → ~ Waitlist (★3)
-9. Drag Tomás Cruz → ✗ Decline (★2) — Release button enables ("Release 5 decisions →")
-10. Click "Release 5 decisions →" — modal opens; "Yes, release" is disabled
-11. Tick "I understand…" checkbox — "Yes, release" enables
-12. Click "Yes, release"
-13. Post-release banner: "Decisions released · artists notified by email"
-14. Scroll to show Accepted/Waitlisted/Declined columns with "Notified ✓" badges
-15. Navigate to Map Editor → geocode search for Cheltenham → place a spot
-16. Fill the spot panel: What3Words, wall width/height, mural status, internal notes; show the What3Words / Google Maps / Apple Maps deep-links → Save (E23.3)
-17. Drag the pin to reposition it (E23.2) → drag an accepted artist from the unassigned rail onto the pin (E23.7)
-18. Back on the festival detail page, the **Spot assignments** summary lists assigned artists ✓ and any still unassigned ⚠ (E23.8)
+2. Open the CPF 2027 festival detail
+3. **Application form builder** (E24): "Edit application form" → the visual builder lists the existing questions → "Add from library" → append the **media-embed** question (YouTube / Vimeo / Sketchfab walkthrough) in one click → **Save form** → "Saved ✓"
+4. Open the applications board — kanban with the submitted cards
+5. **Quick-select triage** (E24): click **Triage** → full-screen one-card view → `→` shortlist, `→` shortlist, `←` pass → `esc` back to the board
+6. Click **Open review round** → round opens, decisions locked, drag handles disappear
+7. Score Rosa Vane (★5, lingering on the profile link) and Amara Diallo (★5) via the slide-over
+8. Click **Close round** → "Review round closed · scores final" banner, ★ scores on cards
+9. Stage decisions: drag Rosa Vane → ✓ Accept, Amara Diallo → ✓ Accept, Tomás Cruz → ✗ Decline; Kit Harrow → ~ Waitlist via slide-over → "Release 4 decisions →" enables
+10. Click "Release 4 decisions →" → tick "I understand…" → "Yes, release" → "Decisions released" banner; scroll the Accepted/Waitlisted/Declined columns
+11. Map Editor → geocode search "Cheltenham" → selecting a result **drops a draft pin to confirm** (D3): show the confirm banner → **Add spot here** → spot panel opens
+12. Spot panel: What3Words / Google Maps / Apple Maps deep-links (E23.3) → drag the pin to reposition (E23.2) → drag an accepted artist from the unassigned rail onto the pin (E23.7)
+13. Back on the festival detail page, the **Spot assignments** summary lists assigned artists ✓ and any still unassigned ⚠ (E23.8)
 
 **Seed requirement:** Run `task demo:seed` to reset. All 5 applications must be `submitted`; Sophie Park (`sophie@cpf-reviewer.art`) seeded as an accepted reviewer with pre-scored applications (★ scores: Rosa 5, Amara 5, Kit 4, Yuki 3, Tomás 2).
 
