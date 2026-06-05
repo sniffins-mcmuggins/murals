@@ -169,6 +169,26 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   await expect(page.getByTestId('spot-panel')).toBeVisible({ timeout: 5_000 })
   await pause(800)
 
+  // ── 8b. Fill spot details + external map deep-links (E23.3) ───────────────────
+  // The spot panel captures wall dimensions, mural status, notes and a
+  // What3Words ref, plus one-tap navigation links for crews on the day.
+  const panel = page.getByTestId('spot-panel')
+  await slowType(panel.getByPlaceholder('e.g. filled.count.soap'), 'filled.count.soap')
+  await slowType(panel.getByPlaceholder('—').first(), '6')   // width (m)
+  await slowType(panel.getByPlaceholder('—').last(), '4')    // height (m)
+  await highlight(page, '[data-testid="spot-panel"] [aria-label="Mural status"]')
+  await panel.getByLabel('Mural status').selectOption('temporary')
+  await pause(500)
+  await slowType(panel.getByPlaceholder('e.g. needs cherry picker'), 'Needs cherry picker — gable end')
+  // What3Words / Google Maps / Apple Maps deep-links for on-site navigation
+  await highlight(page, '[data-testid="link-w3w"]')
+  await highlight(page, '[data-testid="link-google"]')
+  await highlight(page, '[data-testid="link-apple"]')
+  await pause(700)
+  await highlight(page, '[data-testid="spot-panel"] button:has-text("Save")')
+  await panel.getByRole('button', { name: 'Save', exact: true }).click()
+  await pause(1000)
+
   const marker = page.locator('.leaflet-marker-icon').last()
   const markerBox = await marker.boundingBox()
   if (markerBox) {
@@ -188,4 +208,14 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
   const targetPin = page.locator('.leaflet-marker-icon').last()
   await artistCard.dragTo(targetPin)
   await pause(2000)
+
+  // ── 9. Spot-assignment summary on the festival page (E23.8) ───────────────────
+  // Back on the festival overview, the organiser sees an at-a-glance roll-up of
+  // which accepted artists have a spot and which are still unassigned.
+  await page.goto(`/organiser/festivals/${festivalId}`)
+  await expect(page.getByTestId('spot-assignment-summary')).toBeVisible({ timeout: 8000 })
+  await page.getByTestId('spot-assignment-summary').scrollIntoViewIfNeeded()
+  await pause(600)
+  await highlight(page, '[data-testid="spot-assignment-summary"]')
+  await pause(2500)
 })

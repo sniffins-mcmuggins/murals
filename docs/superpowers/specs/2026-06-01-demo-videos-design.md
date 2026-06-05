@@ -16,7 +16,7 @@ This table is the living reference. Add rows as new videos are commissioned.
 | ID  | Persona    | Title                        | DB approach  | Key moments |
 |-----|------------|------------------------------|--------------|-------------|
 | V05 | Artist     | Artist Journey               | From scratch + pre-seeded CPF 2027 | Signup page → "Continue with Google" → dashboard → profile pic + headline photo → bio → portfolio collection → publish → view public page → apply to CPF 2027 → submit |
-| V06 | Organiser  | Organiser: Review Round + Staged Decisions | Pre-seeded (5 submitted + Sophie as accepted reviewer with scores) | Login → CPF 2027 → applications kanban → **Open review round** → decisions locked (drag handles gone) → **Close round** → ★ scores visible on cards → reorder cards by score → drag to Accept/Waitlist/Decline → Release → post-release banner → map editor (geocode search, place spot, drag to position, assign artist) |
+| V06 | Organiser  | Organiser: Review Round + Staged Decisions | Pre-seeded (5 submitted + Sophie as accepted reviewer with scores) | Login → CPF 2027 → applications kanban → **Open review round** → decisions locked (drag handles gone) → **Close round** → ★ scores visible on cards → reorder cards by score → drag to Accept/Waitlist/Decline → Release → post-release banner → map editor (geocode search, place spot, set dimensions + mural status + What3Words/Google/Apple deep-links, drag to position, assign artist) → festival-page spot-assignment summary |
 
 ---
 
@@ -118,7 +118,10 @@ highlight(page, selector)            // brief amber outline to draw the eye
 12. Click "Yes, release"
 13. Post-release banner: "Decisions released · artists notified by email"
 14. Scroll to show Accepted/Waitlisted/Declined columns with "Notified ✓" badges
-15. Navigate to Map Editor → geocode search for Cheltenham → place a spot → drag to position → assign accepted artist from rail
+15. Navigate to Map Editor → geocode search for Cheltenham → place a spot
+16. Fill the spot panel: What3Words, wall width/height, mural status, internal notes; show the What3Words / Google Maps / Apple Maps deep-links → Save (E23.3)
+17. Drag the pin to reposition it (E23.2) → drag an accepted artist from the unassigned rail onto the pin (E23.7)
+18. Back on the festival detail page, the **Spot assignments** summary lists assigned artists ✓ and any still unassigned ⚠ (E23.8)
 
 **Seed requirement:** Run `task demo:seed` to reset. All 5 applications must be `submitted`; Sophie Park (`sophie@cpf-reviewer.art`) seeded as an accepted reviewer with pre-scored applications (★ scores: Rosa 5, Amara 5, Kit 4, Yuki 3, Tomás 2).
 
