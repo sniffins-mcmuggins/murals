@@ -55,3 +55,11 @@ WHERE id = $1
   AND review_opened_at IS NOT NULL
   AND review_closed_at IS NULL
 RETURNING *;
+
+-- name: SetFestivalCenter :one
+UPDATE festivals
+SET center_lat = $2,
+    center_lng = $3,
+    updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING *;

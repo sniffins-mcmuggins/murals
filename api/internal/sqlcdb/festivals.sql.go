@@ -273,6 +273,46 @@ func (q *Queries) OpenReviewRound(ctx context.Context, id pgtype.UUID) (Festival
 	return i, err
 }
 
+const setFestivalCenter = `-- name: SetFestivalCenter :one
+UPDATE festivals
+SET center_lat = $2,
+    center_lng = $3,
+    updated_at = now()
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng
+`
+
+type SetFestivalCenterParams struct {
+	ID        pgtype.UUID    `db:"id" json:"id"`
+	CenterLat pgtype.Numeric `db:"center_lat" json:"center_lat"`
+	CenterLng pgtype.Numeric `db:"center_lng" json:"center_lng"`
+}
+
+func (q *Queries) SetFestivalCenter(ctx context.Context, arg SetFestivalCenterParams) (Festival, error) {
+	row := q.db.QueryRow(ctx, setFestivalCenter, arg.ID, arg.CenterLat, arg.CenterLng)
+	var i Festival
+	err := row.Scan(
+		&i.ID,
+		&i.OrganiserID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.LocationLabel,
+		&i.StartDate,
+		&i.EndDate,
+		&i.Status,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DecisionsReleasedAt,
+		&i.ReviewOpenedAt,
+		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
+	)
+	return i, err
+}
+
 const setFestivalDecisionsReleasedAt = `-- name: SetFestivalDecisionsReleasedAt :one
 UPDATE festivals
 SET decisions_released_at = now(), updated_at = now()

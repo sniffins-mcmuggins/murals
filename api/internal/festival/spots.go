@@ -297,12 +297,13 @@ func UpdateSpotHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.BadRequest(w, "invalid lng")
 			return
 		}
-		if _, err = q.UpdateFestivalSpot(r.Context(), sqlcdb.UpdateFestivalSpotParams{
+		if _, err = q.UpdateFestivalSpotWithStatus(r.Context(), sqlcdb.UpdateFestivalSpotWithStatusParams{
 			ID: spotUUID, FestivalID: festUUID,
 			Lat: lat, Lng: lng, W3w: req.W3W,
-			WidthM:  optFloatToNumeric(req.WidthM),
-			HeightM: optFloatToNumeric(req.HeightM),
-			Notes:   req.Notes,
+			WidthM:      optFloatToNumeric(req.WidthM),
+			HeightM:     optFloatToNumeric(req.HeightM),
+			Notes:       req.Notes,
+			MuralStatus: "unknown",
 		}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.NotFound(w)
