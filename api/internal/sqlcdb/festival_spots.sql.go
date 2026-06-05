@@ -16,7 +16,7 @@ UPDATE festival_spots
 SET artist_id  = NULL,
     updated_at = now()
 WHERE id = $1 AND festival_id = $2
-RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at
+RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at, mural_status
 `
 
 type ClearFestivalSpotArtistParams struct {
@@ -40,6 +40,7 @@ func (q *Queries) ClearFestivalSpotArtist(ctx context.Context, arg ClearFestival
 		&i.ArtistID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MuralStatus,
 	)
 	return i, err
 }
@@ -70,7 +71,7 @@ VALUES (
     COALESCE((SELECT MAX(number) FROM festival_spots WHERE festival_id = $1), 0) + 1,
     $2, $3, $4, $5, $6, $7
 )
-RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at
+RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at, mural_status
 `
 
 type CreateFestivalSpotParams struct {
@@ -107,6 +108,7 @@ func (q *Queries) CreateFestivalSpot(ctx context.Context, arg CreateFestivalSpot
 		&i.ArtistID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MuralStatus,
 	)
 	return i, err
 }
@@ -397,7 +399,7 @@ UPDATE festival_spots
 SET artist_id  = $3,
     updated_at = now()
 WHERE id = $1 AND festival_id = $2
-RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at
+RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at, mural_status
 `
 
 type SetFestivalSpotArtistParams struct {
@@ -422,6 +424,7 @@ func (q *Queries) SetFestivalSpotArtist(ctx context.Context, arg SetFestivalSpot
 		&i.ArtistID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MuralStatus,
 	)
 	return i, err
 }
@@ -436,7 +439,7 @@ SET lat        = $3,
     notes      = $8,
     updated_at = now()
 WHERE id = $1 AND festival_id = $2
-RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at
+RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at, mural_status
 `
 
 type UpdateFestivalSpotParams struct {
@@ -475,6 +478,7 @@ func (q *Queries) UpdateFestivalSpot(ctx context.Context, arg UpdateFestivalSpot
 		&i.ArtistID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MuralStatus,
 	)
 	return i, err
 }

@@ -18,7 +18,7 @@ WHERE id = $1
   AND deleted_at IS NULL
   AND review_opened_at IS NOT NULL
   AND review_closed_at IS NULL
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng
 `
 
 func (q *Queries) CloseReviewRound(ctx context.Context, id pgtype.UUID) (Festival, error) {
@@ -40,6 +40,8 @@ func (q *Queries) CloseReviewRound(ctx context.Context, id pgtype.UUID) (Festiva
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
@@ -47,7 +49,7 @@ func (q *Queries) CloseReviewRound(ctx context.Context, id pgtype.UUID) (Festiva
 const createFestival = `-- name: CreateFestival :one
 INSERT INTO festivals (organiser_id, name, slug, description, location_label, start_date, end_date, status)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng
 `
 
 type CreateFestivalParams struct {
@@ -89,12 +91,14 @@ func (q *Queries) CreateFestival(ctx context.Context, arg CreateFestivalParams) 
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
 
 const getFestivalByID = `-- name: GetFestivalByID :one
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE id = $1 AND deleted_at IS NULL
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng FROM festivals WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetFestivalByID(ctx context.Context, id pgtype.UUID) (Festival, error) {
@@ -116,12 +120,14 @@ func (q *Queries) GetFestivalByID(ctx context.Context, id pgtype.UUID) (Festival
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
 
 const getFestivalBySlug = `-- name: GetFestivalBySlug :one
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE slug = $1 AND deleted_at IS NULL
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng FROM festivals WHERE slug = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetFestivalBySlug(ctx context.Context, slug string) (Festival, error) {
@@ -143,12 +149,14 @@ func (q *Queries) GetFestivalBySlug(ctx context.Context, slug string) (Festival,
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
 
 const listFestivalsByOrganiser = `-- name: ListFestivalsByOrganiser :many
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE organiser_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng FROM festivals WHERE organiser_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC
 `
 
 func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgtype.UUID) ([]Festival, error) {
@@ -176,6 +184,8 @@ func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgty
 			&i.DecisionsReleasedAt,
 			&i.ReviewOpenedAt,
 			&i.ReviewClosedAt,
+			&i.CenterLat,
+			&i.CenterLng,
 		); err != nil {
 			return nil, err
 		}
@@ -188,7 +198,7 @@ func (q *Queries) ListFestivalsByOrganiser(ctx context.Context, organiserID pgty
 }
 
 const listPublicFestivals = `-- name: ListPublicFestivals :many
-SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC
+SELECT id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC
 `
 
 func (q *Queries) ListPublicFestivals(ctx context.Context, status FestivalStatus) ([]Festival, error) {
@@ -216,6 +226,8 @@ func (q *Queries) ListPublicFestivals(ctx context.Context, status FestivalStatus
 			&i.DecisionsReleasedAt,
 			&i.ReviewOpenedAt,
 			&i.ReviewClosedAt,
+			&i.CenterLat,
+			&i.CenterLng,
 		); err != nil {
 			return nil, err
 		}
@@ -233,7 +245,7 @@ SET review_opened_at = now(), review_closed_at = NULL, updated_at = now()
 WHERE id = $1
   AND deleted_at IS NULL
   AND review_closed_at IS NULL
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng
 `
 
 func (q *Queries) OpenReviewRound(ctx context.Context, id pgtype.UUID) (Festival, error) {
@@ -255,6 +267,8 @@ func (q *Queries) OpenReviewRound(ctx context.Context, id pgtype.UUID) (Festival
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
@@ -265,7 +279,7 @@ SET decisions_released_at = now(), updated_at = now()
 WHERE id = $1
   AND decisions_released_at IS NULL
   AND deleted_at IS NULL
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng
 `
 
 func (q *Queries) SetFestivalDecisionsReleasedAt(ctx context.Context, id pgtype.UUID) (Festival, error) {
@@ -287,6 +301,8 @@ func (q *Queries) SetFestivalDecisionsReleasedAt(ctx context.Context, id pgtype.
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
@@ -311,7 +327,7 @@ SET name           = $2,
     status         = $8,
     updated_at     = now()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at
+RETURNING id, organiser_id, name, slug, description, location_label, start_date, end_date, status, deleted_at, created_at, updated_at, decisions_released_at, review_opened_at, review_closed_at, center_lat, center_lng
 `
 
 type UpdateFestivalParams struct {
@@ -353,6 +369,8 @@ func (q *Queries) UpdateFestival(ctx context.Context, arg UpdateFestivalParams) 
 		&i.DecisionsReleasedAt,
 		&i.ReviewOpenedAt,
 		&i.ReviewClosedAt,
+		&i.CenterLat,
+		&i.CenterLng,
 	)
 	return i, err
 }
