@@ -285,6 +285,7 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
         <div>
           <label className="font-sans text-xs text-mid block mb-1">Artist</label>
           <select value={artistId} onChange={e => setArtistId(e.target.value)}
+            aria-label="Artist"
             className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber">
             <option value="">— unassigned —</option>
             {artistOptions.map(a => (

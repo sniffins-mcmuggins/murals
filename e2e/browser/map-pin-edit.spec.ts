@@ -185,8 +185,9 @@ test('release-decisions → artist in pool → assign to spot → appears on pub
     await page.locator('.leaflet-container').click({ position: { x: 250, y: 200 } })
     await expect(page.getByTestId('spot-panel')).toBeVisible({ timeout: 5_000 })
 
-    // Assign the accepted artist from the dropdown
-    await page.getByTestId('spot-panel').getByRole('combobox').selectOption({ index: 1 })
+    // Assign the accepted artist from the dropdown (the panel also has a "Mural
+    // status" select, so target the Artist select specifically).
+    await page.getByTestId('spot-panel').getByLabel('Artist').selectOption({ index: 1 })
     await page.getByTestId('spot-panel').getByRole('button', { name: 'Save' }).click()
     await expect(
       page.getByTestId('spot-panel').getByRole('button', { name: 'Save' }),

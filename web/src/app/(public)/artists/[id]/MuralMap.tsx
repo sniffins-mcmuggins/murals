@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
-interface SpotEntry {
+export interface SpotEntry {
   spot_id: string
   festival_id: string
   festival_name: string

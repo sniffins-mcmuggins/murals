@@ -1,19 +1,10 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { apiClient } from '@/lib/api'
 import { SocialLinks } from '@/components/SocialLinks'
 import { absoluteUrl } from '@/lib/site'
-
-const MuralMap = dynamic(() => import('./MuralMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[280px] bg-warm rounded-xl flex items-center justify-center">
-      <p className="font-sans text-sm text-mid">Loading map…</p>
-    </div>
-  ),
-})
+import MuralMapClient from './MuralMapClient'
 
 interface ArtistPageProps {
   params: Promise<{ id: string }>
@@ -284,7 +275,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           <section aria-label="Mural history" className="mt-12">
             <h2 className="font-serif text-2xl text-ink mb-4">Mural history</h2>
             <div className="rounded-xl overflow-hidden border border-light">
-              <MuralMap spots={profile.spot_history.map(s => ({
+              <MuralMapClient spots={profile.spot_history.map(s => ({
                 spot_id: s.spot_id ?? '',
                 festival_id: s.festival_id ?? '',
                 festival_name: s.festival_name ?? '',

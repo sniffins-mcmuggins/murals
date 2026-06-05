@@ -14,10 +14,11 @@
 ## Key Decisions
 - **Map editor uses Leaflet with `ssr: false`**: `FestivalMapClient.tsx` is a `'use client'` dynamic import — the map cannot be SSR'd
 - **`[data-testid="spot-panel"]`**: the spot edit panel is a custom side panel, NOT a Leaflet popup — Playwright tests target `spot-panel`, not `.leaflet-popup`
+- **Spot panel has two `<select>`s**: Artist (`aria-label="Artist"`) and Mural status (`aria-label="Mural status"`). Tests MUST disambiguate by `getByLabel(...)` — a bare `getByRole('combobox')` / `spot-panel select` is a strict-mode violation
 
 ## Invariants
-- Map editor components MUST be dynamic imports with `ssr: false` inside a `'use client'` wrapper
-- Spot panel tests MUST target `[data-testid="spot-panel"]`, not Leaflet popup selectors
+- Map editor components MUST be dynamic imports with `ssr: false` inside a `'use client'` wrapper. This includes the **public** artist mural-history map (`(public)/artists/[id]/MuralMapClient.tsx`), not just the organiser editor — `ssr: false` in a Server Component is a compile error that 500s the whole `next dev` app
+- Spot panel tests MUST target `[data-testid="spot-panel"]`, not Leaflet popup selectors, and MUST pick a specific select by `aria-label` (Artist vs Mural status)
 
 ## AI Context
 - `festivals/`: festival CRUD + status management
@@ -27,3 +28,4 @@
 
 ## Changelog
 2026-05-31 — initial spec
+2026-06-05 — spot panel gained a Mural status select (now two selects → disambiguate tests by aria-label); ssr:false-in-client-wrapper invariant extended to the public mural-history map

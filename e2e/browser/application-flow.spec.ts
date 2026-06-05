@@ -112,8 +112,9 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
     // Spot panel opens
     await expect(organiserPage.getByTestId('spot-panel')).toBeVisible({ timeout: 5_000 })
 
-    // Select the accepted artist from the dropdown in the panel
-    await organiserPage.locator('[data-testid="spot-panel"] select').selectOption({ label: `E2E Artist ${suffix}` })
+    // Select the accepted artist from the dropdown in the panel (the panel also
+    // has a "Mural status" select, so target the Artist select specifically).
+    await organiserPage.getByTestId('spot-panel').getByLabel('Artist').selectOption({ label: `E2E Artist ${suffix}` })
 
     // Save
     await organiserPage.getByRole('button', { name: 'Save' }).click()
