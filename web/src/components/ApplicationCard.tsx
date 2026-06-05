@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { parseEmbed } from '@/lib/embeds'
 import type { components } from '@render/api-client'
 
 type Application = components['schemas']['Application']
@@ -47,6 +48,9 @@ export function ApplicationCard({
   const avgScore = application.avg_score
   const scoreCount = application.score_count ?? 0
   const showAvg = avgScore != null && scoreCount > 0
+
+  const answers = (application.answers ?? {}) as Record<string, string>
+  const firstEmbed = Object.values(answers).map(v => v && parseEmbed(v)).find(Boolean) || null
 
   const isDecisionColumn = ['accept', 'waitlist', 'decline'].includes(columnKey)
   const cardBg = isDecisionColumn
@@ -97,6 +101,11 @@ export function ApplicationCard({
               </span>
             ))}
           </div>
+        )}
+        {firstEmbed && (
+          <span data-testid="embed-chip" className="font-mono text-[10px] uppercase tracking-widest bg-warm border border-light rounded px-1.5 py-0.5 text-mid">
+            {firstEmbed.provider === 'sketchfab' ? '◆ 3D' : '▶ Video'}
+          </span>
         )}
         {isReleased && isDecisionColumn && (
           <div className="font-mono text-mid mt-0.5" style={{ fontSize: '9px' }}>
