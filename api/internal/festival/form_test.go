@@ -48,6 +48,44 @@ func TestUpsertForm_CreatesAndUpdates(t *testing.T) {
 	assert.Len(t, form2["fields"].([]any), 2)
 }
 
+func TestUpsertForm_RejectsMalformedFields(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	upsertFormRaw := func(fieldsJSON string) int {
+		body := `{"fields":` + fieldsJSON + `}`
+		resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/form", body, orgToken)
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	// missing label
+	if code := upsertFormRaw(`[{"id":"a","type":"text"}]`); code != http.StatusUnprocessableEntity {
+		t.Errorf("missing label: got %d want 422", code)
+	}
+	// unknown type
+	if code := upsertFormRaw(`[{"id":"a","type":"slider","label":"x"}]`); code != http.StatusUnprocessableEntity {
+		t.Errorf("unknown type: got %d want 422", code)
+	}
+	// select with no options
+	if code := upsertFormRaw(`[{"id":"a","type":"select","label":"x"}]`); code != http.StatusUnprocessableEntity {
+		t.Errorf("select no options: got %d want 422", code)
+	}
+	// valid embed field
+	if code := upsertFormRaw(`[{"id":"a","type":"embed","label":"Video"}]`); code != http.StatusOK {
+		t.Errorf("valid embed: got %d want 200", code)
+	}
+}
+
 func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

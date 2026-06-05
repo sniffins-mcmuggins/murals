@@ -216,6 +216,32 @@ func UpsertFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			req.Fields = json.RawMessage(`[]`)
 		}
 
+		// Validate field definitions before persisting.
+		var defs []struct {
+			ID      string   `json:"id"`
+			Type    string   `json:"type"`
+			Label   string   `json:"label"`
+			Options []string `json:"options"`
+		}
+		if err := json.Unmarshal(req.Fields, &defs); err != nil {
+			httperr.BadRequest(w, "invalid fields")
+			return
+		}
+		validType := map[string]bool{
+			"text": true, "textarea": true, "long_text": true,
+			"select": true, "url": true, "embed": true,
+		}
+		for _, d := range defs {
+			if d.ID == "" || d.Label == "" || !validType[d.Type] {
+				httperr.UnprocessableEntity(w, "invalid field definition")
+				return
+			}
+			if d.Type == "select" && len(d.Options) == 0 {
+				httperr.UnprocessableEntity(w, "select field needs at least one option")
+				return
+			}
+		}
+
 		form, err := q.UpsertApplicationForm(r.Context(), sqlcdb.UpsertApplicationFormParams{
 			FestivalID: festUUID,
 			Fields:     req.Fields,
