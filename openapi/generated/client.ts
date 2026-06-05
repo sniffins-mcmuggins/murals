@@ -892,6 +892,10 @@ export interface paths {
                         /** Format: date */
                         endDate?: string | null;
                         status?: components["schemas"]["FestivalStatus"];
+                        /** Format: float */
+                        center_lat?: number | null;
+                        /** Format: float */
+                        center_lng?: number | null;
                     };
                 };
             };
@@ -1573,6 +1577,23 @@ export interface paths {
         patch: operations["setArtistPin"];
         trace?: never;
     };
+    "/festivals/{festivalID}/spots/nearby-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get spots from nearby previous festivals (owner only) */
+        get: operations["getNearbyHistorySpots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/festivals/{festivalID}/spots": {
         parameters: {
             query?: never;
@@ -1846,6 +1867,18 @@ export interface components {
             updated_at: string;
             /** @description Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses. */
             preview_token?: string;
+            spot_history?: {
+                /** Format: uuid */
+                spot_id?: string;
+                /** Format: uuid */
+                festival_id?: string;
+                festival_name?: string;
+                festival_year?: number | null;
+                lat?: number;
+                lng?: number;
+                /** @enum {string} */
+                mural_status?: "permanent" | "temporary" | "unknown";
+            }[];
         };
         CreateProfileRequest: {
             /** @example Alice Muralist */
@@ -1971,6 +2004,10 @@ export interface components {
             review_closed_at?: string | null;
             /** @enum {string} */
             review_status?: "not_started" | "open" | "closed";
+            /** Format: float */
+            center_lat?: number | null;
+            /** Format: float */
+            center_lng?: number | null;
         };
         /** @description A publicly-visible festival an artist is appearing at. */
         FestivalAppearance: {
@@ -2139,6 +2176,11 @@ export interface components {
             /** Format: uuid */
             artist_id?: string | null;
             artist_name?: string | null;
+            /**
+             * @description Whether the mural painted at this spot is still on the wall.
+             * @enum {string}
+             */
+            mural_status?: "permanent" | "temporary" | "unknown";
         };
         UnassignedArtist: {
             /** Format: uuid */
@@ -3427,6 +3469,46 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getNearbyHistorySpots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                festivalID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of nearby historical spots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        spot_id?: string;
+                        /** Format: uuid */
+                        festival_id?: string;
+                        festival_name?: string;
+                        festival_year?: number | null;
+                        lat?: number;
+                        lng?: number;
+                        /** @enum {string} */
+                        mural_status?: "permanent" | "temporary" | "unknown";
+                    }[];
+                };
+            };
+            /** @description Not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getFestivalSpots: {
         parameters: {
             query?: never;
@@ -3538,6 +3620,8 @@ export interface operations {
                     /** Format: float */
                     height_m?: number | null;
                     notes?: string | null;
+                    /** @enum {string|null} */
+                    mural_status?: "permanent" | "temporary" | "unknown" | null;
                 };
             };
         };

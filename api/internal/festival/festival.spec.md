@@ -42,14 +42,14 @@
 - `application.go`: application submit/patch/status + most of the review lifecycle. `ApplicationArtist` now carries `id` (artist profile id) for profile linking — both `toEnrichedResponse` and `toEnrichedReviewerRow` must populate it.
 - `review.go`: `ListApplicationsHandler` branches final encode by role; `Accept/Decline/WaitlistApplicationHandler` all carry the decision gate. `score.go`: reviewer round gate (only while open). `review_round.go`: `reviewRoundStatus()` helper + `OpenReviewRoundHandler` / `CloseReviewRoundHandler`; grep `reviewRoundStatus` when adding a new decision endpoint.
 - `reviewers.go`: panellist account management
-- `spots.go`: map spot assignment
+- `spots.go`: map spot assignment; `NearbyHistoryHandler` at GET /spots/nearby-history returns spots from festivals within 10 km of the current festival's center. Route must be registered BEFORE `/{spotID}` in `main.go` (literal before parameterised — chi route-order invariant).
 - `form.go`: dynamic application form builder
 - `map.go`: `GetMapDataHandler` — public endpoint returning spot locations + artist previews for the Leaflet map
 - `appearances.go`: `POST /appearances` wires confirmed application → artist profile for public display
 - `release.go`: `ReleaseDecisionsHandler` — bulk-finalises staged decisions; upserts `festival_artists` for each accept (mirrors `AcceptApplicationHandler`) and notifies every affected artist
 - `access.go`: the organiser-ownership check — used by most handlers to confirm the caller owns the festival
 - `testhelpers_test.go`: shared test helpers (festival/application setup) — check this before writing new tests to avoid duplication
-- **`PATCH /spots/{id}` is a full replace of mutable fields** — partial updates (e.g. drag) must resend `w3w`/`width_m`/`height_m`/`notes` or they're cleared.
+- **`PATCH /spots/{id}` is a full replace of mutable fields** — partial updates (e.g. drag) must resend `w3w`/`width_m`/`height_m`/`notes`/`mural_status` or they're cleared (mural_status reverts to 'unknown' if omitted).
 - The organiser-facing `ListApplicationsHandler` keeps the full `applicationResponse` (incl. `staged_decision`); only the artist-facing `/me/applications` is trimmed. Don't "unify" them back together.
 
 ## Changelog
@@ -57,6 +57,7 @@
 2026-06-03 — documented staged-decisions + bulk release (E22); recorded the invariant that finalising an accept (direct or via release) upserts a `festival_artists` row, after fixing `ReleaseDecisionsHandler` which omitted it
 2026-06-04 — E23: noted PATCH /spots full-replace invariant; click-to-place already shipped; release→festival_artist gap closed in f1a2264
 2026-06-04 — E23: pre-release spot eligibility + auto-clear invariant; no-artist-awareness (trimmed /me/applications, gated appearances); PATCH /spots full-replace note.
+2026-06-05 — E26: mural_status on festival_spots (permanent/temporary/unknown, default unknown); center_lat/center_lng on festivals; NearbyHistoryHandler (10 km Haversine, nearby-history before /{spotID}); PATCH /spots full-replace includes mural_status.
 2026-06-04 — Epic 1 Phase 1: removed reviewer identity masking entirely (column, stripping, identity_hidden, toggle, e2e). Reviewers always see full identity.
 2026-06-04 — Epic 1 Phase 2: reviewer-only scoring queue; trimmed reviewerApplicationResponse seals the decision-field leak.
 2026-06-04 — Epic 1 Phase 3: review round open/close lifecycle; sequential decision gate (reviewers score only while open; decisions locked while open); reviewers notified on open (accepted only).

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { SocialLinks } from '@/components/SocialLinks'
 import { absoluteUrl } from '@/lib/site'
+import MuralMapClient from './MuralMapClient'
 
 interface ArtistPageProps {
   params: Promise<{ id: string }>
@@ -264,6 +265,32 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                     {statusLabel[collection.status] ?? collection.status}
                   </span>
                 </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Mural history map */}
+        {profile.spot_history && profile.spot_history.length > 0 && (
+          <section aria-label="Mural history" className="mt-12">
+            <h2 className="font-serif text-2xl text-ink mb-4">Mural history</h2>
+            <div className="rounded-xl overflow-hidden border border-light">
+              <MuralMapClient spots={profile.spot_history.map(s => ({
+                spot_id: s.spot_id ?? '',
+                festival_id: s.festival_id ?? '',
+                festival_name: s.festival_name ?? '',
+                festival_year: s.festival_year,
+                lat: s.lat ?? 0,
+                lng: s.lng ?? 0,
+                mural_status: (s.mural_status ?? 'unknown') as 'permanent' | 'temporary' | 'unknown',
+              }))} />
+            </div>
+            <div className="flex gap-3 mt-3 flex-wrap">
+              {(['permanent', 'temporary', 'unknown'] as const).map(s => (
+                <span key={s} className="font-mono text-xs text-mid uppercase tracking-wider flex items-center gap-1.5">
+                  <span className={`w-2.5 h-2.5 rounded-full inline-block ${s === 'permanent' ? 'bg-amber' : s === 'temporary' ? 'bg-mid' : 'bg-light'}`} />
+                  {s}
+                </span>
               ))}
             </div>
           </section>

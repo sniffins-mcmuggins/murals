@@ -20,6 +20,7 @@ SELECT fs.id,
        fs.artist_id,
        fs.created_at,
        fs.updated_at,
+       fs.mural_status,
        ap.display_name AS artist_name
 FROM festival_spots fs
 LEFT JOIN artist_profiles ap ON ap.id = fs.artist_id
@@ -38,21 +39,23 @@ SELECT fs.id,
        fs.artist_id,
        fs.created_at,
        fs.updated_at,
+       fs.mural_status,
        ap.display_name AS artist_name
 FROM festival_spots fs
 LEFT JOIN artist_profiles ap ON ap.id = fs.artist_id
 WHERE fs.festival_id = $1
 ORDER BY fs.number;
 
--- name: UpdateFestivalSpot :one
+-- name: UpdateFestivalSpotWithStatus :one
 UPDATE festival_spots
-SET lat        = $3,
-    lng        = $4,
-    w3w        = $5,
-    width_m    = $6,
-    height_m   = $7,
-    notes      = $8,
-    updated_at = now()
+SET lat          = $3,
+    lng          = $4,
+    w3w          = $5,
+    width_m      = $6,
+    height_m     = $7,
+    notes        = $8,
+    mural_status = $9,
+    updated_at   = now()
 WHERE id = $1 AND festival_id = $2
 RETURNING *;
 
@@ -127,3 +130,31 @@ ORDER BY elig.name;
 UPDATE festival_spots
 SET artist_id = NULL, updated_at = now()
 WHERE festival_id = $1 AND artist_id = $2;
+
+-- name: GetNearbyHistorySpots :many
+-- Returns spots from OTHER festivals within radius_km of a given centre.
+-- festival_year extracted from start_date; NULL start_date → 0.
+SELECT
+    fs.id               AS spot_id,
+    fs.lat,
+    fs.lng,
+    fs.mural_status,
+    f.id                AS festival_id,
+    f.name              AS festival_name,
+    COALESCE(EXTRACT(YEAR FROM f.start_date)::int, 0) AS festival_year
+FROM festival_spots fs
+JOIN festivals f ON f.id = fs.festival_id
+WHERE f.id != @festival_id
+  AND f.deleted_at IS NULL
+  AND f.center_lat IS NOT NULL
+  AND f.center_lng IS NOT NULL
+  AND (
+    6371 * acos(
+      LEAST(1, GREATEST(-1,
+        cos(radians(@center_lat::float)) * cos(radians(f.center_lat::float))
+          * cos(radians(f.center_lng::float) - radians(@center_lng::float))
+        + sin(radians(@center_lat::float)) * sin(radians(f.center_lat::float))
+      ))
+    )
+  ) <= @radius_km
+ORDER BY f.start_date DESC NULLS LAST, fs.created_at;

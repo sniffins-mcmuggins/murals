@@ -68,6 +68,27 @@ func (e ApplicationStatus) Valid() bool {
 	}
 }
 
+// Defines values for ArtistProfileSpotHistoryMuralStatus.
+const (
+	ArtistProfileSpotHistoryMuralStatusPermanent ArtistProfileSpotHistoryMuralStatus = "permanent"
+	ArtistProfileSpotHistoryMuralStatusTemporary ArtistProfileSpotHistoryMuralStatus = "temporary"
+	ArtistProfileSpotHistoryMuralStatusUnknown   ArtistProfileSpotHistoryMuralStatus = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the ArtistProfileSpotHistoryMuralStatus enum.
+func (e ArtistProfileSpotHistoryMuralStatus) Valid() bool {
+	switch e {
+	case ArtistProfileSpotHistoryMuralStatusPermanent:
+		return true
+	case ArtistProfileSpotHistoryMuralStatusTemporary:
+		return true
+	case ArtistProfileSpotHistoryMuralStatusUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ArtistProfileVisibility.
 const (
 	ArtistProfileVisibilityDraft  ArtistProfileVisibility = "draft"
@@ -182,6 +203,27 @@ func (e FestivalAppearanceStatus) Valid() bool {
 	}
 }
 
+// Defines values for FestivalSpotMuralStatus.
+const (
+	FestivalSpotMuralStatusPermanent FestivalSpotMuralStatus = "permanent"
+	FestivalSpotMuralStatusTemporary FestivalSpotMuralStatus = "temporary"
+	FestivalSpotMuralStatusUnknown   FestivalSpotMuralStatus = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the FestivalSpotMuralStatus enum.
+func (e FestivalSpotMuralStatus) Valid() bool {
+	switch e {
+	case FestivalSpotMuralStatusPermanent:
+		return true
+	case FestivalSpotMuralStatusTemporary:
+		return true
+	case FestivalSpotMuralStatusUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FestivalStatus.
 const (
 	FestivalStatusArchived FestivalStatus = "archived"
@@ -245,6 +287,48 @@ func (e PatchFestivalsFestivalIDApplicationsApplicationIDJSONBodyStagedDecision)
 	case PatchFestivalsFestivalIDApplicationsApplicationIDJSONBodyStagedDecisionDecline:
 		return true
 	case PatchFestivalsFestivalIDApplicationsApplicationIDJSONBodyStagedDecisionWaitlist:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetNearbyHistorySpots200JSONResponseBodyMuralStatus.
+const (
+	GetNearbyHistorySpots200JSONResponseBodyMuralStatusPermanent GetNearbyHistorySpots200JSONResponseBodyMuralStatus = "permanent"
+	GetNearbyHistorySpots200JSONResponseBodyMuralStatusTemporary GetNearbyHistorySpots200JSONResponseBodyMuralStatus = "temporary"
+	GetNearbyHistorySpots200JSONResponseBodyMuralStatusUnknown   GetNearbyHistorySpots200JSONResponseBodyMuralStatus = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the GetNearbyHistorySpots200JSONResponseBodyMuralStatus enum.
+func (e GetNearbyHistorySpots200JSONResponseBodyMuralStatus) Valid() bool {
+	switch e {
+	case GetNearbyHistorySpots200JSONResponseBodyMuralStatusPermanent:
+		return true
+	case GetNearbyHistorySpots200JSONResponseBodyMuralStatusTemporary:
+		return true
+	case GetNearbyHistorySpots200JSONResponseBodyMuralStatusUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateFestivalSpotJSONBodyMuralStatus.
+const (
+	UpdateFestivalSpotJSONBodyMuralStatusPermanent UpdateFestivalSpotJSONBodyMuralStatus = "permanent"
+	UpdateFestivalSpotJSONBodyMuralStatusTemporary UpdateFestivalSpotJSONBodyMuralStatus = "temporary"
+	UpdateFestivalSpotJSONBodyMuralStatusUnknown   UpdateFestivalSpotJSONBodyMuralStatus = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the UpdateFestivalSpotJSONBodyMuralStatus enum.
+func (e UpdateFestivalSpotJSONBodyMuralStatus) Valid() bool {
+	switch e {
+	case UpdateFestivalSpotJSONBodyMuralStatusPermanent:
+		return true
+	case UpdateFestivalSpotJSONBodyMuralStatusTemporary:
+		return true
+	case UpdateFestivalSpotJSONBodyMuralStatusUnknown:
 		return true
 	default:
 		return false
@@ -395,7 +479,16 @@ type ArtistProfile struct {
 	// PreviewToken Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses.
 	PreviewToken *string           `json:"preview_token,omitempty"`
 	SocialLinks  map[string]string `json:"social_links"`
-	UpdatedAt    time.Time         `json:"updated_at"`
+	SpotHistory  *[]struct {
+		FestivalId   *openapi_types.UUID                  `json:"festival_id,omitempty"`
+		FestivalName *string                              `json:"festival_name,omitempty"`
+		FestivalYear *int                                 `json:"festival_year,omitempty"`
+		Lat          *float32                             `json:"lat,omitempty"`
+		Lng          *float32                             `json:"lng,omitempty"`
+		MuralStatus  *ArtistProfileSpotHistoryMuralStatus `json:"mural_status,omitempty"`
+		SpotId       *openapi_types.UUID                  `json:"spot_id,omitempty"`
+	} `json:"spot_history,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// UserId UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
 	UserId *openapi_types.UUID `json:"user_id,omitempty"`
@@ -403,6 +496,9 @@ type ArtistProfile struct {
 	// Visibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
 	Visibility ArtistProfileVisibility `json:"visibility"`
 }
+
+// ArtistProfileSpotHistoryMuralStatus defines model for ArtistProfile.SpotHistory.MuralStatus.
+type ArtistProfileSpotHistoryMuralStatus string
 
 // ArtistProfileVisibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
 type ArtistProfileVisibility string
@@ -538,6 +634,8 @@ type EndorsementResponseKind string
 
 // Festival defines model for Festival.
 type Festival struct {
+	CenterLat *float32   `json:"center_lat,omitempty"`
+	CenterLng *float32   `json:"center_lng,omitempty"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
 	// DecisionsReleasedAt Set once when Release Decisions is triggered; null until then
@@ -584,11 +682,17 @@ type FestivalSpot struct {
 	Id         openapi_types.UUID  `json:"id"`
 	Lat        float32             `json:"lat"`
 	Lng        float32             `json:"lng"`
-	Notes      *string             `json:"notes,omitempty"`
-	Number     int                 `json:"number"`
-	W3w        *string             `json:"w3w,omitempty"`
-	WidthM     *float32            `json:"width_m,omitempty"`
+
+	// MuralStatus Whether the mural painted at this spot is still on the wall.
+	MuralStatus *FestivalSpotMuralStatus `json:"mural_status,omitempty"`
+	Notes       *string                  `json:"notes,omitempty"`
+	Number      int                      `json:"number"`
+	W3w         *string                  `json:"w3w,omitempty"`
+	WidthM      *float32                 `json:"width_m,omitempty"`
 }
+
+// FestivalSpotMuralStatus Whether the mural painted at this spot is still on the wall.
+type FestivalSpotMuralStatus string
 
 // FestivalSpotsResponse defines model for FestivalSpotsResponse.
 type FestivalSpotsResponse struct {
@@ -844,6 +948,8 @@ type PostFestivalsJSONBody struct {
 
 // PatchFestivalsFestivalIDJSONBody defines parameters for PatchFestivalsFestivalID.
 type PatchFestivalsFestivalIDJSONBody struct {
+	CenterLat     *float32            `json:"center_lat,omitempty"`
+	CenterLng     *float32            `json:"center_lng,omitempty"`
 	Description   *string             `json:"description,omitempty"`
 	EndDate       *openapi_types.Date `json:"endDate,omitempty"`
 	LocationLabel *string             `json:"locationLabel,omitempty"`
@@ -916,15 +1022,22 @@ type CreateFestivalSpotJSONBody struct {
 	WidthM  *float32 `json:"width_m,omitempty"`
 }
 
+// GetNearbyHistorySpots200JSONResponseBodyMuralStatus defines parameters for GetNearbyHistorySpots.
+type GetNearbyHistorySpots200JSONResponseBodyMuralStatus string
+
 // UpdateFestivalSpotJSONBody defines parameters for UpdateFestivalSpot.
 type UpdateFestivalSpotJSONBody struct {
-	HeightM *float32 `json:"height_m,omitempty"`
-	Lat     float32  `json:"lat"`
-	Lng     float32  `json:"lng"`
-	Notes   *string  `json:"notes,omitempty"`
-	W3w     *string  `json:"w3w,omitempty"`
-	WidthM  *float32 `json:"width_m,omitempty"`
+	HeightM     *float32                               `json:"height_m,omitempty"`
+	Lat         float32                                `json:"lat"`
+	Lng         float32                                `json:"lng"`
+	MuralStatus *UpdateFestivalSpotJSONBodyMuralStatus `json:"mural_status,omitempty"`
+	Notes       *string                                `json:"notes,omitempty"`
+	W3w         *string                                `json:"w3w,omitempty"`
+	WidthM      *float32                               `json:"width_m,omitempty"`
 }
+
+// UpdateFestivalSpotJSONBodyMuralStatus defines parameters for UpdateFestivalSpot.
+type UpdateFestivalSpotJSONBodyMuralStatus string
 
 // SetSpotArtistJSONBody defines parameters for SetSpotArtist.
 type SetSpotArtistJSONBody struct {
@@ -1192,6 +1305,9 @@ type ServerInterface interface {
 	// Create a new spot
 	// (POST /festivals/{festivalID}/spots)
 	CreateFestivalSpot(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
+	// Get spots from nearby previous festivals (owner only)
+	// (GET /festivals/{festivalID}/spots/nearby-history)
+	GetNearbyHistorySpots(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID)
 	// Delete a spot (idempotent — always 204 whether spot existed or not)
 	// (DELETE /festivals/{festivalID}/spots/{spotID})
 	DeleteFestivalSpot(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID, spotID openapi_types.UUID)
@@ -1552,6 +1668,12 @@ func (_ Unimplemented) GetFestivalSpots(w http.ResponseWriter, r *http.Request, 
 // Create a new spot
 // (POST /festivals/{festivalID}/spots)
 func (_ Unimplemented) CreateFestivalSpot(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get spots from nearby previous festivals (owner only)
+// (GET /festivals/{festivalID}/spots/nearby-history)
+func (_ Unimplemented) GetNearbyHistorySpots(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3133,6 +3255,38 @@ func (siw *ServerInterfaceWrapper) CreateFestivalSpot(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetNearbyHistorySpots operation middleware
+func (siw *ServerInterfaceWrapper) GetNearbyHistorySpots(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "festivalID" -------------
+	var festivalID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "festivalID", chi.URLParam(r, "festivalID"), &festivalID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "festivalID", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNearbyHistorySpots(w, r, festivalID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteFestivalSpot operation middleware
 func (siw *ServerInterfaceWrapper) DeleteFestivalSpot(w http.ResponseWriter, r *http.Request) {
 
@@ -4111,6 +4265,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/festivals/{festivalID}/spots", wrapper.CreateFestivalSpot)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/festivals/{festivalID}/spots/nearby-history", wrapper.GetNearbyHistorySpots)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/festivals/{festivalID}/spots/{spotID}", wrapper.DeleteFestivalSpot)
@@ -6939,6 +7096,44 @@ func (response CreateFestivalSpot403ApplicationProblemPlusJSONResponse) VisitCre
 	return err
 }
 
+type GetNearbyHistorySpotsRequestObject struct {
+	FestivalID openapi_types.UUID `json:"festivalID"`
+}
+
+type GetNearbyHistorySpotsResponseObject interface {
+	VisitGetNearbyHistorySpotsResponse(w http.ResponseWriter) error
+}
+
+type GetNearbyHistorySpots200JSONResponse []struct {
+	FestivalId   *openapi_types.UUID                                  `json:"festival_id,omitempty"`
+	FestivalName *string                                              `json:"festival_name,omitempty"`
+	FestivalYear *int                                                 `json:"festival_year,omitempty"`
+	Lat          *float32                                             `json:"lat,omitempty"`
+	Lng          *float32                                             `json:"lng,omitempty"`
+	MuralStatus  *GetNearbyHistorySpots200JSONResponseBodyMuralStatus `json:"mural_status,omitempty"`
+	SpotId       *openapi_types.UUID                                  `json:"spot_id,omitempty"`
+}
+
+func (response GetNearbyHistorySpots200JSONResponse) VisitGetNearbyHistorySpotsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNearbyHistorySpots403Response struct {
+}
+
+func (response GetNearbyHistorySpots403Response) VisitGetNearbyHistorySpotsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
 type DeleteFestivalSpotRequestObject struct {
 	FestivalID openapi_types.UUID `json:"festivalID"`
 	SpotID     openapi_types.UUID `json:"spotID"`
@@ -8396,6 +8591,9 @@ type StrictServerInterface interface {
 	// Create a new spot
 	// (POST /festivals/{festivalID}/spots)
 	CreateFestivalSpot(ctx context.Context, request CreateFestivalSpotRequestObject) (CreateFestivalSpotResponseObject, error)
+	// Get spots from nearby previous festivals (owner only)
+	// (GET /festivals/{festivalID}/spots/nearby-history)
+	GetNearbyHistorySpots(ctx context.Context, request GetNearbyHistorySpotsRequestObject) (GetNearbyHistorySpotsResponseObject, error)
 	// Delete a spot (idempotent — always 204 whether spot existed or not)
 	// (DELETE /festivals/{festivalID}/spots/{spotID})
 	DeleteFestivalSpot(ctx context.Context, request DeleteFestivalSpotRequestObject) (DeleteFestivalSpotResponseObject, error)
@@ -9852,6 +10050,32 @@ func (sh *strictHandler) CreateFestivalSpot(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateFestivalSpotResponseObject); ok {
 		if err := validResponse.VisitCreateFestivalSpotResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetNearbyHistorySpots operation middleware
+func (sh *strictHandler) GetNearbyHistorySpots(w http.ResponseWriter, r *http.Request, festivalID openapi_types.UUID) {
+	var request GetNearbyHistorySpotsRequestObject
+
+	request.FestivalID = festivalID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNearbyHistorySpots(ctx, request.(GetNearbyHistorySpotsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNearbyHistorySpots")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNearbyHistorySpotsResponseObject); ok {
+		if err := validResponse.VisitGetNearbyHistorySpotsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

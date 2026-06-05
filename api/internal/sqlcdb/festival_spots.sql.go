@@ -189,6 +189,7 @@ SELECT fs.id,
        fs.artist_id,
        fs.created_at,
        fs.updated_at,
+       fs.mural_status,
        ap.display_name AS artist_name
 FROM festival_spots fs
 LEFT JOIN artist_profiles ap ON ap.id = fs.artist_id
@@ -201,19 +202,20 @@ type GetFestivalSpotParams struct {
 }
 
 type GetFestivalSpotRow struct {
-	ID         pgtype.UUID        `db:"id" json:"id"`
-	FestivalID pgtype.UUID        `db:"festival_id" json:"festival_id"`
-	Number     int32              `db:"number" json:"number"`
-	Lat        pgtype.Numeric     `db:"lat" json:"lat"`
-	Lng        pgtype.Numeric     `db:"lng" json:"lng"`
-	W3w        *string            `db:"w3w" json:"w3w"`
-	WidthM     pgtype.Numeric     `db:"width_m" json:"width_m"`
-	HeightM    pgtype.Numeric     `db:"height_m" json:"height_m"`
-	Notes      *string            `db:"notes" json:"notes"`
-	ArtistID   pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	ArtistName *string            `db:"artist_name" json:"artist_name"`
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	FestivalID  pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Number      int32              `db:"number" json:"number"`
+	Lat         pgtype.Numeric     `db:"lat" json:"lat"`
+	Lng         pgtype.Numeric     `db:"lng" json:"lng"`
+	W3w         *string            `db:"w3w" json:"w3w"`
+	WidthM      pgtype.Numeric     `db:"width_m" json:"width_m"`
+	HeightM     pgtype.Numeric     `db:"height_m" json:"height_m"`
+	Notes       *string            `db:"notes" json:"notes"`
+	ArtistID    pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MuralStatus string             `db:"mural_status" json:"mural_status"`
+	ArtistName  *string            `db:"artist_name" json:"artist_name"`
 }
 
 func (q *Queries) GetFestivalSpot(ctx context.Context, arg GetFestivalSpotParams) (GetFestivalSpotRow, error) {
@@ -232,6 +234,7 @@ func (q *Queries) GetFestivalSpot(ctx context.Context, arg GetFestivalSpotParams
 		&i.ArtistID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MuralStatus,
 		&i.ArtistName,
 	)
 	return i, err
@@ -250,6 +253,7 @@ SELECT fs.id,
        fs.artist_id,
        fs.created_at,
        fs.updated_at,
+       fs.mural_status,
        ap.display_name AS artist_name
 FROM festival_spots fs
 LEFT JOIN artist_profiles ap ON ap.id = fs.artist_id
@@ -258,19 +262,20 @@ ORDER BY fs.number
 `
 
 type GetFestivalSpotsRow struct {
-	ID         pgtype.UUID        `db:"id" json:"id"`
-	FestivalID pgtype.UUID        `db:"festival_id" json:"festival_id"`
-	Number     int32              `db:"number" json:"number"`
-	Lat        pgtype.Numeric     `db:"lat" json:"lat"`
-	Lng        pgtype.Numeric     `db:"lng" json:"lng"`
-	W3w        *string            `db:"w3w" json:"w3w"`
-	WidthM     pgtype.Numeric     `db:"width_m" json:"width_m"`
-	HeightM    pgtype.Numeric     `db:"height_m" json:"height_m"`
-	Notes      *string            `db:"notes" json:"notes"`
-	ArtistID   pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	ArtistName *string            `db:"artist_name" json:"artist_name"`
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	FestivalID  pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Number      int32              `db:"number" json:"number"`
+	Lat         pgtype.Numeric     `db:"lat" json:"lat"`
+	Lng         pgtype.Numeric     `db:"lng" json:"lng"`
+	W3w         *string            `db:"w3w" json:"w3w"`
+	WidthM      pgtype.Numeric     `db:"width_m" json:"width_m"`
+	HeightM     pgtype.Numeric     `db:"height_m" json:"height_m"`
+	Notes       *string            `db:"notes" json:"notes"`
+	ArtistID    pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MuralStatus string             `db:"mural_status" json:"mural_status"`
+	ArtistName  *string            `db:"artist_name" json:"artist_name"`
 }
 
 func (q *Queries) GetFestivalSpots(ctx context.Context, festivalID pgtype.UUID) ([]GetFestivalSpotsRow, error) {
@@ -295,7 +300,87 @@ func (q *Queries) GetFestivalSpots(ctx context.Context, festivalID pgtype.UUID) 
 			&i.ArtistID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MuralStatus,
 			&i.ArtistName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getNearbyHistorySpots = `-- name: GetNearbyHistorySpots :many
+SELECT
+    fs.id               AS spot_id,
+    fs.lat,
+    fs.lng,
+    fs.mural_status,
+    f.id                AS festival_id,
+    f.name              AS festival_name,
+    COALESCE(EXTRACT(YEAR FROM f.start_date)::int, 0) AS festival_year
+FROM festival_spots fs
+JOIN festivals f ON f.id = fs.festival_id
+WHERE f.id != $1
+  AND f.deleted_at IS NULL
+  AND f.center_lat IS NOT NULL
+  AND f.center_lng IS NOT NULL
+  AND (
+    6371 * acos(
+      LEAST(1, GREATEST(-1,
+        cos(radians($2::float)) * cos(radians(f.center_lat::float))
+          * cos(radians(f.center_lng::float) - radians($3::float))
+        + sin(radians($2::float)) * sin(radians(f.center_lat::float))
+      ))
+    )
+  ) <= $4
+ORDER BY f.start_date DESC NULLS LAST, fs.created_at
+`
+
+type GetNearbyHistorySpotsParams struct {
+	FestivalID pgtype.UUID    `db:"festival_id" json:"festival_id"`
+	CenterLat  float64        `db:"center_lat" json:"center_lat"`
+	CenterLng  float64        `db:"center_lng" json:"center_lng"`
+	RadiusKm   pgtype.Numeric `db:"radius_km" json:"radius_km"`
+}
+
+type GetNearbyHistorySpotsRow struct {
+	SpotID       pgtype.UUID    `db:"spot_id" json:"spot_id"`
+	Lat          pgtype.Numeric `db:"lat" json:"lat"`
+	Lng          pgtype.Numeric `db:"lng" json:"lng"`
+	MuralStatus  string         `db:"mural_status" json:"mural_status"`
+	FestivalID   pgtype.UUID    `db:"festival_id" json:"festival_id"`
+	FestivalName string         `db:"festival_name" json:"festival_name"`
+	FestivalYear interface{}    `db:"festival_year" json:"festival_year"`
+}
+
+// Returns spots from OTHER festivals within radius_km of a given centre.
+// festival_year extracted from start_date; NULL start_date → 0.
+func (q *Queries) GetNearbyHistorySpots(ctx context.Context, arg GetNearbyHistorySpotsParams) ([]GetNearbyHistorySpotsRow, error) {
+	rows, err := q.db.Query(ctx, getNearbyHistorySpots,
+		arg.FestivalID,
+		arg.CenterLat,
+		arg.CenterLng,
+		arg.RadiusKm,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetNearbyHistorySpotsRow
+	for rows.Next() {
+		var i GetNearbyHistorySpotsRow
+		if err := rows.Scan(
+			&i.SpotID,
+			&i.Lat,
+			&i.Lng,
+			&i.MuralStatus,
+			&i.FestivalID,
+			&i.FestivalName,
+			&i.FestivalYear,
 		); err != nil {
 			return nil, err
 		}
@@ -429,32 +514,34 @@ func (q *Queries) SetFestivalSpotArtist(ctx context.Context, arg SetFestivalSpot
 	return i, err
 }
 
-const updateFestivalSpot = `-- name: UpdateFestivalSpot :one
+const updateFestivalSpotWithStatus = `-- name: UpdateFestivalSpotWithStatus :one
 UPDATE festival_spots
-SET lat        = $3,
-    lng        = $4,
-    w3w        = $5,
-    width_m    = $6,
-    height_m   = $7,
-    notes      = $8,
-    updated_at = now()
+SET lat          = $3,
+    lng          = $4,
+    w3w          = $5,
+    width_m      = $6,
+    height_m     = $7,
+    notes        = $8,
+    mural_status = $9,
+    updated_at   = now()
 WHERE id = $1 AND festival_id = $2
 RETURNING id, festival_id, number, lat, lng, w3w, width_m, height_m, notes, artist_id, created_at, updated_at, mural_status
 `
 
-type UpdateFestivalSpotParams struct {
-	ID         pgtype.UUID    `db:"id" json:"id"`
-	FestivalID pgtype.UUID    `db:"festival_id" json:"festival_id"`
-	Lat        pgtype.Numeric `db:"lat" json:"lat"`
-	Lng        pgtype.Numeric `db:"lng" json:"lng"`
-	W3w        *string        `db:"w3w" json:"w3w"`
-	WidthM     pgtype.Numeric `db:"width_m" json:"width_m"`
-	HeightM    pgtype.Numeric `db:"height_m" json:"height_m"`
-	Notes      *string        `db:"notes" json:"notes"`
+type UpdateFestivalSpotWithStatusParams struct {
+	ID          pgtype.UUID    `db:"id" json:"id"`
+	FestivalID  pgtype.UUID    `db:"festival_id" json:"festival_id"`
+	Lat         pgtype.Numeric `db:"lat" json:"lat"`
+	Lng         pgtype.Numeric `db:"lng" json:"lng"`
+	W3w         *string        `db:"w3w" json:"w3w"`
+	WidthM      pgtype.Numeric `db:"width_m" json:"width_m"`
+	HeightM     pgtype.Numeric `db:"height_m" json:"height_m"`
+	Notes       *string        `db:"notes" json:"notes"`
+	MuralStatus string         `db:"mural_status" json:"mural_status"`
 }
 
-func (q *Queries) UpdateFestivalSpot(ctx context.Context, arg UpdateFestivalSpotParams) (FestivalSpot, error) {
-	row := q.db.QueryRow(ctx, updateFestivalSpot,
+func (q *Queries) UpdateFestivalSpotWithStatus(ctx context.Context, arg UpdateFestivalSpotWithStatusParams) (FestivalSpot, error) {
+	row := q.db.QueryRow(ctx, updateFestivalSpotWithStatus,
 		arg.ID,
 		arg.FestivalID,
 		arg.Lat,
@@ -463,6 +550,7 @@ func (q *Queries) UpdateFestivalSpot(ctx context.Context, arg UpdateFestivalSpot
 		arg.WidthM,
 		arg.HeightM,
 		arg.Notes,
+		arg.MuralStatus,
 	)
 	var i FestivalSpot
 	err := row.Scan(
