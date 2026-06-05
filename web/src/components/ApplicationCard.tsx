@@ -77,9 +77,15 @@ export function ApplicationCard({
         </button>
       )}
 
-      <div className="w-8 h-8 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold text-xs flex-shrink-0">
-        {initials(name)}
-      </div>
+      {artist?.avatar_s3_key
+        ? <img
+            src={artist.avatar_s3_key}
+            alt={name}
+            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+          />
+        : <div className="w-8 h-8 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold text-xs flex-shrink-0">
+            {initials(name)}
+          </div>}
 
       <div className="flex-1 min-w-0">
         <div className="font-sans font-semibold text-ink text-xs truncate">{name}</div>
