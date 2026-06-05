@@ -83,7 +83,12 @@ export default function FormBuilderClient({ festivalId }: { festivalId: string }
       body: { fields: fields as unknown as Record<string, never>[] },
     })
     setSaving(false)
-    if (res.error) { setSaveError('Could not save the form.'); return }
+    if (res.error) {
+      // Surface the server's specific message (e.g. a 422 validation reason) when present.
+      const msg = (res.error as { message?: string })?.message
+      setSaveError(msg || 'Could not save the form.')
+      return
+    }
     setSaved(true)
   }
 

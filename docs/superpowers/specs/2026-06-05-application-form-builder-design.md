@@ -26,7 +26,7 @@ This spec delivers a visual form builder, a curated question library + starter t
 - Per question set: **type** (Text · Paragraph · Dropdown · Media embed), **label**, **required** toggle, and **options** (Dropdown only).
 - Insert curated questions from a **library** panel (one click appends a pre-configured field).
 - Load a full **"Standard paint-festival application"** starter template (offered only when the form is empty).
-- Save — persists the `fields` array via the existing `PATCH /festivals/{festivalID}/form`.
+- Save — persists the `fields` array via the existing `PUT /festivals/{festivalID}/form` (UpsertFormHandler; the PATCH route is review-criteria-only).
 
 **New applicant-facing capability:** a `embed` field renders a URL input (validated, with a live preview) in `DynamicForm`; the answer is a provider URL stored as a plain string in `answers[field.id]`.
 
@@ -78,7 +78,7 @@ Provider rules (v1):
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `web/src/app/organiser/festivals/[id]/form/page.tsx` (new) + a `FormBuilderClient.tsx` (new, `'use client'`) | The builder UI. Loads form via `GET /form`, edits a local `fields[]`, saves via `PATCH /form`. |
+| 1 | `web/src/app/organiser/festivals/[id]/form/page.tsx` (new) + a `FormBuilderClient.tsx` (new, `'use client'`) | The builder UI. Loads form via `GET /form`, edits a local `fields[]`, saves via `PUT /form`. |
 | 2 | `web/src/lib/embeds.ts` (new) | `parseEmbed` + provider constants. |
 | 3 | `web/src/lib/questionLibrary.ts` (new) | Curated question presets + the starter template, as static data. |
 | 4 | `web/src/components/DynamicForm.tsx` | Add `type === 'embed'` branch: URL input + inline validation (`parseEmbed` null → error) + small preview chip when valid. |
@@ -99,7 +99,7 @@ Provider rules (v1):
   - *Portfolio* — portfolio link (text), media walkthrough (embed).
   - Clicking a preset appends a fully-configured field (type+label+required preset).
 - **Starter template:** "Start from a template" button, shown only when `fields.length === 0`. Loads the full "Standard paint-festival application" set (a superset of the library presets in a sensible order). Never clobbers a non-empty form.
-- **Save:** validates client-side (every field has a label; selects have ≥1 option) before `PATCH`; surfaces server `422` inline.
+- **Save:** validates client-side (every field has a label; selects have ≥1 option) before `PUT`; surfaces server `422` inline.
 
 ### Security
 
@@ -150,7 +150,7 @@ Provider rules (v1):
 
 **E2E (api):**
 - Submit application with a junk URL in an `embed` field → `422`.
-- `PATCH /form` with a malformed field (missing label, or unknown type) → `422`.
+- `PUT /form` with a malformed field (missing label, or unknown type) → `422`.
 
 ---
 
