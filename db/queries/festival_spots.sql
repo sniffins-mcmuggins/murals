@@ -141,7 +141,7 @@ SELECT
     fs.mural_status,
     f.id                AS festival_id,
     f.name              AS festival_name,
-    EXTRACT(YEAR FROM f.start_date)::int AS festival_year
+    COALESCE(EXTRACT(YEAR FROM f.start_date)::int, 0) AS festival_year
 FROM festival_spots fs
 JOIN festivals f ON f.id = fs.festival_id
 WHERE f.id != @festival_id

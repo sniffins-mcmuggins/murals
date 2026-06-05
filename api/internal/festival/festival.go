@@ -17,21 +17,23 @@ import (
 )
 
 type festivalResponse struct {
-	ID                  string  `json:"id"`
-	OrganiserID         string  `json:"organiser_id"`
-	Name                string  `json:"name"`
-	Slug                string  `json:"slug"`
-	Description         string  `json:"description"`
-	LocationLabel       string  `json:"location_label"`
-	StartDate           *string `json:"start_date,omitempty"`
-	EndDate             *string `json:"end_date,omitempty"`
-	Status              string  `json:"status"`
-	CreatedAt           string  `json:"created_at"`
-	UpdatedAt           string  `json:"updated_at"`
-	DecisionsReleasedAt *string `json:"decisions_released_at,omitempty"`
-	ReviewOpenedAt      *string `json:"review_opened_at,omitempty"`
-	ReviewClosedAt      *string `json:"review_closed_at,omitempty"`
-	ReviewStatus        string  `json:"review_status"`
+	ID                  string   `json:"id"`
+	OrganiserID         string   `json:"organiser_id"`
+	Name                string   `json:"name"`
+	Slug                string   `json:"slug"`
+	Description         string   `json:"description"`
+	LocationLabel       string   `json:"location_label"`
+	StartDate           *string  `json:"start_date,omitempty"`
+	EndDate             *string  `json:"end_date,omitempty"`
+	Status              string   `json:"status"`
+	CreatedAt           string   `json:"created_at"`
+	UpdatedAt           string   `json:"updated_at"`
+	DecisionsReleasedAt *string  `json:"decisions_released_at,omitempty"`
+	ReviewOpenedAt      *string  `json:"review_opened_at,omitempty"`
+	ReviewClosedAt      *string  `json:"review_closed_at,omitempty"`
+	ReviewStatus        string   `json:"review_status"`
+	CenterLat           *float64 `json:"center_lat,omitempty"`
+	CenterLng           *float64 `json:"center_lng,omitempty"`
 }
 
 func toFestivalResponse(f sqlcdb.Festival) festivalResponse {
@@ -68,6 +70,14 @@ func toFestivalResponse(f sqlcdb.Festival) festivalResponse {
 		s := f.ReviewClosedAt.Time.Format(time.RFC3339)
 		resp.ReviewClosedAt = &s
 		resp.ReviewStatus = "closed"
+	}
+	if f.CenterLat.Valid {
+		v, _ := f.CenterLat.Float64Value()
+		resp.CenterLat = &v.Float64
+	}
+	if f.CenterLng.Valid {
+		v, _ := f.CenterLng.Float64Value()
+		resp.CenterLng = &v.Float64
 	}
 	return resp
 }
@@ -251,13 +261,15 @@ func UpdateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		var req struct {
-			Name          string `json:"name"`
-			Slug          string `json:"slug"`
-			Description   string `json:"description"`
-			LocationLabel string `json:"locationLabel"`
-			Status        string `json:"status"`
-			StartDate     string `json:"startDate"`
-			EndDate       string `json:"endDate"`
+			Name          string   `json:"name"`
+			Slug          string   `json:"slug"`
+			Description   string   `json:"description"`
+			LocationLabel string   `json:"locationLabel"`
+			Status        string   `json:"status"`
+			StartDate     string   `json:"startDate"`
+			EndDate       string   `json:"endDate"`
+			CenterLat     *float64 `json:"center_lat"`
+			CenterLng     *float64 `json:"center_lng"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -326,6 +338,28 @@ func UpdateHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 			httperr.InternalServerError(w)
 			return
+		}
+
+		if req.CenterLat != nil && req.CenterLng != nil {
+			clat, err := numericFromFloat(*req.CenterLat)
+			if err != nil {
+				httperr.BadRequest(w, "invalid center_lat")
+				return
+			}
+			clng, err := numericFromFloat(*req.CenterLng)
+			if err != nil {
+				httperr.BadRequest(w, "invalid center_lng")
+				return
+			}
+			updated, err = q.SetFestivalCenter(r.Context(), sqlcdb.SetFestivalCenterParams{
+				ID:        festUUID,
+				CenterLat: clat,
+				CenterLng: clng,
+			})
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

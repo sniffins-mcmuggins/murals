@@ -19,16 +19,17 @@ import (
 // ─── response types ───────────────────────────────────────────────────────────
 
 type spotResponse struct {
-	ID         string   `json:"id"`
-	Number     int32    `json:"number"`
-	Lat        float64  `json:"lat"`
-	Lng        float64  `json:"lng"`
-	W3W        *string  `json:"w3w"`
-	WidthM     *float64 `json:"width_m"`
-	HeightM    *float64 `json:"height_m"`
-	Notes      *string  `json:"notes"`
-	ArtistID   *string  `json:"artist_id"`
-	ArtistName *string  `json:"artist_name"`
+	ID          string   `json:"id"`
+	Number      int32    `json:"number"`
+	Lat         float64  `json:"lat"`
+	Lng         float64  `json:"lng"`
+	W3W         *string  `json:"w3w"`
+	WidthM      *float64 `json:"width_m"`
+	HeightM     *float64 `json:"height_m"`
+	Notes       *string  `json:"notes"`
+	ArtistID    *string  `json:"artist_id"`
+	ArtistName  *string  `json:"artist_name"`
+	MuralStatus string   `json:"mural_status"`
 }
 
 type unassignedArtistResponse struct {
@@ -89,31 +90,33 @@ func optUUIDToStringPtr(u pgtype.UUID) *string {
 
 func toSpotResponse(row sqlcdb.GetFestivalSpotRow) spotResponse {
 	return spotResponse{
-		ID:         row.ID.String(),
-		Number:     row.Number,
-		Lat:        numericToFloat64(row.Lat),
-		Lng:        numericToFloat64(row.Lng),
-		W3W:        row.W3w,
-		WidthM:     optNumericToFloat64(row.WidthM),
-		HeightM:    optNumericToFloat64(row.HeightM),
-		Notes:      row.Notes,
-		ArtistID:   optUUIDToStringPtr(row.ArtistID),
-		ArtistName: row.ArtistName,
+		ID:          row.ID.String(),
+		Number:      row.Number,
+		Lat:         numericToFloat64(row.Lat),
+		Lng:         numericToFloat64(row.Lng),
+		W3W:         row.W3w,
+		WidthM:      optNumericToFloat64(row.WidthM),
+		HeightM:     optNumericToFloat64(row.HeightM),
+		Notes:       row.Notes,
+		ArtistID:    optUUIDToStringPtr(row.ArtistID),
+		ArtistName:  row.ArtistName,
+		MuralStatus: row.MuralStatus,
 	}
 }
 
 func toSpotResponseFromListRow(row sqlcdb.GetFestivalSpotsRow) spotResponse {
 	return spotResponse{
-		ID:         row.ID.String(),
-		Number:     row.Number,
-		Lat:        numericToFloat64(row.Lat),
-		Lng:        numericToFloat64(row.Lng),
-		W3W:        row.W3w,
-		WidthM:     optNumericToFloat64(row.WidthM),
-		HeightM:    optNumericToFloat64(row.HeightM),
-		Notes:      row.Notes,
-		ArtistID:   optUUIDToStringPtr(row.ArtistID),
-		ArtistName: row.ArtistName,
+		ID:          row.ID.String(),
+		Number:      row.Number,
+		Lat:         numericToFloat64(row.Lat),
+		Lng:         numericToFloat64(row.Lng),
+		W3W:         row.W3w,
+		WidthM:      optNumericToFloat64(row.WidthM),
+		HeightM:     optNumericToFloat64(row.HeightM),
+		Notes:       row.Notes,
+		ArtistID:    optUUIDToStringPtr(row.ArtistID),
+		ArtistName:  row.ArtistName,
+		MuralStatus: row.MuralStatus,
 	}
 }
 
@@ -264,12 +267,13 @@ func UpdateSpotHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		var req struct {
-			Lat     *float64 `json:"lat"`
-			Lng     *float64 `json:"lng"`
-			W3W     *string  `json:"w3w"`
-			WidthM  *float64 `json:"width_m"`
-			HeightM *float64 `json:"height_m"`
-			Notes   *string  `json:"notes"`
+			Lat         *float64 `json:"lat"`
+			Lng         *float64 `json:"lng"`
+			W3W         *string  `json:"w3w"`
+			WidthM      *float64 `json:"width_m"`
+			HeightM     *float64 `json:"height_m"`
+			Notes       *string  `json:"notes"`
+			MuralStatus *string  `json:"mural_status"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -297,13 +301,25 @@ func UpdateSpotHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			httperr.BadRequest(w, "invalid lng")
 			return
 		}
+		muralStatus := "unknown"
+		if req.MuralStatus != nil {
+			switch *req.MuralStatus {
+			case "permanent", "temporary", "unknown":
+				muralStatus = *req.MuralStatus
+			default:
+				httperr.UnprocessableEntity(w, "mural_status must be permanent, temporary, or unknown")
+				return
+			}
+		}
 		if _, err = q.UpdateFestivalSpotWithStatus(r.Context(), sqlcdb.UpdateFestivalSpotWithStatusParams{
 			ID: spotUUID, FestivalID: festUUID,
-			Lat: lat, Lng: lng, W3w: req.W3W,
+			Lat:         lat,
+			Lng:         lng,
+			W3w:         req.W3W,
 			WidthM:      optFloatToNumeric(req.WidthM),
 			HeightM:     optFloatToNumeric(req.HeightM),
 			Notes:       req.Notes,
-			MuralStatus: "unknown",
+			MuralStatus: muralStatus,
 		}); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httperr.NotFound(w)
@@ -406,6 +422,86 @@ func SetSpotArtistHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toSpotResponse(full))
+	}
+}
+
+// NearbyHistoryHandler handles GET /festivals/{festivalID}/spots/nearby-history.
+// Owner only. Returns spots from other festivals whose center is within 10 km.
+// Returns [] when the festival has no center coordinates set.
+func NearbyHistoryHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := sqlcdb.New(pool)
+		festUUID, ok := requireFestivalOwner(r, w, q, chi.URLParam(r, "festivalID"))
+		if !ok {
+			return
+		}
+		fest, err := q.GetFestivalByID(r.Context(), festUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		type historyEntry struct {
+			SpotID       string  `json:"spot_id"`
+			FestivalID   string  `json:"festival_id"`
+			FestivalName string  `json:"festival_name"`
+			FestivalYear *int32  `json:"festival_year"`
+			Lat          float64 `json:"lat"`
+			Lng          float64 `json:"lng"`
+			MuralStatus  string  `json:"mural_status"`
+		}
+
+		if !fest.CenterLat.Valid || !fest.CenterLng.Valid {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode([]historyEntry{})
+			return
+		}
+
+		centerLat := numericToFloat64(fest.CenterLat)
+		centerLng := numericToFloat64(fest.CenterLng)
+		radiusKm, _ := numericFromFloat(10.0)
+
+		rows, err := q.GetNearbyHistorySpots(r.Context(), sqlcdb.GetNearbyHistorySpotsParams{
+			FestivalID: festUUID,
+			CenterLat:  centerLat,
+			CenterLng:  centerLng,
+			RadiusKm:   radiusKm,
+		})
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		resp := make([]historyEntry, len(rows))
+		for i, row := range rows {
+			var yr *int32
+			switch v := row.FestivalYear.(type) {
+			case int32:
+				if v != 0 {
+					yr = &v
+				}
+			case int64:
+				if v != 0 {
+					i32 := int32(v)
+					yr = &i32
+				}
+			}
+			resp[i] = historyEntry{
+				SpotID:       row.SpotID.String(),
+				FestivalID:   row.FestivalID.String(),
+				FestivalName: row.FestivalName,
+				FestivalYear: yr,
+				Lat:          numericToFloat64(row.Lat),
+				Lng:          numericToFloat64(row.Lng),
+				MuralStatus:  row.MuralStatus,
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 

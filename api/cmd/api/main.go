@@ -234,7 +234,8 @@ func main() {
 		// Per-reviewer score — owner or reviewer (handler-level check).
 		r.Put("/festivals/{festivalID}/applications/{applicationID}/score", festival.ScoreApplicationHandler(pool))
 
-		// Spots (map editor)
+		// Spots (map editor) — literal /nearby-history before parameterised /{spotID}
+		r.Get("/festivals/{festivalID}/spots/nearby-history", festival.NearbyHistoryHandler(pool))
 		r.Get("/festivals/{festivalID}/spots", festival.GetSpotsHandler(pool))
 		r.Post("/festivals/{festivalID}/spots", festival.CreateSpotHandler(pool))
 		r.Patch("/festivals/{festivalID}/spots/{spotID}", festival.UpdateSpotHandler(pool))

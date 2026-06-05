@@ -321,7 +321,7 @@ SELECT
     fs.mural_status,
     f.id                AS festival_id,
     f.name              AS festival_name,
-    EXTRACT(YEAR FROM f.start_date)::int AS festival_year
+    COALESCE(EXTRACT(YEAR FROM f.start_date)::int, 0) AS festival_year
 FROM festival_spots fs
 JOIN festivals f ON f.id = fs.festival_id
 WHERE f.id != $1
@@ -354,7 +354,7 @@ type GetNearbyHistorySpotsRow struct {
 	MuralStatus  string         `db:"mural_status" json:"mural_status"`
 	FestivalID   pgtype.UUID    `db:"festival_id" json:"festival_id"`
 	FestivalName string         `db:"festival_name" json:"festival_name"`
-	FestivalYear int32          `db:"festival_year" json:"festival_year"`
+	FestivalYear interface{}    `db:"festival_year" json:"festival_year"`
 }
 
 // Returns spots from OTHER festivals within radius_km of a given centre.
