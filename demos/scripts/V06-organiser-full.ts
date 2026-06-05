@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { pause, highlight, slowType } from './helpers.js'
+import { pause, highlight, slowType, addCursorOverlay } from './helpers.js'
 
 // Drag a card (identified by artist name) into a kanban column.
 // Column indices: 0=Undecided, 1=Shortlisted, 2=Accept, 3=Waitlist, 4=Decline
@@ -38,17 +38,20 @@ async function dragCardToColumn(page: Page, artistName: string, colIndex: number
 }
 
 // Open the application slide-over by clicking the card, score it, then close.
-async function scoreViaSlideOver(page: Page, artistName: string, stars: number): Promise<void> {
-  // Click the card itself (not the drag handle)
+// showProfileLink=true pauses on the "View full profile" button before scoring.
+async function scoreViaSlideOver(page: Page, artistName: string, stars: number, showProfileLink = false): Promise<void> {
   const card = page.locator('[class*="rounded-lg"]').filter({ hasText: artistName }).first()
   await card.click()
   await expect(page.getByRole('heading', { name: artistName })).toBeVisible({ timeout: 5_000 })
-  await pause(800)
-  // Click the Nth star in the overall rubric
-  await page.getByRole('button', { name: `Score ${stars}` }).click()
   await pause(600)
+  if (showProfileLink) {
+    await highlight(page, 'a:has-text("View full profile")')
+    await pause(1200)
+  }
+  await page.getByRole('button', { name: `Score ${stars}` }).click()
+  await pause(500)
   await page.keyboard.press('Escape')
-  await pause(800)
+  await pause(700)
 }
 
 // Stage a decision via the slide-over (faster than drag for non-hero moves).
@@ -65,6 +68,9 @@ async function stageViaSlideOver(page: Page, artistName: string, decision: 'acce
 }
 
 test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
+  // Inject amber cursor dot — visible in the recording on every page.
+  await addCursorOverlay(page)
+
   // ── 1. Log in as Marcus Webb ─────────────────────────────────────────────────
   await page.goto('/login')
   await pause(800)
@@ -99,7 +105,8 @@ test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
 
   // ── 4. Marcus scores two artists while the round is open ─────────────────────
   // Organiser-role can score at any time — decisions are still locked (no drag handles).
-  await scoreViaSlideOver(page, 'Rosa Vane', 5)
+  // On the first card, linger on the profile link so viewers see it.
+  await scoreViaSlideOver(page, 'Rosa Vane', 5, true)
   await scoreViaSlideOver(page, 'Amara Diallo', 5)
   await pause(800)
 

@@ -43,6 +43,16 @@ type fictionalArtist struct {
 	pinLng  float64
 }
 
+// avatarURLs maps fictional artist name → a portrait photo URL used as avatar_s3_key.
+// These are public Unsplash images — the seed stores the URL directly as the key
+// (same pattern as Lady Gabe's avatar), so cards render them without MinIO.
+var avatarURLs = map[string]string{
+	"Kit Harrow":   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=faces",
+	"Tomás Cruz":   "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&crop=faces",
+	"Amara Diallo": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=120&h=120&fit=crop&crop=faces",
+	"Rosa Vane":    "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop&crop=faces",
+}
+
 var artistSeed = []fictionalArtist{
 	{"Kit Harrow", "kit@demo-artist.art", "Urban wildlife muralist based in Bristol.", "Spray paint",
 		"A series of endangered British species rendered life-size across three panels.", "Large (20m²+)", "submitted", 0, 0},
@@ -173,10 +183,11 @@ func main() {
 		}
 		handle := a.email[:strings.Index(a.email, "@")]
 		socialJSON := fmt.Sprintf(`{"instagram":"https://instagram.com/%s"}`, handle)
+		avatarURL := avatarURLs[a.name]
 		if err := conn.QueryRow(ctx,
-			`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility)
-			 VALUES ($1, $2, $3, $4, 'public') RETURNING id`,
-			uid, a.name, a.bio, socialJSON).Scan(&pid); err != nil {
+			`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility, avatar_s3_key)
+			 VALUES ($1, $2, $3, $4, 'public', $5) RETURNING id`,
+			uid, a.name, a.bio, socialJSON, avatarURL).Scan(&pid); err != nil {
 			log.Fatalf("insert fictional profile %s: %v", a.name, err)
 		}
 		seeded = append(seeded, seededArtist{pid, a})

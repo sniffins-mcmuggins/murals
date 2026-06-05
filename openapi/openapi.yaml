@@ -634,6 +634,10 @@ components:
     ApplicationArtist:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
+          description: Artist profile id — use to link to /artists/{id}
         display_name:
           type: string
         avatar_s3_key:

@@ -112,6 +112,22 @@ describe('festival reviewer / panellist accounts', () => {
     expect(Array.isArray(app.criterion_scores)).toBe(true)
   })
 
+  it('ApplicationArtist carries id in both organiser and reviewer responses', async () => {
+    // Organiser view
+    const orgRes = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(orgToken) })
+    const orgApps = await orgRes.json()
+    const orgApp = orgApps.find((a: { id: string }) => a.id === appId)
+    expect(orgApp?.artist?.id).toBeDefined()
+    expect(typeof orgApp?.artist?.id).toBe('string')
+
+    // Reviewer view
+    const revRes = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(reviewerToken) })
+    const revApps = await revRes.json()
+    const revApp = revApps.find((a: { id: string }) => a.id === appId)
+    expect(revApp?.artist?.id).toBeDefined()
+    expect(typeof revApp?.artist?.id).toBe('string')
+  })
+
   // Owner shape is unchanged — decision fields still present for the organiser.
   it('owner list response still includes decision fields', async () => {
     const res = await fetch(`${API}/festivals/${festivalId}/applications`, { headers: auth(orgToken) })

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { slowType, pause, highlight, scrollTo } from "./helpers.js";
+import { slowType, pause, highlight, scrollTo, addCursorOverlay } from "./helpers.js";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -16,6 +16,9 @@ const GABE_2 = path.join(__dirname, "../fixtures/lady-gabe-2.jpg");
 const GABE_3 = path.join(__dirname, "../fixtures/lady-gabe-3.jpg");
 
 test("V05 — Artist Journey", async ({ page }) => {
+  // Inject amber cursor dot — visible in the recording on every page.
+  await addCursorOverlay(page)
+
   const suffix = Date.now();
   const email = `gabe-${suffix}@demo.art`;
   const password = "demo-password-2027";

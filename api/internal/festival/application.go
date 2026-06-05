@@ -23,6 +23,7 @@ type formField struct {
 }
 
 type artistSummary struct {
+	ID            string   `json:"id"`
 	DisplayName   string   `json:"display_name"`
 	AvatarS3Key   *string  `json:"avatar_s3_key"`
 	MediumTags    []string `json:"medium_tags"`
@@ -163,6 +164,7 @@ func toEnrichedResponse(
 		CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:      row.UpdatedAt.Time.Format(time.RFC3339),
 		Artist: &artistSummary{
+			ID:            row.ArtistID.String(),
 			DisplayName:   row.DisplayName,
 			AvatarS3Key:   row.AvatarS3Key,
 			MediumTags:    mediumTags,
@@ -191,6 +193,7 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 		CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:      row.UpdatedAt.Time.Format(time.RFC3339),
 		Artist: &artistSummary{
+			ID:            row.ArtistID.String(),
 			DisplayName:   row.DisplayName,
 			AvatarS3Key:   row.AvatarS3Key,
 			MediumTags:    mediumTags,

@@ -94,6 +94,17 @@ export function ApplicationSlideOver({
             <button onClick={onClose} className="font-sans text-mid hover:text-ink text-xl leading-none">✕</button>
           </div>
 
+          {artist?.id && (
+            <a
+              href={`/artists/${artist.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 mt-3 font-sans text-sm font-semibold text-ink bg-warm border border-light rounded-lg px-3.5 py-2 hover:opacity-80 transition-opacity"
+            >
+              👤 View full profile ↗
+            </a>
+          )}
+
           {/* Medium tags */}
           {(artist?.medium_tags ?? []).length > 0 && (
             <div className="flex gap-1.5 flex-wrap">

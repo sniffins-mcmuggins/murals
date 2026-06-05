@@ -79,9 +79,15 @@ function ReviewerRow({ app, onSelect, scored, disabled }: {
 
   return (
     <li className={`flex items-center gap-3 p-3 rounded-lg border ${scored ? 'bg-warm border-light' : 'bg-offwhite border-light'}`}>
-      <div className="w-10 h-10 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold text-xs flex-shrink-0">
-        {initials(name)}
-      </div>
+      {artist?.avatar_s3_key
+        ? <img
+            src={artist.avatar_s3_key}
+            alt={name}
+            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+          />
+        : <div className="w-10 h-10 rounded-full bg-clay flex items-center justify-center text-offwhite font-bold text-xs flex-shrink-0">
+            {initials(name)}
+          </div>}
       <div className="min-w-0">
         <div className="font-sans font-semibold text-ink text-sm truncate">{name}</div>
         {tags.length > 0 && (
