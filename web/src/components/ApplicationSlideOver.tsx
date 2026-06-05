@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ApplicationNotes } from './ApplicationNotes'
+import { parseEmbed } from '@/lib/embeds'
 import type { components } from '@render/api-client'
 
 type Application = components['schemas']['Application']
@@ -38,6 +39,33 @@ interface Props {
 
 function initials(name: string): string {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
+}
+
+function EmbedPlayer({ url }: { url: string }) {
+  const [loaded, setLoaded] = useState(false)
+  const info = parseEmbed(url)
+  if (!info) {
+    return <a href={url} target="_blank" rel="noreferrer" className="font-sans text-sm text-clay underline">{url}</a>
+  }
+  if (!loaded) {
+    return (
+      <button onClick={() => setLoaded(true)}
+        className="font-sans text-sm bg-warm border border-light rounded-lg px-3 py-2 hover:border-amber">
+        ▶ Load {info.provider} {info.provider === 'sketchfab' ? '3D model' : 'video'}
+      </button>
+    )
+  }
+  return (
+    <div className="aspect-video w-full">
+      <iframe
+        src={info.embedUrl}
+        title={`${info.provider} embed`}
+        className="w-full h-full rounded-lg border border-light"
+        sandbox="allow-scripts allow-same-origin allow-presentation"
+        allow="fullscreen"
+      />
+    </div>
+  )
 }
 
 export function ApplicationSlideOver({
@@ -246,12 +274,17 @@ export function ApplicationSlideOver({
             <div>
               <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-3">Application</h3>
               <div className="space-y-4">
-                {Object.entries(answers).map(([fieldId, value]) => (
-                  <div key={fieldId}>
-                    <p className="font-sans text-xs text-mid mb-1">{labelFor(fieldId)}</p>
-                    <p className="font-sans text-sm text-ink">{value}</p>
-                  </div>
-                ))}
+                {Object.entries(answers).map(([fieldId, value]) => {
+                  const field = formFields.find(f => f.id === fieldId)
+                  return (
+                    <div key={fieldId}>
+                      <p className="font-sans text-xs text-mid mb-1">{labelFor(fieldId)}</p>
+                      {field?.type === 'embed' && value
+                        ? <EmbedPlayer url={value} />
+                        : <p className="font-sans text-sm text-ink">{value}</p>}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
