@@ -470,6 +470,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
 
   const spots = spotsQuery.data?.spots ?? []
   const unassignedArtists = spotsQuery.data?.unassigned_artists ?? []
+  const historyEntries: HistoryEntry[] = Array.isArray(historyQuery.data) ? historyQuery.data : []
   const selectedSpot = spots.find(s => s.id === selectedSpotId) ?? null
   const assignedCount = spots.filter(s => s.artist_id).length
 
@@ -516,11 +517,11 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
             {historyOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-offwhite border border-light rounded-lg shadow-lg z-50 p-3">
                 <p className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Overlay previous years</p>
-                {(historyQuery.data ?? []).length === 0 && (
+                {(historyEntries).length === 0 && (
                   <p className="font-sans text-xs text-mid">No nearby festivals found.</p>
                 )}
                 {Array.from(
-                  new Map((historyQuery.data ?? []).map((e: HistoryEntry) => [e.festival_id, e])).values()
+                  new Map((historyEntries).map((e: HistoryEntry) => [e.festival_id, e])).values()
                 ).map((fest: HistoryEntry) => (
                   <label key={fest.festival_id} className="flex items-center gap-2 py-1.5 cursor-pointer">
                     <input
@@ -692,7 +693,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                 <MapClickCapture active={placingSpot} onMapClick={handleMapClick} />
                 <MapViewUpdater target={mapTarget} />
                 <MapRefCapture onReady={(m) => { mapRef.current = m }} />
-                {(historyQuery.data ?? [])
+                {(historyEntries)
                   .filter((e: HistoryEntry) => checkedFestivals.has(e.festival_id))
                   .map((e: HistoryEntry) => {
                     const color = e.mural_status === 'permanent' ? '#E8A838' : e.mural_status === 'temporary' ? '#8A8896' : '#E2DDD6'
