@@ -46,8 +46,6 @@ type fictionalArtist struct {
 var artistSeed = []fictionalArtist{
 	{"Kit Harrow", "kit@demo-artist.art", "Urban wildlife muralist based in Bristol.", "Spray paint",
 		"A series of endangered British species rendered life-size across three panels.", "Large (20m²+)", "submitted", 0, 0},
-	{"Yuki Tanaka", "yuki@demo-artist.art", "Nature and landscape, Japanese-influenced style.", "Brush",
-		"Cherry blossom and oak — a conversation between Japanese and British flora.", "Small (up to 4m²)", "submitted", 0, 0},
 	{"Tomás Cruz", "tomas@demo-artist.art", "Geometric abstraction in public spaces.", "Mixed media",
 		"Fractured geometry reflecting Cheltenham's Regency architecture.", "Medium (4–20m²)", "submitted", 0, 0},
 	{"Amara Diallo", "amara@demo-artist.art", "Celebrating West African cultural heritage through colour.", "Spray paint",
@@ -317,7 +315,6 @@ func main() {
 	// Pre-seed Sophie's scores on all 5 submitted applications so averages show on cards
 	sophieScores := map[string]int32{
 		"Kit Harrow":   4,
-		"Yuki Tanaka":  3,
 		"Tomás Cruz":   2,
 		"Amara Diallo": 5,
 		"Rosa Vane":    5,
@@ -343,7 +340,7 @@ func main() {
 			log.Fatalf("insert score for %s: %v", s.a.name, err)
 		}
 	}
-	fmt.Printf("  reviewer:  %s (scores seeded for 5 applications)\n", sophieEmail)
+	fmt.Printf("  reviewer:  %s (scores seeded for %d applications)\n", sophieEmail, len(seeded))
 
 	fmt.Println("Demo seed complete ✓")
 }
