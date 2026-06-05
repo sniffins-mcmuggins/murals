@@ -9,28 +9,66 @@ import type { Locator, Page } from '@playwright/test'
 export async function addCursorOverlay(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const CURSOR_ID = '__demo_cursor__'
+    const STYLE_ID = '__demo_cursor_style__'
     const inject = () => {
       if (document.getElementById(CURSOR_ID)) return
+
+      // Keyframes for the click ripple — registered once per document.
+      if (!document.getElementById(STYLE_ID)) {
+        const style = document.createElement('style')
+        style.id = STYLE_ID
+        style.textContent =
+          '@keyframes __demo_ripple__ {' +
+          '  0%   { transform: translate(-50%,-50%) scale(0.3); opacity: 0.6; }' +
+          '  100% { transform: translate(-50%,-50%) scale(2.6); opacity: 0; }' +
+          '}'
+        ;(document.head ?? document.documentElement).appendChild(style)
+      }
+
       const dot = document.createElement('div')
       dot.id = CURSOR_ID
       Object.assign(dot.style, {
         position:      'fixed',
-        top:           '-40px',
-        left:          '-40px',
-        width:         '18px',
-        height:        '18px',
+        top:           '-60px',
+        left:          '-60px',
+        width:         '24px',
+        height:        '24px',
         borderRadius:  '50%',
         background:    '#E8A838',
-        border:        '2px solid rgba(26,26,46,0.35)',
-        boxShadow:     '0 2px 8px rgba(0,0,0,0.30)',
+        border:        '3px solid rgba(26,26,46,0.6)',
+        // Outer halo + drop shadow so the cursor reads against any background.
+        boxShadow:     '0 0 0 4px rgba(232,168,56,0.35), 0 3px 12px rgba(0,0,0,0.45)',
         pointerEvents: 'none',
         zIndex:        '2147483647',
         transform:     'translate(-50%,-50%)',
+        // Glide between positions so click-teleports become a visible travel.
+        transition:    'left 0.09s ease-out, top 0.09s ease-out',
       })
       document.body.appendChild(dot)
+
       document.addEventListener('mousemove', (e: MouseEvent) => {
         dot.style.left = e.clientX + 'px'
         dot.style.top  = e.clientY + 'px'
+      })
+
+      // Emit an expanding ripple on every press so clicks are unmistakable.
+      document.addEventListener('mousedown', (e: MouseEvent) => {
+        const ripple = document.createElement('div')
+        Object.assign(ripple.style, {
+          position:      'fixed',
+          left:          e.clientX + 'px',
+          top:           e.clientY + 'px',
+          width:         '44px',
+          height:        '44px',
+          borderRadius:  '50%',
+          background:    'rgba(232,168,56,0.35)',
+          border:        '2px solid rgba(232,168,56,0.9)',
+          pointerEvents: 'none',
+          zIndex:        '2147483646',
+          animation:     '__demo_ripple__ 0.6s ease-out forwards',
+        })
+        document.body.appendChild(ripple)
+        setTimeout(() => ripple.remove(), 650)
       })
     }
     if (document.readyState === 'loading') {
