@@ -91,6 +91,37 @@ func TestSubmitApplication_DuplicateReturns409(t *testing.T) {
 	_ = resp2.Body.Close()
 }
 
+func TestSubmitApplication_RejectsUnknownEmbed(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, _, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationFormWithFields(t, db, festID,
+		`[{"id":"walkthrough","type":"embed","label":"Walkthrough","required":false}]`)
+
+	artistID, artistToken, _ := createTestUser(t, db)
+	createTestArtistProfile(t, db, artistID, "Embed Artist")
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Post("/festivals/{festivalID}/apply", festival.SubmitApplicationHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	// Non-provider URL must be rejected with 422.
+	resp := doRequest(t, srv, "POST", "/festivals/"+festID+"/apply",
+		`{"answers":{"walkthrough":"https://example.com/not-a-provider"}}`, artistToken)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	_ = resp.Body.Close()
+
+	// Valid YouTube URL must succeed.
+	resp2 := doRequest(t, srv, "POST", "/festivals/"+festID+"/apply",
+		`{"answers":{"walkthrough":"https://youtu.be/dQw4w9WgXcQ"}}`, artistToken)
+	require.Equal(t, http.StatusCreated, resp2.StatusCode)
+	_ = resp2.Body.Close()
+}
+
 // A user without an artist profile attempting to apply gets 409 profile_required.
 // Previously this would have been gated on the user's role; now it's profile-gated.
 func TestSubmitApplication_NoArtistProfile_Returns409(t *testing.T) {
