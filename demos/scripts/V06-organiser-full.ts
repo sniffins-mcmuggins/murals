@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { pause, highlight, slowType } from './helpers.js'
+import { pause, highlight, slowType, addCursorOverlay } from './helpers.js'
 
 // Drag a card (identified by artist name) into a kanban column.
 // Column indices: 0=Undecided, 1=Shortlisted, 2=Accept, 3=Waitlist, 4=Decline
@@ -68,6 +68,9 @@ async function stageViaSlideOver(page: Page, artistName: string, decision: 'acce
 }
 
 test('V06 — Organiser: Review Round + Staged Decisions', async ({ page }) => {
+  // Inject amber cursor dot — visible in the recording on every page.
+  await addCursorOverlay(page)
+
   // ── 1. Log in as Marcus Webb ─────────────────────────────────────────────────
   await page.goto('/login')
   await pause(800)
