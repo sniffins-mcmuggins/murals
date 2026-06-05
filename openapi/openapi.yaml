@@ -242,6 +242,29 @@ components:
             (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish).
             Share /profiles/preview/{token} for pre-publish access. Omitted from
             public responses.
+        spot_history:
+          type: array
+          items:
+            type: object
+            properties:
+              spot_id:
+                type: string
+                format: uuid
+              festival_id:
+                type: string
+                format: uuid
+              festival_name:
+                type: string
+              festival_year:
+                type: integer
+                nullable: true
+              lat:
+                type: number
+              lng:
+                type: number
+              mural_status:
+                type: string
+                enum: [permanent, temporary, unknown]
 
     CreateProfileRequest:
       type: object
@@ -455,6 +478,14 @@ components:
         review_status:
           type: string
           enum: [not_started, open, closed]
+        center_lat:
+          type: number
+          format: float
+          nullable: true
+        center_lng:
+          type: number
+          format: float
+          nullable: true
 
     FestivalAppearance:
       type: object
@@ -751,6 +782,10 @@ components:
         artist_name:
           type: string
           nullable: true
+        mural_status:
+          type: string
+          enum: [permanent, temporary, unknown]
+          description: Whether the mural painted at this spot is still on the wall.
 
     UnassignedArtist:
       type: object
@@ -2249,6 +2284,14 @@ paths:
                   nullable: true
                 status:
                   $ref: "#/components/schemas/FestivalStatus"
+                center_lat:
+                  type: number
+                  format: float
+                  nullable: true
+                center_lng:
+                  type: number
+                  format: float
+                  nullable: true
       responses:
         "200":
           description: Updated festival
@@ -2805,6 +2848,39 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /festivals/{festivalID}/spots/nearby-history:
+    get:
+      operationId: getNearbyHistorySpots
+      summary: Get spots from nearby previous festivals (owner only)
+      tags: [festival]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: festivalID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of nearby historical spots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    spot_id: { type: string, format: uuid }
+                    festival_id: { type: string, format: uuid }
+                    festival_name: { type: string }
+                    festival_year: { type: integer, nullable: true }
+                    lat: { type: number }
+                    lng: { type: number }
+                    mural_status: { type: string, enum: [permanent, temporary, unknown] }
+        '403': { description: Not the owner }
+
   /festivals/{festivalID}/spots:
     parameters:
       - name: festivalID
@@ -2930,6 +3006,10 @@ paths:
                   nullable: true
                 notes:
                   type: string
+                  nullable: true
+                mural_status:
+                  type: string
+                  enum: [permanent, temporary, unknown]
                   nullable: true
       responses:
         "200":
