@@ -1,3 +1,8 @@
+DROP TABLE IF EXISTS endorsements;
+DROP TABLE IF EXISTS festival_reviewers;
+DROP TABLE IF EXISTS festival_spots;
+DROP TABLE IF EXISTS application_scores;
+DROP TABLE IF EXISTS application_notes;
 DROP TABLE IF EXISTS applications;
 DROP TYPE IF EXISTS application_status;
 DROP TABLE IF EXISTS application_forms;

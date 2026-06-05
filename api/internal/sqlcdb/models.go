@@ -191,6 +191,7 @@ const (
 	FestivalStatusDraft    FestivalStatus = "draft"
 	FestivalStatusOpen     FestivalStatus = "open"
 	FestivalStatusLive     FestivalStatus = "live"
+	FestivalStatusClosed   FestivalStatus = "closed"
 	FestivalStatusArchived FestivalStatus = "archived"
 )
 
@@ -393,6 +394,8 @@ type Festival struct {
 	DecisionsReleasedAt pgtype.Timestamptz `db:"decisions_released_at" json:"decisions_released_at"`
 	ReviewOpenedAt      pgtype.Timestamptz `db:"review_opened_at" json:"review_opened_at"`
 	ReviewClosedAt      pgtype.Timestamptz `db:"review_closed_at" json:"review_closed_at"`
+	CenterLat           pgtype.Numeric     `db:"center_lat" json:"center_lat"`
+	CenterLng           pgtype.Numeric     `db:"center_lng" json:"center_lng"`
 }
 
 type FestivalArtist struct {
@@ -411,18 +414,19 @@ type FestivalReviewer struct {
 }
 
 type FestivalSpot struct {
-	ID         pgtype.UUID        `db:"id" json:"id"`
-	FestivalID pgtype.UUID        `db:"festival_id" json:"festival_id"`
-	Number     int32              `db:"number" json:"number"`
-	Lat        pgtype.Numeric     `db:"lat" json:"lat"`
-	Lng        pgtype.Numeric     `db:"lng" json:"lng"`
-	W3w        *string            `db:"w3w" json:"w3w"`
-	WidthM     pgtype.Numeric     `db:"width_m" json:"width_m"`
-	HeightM    pgtype.Numeric     `db:"height_m" json:"height_m"`
-	Notes      *string            `db:"notes" json:"notes"`
-	ArtistID   pgtype.UUID        `db:"artist_id" json:"artist_id"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID          pgtype.UUID        `db:"id" json:"id"`
+	FestivalID  pgtype.UUID        `db:"festival_id" json:"festival_id"`
+	Number      int32              `db:"number" json:"number"`
+	Lat         pgtype.Numeric     `db:"lat" json:"lat"`
+	Lng         pgtype.Numeric     `db:"lng" json:"lng"`
+	W3w         *string            `db:"w3w" json:"w3w"`
+	WidthM      pgtype.Numeric     `db:"width_m" json:"width_m"`
+	HeightM     pgtype.Numeric     `db:"height_m" json:"height_m"`
+	Notes       *string            `db:"notes" json:"notes"`
+	ArtistID    pgtype.UUID        `db:"artist_id" json:"artist_id"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MuralStatus string             `db:"mural_status" json:"mural_status"`
 }
 
 type MigrationsHealth struct {
