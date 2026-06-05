@@ -2,7 +2,10 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './scripts',
-  testMatch: '**/*.ts',
+  // Only the V## demo scripts are tests; helpers.ts / mailpit.ts are shared
+  // modules imported by them. Playwright forbids a test file importing another
+  // test file, so they must not match testMatch.
+  testMatch: '**/V[0-9]*.ts',
   workers: 1,
   timeout: 180000,
   reporter: [['list']],
