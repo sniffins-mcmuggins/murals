@@ -9,6 +9,7 @@ import { apiClient } from '@/lib/api'
 import { ApplicationCard } from '@/components/ApplicationCard'
 import { ApplicationSlideOver } from '@/components/ApplicationSlideOver'
 import { KanbanColumn } from '@/components/KanbanColumn'
+import { TriageMode } from '@/components/TriageMode'
 import { ReviewerQueue } from '@/components/ReviewerQueue'
 import type { components } from '@render/api-client'
 
@@ -56,6 +57,7 @@ export default function ApplicationsReviewPage({ params }: Props) {
 
 function KanbanView({ festivalId }: { festivalId: string }) {
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
+  const [triageOpen, setTriageOpen] = useState(false)
   const [localApps, setLocalApps] = useState<Application[] | null>(null)
   const [showReleaseModal, setShowReleaseModal] = useState(false)
   const [releaseConfirmed, setReleaseConfirmed] = useState(false)
@@ -310,6 +312,12 @@ function KanbanView({ festivalId }: { festivalId: string }) {
 
   const stagedCount = allApps.filter(a => a.staged_decision != null).length
   const submittedUndecided = allApps.filter(a => a.status === 'submitted' && !a.staged_decision).length
+  const submittedApps = allApps.filter(a => a.status === 'submitted')
+
+  function handleTriageShortlist(id: string, shortlisted: boolean) {
+    const app = allApps.find(a => a.id === id)
+    patchMutation.mutate({ id, shortlisted, reviewFlag: app?.review_flag ?? false })
+  }
 
   const sensors = useSensors(useSensor(PointerSensor))
 
@@ -433,13 +441,23 @@ function KanbanView({ festivalId }: { festivalId: string }) {
         </div>
         {!isReviewer && !isReleased && (
           <div className="flex flex-col items-end gap-1">
-            <button
-              onClick={() => setShowReleaseModal(true)}
-              disabled={submittedUndecided > 0 || stagedCount === 0}
-              className="font-sans text-sm font-bold bg-amber text-ink px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              Release {stagedCount > 0 ? `${stagedCount} ` : ''}decisions →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTriageOpen(true)}
+                disabled={submittedApps.length === 0}
+                className="font-sans text-sm border border-light rounded-lg px-4 py-2 hover:border-amber disabled:opacity-40"
+                data-testid="open-triage"
+              >
+                Triage
+              </button>
+              <button
+                onClick={() => setShowReleaseModal(true)}
+                disabled={submittedUndecided > 0 || stagedCount === 0}
+                className="font-sans text-sm font-bold bg-amber text-ink px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                Release {stagedCount > 0 ? `${stagedCount} ` : ''}decisions →
+              </button>
+            </div>
             {submittedUndecided > 0 && (
               <p className="font-mono text-xs text-mid">
                 {submittedUndecided} still need a decision
@@ -582,6 +600,17 @@ function KanbanView({ festivalId }: { festivalId: string }) {
             )}
           </div>
         </div>
+      )}
+
+      {triageOpen && (
+        <TriageMode
+          apps={submittedApps}
+          formFields={formFields}
+          detailOpen={!!selectedApp}
+          onShortlist={handleTriageShortlist}
+          onOpenDetail={setSelectedApp}
+          onClose={() => setTriageOpen(false)}
+        />
       )}
 
       <ApplicationSlideOver
