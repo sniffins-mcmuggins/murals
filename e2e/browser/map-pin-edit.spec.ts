@@ -259,6 +259,13 @@ test('address search recentres the map (stubbed geocode)', async ({ browser }) =
     await page.getByTestId('geocode-results').getByRole('option').first().click()
     await expect(page.getByTestId('geocode-results')).not.toBeVisible()
     await expect(page.getByLabel('Search address')).toHaveValue('')
+
+    // D3: selecting a result drops a draft pin to confirm — it is NOT an
+    // immediate spot. Confirming creates the spot and opens its edit panel.
+    await expect(page.getByTestId('draft-pin-confirm')).toBeVisible()
+    await page.getByTestId('confirm-draft-spot').click()
+    await expect(page.getByTestId('draft-pin-confirm')).not.toBeVisible()
+    await expect(page.getByTestId('spot-panel')).toBeVisible()
   } finally {
     await ctx.close()
   }

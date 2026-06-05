@@ -50,6 +50,15 @@ const TerracottaIcon = L.divIcon({
   iconAnchor: [9, 9],
 })
 
+// Provisional pin dropped at a searched address — visually distinct (dashed
+// ring) until the organiser confirms it into a real spot.
+const DraftIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:20px;height:20px;background:rgba(196,92,58,.25);border:2.5px dashed #C45C3A;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.25)"></div>',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+})
+
 // ─── Map ref capture ──────────────────────────────────────────────────────────
 
 function MapRefCapture({ onReady }: { onReady: (map: L.Map) => void }) {
@@ -322,6 +331,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
   const [searchResults, setSearchResults] = useState<GeocodeSuggestion[]>([])
   const [mapTarget, setMapTarget] = useState<[number, number] | null>(null)
   const [searchError, setSearchError] = useState(false)
+  const [draftPin, setDraftPin] = useState<{ lat: number; lng: number } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [checkedFestivals, setCheckedFestivals] = useState<Set<string>>(new Set())
 
@@ -369,6 +379,8 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
 
   function handleSelectResult(r: GeocodeSuggestion) {
     setMapTarget([r.lat, r.lng])
+    // Drop a draft pin the organiser confirms (and can drag) before it becomes a spot.
+    setDraftPin({ lat: r.lat, lng: r.lng })
     setSearchQ('')
     setSearchResults([])
     setSearchError(false)
@@ -658,6 +670,27 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
             )}
           </div>
 
+          {draftPin && (
+            <div className="mb-3 flex items-center gap-3 p-3 bg-warm border border-amber rounded-lg" data-testid="draft-pin-confirm">
+              <span className="font-sans text-sm text-ink flex-1">
+                Add a spot here? Drag the dashed pin to fine-tune the position first.
+              </span>
+              <button
+                onClick={() => { createSpotMutation.mutate(draftPin); setDraftPin(null) }}
+                className="font-sans text-sm bg-amber text-ink font-medium px-4 py-2 rounded-lg hover:opacity-90"
+                data-testid="confirm-draft-spot"
+              >
+                Add spot here
+              </button>
+              <button
+                onClick={() => setDraftPin(null)}
+                className="font-sans text-sm text-mid hover:text-ink px-2"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {spotsQuery.isError && (
             <p role="alert" className="font-sans text-sm text-clay mb-4">Failed to load spots.</p>
           )}
@@ -731,6 +764,23 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                     </Popup>
                   </Marker>
                 ))}
+                {draftPin && (
+                  <Marker
+                    position={[draftPin.lat, draftPin.lng]}
+                    icon={DraftIcon}
+                    draggable
+                    eventHandlers={{
+                      dragend: (e) => {
+                        const { lat, lng } = (e.target as L.Marker).getLatLng()
+                        setDraftPin({ lat, lng })
+                      },
+                    }}
+                  >
+                    <Popup>
+                      <span className="font-sans text-sm">Draft spot — confirm to add</span>
+                    </Popup>
+                  </Marker>
+                )}
               </MapContainer>
             </div>
           )}
