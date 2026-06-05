@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import icon from 'leaflet/dist/images/marker-icon.png'
@@ -15,6 +15,16 @@ type FestivalSpot = components['schemas']['FestivalSpot']
 type FestivalSpotsResponse = components['schemas']['FestivalSpotsResponse']
 type UnassignedArtist = components['schemas']['UnassignedArtist']
 type GeocodeSuggestion = components['schemas']['GeocodeSuggestion']
+
+type HistoryEntry = {
+  spot_id: string
+  festival_id: string
+  festival_name: string
+  festival_year?: number | null
+  lat: number
+  lng: number
+  mural_status: 'permanent' | 'temporary' | 'unknown'
+}
 
 // Fix default Leaflet icon broken by webpack
 const DefaultIcon = L.icon({
@@ -87,6 +97,9 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
   const [heightM, setHeightM] = useState(spot.height_m != null ? String(spot.height_m) : '')
   const [notes, setNotes] = useState(spot.notes ?? '')
   const [artistId, setArtistId] = useState(spot.artist_id ?? '')
+  const [muralStatus, setMuralStatus] = useState<'permanent' | 'temporary' | 'unknown'>(
+    (spot.mural_status as 'permanent' | 'temporary' | 'unknown') ?? 'unknown'
+  )
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -99,6 +112,7 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
     setHeightM(spot.height_m != null ? String(spot.height_m) : '')
     setNotes(spot.notes ?? '')
     setArtistId(spot.artist_id ?? '')
+    setMuralStatus((spot.mural_status as 'permanent' | 'temporary' | 'unknown') ?? 'unknown')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spot])
 
@@ -127,6 +141,7 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
           width_m: widthM ? parseFloat(widthM) : null,
           height_m: heightM ? parseFloat(heightM) : null,
           notes: notes.trim() || null,
+          mural_status: muralStatus,
         },
       })
       if (patchRes.error) throw new Error('Failed to save spot details')
@@ -219,6 +234,20 @@ function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMutated }: 
             className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber resize-none" />
         </div>
 
+        <div>
+          <label className="font-sans text-xs text-mid block mb-1">Mural status</label>
+          <select
+            value={muralStatus}
+            onChange={e => setMuralStatus(e.target.value as 'permanent' | 'temporary' | 'unknown')}
+            className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
+            aria-label="Mural status"
+          >
+            <option value="unknown">Unknown</option>
+            <option value="permanent">Permanent — mural still on the wall</option>
+            <option value="temporary">Temporary — wall painted over</option>
+          </select>
+        </div>
+
         <div className="flex flex-wrap gap-3 pt-1 border-t border-light">
           <a
             href={
@@ -292,6 +321,8 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
   const [searchResults, setSearchResults] = useState<GeocodeSuggestion[]>([])
   const [mapTarget, setMapTarget] = useState<[number, number] | null>(null)
   const [searchError, setSearchError] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [checkedFestivals, setCheckedFestivals] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (searchQ.trim().length < 3) {
@@ -315,11 +346,38 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
     return () => clearTimeout(timer)
   }, [searchQ])
 
+  const festivalQuery = useQuery({
+    queryKey: ['festival', festivalId],
+    queryFn: async () => {
+      const res = await apiClient.GET('/festivals/{festivalID}', {
+        params: { path: { festivalID: festivalId } },
+      })
+      return res.data ?? null
+    },
+  })
+
+  const historyQuery = useQuery({
+    queryKey: ['spots-history', festivalId],
+    queryFn: async () => {
+      const res = await apiClient.GET('/festivals/{festivalID}/spots/nearby-history', {
+        params: { path: { festivalID: festivalId } },
+      })
+      return (res.data ?? []) as HistoryEntry[]
+    },
+  })
+
   function handleSelectResult(r: GeocodeSuggestion) {
     setMapTarget([r.lat, r.lng])
     setSearchQ('')
     setSearchResults([])
     setSearchError(false)
+    // Auto-save festival centre on first geocode selection
+    if (!festivalQuery.data?.center_lat) {
+      apiClient.PATCH('/festivals/{festivalID}', {
+        params: { path: { festivalID: festivalId } },
+        body: { center_lat: r.lat, center_lng: r.lng },
+      }).catch(() => {})
+    }
   }
 
   const spotsQuery = useQuery({
@@ -374,6 +432,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
           width_m: spot.width_m ?? null,
           height_m: spot.height_m ?? null,
           notes: spot.notes ?? null,
+          mural_status: (spot.mural_status as 'permanent' | 'temporary' | 'unknown') ?? 'unknown',
         },
       })
       if (res.error) throw new Error('Failed to move spot')
@@ -436,7 +495,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
         <div className="w-56 flex-shrink-0">
           <button
             onClick={() => { setPlacingSpot(v => !v); setPlaceError(null) }}
-            className={`w-full font-sans text-sm font-medium px-4 py-2 rounded-lg mb-4 transition-colors ${
+            className={`w-full font-sans text-sm font-medium px-4 py-2 rounded-lg mb-2 transition-colors ${
               placingSpot
                 ? 'bg-ink text-offwhite'
                 : 'bg-amber text-ink hover:opacity-90'
@@ -445,6 +504,51 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
           >
             {placingSpot ? 'Click map to place…' : '+ Add spot'}
           </button>
+
+          {/* History overlay toggle */}
+          <div className="relative mb-4">
+            <button
+              onClick={() => setHistoryOpen(o => !o)}
+              className={`w-full font-mono text-xs uppercase tracking-widest px-3 py-2 rounded-lg border transition-colors ${historyOpen ? 'bg-amber/10 border-amber text-ink' : 'bg-offwhite border-light text-mid hover:text-ink'}`}
+            >
+              🕐 History {historyOpen ? '▲' : '▾'}
+            </button>
+            {historyOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-offwhite border border-light rounded-lg shadow-lg z-50 p-3">
+                <p className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Overlay previous years</p>
+                {(historyQuery.data ?? []).length === 0 && (
+                  <p className="font-sans text-xs text-mid">No nearby festivals found.</p>
+                )}
+                {Array.from(
+                  new Map((historyQuery.data ?? []).map((e: HistoryEntry) => [e.festival_id, e])).values()
+                ).map((fest: HistoryEntry) => (
+                  <label key={fest.festival_id} className="flex items-center gap-2 py-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="accent-amber"
+                      checked={checkedFestivals.has(fest.festival_id)}
+                      onChange={e => {
+                        setCheckedFestivals(prev => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(fest.festival_id)
+                          else next.delete(fest.festival_id)
+                          return next
+                        })
+                      }}
+                    />
+                    <span className="font-sans text-xs text-ink">
+                      {fest.festival_name}{fest.festival_year ? ` · ${fest.festival_year}` : ''}
+                    </span>
+                  </label>
+                ))}
+                <div className="mt-2 pt-2 border-t border-light space-y-1">
+                  <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full inline-block bg-amber opacity-70" /><span className="font-mono text-xs text-mid">Permanent</span></div>
+                  <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full inline-block bg-mid opacity-50" /><span className="font-mono text-xs text-mid">Temporary</span></div>
+                  <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full inline-block bg-light" /><span className="font-mono text-xs text-mid">Unknown</span></div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {placeError && (
             <p role="alert" className="font-sans text-xs text-clay mb-3">{placeError}</p>
@@ -588,6 +692,22 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                 <MapClickCapture active={placingSpot} onMapClick={handleMapClick} />
                 <MapViewUpdater target={mapTarget} />
                 <MapRefCapture onReady={(m) => { mapRef.current = m }} />
+                {(historyQuery.data ?? [])
+                  .filter((e: HistoryEntry) => checkedFestivals.has(e.festival_id))
+                  .map((e: HistoryEntry) => {
+                    const color = e.mural_status === 'permanent' ? '#E8A838' : e.mural_status === 'temporary' ? '#8A8896' : '#E2DDD6'
+                    const opacity = e.mural_status === 'permanent' ? 0.7 : 0.45
+                    return (
+                      <CircleMarker key={e.spot_id} center={[e.lat, e.lng]} radius={8} pathOptions={{ color, fillColor: color, fillOpacity: opacity, weight: 1 }}>
+                        <Popup>
+                          <span className="font-sans text-xs">
+                            {e.festival_name}{e.festival_year ? ` ${e.festival_year}` : ''}<br />
+                            <span className="capitalize">{e.mural_status}</span>
+                          </span>
+                        </Popup>
+                      </CircleMarker>
+                    )
+                  })}
                 {spots.map(s => (
                   <Marker
                     key={s.id}
