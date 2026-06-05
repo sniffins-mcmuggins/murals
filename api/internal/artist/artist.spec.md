@@ -4,6 +4,7 @@
 
 ## Contract
 - CRUD for artist profiles: create, get-mine, update, public-get (by profile ID)
+- Spot history: `GET /profiles/{profileID}` includes `spot_history` — spots from live/closed festivals where this artist was assigned; always an array (never null)
 - Collections: create, get, patch, reorder, delete
 - Collection images: add, reorder, delete, set-cover
 - QR code: generate branded PNG for the artist's public profile URL
@@ -50,6 +51,7 @@
 - Analytics: `profile.go` fires a `profile_view` event on public reads — this calls into the analytics package; do not remove it accidentally when refactoring the public GET handler
 
 ## Changelog
+2026-06-05 — E26: spot_history added to public profile response (live/closed festivals only); always [] not null.
 2026-06-01 — E15.4: nullable user_id, prospect profile visibility invariants
 2026-06-01 — E15.3: publish/unpublish endpoints, preview_token in ArtistProfile response, PublishBar web component
 2026-05-31 — initial spec

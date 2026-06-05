@@ -204,15 +204,22 @@ func main() {
 	}
 	fmt.Println("  promo code: DEMO2027")
 
+	const (
+		cheltLat = 51.8994
+		cheltLng = -2.0783
+	)
+
 	var festivalID string
 	if err := conn.QueryRow(ctx,
 		`INSERT INTO festivals
-		   (organiser_id, name, slug, description, location_label, start_date, end_date, status)
+		   (organiser_id, name, slug, description, location_label, start_date, end_date, status,
+		    center_lat, center_lng)
 		 VALUES ($1, 'Cheltenham Paint Festival 2027', 'cpf-2027',
 		   'The UK''s premier paint festival returns for 2027. Eight days of live mural creation across the town centre.',
-		   'Cheltenham, UK', '2027-10-10', '2027-10-17', 'open')
+		   'Cheltenham, UK', '2027-10-10', '2027-10-17', 'open',
+		   $2, $3)
 		 RETURNING id`,
-		marcusID).Scan(&festivalID); err != nil {
+		marcusID, cheltLat, cheltLng).Scan(&festivalID); err != nil {
 		log.Fatalf("insert festival: %v", err)
 	}
 	fmt.Printf("  festival:  cpf-2027 (%s)\n", festivalID)
@@ -352,6 +359,42 @@ func main() {
 		}
 	}
 	fmt.Printf("  reviewer:  %s (scores seeded for %d applications)\n", sophieEmail, len(seeded))
+
+	// ── CPF 2026 (historical — used for history overlay demo) ─────────────────────
+	var cpf2026ID string
+	if err := conn.QueryRow(ctx,
+		`INSERT INTO festivals
+		   (organiser_id, name, slug, description, location_label, start_date, end_date, status,
+		    center_lat, center_lng)
+		 VALUES ($1, 'Cheltenham Paint Festival 2026', 'cpf-2026',
+		   'The 2026 edition of the UK''s premier paint festival.',
+		   'Cheltenham, UK', '2026-10-09', '2026-10-16', 'closed',
+		   $2, $3)
+		 RETURNING id`,
+		marcusID, cheltLat, cheltLng).Scan(&cpf2026ID); err != nil {
+		log.Fatalf("insert cpf2026: %v", err)
+	}
+	type histSpot struct {
+		lat, lng float64
+		status   string
+	}
+	cpf2026Spots := []histSpot{
+		{51.9020, -2.0741, "permanent"},
+		{51.8975, -2.0798, "permanent"},
+		{51.9003, -2.0770, "temporary"},
+		{51.8988, -2.0815, "temporary"},
+		{51.9015, -2.0760, "unknown"},
+		{51.8962, -2.0730, "unknown"},
+	}
+	for i, s := range cpf2026Spots {
+		if _, err := conn.Exec(ctx,
+			`INSERT INTO festival_spots (festival_id, number, lat, lng, mural_status)
+			 VALUES ($1, $2, $3, $4, $5)`,
+			cpf2026ID, i+1, s.lat, s.lng, s.status); err != nil {
+			log.Fatalf("insert cpf2026 spot %d: %v", i+1, err)
+		}
+	}
+	fmt.Printf("  cpf-2026:  %s (6 historical spots seeded)\n", cpf2026ID)
 
 	fmt.Println("Demo seed complete ✓")
 }
