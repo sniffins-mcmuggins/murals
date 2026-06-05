@@ -339,10 +339,13 @@ type ApplicationStagedDecision string
 
 // ApplicationArtist defines model for ApplicationArtist.
 type ApplicationArtist struct {
-	AvatarS3Key   *string   `json:"avatar_s3_key,omitempty"`
-	DisplayName   *string   `json:"display_name,omitempty"`
-	LocationLabel *string   `json:"location_label,omitempty"`
-	MediumTags    *[]string `json:"medium_tags,omitempty"`
+	AvatarS3Key *string `json:"avatar_s3_key,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+
+	// Id Artist profile id — use to link to /artists/{id}
+	Id            *openapi_types.UUID `json:"id,omitempty"`
+	LocationLabel *string             `json:"location_label,omitempty"`
+	MediumTags    *[]string           `json:"medium_tags,omitempty"`
 }
 
 // ApplicationForm defines model for ApplicationForm.

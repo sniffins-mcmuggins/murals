@@ -2077,6 +2077,11 @@ export interface components {
             updated_at: string;
         };
         ApplicationArtist: {
+            /**
+             * Format: uuid
+             * @description Artist profile id — use to link to /artists/{id}
+             */
+            id?: string;
             display_name?: string;
             avatar_s3_key?: string | null;
             medium_tags?: string[];
