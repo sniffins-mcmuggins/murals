@@ -84,6 +84,10 @@ func TestUpsertForm_RejectsMalformedFields(t *testing.T) {
 	if code := upsertFormRaw(`[{"id":"a","type":"embed","label":"Video"}]`); code != http.StatusOK {
 		t.Errorf("valid embed: got %d want 200", code)
 	}
+	// missing id is backfilled (not rejected) — keeps older callers/seed data working
+	if code := upsertFormRaw(`[{"type":"text","label":"Artist statement","required":true}]`); code != http.StatusOK {
+		t.Errorf("missing id (backfilled): got %d want 200", code)
+	}
 }
 
 func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
