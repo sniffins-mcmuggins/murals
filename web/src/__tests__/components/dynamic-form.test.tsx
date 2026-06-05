@@ -29,6 +29,16 @@ describe('DynamicForm', () => {
     expect(screen.getByRole('option', { name: 'Abstract' })).toBeInTheDocument()
   })
 
+  it('renders an embed field, validates the URL, and previews when valid', () => {
+    const fields = [{ id: 'walkthrough', type: 'embed' as const, label: 'Walkthrough video' }]
+    render(React.createElement(DynamicForm, { fields, onSubmit: vi.fn() }))
+    const input = screen.getByLabelText('Walkthrough video')
+    fireEvent.change(input, { target: { value: 'not a video' } })
+    expect(screen.getByText(/paste a youtube, vimeo or sketchfab/i)).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: 'https://youtu.be/dQw4w9WgXcQ' } })
+    expect(screen.getByText(/youtube/i)).toBeInTheDocument()
+  })
+
   it('calls onSubmit with answers keyed by field label when submitted', () => {
     const onSubmit = vi.fn()
     const fields = [
