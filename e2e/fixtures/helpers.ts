@@ -221,13 +221,15 @@ export async function setFestivalStatus(
   if (!res.ok) throw new Error(`Set festival status failed: ${res.status}`)
 }
 
-export async function upsertForm(token: string, festivalId: string): Promise<void> {
+export async function upsertForm(
+  token: string,
+  festivalId: string,
+  fields: Array<Record<string, unknown>> = [{ id: 'artist-statement', type: 'text', label: 'Artist statement', required: true }],
+): Promise<void> {
   const res = await fetch(`${API}/festivals/${festivalId}/form`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({
-      fields: [{ id: 'artist-statement', type: 'text', label: 'Artist statement', required: true }],
-    }),
+    body: JSON.stringify({ fields }),
   })
   if (!res.ok) throw new Error(`Upsert form failed: ${res.status}`)
 }

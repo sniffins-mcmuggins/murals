@@ -281,6 +281,16 @@ func SubmitApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		// Validate embed fields: a non-empty answer must be a recognised provider URL.
+		for _, f := range fields {
+			if f.Type == "embed" {
+				if v, ok := req.Answers[f.ID]; ok && v != "" && embedProvider(v) == "" {
+					httperr.UnprocessableEntity(w, "invalid embed URL for field: "+f.ID)
+					return
+				}
+			}
+		}
+
 		// Get artist profile
 		userUUID, err := pgUUIDFromString(principal.UserID)
 		if err != nil {

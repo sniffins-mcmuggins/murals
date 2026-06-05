@@ -262,6 +262,12 @@ function FestivalDetail({
           >
             View applications
           </Link>
+          <Link
+            href={`/organiser/festivals/${festivalId}/form`}
+            className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors"
+          >
+            Edit application form
+          </Link>
           <span className="font-mono text-xs text-mid uppercase tracking-wider">{festival.status}</span>
         </div>
       </div>

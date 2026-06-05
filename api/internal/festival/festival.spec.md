@@ -36,6 +36,8 @@
 - Reviewer application responses use `reviewerApplicationResponse` — they MUST omit `staged_decision`, `shortlisted`, `review_flag`, `rank`, `status`, `notes`, and `updated_at`. The organiser receives the full `applicationResponse`. Do not unify these two shapes.
 - While `reviewRoundStatus(fest) == reviewOpen`: `ScoreApplicationHandler` blocks non-reviewer callers (409); all organiser decision endpoints (`PatchApplicationHandler` staged fields, accept/decline/waitlist, reorder, release-decisions) return 409. `reviewNotStarted` and `reviewClosed` impose no gate — a festival without a round uses the kanban freely.
 - Every owner-only endpoint that mutates application state MUST check `reviewRoundStatus` immediately after ownership confirmation. Grep for `reviewRoundStatus` to find all existing sites before adding a new one. Exception: `AddApplicationNoteHandler` — notes are always allowed during review.
+- `UpsertFormHandler` (`PUT /festivals/{festivalID}/form`) rejects (422) any field definition that: (a) has an empty `id` or `label`, (b) has a `type` not in `{text, textarea, select, embed}`, or (c) is a `select` with no `options`. Valid field definitions are persisted as-is to the opaque `application_forms.fields` jsonb column.
+- `SubmitApplicationHandler` rejects (422) any `embed` field whose answer is non-empty and is not a recognised provider URL. Recognised providers: YouTube (`youtube.com`, `youtu.be`), Vimeo (`vimeo.com`), Sketchfab (`sketchfab.com`). Detection rules live in `embed.go` and are mirrored client-side in `web/src/lib/embeds.ts`. Empty embed answers are permitted (field not required, artist has no media).
 
 ## AI Context
 - `festival.go`: festival CRUD — `GetHandler` contains the public-status gate
@@ -62,3 +64,4 @@
 2026-06-04 — Epic 1 Phase 2: reviewer-only scoring queue; trimmed reviewerApplicationResponse seals the decision-field leak.
 2026-06-04 — Epic 1 Phase 3: review round open/close lifecycle; sequential decision gate (reviewers score only while open; decisions locked while open); reviewers notified on open (accepted only).
 2026-06-05 — Epic 2 (E25): avatar images on kanban cards + reviewer queue; View full profile ↗ button in slide-over; ApplicationArtist.id added to API + OpenAPI.
+2026-06-05 — embed field type + form-field-definition validation (form builder A+C): UpsertFormHandler validates id/label/type/options; SubmitApplicationHandler rejects unrecognised embed URLs; provider rules in embed.go mirrored by web/src/lib/embeds.ts.

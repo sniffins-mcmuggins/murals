@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -216,9 +217,46 @@ func UpsertFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			req.Fields = json.RawMessage(`[]`)
 		}
 
+		// Validate field definitions before persisting. Unmarshal into generic maps
+		// so every caller-supplied key (e.g. options, required) is preserved, and a
+		// missing id can be backfilled rather than rejected (keeps older callers and
+		// seed data working while guaranteeing every persisted field has an id).
+		var defs []map[string]any
+		if err := json.Unmarshal(req.Fields, &defs); err != nil {
+			httperr.BadRequest(w, "invalid fields")
+			return
+		}
+		validType := map[string]bool{
+			"text": true, "textarea": true, "long_text": true,
+			"select": true, "url": true, "embed": true,
+		}
+		for _, d := range defs {
+			label, _ := d["label"].(string)
+			typ, _ := d["type"].(string)
+			if strings.TrimSpace(label) == "" || !validType[typ] {
+				httperr.UnprocessableEntity(w, "invalid field definition")
+				return
+			}
+			if typ == "select" {
+				opts, _ := d["options"].([]any)
+				if len(opts) == 0 {
+					httperr.UnprocessableEntity(w, "select field needs at least one option")
+					return
+				}
+			}
+			if id, _ := d["id"].(string); strings.TrimSpace(id) == "" {
+				d["id"] = uuid.New().String()
+			}
+		}
+		normalised, err := json.Marshal(defs)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
 		form, err := q.UpsertApplicationForm(r.Context(), sqlcdb.UpsertApplicationFormParams{
 			FestivalID: festUUID,
-			Fields:     req.Fields,
+			Fields:     normalised,
 		})
 		if err != nil {
 			httperr.InternalServerError(w)

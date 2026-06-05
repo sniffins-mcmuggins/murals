@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { parseEmbed } from '@/lib/embeds'
 
 export type FormField = {
   id?: string
-  type: 'text' | 'textarea' | 'select' | string
+  type: 'text' | 'textarea' | 'select' | 'embed' | string
   label: string
   required?: boolean
   options?: string[]
@@ -68,6 +69,24 @@ export default function DynamicForm({ fields, onSubmit, submitting = false }: Pr
                   </option>
                 ))}
               </select>
+            ) : field.type === 'embed' ? (
+              <div className="flex flex-col gap-1">
+                <input
+                  id={htmlId}
+                  type="url"
+                  name={key}
+                  required={field.required}
+                  value={values[key] ?? ''}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  placeholder="https://youtube.com/… or vimeo.com/… or sketchfab.com/…"
+                  className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
+                />
+                {values[key]
+                  ? parseEmbed(values[key])
+                    ? <span className="font-mono text-xs text-mid uppercase tracking-widest">{parseEmbed(values[key])!.provider} link ✓</span>
+                    : <span role="alert" className="font-sans text-xs text-clay">Paste a YouTube, Vimeo or Sketchfab link.</span>
+                  : null}
+              </div>
             ) : (
               <input
                 id={htmlId}
