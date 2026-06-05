@@ -39,7 +39,7 @@
 
 ## AI Context
 - `festival.go`: festival CRUD — `GetHandler` contains the public-status gate
-- `application.go`: application submit/patch/status + most of the review lifecycle
+- `application.go`: application submit/patch/status + most of the review lifecycle. `ApplicationArtist` now carries `id` (artist profile id) for profile linking — both `toEnrichedResponse` and `toEnrichedReviewerRow` must populate it.
 - `review.go`: `ListApplicationsHandler` branches final encode by role; `Accept/Decline/WaitlistApplicationHandler` all carry the decision gate. `score.go`: reviewer round gate (only while open). `review_round.go`: `reviewRoundStatus()` helper + `OpenReviewRoundHandler` / `CloseReviewRoundHandler`; grep `reviewRoundStatus` when adding a new decision endpoint.
 - `reviewers.go`: panellist account management
 - `spots.go`: map spot assignment
@@ -60,3 +60,4 @@
 2026-06-04 — Epic 1 Phase 1: removed reviewer identity masking entirely (column, stripping, identity_hidden, toggle, e2e). Reviewers always see full identity.
 2026-06-04 — Epic 1 Phase 2: reviewer-only scoring queue; trimmed reviewerApplicationResponse seals the decision-field leak.
 2026-06-04 — Epic 1 Phase 3: review round open/close lifecycle; sequential decision gate (reviewers score only while open; decisions locked while open); reviewers notified on open (accepted only).
+2026-06-05 — Epic 2 (E25): avatar images on kanban cards + reviewer queue; View full profile ↗ button in slide-over; ApplicationArtist.id added to API + OpenAPI.
