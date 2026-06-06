@@ -170,6 +170,7 @@ func main() {
 		r.Post("/profiles/me/preview-token/rotate", artist.RotatePreviewTokenHandler(pool)) // literal /me before /{profileID}
 		r.Post("/profiles/me/publish", artist.PublishHandler(pool))                         // literal /me before /{profileID}
 		r.Post("/profiles/me/unpublish", artist.UnpublishHandler(pool))                     // literal /me before /{profileID}
+		r.Post("/profiles/me/complete-setup", artist.CompleteSetupHandler(pool))            // literal /me before /{profileID}
 		r.Get("/profiles/preview/{token}", artist.PreviewByTokenHandler(pool))              // literal /preview before /{profileID}
 		r.Post("/profiles/{profileID}/link-click", analytics.LinkClickHandler(pool))        // public — no auth
 		r.Get("/profiles/{profileID}", artist.GetProfileHandler(pool))
