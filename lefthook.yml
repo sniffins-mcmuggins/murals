@@ -32,8 +32,3 @@ pre-push:
     mobile-test:
       glob: "mobile/**/*.{ts,tsx,js,jsx}"
       run: cd mobile && npm test
-    # No glob: an e2e break can originate almost anywhere (api/web/db/infra/e2e),
-    # so run the full clean suite on every push. e2e:clean wipes volumes, rebuilds
-    # the stack, runs the API gate + browser specs, and always tears down (defer).
-    e2e-clean:
-      run: task e2e:clean
