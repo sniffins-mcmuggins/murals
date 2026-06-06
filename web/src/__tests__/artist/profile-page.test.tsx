@@ -1,6 +1,8 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import React from 'react'
 
+const { mockGet } = vi.hoisted(() => ({ mockGet: vi.fn() }))
+
 vi.mock('@/lib/api', () => ({ apiClient: { GET: vi.fn(), POST: vi.fn(), PATCH: vi.fn() } }))
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }),
@@ -18,10 +20,7 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue({ get: vi.fn().mockReturnValue({ value: 'test-session' }) }),
 }))
 vi.mock('@render/api-client', () => ({
-  createApiClient: vi.fn().mockReturnValue({
-    GET: vi.fn().mockResolvedValue({ data: null, error: { status: 404 } }),
-    use: vi.fn(),
-  }),
+  createApiClient: vi.fn().mockReturnValue({ GET: mockGet, use: vi.fn() }),
 }))
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn().mockReturnValue({ invalidateQueries: vi.fn() }),
@@ -29,13 +28,43 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 import ProfilePage from '@/app/(artist)/profile/page'
+import { redirect } from 'next/navigation'
+
+const setUpProfile = {
+  id: 'p1',
+  display_name: 'Test Artist',
+  bio: '',
+  visibility: 'draft',
+  medium_tags: [],
+  social_links: {},
+  headline_image_urls: [],
+  setup_completed_at: '2026-06-06T00:00:00Z',
+  created_at: '2026-06-06T00:00:00Z',
+  updated_at: '2026-06-06T00:00:00Z',
+}
 
 describe('ProfilePage', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('renders without throwing when profile is null', async () => {
+  it('redirects to the setup wizard when the artist has not completed setup', async () => {
+    mockGet.mockResolvedValue({ data: null, error: { status: 404 } })
+    await expect(ProfilePage({ searchParams: Promise.resolve({}) })).rejects.toThrow('NEXT_REDIRECT')
+    expect(redirect).toHaveBeenCalledWith('/profile/setup')
+  })
+
+  it('renders the editor when setup is complete', async () => {
+    mockGet.mockResolvedValue({ data: setUpProfile, error: undefined })
     const jsx = await ProfilePage({ searchParams: Promise.resolve({}) })
     const rendered = JSON.stringify(jsx)
     expect(rendered).toContain('Profile')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('renders the editor for a freshly claimed prospect even before setup completes', async () => {
+    mockGet.mockResolvedValue({ data: null, error: { status: 404 } })
+    const jsx = await ProfilePage({ searchParams: Promise.resolve({ claimed: '1' }) })
+    const rendered = JSON.stringify(jsx)
+    expect(rendered).toContain('Profile')
+    expect(redirect).not.toHaveBeenCalled()
   })
 })
