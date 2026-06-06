@@ -24,6 +24,9 @@
 - Route structure mirrors the API surface — `analytics/`, `applications/`, `billing/`, `collections/`, `profile/`
 - `layout.tsx`: artist shell layout with navigation
 - See e2e-debugging rule for the ECONNREFUSED / `NEXT_PUBLIC_API_URL` pitfall
+- `profile/setup/`: first-run wizard (`ProfileWizard`) — one `'use client'` component, internal step index, auto-saves each step via PATCH /profiles/me. `profile/page.tsx` redirects here when `setup_completed_at` is null.
+- Shared field components in `web/src/components/`: `MediumPicker`, `SupportLinkField`, `ImageSlot` — used by BOTH the wizard and `ProfileForm`. Edit the shared component, not one copy.
 
 ## Changelog
+2026-06-06 — Added profile setup wizard (profile/setup/) + shared field components; editor reuses them.
 2026-05-31 — initial spec

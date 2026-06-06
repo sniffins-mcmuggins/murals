@@ -79,6 +79,8 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   }
 
   const profile = profileRes.data
+  const supportUrl =
+    profile.support_url && /^https?:\/\//i.test(profile.support_url) ? profile.support_url : null
   const collections = collectionsRes.data ?? []
   const appearances = festivalsRes.data ?? []
   const endorsements = endorsementsRes.data?.endorsements ?? []
@@ -191,6 +193,17 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
 
           {/* Social links */}
           <SocialLinks profileId={profile.id} socialLinks={profile.social_links} />
+
+          {supportUrl && (
+            <a
+              href={supportUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-block mt-4 mr-3 font-mono text-xs uppercase tracking-widest bg-amber text-ink hover:opacity-90 px-4 py-2 rounded transition-opacity"
+            >
+              Support this artist
+            </a>
+          )}
 
           <Link
             href={`/endorse/${id}`}

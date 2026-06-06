@@ -30,14 +30,25 @@ test('artist onboarding: signup → profile → collection → upload → public
   await verifyEmailViaMailpit(page, email)
   await expect(page).toHaveURL('/dashboard')
 
-  // ── 3. Navigate to Profile and fill in details ────────────────────────────────
+  // ── 3. Create + fill profile via API, then navigate to the profile editor ───
+  // New users are redirected to the setup wizard before setup_completed_at is
+  // stamped. We use the API directly here (cookies are shared with page.request)
+  // to seed the profile data and mark setup complete, then confirm the editor
+  // renders correctly. The wizard UI flow itself is covered by the wizard spec.
+  const createRes = await page.request.post(`${API}/profiles`, {
+    data: { displayName: 'Test Muralist' },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  expect(createRes.ok()).toBe(true)
+  await page.request.patch(`${API}/profiles/me`, {
+    data: { bio: 'I paint walls.' },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  await page.request.post(`${API}/profiles/me/complete-setup`, {})
+
   await page.goto('/profile')
   await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
-
-  await page.fill('input[placeholder*="Display name"], input[placeholder*="display name"], input[name="displayName"], #displayName', 'Test Muralist')
-  await page.fill('textarea', 'I paint walls.')
-  await page.getByRole('button', { name: /save/i }).click()
-  await expect(page.getByText(/saved|success/i)).toBeVisible()
+  await expect(page.locator('input[name="displayName"]')).toHaveValue('Test Muralist')
 
   // ── 4. Get profile ID via API (cookies shared for localhost) ──────────────────
   const profileRes = await page.request.get(`${API}/profiles/me`)
