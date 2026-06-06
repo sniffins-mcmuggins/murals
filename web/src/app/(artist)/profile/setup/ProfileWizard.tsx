@@ -267,7 +267,8 @@ export default function ProfileWizard({ initialProfile }: { initialProfile: Arti
           const res = await apiClient.POST('/profiles/me/publish', {})
           setBusy(false)
           if (res.error) { setError('Publishing needs an active membership. You can finish and publish from your profile.'); return }
-          await apiClient.POST('/profiles/me/complete-setup', {})
+          const done = await apiClient.POST('/profiles/me/complete-setup', {})
+          if (done.error) { setError('Your page is published, but we could not finish setup — please try again.'); return }
           window.localStorage.removeItem(storageKey)
           router.push('/profile')
         }}>
@@ -285,7 +286,10 @@ export default function ProfileWizard({ initialProfile }: { initialProfile: Arti
         </div>
         <button type="button"
           onClick={async () => {
-            await apiClient.POST('/profiles/me/complete-setup', {})
+            setBusy(true)
+            const done = await apiClient.POST('/profiles/me/complete-setup', {})
+            setBusy(false)
+            if (done.error) { setError('Could not finish setup — please try again.'); return }
             window.localStorage.removeItem(storageKey)
             router.push('/profile')
           }}
