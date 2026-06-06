@@ -728,8 +728,13 @@ All issues use `[EX]` (epic) or `[EX.Y]` (task) prefixes. No `feat:`, `Epic:`, o
 | E20 | Refer-an-artist |
 | E21 | Public mobile: GPS audio, festival trail, save/seen-it |
 | E22 | Organiser review & selection (panellist, rubric, anon, multi-round) |
+| E23 | Spot assignment & map-editor placement |
+| E24 | Reviewer scoring round (pre-kanban stage) |
+| E25 | Kanban card visuals & profile access |
+| E26 | Profile spot history (public mural map) |
+| E27 | Artist profile setup wizard (guided onboarding + support link) |
 
-**Next epic: E23.** See `.claude/rules/issue-labels.md` for the full label set and hygiene rules.
+**Next epic: E28.** See `.claude/rules/issue-labels.md` for the full label set and hygiene rules.
 
 ### Labels
 
