@@ -45,7 +45,11 @@ export async function createUser(
   prefix = 'user',
   suffix: string | number = uniqueSuffix(),
 ): Promise<UserSetup> {
-  const email = `${prefix}-${suffix}@e2e.test`
+  // Always append random entropy to the signup email. Many callers pass a
+  // collidable suffix (a bare `Date.now()` or a `SUFFIX_BASE + N` offset), which
+  // collides across parallel workers in the same millisecond and 409s on signup.
+  // Every caller uses the returned `email`, so this is transparent to them.
+  const email = `${prefix}-${suffix}-${Math.random().toString(36).slice(2, 7)}@e2e.test`
   const password = 'testpass123'
 
   const signupRes = await fetch(`${API}/auth/signup`, {
