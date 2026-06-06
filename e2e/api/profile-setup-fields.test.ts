@@ -45,6 +45,45 @@ describe('profile setup fields', () => {
     expect(JSON.stringify(body).toLowerCase()).toMatch(/url/)
   })
 
+  it('bio can be set then cleared via PATCH; displayName cannot be cleared', async () => {
+    const { token } = await createArtist()
+    const created = await fetch(`${API}/profiles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ displayName: 'Bio Clear Artist' }),
+    })
+    expect(created.ok).toBe(true)
+
+    // Set a bio.
+    let res = await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ bio: 'I paint walls.' }),
+    })
+    expect(res.status).toBe(200)
+    expect((await res.json()).bio).toBe('I paint walls.')
+
+    // Clear the bio with an empty string.
+    res = await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ bio: '' }),
+    })
+    expect(res.status).toBe(200)
+    expect((await res.json()).bio).toBe('')
+
+    // Omitting bio leaves it unchanged (still empty), and an empty displayName does NOT wipe the name.
+    res = await fetch(`${API}/profiles/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ displayName: '' }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.bio).toBe('')                       // unchanged by this PATCH
+    expect(body.display_name).toBe('Bio Clear Artist') // empty displayName ignored (required field)
+  })
+
   it('complete-setup stamps setup_completed_at and is idempotent', async () => {
     const { token } = await createArtist()
     const created = await fetch(`${API}/profiles`, {

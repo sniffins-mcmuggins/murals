@@ -277,7 +277,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var req struct {
 			DisplayName       string          `json:"displayName"`
-			Bio               string          `json:"bio"`
+			Bio               *string         `json:"bio"`
 			LocationLabel     *string         `json:"locationLabel"`
 			ShowLocation      *bool           `json:"showLocation"`
 			MediumTags        []string        `json:"mediumTags"`
@@ -315,8 +315,8 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			displayName = req.DisplayName
 		}
 		bio := existing.Bio
-		if req.Bio != "" {
-			bio = req.Bio
+		if req.Bio != nil {
+			bio = *req.Bio
 		}
 		mediumTags := existing.MediumTags
 		if req.MediumTags != nil {
