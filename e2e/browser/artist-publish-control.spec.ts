@@ -37,11 +37,13 @@ test('entitled artist: publish → public → unpublish → draft', async ({ pag
 
   await signupAndLogin(page, email, password)
 
-  // Create a profile
+  // Create a profile via API + mark setup complete so /profile shows the editor
+  // (a brand-new artist is otherwise redirected to the /profile/setup wizard).
+  const createRes = await page.request.post(`${API}/profiles`, { data: { displayName: 'Publish Test Artist' } })
+  expect(createRes.ok()).toBe(true)
+  const setupRes = await page.request.post(`${API}/profiles/me/complete-setup`)
+  expect(setupRes.ok()).toBe(true)
   await page.goto('/profile')
-  await page.fill('input[name="displayName"]', 'Publish Test Artist')
-  await page.getByRole('button', { name: /save/i }).click()
-  await expect(page.getByText(/saved/i)).toBeVisible()
 
   // Get user_id via API for DB grant
   const profileRes = await page.request.get(`${API}/profiles/me`)
@@ -98,10 +100,13 @@ test('non-entitled artist: Go Public shows upsell, profile stays draft', async (
 
   await signupAndLogin(page, email, password)
 
+  // Create a profile via API + mark setup complete so /profile shows the editor
+  // (a brand-new artist is otherwise redirected to the /profile/setup wizard).
+  const createRes = await page.request.post(`${API}/profiles`, { data: { displayName: 'No Pay Artist' } })
+  expect(createRes.ok()).toBe(true)
+  const setupRes = await page.request.post(`${API}/profiles/me/complete-setup`)
+  expect(setupRes.ok()).toBe(true)
   await page.goto('/profile')
-  await page.fill('input[name="displayName"]', 'No Pay Artist')
-  await page.getByRole('button', { name: /save/i }).click()
-  await expect(page.getByText(/saved/i)).toBeVisible()
 
   // Reload to render PublishBar from server
   await page.reload()
