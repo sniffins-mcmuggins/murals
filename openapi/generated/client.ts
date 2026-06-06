@@ -325,6 +325,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/me/complete-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark first-run profile setup complete
+         * @description Idempotently stamps setup_completed_at so /profile shows the editor, not the wizard.
+         */
+        post: operations["completeProfileSetup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/{profileID}": {
         parameters: {
             query?: never;
@@ -1867,6 +1887,13 @@ export interface components {
             updated_at: string;
             /** @description Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses. */
             preview_token?: string;
+            /** @description Optional "Support this artist" donation link (http/https). Shown publicly. */
+            support_url?: string | null;
+            /**
+             * Format: date-time
+             * @description When the artist completed first-run setup. Owner-only; null = wizard not yet finished.
+             */
+            setup_completed_at?: string | null;
             spot_history?: {
                 /** Format: uuid */
                 spot_id?: string;
@@ -1895,6 +1922,8 @@ export interface components {
                 [key: string]: string;
             };
             avatarS3Key?: string | null;
+            /** @description Donation link. Empty string clears it; non-empty must be a valid http(s) URL. */
+            supportUrl?: string | null;
         };
         /** @enum {string} */
         CollectionStatus: "active" | "archived" | "ongoing";
@@ -2826,6 +2855,28 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Updated profile (visibility is now draft). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    completeProfileSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setup marked complete */
             200: {
                 headers: {
                     [name: string]: unknown;

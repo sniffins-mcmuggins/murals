@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, FormEvent, useRef } from 'react'
+import { useState, FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 import { SocialIcon, SOCIAL_PLATFORMS } from '@/components/SocialIcon'
 import { useProfileImageUpload } from '@/hooks/useProfileImageUpload'
+import { ImageSlot } from '@/components/ImageSlot'
+import { MediumPicker } from '@/components/MediumPicker'
+import { SupportLinkField } from '@/components/SupportLinkField'
 
 type ArtistProfile = components['schemas']['ArtistProfile']
 
@@ -24,63 +27,14 @@ function initSocialLinks(profile: ArtistProfile | null): Record<string, string> 
 
 const MAX_HEADLINE = 3
 
-function ImageSlot({
-  url,
-  label,
-  round,
-  onFile,
-  isUploading,
-}: {
-  url: string | null
-  label: string
-  round?: boolean
-  onFile: (file: File) => void
-  isUploading: boolean
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const shape = round ? 'rounded-full' : 'rounded-lg'
-  const size = round ? 'w-24 h-24' : 'w-full h-40'
-
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={isUploading}
-        className={`${size} ${shape} border-2 border-dashed border-light bg-warm flex items-center justify-center overflow-hidden hover:border-amber transition-colors disabled:opacity-50 relative`}
-        aria-label={`Upload ${label}`}
-      >
-        {url ? (
-          <img src={url} alt={label} className={`${size} ${shape} object-cover`} />
-        ) : (
-          <span className="font-mono text-xs uppercase tracking-widest text-mid">
-            {isUploading ? '…' : '+'}
-          </span>
-        )}
-      </button>
-      <span className="font-sans text-xs text-mid">{label}</span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        className="sr-only"
-        onChange={e => {
-          const file = e.target.files?.[0]
-          if (file) onFile(file)
-          e.target.value = ''
-        }}
-      />
-    </div>
-  )
-}
-
 export default function ProfileForm({ profile, userId }: Props) {
   const queryClient = useQueryClient()
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
   const [bio, setBio] = useState(profile?.bio ?? '')
   const [location, setLocation] = useState(profile?.location_label ?? '')
-  const [mediumTags, setMediumTags] = useState((profile?.medium_tags ?? []).join(', '))
+  const [mediumTags, setMediumTags] = useState<string[]>(profile?.medium_tags ?? [])
   const [socialLinks, setSocialLinks] = useState<Record<string, string>>(() => initSocialLinks(profile))
+  const [supportUrl, setSupportUrl] = useState(profile?.support_url ?? '')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_s3_key ?? null)
   const [headlineUrls, setHeadlineUrls] = useState<(string | null)[]>(() => {
     const existing = profile?.headline_image_urls ?? []
@@ -114,6 +68,7 @@ export default function ProfileForm({ profile, userId }: Props) {
       locationLabel: string
       mediumTags: string[]
       socialLinks: Record<string, string>
+      supportUrl: string
       avatarS3Key: string | null
       headlineImageUrls: string[]
     }) => {
@@ -129,6 +84,7 @@ export default function ProfileForm({ profile, userId }: Props) {
             locationLabel: data.locationLabel,
             mediumTags: data.mediumTags,
             socialLinks: filteredLinks,
+            supportUrl: data.supportUrl,
             avatarS3Key: data.avatarS3Key,
             headlineImageUrls: data.headlineImageUrls,
           },
@@ -142,6 +98,7 @@ export default function ProfileForm({ profile, userId }: Props) {
             locationLabel: data.locationLabel,
             mediumTags: data.mediumTags,
             socialLinks: filteredLinks,
+            supportUrl: data.supportUrl,
             avatarS3Key: data.avatarS3Key,
             headlineImageUrls: data.headlineImageUrls,
           },
@@ -165,8 +122,9 @@ export default function ProfileForm({ profile, userId }: Props) {
       displayName,
       bio,
       locationLabel: location,
-      mediumTags: mediumTags.split(',').map(t => t.trim()).filter(Boolean),
+      mediumTags,
       socialLinks,
+      supportUrl,
       avatarS3Key: avatarUrl,
       headlineImageUrls: headlineUrls.filter((u): u is string => u !== null),
     })
@@ -239,14 +197,7 @@ export default function ProfileForm({ profile, userId }: Props) {
       </div>
       <div>
         <label className="block font-sans text-sm text-ink mb-1">Medium tags</label>
-        <input
-          type="text"
-          value={mediumTags}
-          onChange={e => setMediumTags(e.target.value)}
-          placeholder="mural, stencil, paste-up"
-          className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite placeholder:text-mid focus:outline-none focus:border-amber"
-        />
-        <p className="mt-1 font-sans text-xs text-mid">Comma-separated list of mediums.</p>
+        <MediumPicker value={mediumTags} onChange={setMediumTags} />
       </div>
 
       <fieldset>
@@ -269,6 +220,11 @@ export default function ProfileForm({ profile, userId }: Props) {
           ))}
         </div>
       </fieldset>
+
+      <div>
+        <label className="block font-sans text-sm text-ink mb-1">Support link</label>
+        <SupportLinkField value={supportUrl} onChange={setSupportUrl} />
+      </div>
 
       {error && <p role="alert" className="font-sans text-sm text-clay">{error}</p>}
       {success && <p role="status" className="font-sans text-sm text-amber">Saved!</p>}

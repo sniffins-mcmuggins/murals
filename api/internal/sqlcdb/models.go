@@ -310,6 +310,8 @@ type ArtistProfile struct {
 	ClaimToken        *string            `db:"claim_token" json:"claim_token"`
 	ClaimedAt         pgtype.Timestamptz `db:"claimed_at" json:"claimed_at"`
 	CreatedBy         pgtype.UUID        `db:"created_by" json:"created_by"`
+	SupportUrl        *string            `db:"support_url" json:"support_url"`
+	SetupCompletedAt  pgtype.Timestamptz `db:"setup_completed_at" json:"setup_completed_at"`
 }
 
 type BetaFeedback struct {

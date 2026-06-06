@@ -20,6 +20,7 @@ SET display_name        = $2,
     avatar_s3_key       = $8,
     headline_image_urls = $9,
     visibility          = $10,
+    support_url         = $11,
     updated_at          = now()
 WHERE id = $1
 RETURNING *;
@@ -63,11 +64,13 @@ SELECT * FROM artist_profiles WHERE claim_token = $1;
 -- name: ClaimArtistProfile :one
 -- Atomically binds a profile to a user. Returns no row if already claimed
 -- (user_id IS NOT NULL) or if the token doesn't exist — caller checks for
--- pgx.ErrNoRows and returns 409.
+-- pgx.ErrNoRows and returns 409. Stamps setup_completed_at so the claimer
+-- lands on the editor, not the first-run wizard (the page was pre-built).
 UPDATE artist_profiles
-SET user_id    = $1,
-    claimed_at = now(),
-    updated_at = now()
+SET user_id            = $1,
+    claimed_at         = now(),
+    setup_completed_at = now(),
+    updated_at         = now()
 WHERE claim_token = $2
   AND user_id IS NULL
 RETURNING *;
@@ -87,6 +90,15 @@ WHERE display_name = $1
   AND created_by   = $2
   AND user_id IS NULL
 LIMIT 1;
+
+-- name: CompleteArtistProfileSetup :one
+-- Idempotently marks first-run setup complete. COALESCE keeps the first
+-- completion timestamp if called more than once, and always returns the row.
+UPDATE artist_profiles
+SET setup_completed_at = COALESCE(setup_completed_at, now()),
+    updated_at         = now()
+WHERE user_id = $1
+RETURNING *;
 
 -- name: GetSpotHistoryForProfile :many
 -- Returns festival spot placements for a given artist profile.

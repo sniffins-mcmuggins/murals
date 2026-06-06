@@ -242,6 +242,15 @@ components:
             (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish).
             Share /profiles/preview/{token} for pre-publish access. Omitted from
             public responses.
+        support_url:
+          type: string
+          nullable: true
+          description: Optional "Support this artist" donation link (http/https). Shown publicly.
+        setup_completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the artist completed first-run setup. Owner-only; null = wizard not yet finished.
         spot_history:
           type: array
           items:
@@ -298,6 +307,10 @@ components:
         avatarS3Key:
           type: string
           nullable: true
+        supportUrl:
+          type: string
+          nullable: true
+          description: Donation link. Empty string clears it; non-empty must be a valid http(s) URL.
 
     CollectionStatus:
       type: string
@@ -1527,6 +1540,27 @@ paths:
       responses:
         "200":
           description: Updated profile (visibility is now draft).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/me/complete-setup:
+    post:
+      operationId: completeProfileSetup
+      summary: Mark first-run profile setup complete
+      description: Idempotently stamps setup_completed_at so /profile shows the editor, not the wizard.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setup marked complete
           content:
             application/json:
               schema:

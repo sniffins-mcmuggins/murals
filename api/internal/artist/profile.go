@@ -6,7 +6,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -46,6 +48,8 @@ type profileResponse struct {
 	CreatedAt         string             `json:"created_at"`
 	UpdatedAt         string             `json:"updated_at"`
 	PreviewToken      *string            `json:"preview_token,omitempty"`
+	SupportURL        *string            `json:"support_url,omitempty"`
+	SetupCompletedAt  *string            `json:"setup_completed_at,omitempty"`
 	SpotHistory       []spotHistoryEntry `json:"spot_history"`
 }
 
@@ -78,6 +82,11 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 		HeadlineImageUrls: headlineImageUrls,
 		CreatedAt:         p.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:         p.UpdatedAt.Time.Format(time.RFC3339),
+	}
+	resp.SupportURL = p.SupportUrl
+	if !public && p.SetupCompletedAt.Valid {
+		s := p.SetupCompletedAt.Time.Format(time.RFC3339)
+		resp.SetupCompletedAt = &s
 	}
 	if !public || p.ShowLocation {
 		resp.LocationLabel = p.LocationLabel
@@ -268,7 +277,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 		var req struct {
 			DisplayName       string          `json:"displayName"`
-			Bio               string          `json:"bio"`
+			Bio               *string         `json:"bio"`
 			LocationLabel     *string         `json:"locationLabel"`
 			ShowLocation      *bool           `json:"showLocation"`
 			MediumTags        []string        `json:"mediumTags"`
@@ -276,6 +285,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			AvatarS3Key       *string         `json:"avatarS3Key"`
 			HeadlineImageUrls []string        `json:"headlineImageUrls"`
 			Visibility        *string         `json:"visibility"`
+			SupportURL        *string         `json:"supportUrl"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
@@ -305,8 +315,8 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			displayName = req.DisplayName
 		}
 		bio := existing.Bio
-		if req.Bio != "" {
-			bio = req.Bio
+		if req.Bio != nil {
+			bio = *req.Bio
 		}
 		mediumTags := existing.MediumTags
 		if req.MediumTags != nil {
@@ -334,6 +344,20 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		if headlineImageUrls == nil {
 			headlineImageUrls = []string{}
+		}
+		supportURL := existing.SupportUrl
+		if req.SupportURL != nil {
+			trimmed := strings.TrimSpace(*req.SupportURL)
+			if trimmed == "" {
+				supportURL = nil
+			} else {
+				u, perr := url.Parse(trimmed)
+				if perr != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+					httperr.UnprocessableEntity(w, "supportUrl must be a valid http(s) URL")
+					return
+				}
+				supportURL = &trimmed
+			}
 		}
 		visibility := existing.Visibility
 		if req.Visibility != nil {
@@ -373,6 +397,7 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			AvatarS3Key:       avatarS3Key,
 			HeadlineImageUrls: headlineImageUrls,
 			Visibility:        visibility,
+			SupportUrl:        supportURL,
 		})
 		if err != nil {
 			httperr.InternalServerError(w)

@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth-server'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { createApiClient } from '@render/api-client'
 import ProfileForm from './ProfileForm'
 import PublishBar from './PublishBar'
@@ -26,6 +27,13 @@ export default async function ProfilePage({
 
   const params = await searchParams
   const justClaimed = params.claimed === '1'
+
+  // First-run artists (setup not completed) go to the guided wizard. Claimed
+  // prospects have setup_completed_at stamped at claim time, so they fall through
+  // to the editor here (with the celebratory banner).
+  if (!profile || profile.setup_completed_at == null) {
+    if (!justClaimed) redirect('/profile/setup')
+  }
 
   return (
     <div>

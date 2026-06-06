@@ -3,7 +3,7 @@
 **Last updated:** 2026-05-31
 
 ## Contract
-- `db/migrations/`: golang-migrate up/down SQL files, numbered `000001_...` through `000016_...`
+- `db/migrations/`: golang-migrate up/down SQL files, domain-grouped (`000001_users` … `000005_profile_setup_fields`); current highest is `000005`
 - `db/queries/`: sqlc input — SQL queries that `task db:generate` compiles to `api/internal/sqlcdb/*.sql.go`
 - `db/seed/`: seed data for local development
 - `api/internal/db/db.go`: `db.Open(ctx, url)` — creates and validates a pgx connection pool
@@ -25,7 +25,7 @@
 - The `dirty` flag in `schema_migrations` indicates a failed partial migration — do not re-run until the state is manually fixed
 
 ## AI Context
-- `db/migrations/`: numbered SQL files — current highest is `000016`
+- `db/migrations/`: numbered SQL files — current highest is `000005`
 - `db/queries/`: one file per table or concern — edit here, then `task db:generate`
 - `api/internal/sqlcdb/`: generated output — `models.go` has the struct definitions; `*.sql.go` has the query implementations
 - `task db:migrate`: applies pending migrations against the running Docker DB
@@ -33,4 +33,5 @@
 - The dual concern (sqlc-generated code + migration SQL) is fully documented in `.claude/rules/sqlc-and-schema.md` — read that rule when touching anything here
 
 ## Changelog
+2026-06-06 — Corrected stale migration count (filesystem highest is 000005, not 000016); added profile setup fields migration.
 2026-05-31 — initial spec

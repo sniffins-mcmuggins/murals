@@ -3,6 +3,8 @@
 **Last updated:** 2026-06-01
 
 ## Contract
+- Support link: `support_url` (nullable http(s)) on profile responses + `supportUrl` on PATCH /profiles/me (422 on malformed URL)
+- Setup completion: `setup_completed_at` (owner responses only) + `POST /profiles/me/complete-setup` stamps it idempotently; claiming a prospect also stamps it
 - CRUD for artist profiles: create, get-mine, update, public-get (by profile ID)
 - Spot history: `GET /profiles/{profileID}` includes `spot_history` — spots from live/closed festivals where this artist was assigned; always an array (never null)
 - Collections: create, get, patch, reorder, delete
@@ -31,6 +33,7 @@
 - **Preview token is the secret**: opaque UUID-derived string stored on the profile row; not a JWT, carries no claims. Sharing the URL grants access. Rotating revokes all previously shared links immediately.
 - **`preview_token` omitted from public responses**: `toProfileResponse(p, public=true)` sets `PreviewToken = nil`; only the rotate response (`public=false`) returns it so the owner can copy the new link
 - **Nullable user_id**: profiles owned by nobody until claimed; the partial unique index (WHERE user_id IS NOT NULL) enforces 1:1 user↔profile invariant only for claimed profiles
+- **Bio is clearable; displayName is not**: `PATCH /profiles/me` treats `bio` as a pointer — omitted keeps the existing value, `""` clears it. `displayName` is a required field, so an empty `displayName` is ignored (keeps existing) rather than clearing.
 
 ## Invariants
 - Public profile read MUST return 404 (not 403) for non-public profiles — information about private profiles must not leak
@@ -51,6 +54,8 @@
 - Analytics: `profile.go` fires a `profile_view` event on public reads — this calls into the analytics package; do not remove it accidentally when refactoring the public GET handler
 
 ## Changelog
+2026-06-06 — bio made clearable via PATCH (empty string clears; pointer semantics); displayName stays required.
+2026-06-06 — Profile setup wizard backend: support_url + setup_completed_at columns; complete-setup endpoint; claim stamps setup_completed_at.
 2026-06-05 — E26: spot_history added to public profile response (live/closed festivals only); always [] not null.
 2026-06-01 — E15.4: nullable user_id, prospect profile visibility invariants
 2026-06-01 — E15.3: publish/unpublish endpoints, preview_token in ArtistProfile response, PublishBar web component

@@ -5,7 +5,7 @@ import { apiClient } from '@/lib/api'
 
 type UploadState = 'idle' | 'uploading' | 'error'
 
-export function useProfileImageUpload(onComplete: (cdnUrl: string) => void) {
+export function useProfileImageUpload(onComplete: (cdnUrl: string, s3Key: string) => void) {
   const [state, setState] = useState<UploadState>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -29,7 +29,7 @@ export function useProfileImageUpload(onComplete: (cdnUrl: string) => void) {
       const confirmRes = await apiClient.POST('/images/confirm', { body: { s3Key } })
       if (confirmRes.error || !confirmRes.data) throw new Error('Failed to confirm upload')
 
-      onComplete(confirmRes.data.cdnUrl)
+      onComplete(confirmRes.data.cdnUrl, s3Key)
       setState('idle')
     } catch (err) {
       setState('error')
