@@ -477,9 +477,12 @@ type ArtistProfile struct {
 	MediumTags    []string `json:"medium_tags"`
 
 	// PreviewToken Opaque preview token. Only present in owner-facing responses (GET /profiles/me, POST /profiles/me/publish, POST /profiles/me/unpublish). Share /profiles/preview/{token} for pre-publish access. Omitted from public responses.
-	PreviewToken *string           `json:"preview_token,omitempty"`
-	SocialLinks  map[string]string `json:"social_links"`
-	SpotHistory  *[]struct {
+	PreviewToken *string `json:"preview_token,omitempty"`
+
+	// SetupCompletedAt When the artist completed first-run setup. Owner-only; null = wizard not yet finished.
+	SetupCompletedAt *time.Time        `json:"setup_completed_at,omitempty"`
+	SocialLinks      map[string]string `json:"social_links"`
+	SpotHistory      *[]struct {
 		FestivalId   *openapi_types.UUID                  `json:"festival_id,omitempty"`
 		FestivalName *string                              `json:"festival_name,omitempty"`
 		FestivalYear *int                                 `json:"festival_year,omitempty"`
@@ -488,7 +491,10 @@ type ArtistProfile struct {
 		MuralStatus  *ArtistProfileSpotHistoryMuralStatus `json:"mural_status,omitempty"`
 		SpotId       *openapi_types.UUID                  `json:"spot_id,omitempty"`
 	} `json:"spot_history,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
+
+	// SupportUrl Optional "Support this artist" donation link (http/https). Shown publicly.
+	SupportUrl *string   `json:"support_url,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at"`
 
 	// UserId UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
 	UserId *openapi_types.UUID `json:"user_id,omitempty"`
@@ -890,6 +896,9 @@ type UpdateProfileRequest struct {
 	// ShowLocation Controls whether location_label appears on the public profile.
 	ShowLocation *bool              `json:"showLocation,omitempty"`
 	SocialLinks  *map[string]string `json:"socialLinks,omitempty"`
+
+	// SupportUrl Donation link. Empty string clears it; non-empty must be a valid http(s) URL.
+	SupportUrl *string `json:"supportUrl,omitempty"`
 }
 
 // User defines model for User.
@@ -1353,6 +1362,9 @@ type ServerInterface interface {
 	// Get aggregated analytics for the authenticated artist's profile
 	// (GET /profiles/me/analytics)
 	GetMyAnalytics(w http.ResponseWriter, r *http.Request)
+	// Mark first-run profile setup complete
+	// (POST /profiles/me/complete-setup)
+	CompleteProfileSetup(w http.ResponseWriter, r *http.Request)
 	// Publish own artist profile (draft → public)
 	// (POST /profiles/me/publish)
 	PublishProfile(w http.ResponseWriter, r *http.Request)
@@ -1764,6 +1776,12 @@ func (_ Unimplemented) PatchProfileMe(w http.ResponseWriter, r *http.Request) {
 // Get aggregated analytics for the authenticated artist's profile
 // (GET /profiles/me/analytics)
 func (_ Unimplemented) GetMyAnalytics(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Mark first-run profile setup complete
+// (POST /profiles/me/complete-setup)
+func (_ Unimplemented) CompleteProfileSetup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3712,6 +3730,28 @@ func (siw *ServerInterfaceWrapper) GetMyAnalytics(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// CompleteProfileSetup operation middleware
+func (siw *ServerInterfaceWrapper) CompleteProfileSetup(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteProfileSetup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PublishProfile operation middleware
 func (siw *ServerInterfaceWrapper) PublishProfile(w http.ResponseWriter, r *http.Request) {
 
@@ -4313,6 +4353,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/profiles/me/analytics", wrapper.GetMyAnalytics)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/profiles/me/complete-setup", wrapper.CompleteProfileSetup)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/profiles/me/publish", wrapper.PublishProfile)
@@ -8018,6 +8061,59 @@ func (response GetMyAnalytics404ApplicationProblemPlusJSONResponse) VisitGetMyAn
 	return err
 }
 
+type CompleteProfileSetupRequestObject struct {
+}
+
+type CompleteProfileSetupResponseObject interface {
+	VisitCompleteProfileSetupResponse(w http.ResponseWriter) error
+}
+
+type CompleteProfileSetup200JSONResponse ArtistProfile
+
+func (response CompleteProfileSetup200JSONResponse) VisitCompleteProfileSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteProfileSetup401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteProfileSetup401ApplicationProblemPlusJSONResponse) VisitCompleteProfileSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteProfileSetup404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteProfileSetup404ApplicationProblemPlusJSONResponse) VisitCompleteProfileSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PublishProfileRequestObject struct {
 }
 
@@ -8639,6 +8735,9 @@ type StrictServerInterface interface {
 	// Get aggregated analytics for the authenticated artist's profile
 	// (GET /profiles/me/analytics)
 	GetMyAnalytics(ctx context.Context, request GetMyAnalyticsRequestObject) (GetMyAnalyticsResponseObject, error)
+	// Mark first-run profile setup complete
+	// (POST /profiles/me/complete-setup)
+	CompleteProfileSetup(ctx context.Context, request CompleteProfileSetupRequestObject) (CompleteProfileSetupResponseObject, error)
 	// Publish own artist profile (draft → public)
 	// (POST /profiles/me/publish)
 	PublishProfile(ctx context.Context, request PublishProfileRequestObject) (PublishProfileResponseObject, error)
@@ -10492,6 +10591,30 @@ func (sh *strictHandler) GetMyAnalytics(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMyAnalyticsResponseObject); ok {
 		if err := validResponse.VisitGetMyAnalyticsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteProfileSetup operation middleware
+func (sh *strictHandler) CompleteProfileSetup(w http.ResponseWriter, r *http.Request) {
+	var request CompleteProfileSetupRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteProfileSetup(ctx, request.(CompleteProfileSetupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteProfileSetup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteProfileSetupResponseObject); ok {
+		if err := validResponse.VisitCompleteProfileSetupResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
