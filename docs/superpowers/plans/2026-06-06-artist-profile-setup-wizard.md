@@ -1621,6 +1621,20 @@ gh pr create --title "Artist profile setup wizard" --body "<summary + screenshot
 
 ---
 
+## Follow-ons after this PR
+
+This plan ships one cohesive feature. The items below are **deliberately out of scope** here (per the design spec) and are the natural next steps once this merges. Each needs its **own** brainstorm → spec → plan cycle — they are not extensions of this branch.
+
+| Follow-on | What it is | Why separate | Rough size |
+|---|---|---|---|
+| **Festival history on profile** | Surface the existing `spot_history` (E26) as a "Festivals" section on the public profile and (optionally) the editor | Public-page display feature, not a setup input; data already exists server-side | Small–medium (web-only) |
+| **Work map** | Aggregate all collection location-pins onto one profile map, colour-coded by collection | Touches the Leaflet map stack and collection-image pin data; display feature | Medium (web + possibly a pins endpoint) |
+| **AI onboarding (E19, iceboxed)** | Pre-fill wizard steps from a pasted link / existing site so setup is near-zero-effort | Layers *on top of* this wizard; needs an extraction service + provider decision | Large; revisit post-pilot |
+
+Two knobs this PR settled rather than deferred (noted so they're not re-litigated): `complete-setup` is a dedicated idempotent endpoint (not folded into publish), and the medium vocabulary is the 10-term list in `web/src/lib/mediums.ts` (extend by editing that constant).
+
+When picking up a follow-on: start a fresh `brainstorming` pass — don't graft it onto `feat/artist-profile-setup-wizard`.
+
 ## Self-review notes (addressed)
 
 - **Spec coverage:** wizard shape (Tasks 7-9), 9 steps incl. controlled mediums (Task 5) + support link (Tasks 6, 11) + first work (Task 8 / FirstWorkStep), single-page editor retained & refactored (Task 11), entry via `setup_completed_at` (Tasks 1-2, 9), `support_url` ungated full-stack (Tasks 1-4, 11), out-of-scope items untouched, tests (Tasks 3, 10) — all present.
