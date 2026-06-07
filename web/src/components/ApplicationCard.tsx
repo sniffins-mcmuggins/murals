@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { SocialIcon, SOCIAL_PLATFORMS } from './SocialIcon'
 import { parseEmbed } from '@/lib/embeds'
 import type { components } from '@render/api-client'
 
@@ -52,6 +53,11 @@ export function ApplicationCard({
   const answers = (application.answers ?? {}) as Record<string, string>
   const firstEmbed = Object.values(answers).map(v => v && parseEmbed(v)).find(Boolean) || null
 
+  // Compact social icons, surfaced live from the artist profile (E28 M1). Fixed-size
+  // icons (not truncated text) so they never collapse to zero width on a dense card.
+  const socialLinks = (artist?.social_links ?? {}) as Record<string, string>
+  const presentSocials = SOCIAL_PLATFORMS.filter(p => (socialLinks[p.key] ?? '').trim()).slice(0, 4)
+
   const isDecisionColumn = ['accept', 'waitlist', 'decline'].includes(columnKey)
   const cardBg = isDecisionColumn
     ? columnKey === 'accept'   ? 'bg-green-50 border-green-200'
@@ -99,6 +105,24 @@ export function ApplicationCard({
               <span key={tag} className="font-mono text-mid bg-white border border-light rounded px-1 py-0.5 uppercase tracking-wider" style={{ fontSize: '9px' }}>
                 {tag}
               </span>
+            ))}
+          </div>
+        )}
+        {presentSocials.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-1" data-testid="card-socials">
+            {presentSocials.map(p => (
+              <a
+                key={p.key}
+                href={socialLinks[p.key]}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={p.label}
+                aria-label={p.label}
+                onClick={e => e.stopPropagation()}
+                className="text-mid hover:text-ink transition-colors flex-shrink-0"
+              >
+                <SocialIcon platform={p.key} className="w-3.5 h-3.5" />
+              </a>
             ))}
           </div>
         )}

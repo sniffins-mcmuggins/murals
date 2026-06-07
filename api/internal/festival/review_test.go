@@ -88,6 +88,60 @@ func TestListApplications(t *testing.T) {
 	assert.Equal(t, false, app["review_flag"])
 }
 
+// TestListApplications_EnrichesWithSocialLinksAndBio is the E28 M1 canary: it
+// sets social_links/bio/support_url on the applicant's profile and asserts they
+// surface live in the organiser's applications response. This is the test that
+// catches a regressed sqlc SELECT/Scan (the columns would silently be zero).
+func TestListApplications_EnrichesWithSocialLinksAndBio(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "open")
+	createTestApplicationFormWithFields(t, db, festID, `[]`)
+
+	artistID, _, _ := createTestUser(t, db)
+	profileID := createTestArtistProfile(t, db, artistID, "Canary Artist")
+
+	// Profile context that M1 must surface live to the organiser.
+	_, err := db.Exec(context.Background(),
+		`UPDATE artist_profiles SET social_links = $1, bio = $2, support_url = $3 WHERE id = $4`,
+		[]byte(`{"instagram":"https://instagram.com/canary"}`), "Canary bio", "https://ko-fi.com/canary",
+		pgUUID(t, profileID))
+	require.NoError(t, err)
+
+	q := sqlcdb.New(db)
+	form, err := q.GetApplicationFormByFestivalID(context.Background(), pgUUID(t, festID))
+	require.NoError(t, err)
+	_, err = q.CreateApplication(context.Background(), sqlcdb.CreateApplicationParams{
+		FormID:   form.ID,
+		ArtistID: pgUUID(t, profileID),
+		Answers:  []byte(`{}`),
+	})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	resp := doRequest(t, srv, "GET", "/festivals/"+festID+"/applications", "", orgToken)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var list []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
+	_ = resp.Body.Close()
+	require.Len(t, list, 1)
+
+	artist, ok := list[0]["artist"].(map[string]any)
+	require.True(t, ok, "artist summary missing")
+	social, ok := artist["social_links"].(map[string]any)
+	require.True(t, ok, "social_links missing from artist summary")
+	assert.Equal(t, "https://instagram.com/canary", social["instagram"])
+	assert.Equal(t, "Canary bio", artist["bio"])
+	assert.Equal(t, "https://ko-fi.com/canary", artist["support_url"])
+}
+
 func TestAcceptApplication(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

@@ -200,7 +200,10 @@ SELECT
   ap.display_name,
   ap.avatar_s3_key,
   ap.medium_tags,
-  ap.location_label
+  ap.location_label,
+  ap.social_links,
+  ap.bio,
+  ap.support_url
 FROM applications a
 JOIN artist_profiles ap ON ap.id = a.artist_id
 WHERE a.form_id = $1
@@ -223,6 +226,9 @@ type ListApplicationsByFormWithArtistRow struct {
 	AvatarS3Key    *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
 	MediumTags     []string           `db:"medium_tags" json:"medium_tags"`
 	LocationLabel  *string            `db:"location_label" json:"location_label"`
+	SocialLinks    json.RawMessage    `db:"social_links" json:"social_links"`
+	Bio            string             `db:"bio" json:"bio"`
+	SupportUrl     *string            `db:"support_url" json:"support_url"`
 }
 
 func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID pgtype.UUID) ([]ListApplicationsByFormWithArtistRow, error) {
@@ -250,6 +256,9 @@ func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID p
 			&i.AvatarS3Key,
 			&i.MediumTags,
 			&i.LocationLabel,
+			&i.SocialLinks,
+			&i.Bio,
+			&i.SupportUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -262,7 +271,8 @@ func (q *Queries) ListApplicationsByFormWithArtist(ctx context.Context, formID p
 }
 
 const listApplicationsByFormWithArtistExcludingReviewer = `-- name: ListApplicationsByFormWithArtistExcludingReviewer :many
-SELECT a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, a.staged_decision, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label
+SELECT a.id, a.form_id, a.artist_id, a.status, a.answers, a.created_at, a.updated_at, a.rank, a.shortlisted, a.review_flag, a.staged_decision, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label,
+  ap.social_links, ap.bio, ap.support_url
 FROM applications a
 JOIN artist_profiles ap ON ap.id = a.artist_id
 WHERE a.form_id = $1
@@ -291,6 +301,9 @@ type ListApplicationsByFormWithArtistExcludingReviewerRow struct {
 	AvatarS3Key    *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
 	MediumTags     []string           `db:"medium_tags" json:"medium_tags"`
 	LocationLabel  *string            `db:"location_label" json:"location_label"`
+	SocialLinks    json.RawMessage    `db:"social_links" json:"social_links"`
+	Bio            string             `db:"bio" json:"bio"`
+	SupportUrl     *string            `db:"support_url" json:"support_url"`
 }
 
 // Reviewer-scoped: hides the application belonging to the reviewer ($2 = user_id).
@@ -319,6 +332,9 @@ func (q *Queries) ListApplicationsByFormWithArtistExcludingReviewer(ctx context.
 			&i.AvatarS3Key,
 			&i.MediumTags,
 			&i.LocationLabel,
+			&i.SocialLinks,
+			&i.Bio,
+			&i.SupportUrl,
 		); err != nil {
 			return nil, err
 		}

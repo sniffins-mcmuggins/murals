@@ -90,6 +90,34 @@ func TestUpsertForm_RejectsMalformedFields(t *testing.T) {
 	}
 }
 
+// TestUpsertForm_ValidatesPrefill covers the E28 M2 profile-binding allowlist:
+// a known prefill key is accepted, an unknown one is rejected with 422, and an
+// empty/absent prefill is treated as "no binding".
+func TestUpsertForm_ValidatesPrefill(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	orgID, orgToken, _ := createTestUser(t, db)
+	festID, _ := createTestFestival(t, db, orgID, "draft")
+
+	r := chi.NewRouter()
+	r.Use(auth.Middleware(db, testSecret))
+	r.Put("/festivals/{festivalID}/form", festival.UpsertFormHandler(db))
+
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+
+	put := func(fieldsJSON string) int {
+		resp := doRequest(t, srv, "PUT", "/festivals/"+festID+"/form", `{"fields":`+fieldsJSON+`}`, orgToken)
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	assert.Equal(t, http.StatusOK, put(`[{"id":"a","type":"text","label":"Instagram","prefill":"social.instagram"}]`), "valid social prefill")
+	assert.Equal(t, http.StatusOK, put(`[{"id":"a","type":"text","label":"Portfolio","prefill":"portfolio_collection"}]`), "valid portfolio_collection prefill")
+	assert.Equal(t, http.StatusUnprocessableEntity, put(`[{"id":"a","type":"text","label":"x","prefill":"social.myspace"}]`), "unknown prefill key rejected")
+	assert.Equal(t, http.StatusOK, put(`[{"id":"a","type":"text","label":"x","prefill":""}]`), "empty prefill = no binding")
+}
+
 func TestUpsertForm_OnlyOrganiserOwnerCanUpsert(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

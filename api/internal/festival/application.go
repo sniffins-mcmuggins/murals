@@ -23,11 +23,14 @@ type formField struct {
 }
 
 type artistSummary struct {
-	ID            string   `json:"id"`
-	DisplayName   string   `json:"display_name"`
-	AvatarS3Key   *string  `json:"avatar_s3_key"`
-	MediumTags    []string `json:"medium_tags"`
-	LocationLabel *string  `json:"location_label"`
+	ID            string          `json:"id"`
+	DisplayName   string          `json:"display_name"`
+	AvatarS3Key   *string         `json:"avatar_s3_key"`
+	MediumTags    []string        `json:"medium_tags"`
+	LocationLabel *string         `json:"location_label"`
+	SocialLinks   json.RawMessage `json:"social_links,omitempty"`
+	Bio           string          `json:"bio,omitempty"`
+	SupportURL    *string         `json:"support_url,omitempty"`
 }
 
 type noteResponse struct {
@@ -169,6 +172,9 @@ func toEnrichedResponse(
 			AvatarS3Key:   row.AvatarS3Key,
 			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
+			SocialLinks:   row.SocialLinks,
+			Bio:           row.Bio,
+			SupportURL:    row.SupportUrl,
 		},
 		Notes:           []noteResponse{},
 		CriterionScores: []criterionScore{},
@@ -198,6 +204,9 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 			AvatarS3Key:   row.AvatarS3Key,
 			MediumTags:    mediumTags,
 			LocationLabel: row.LocationLabel,
+			SocialLinks:   row.SocialLinks,
+			Bio:           row.Bio,
+			SupportURL:    row.SupportUrl,
 		},
 		Notes:           []noteResponse{},
 		CriterionScores: []criterionScore{},

@@ -57,4 +57,40 @@ describe('DynamicForm', () => {
       'Artist statement': 'I paint walls.',
     })
   })
+
+  // E28 M2: profile-bound fields pre-fill from initialValues but stay editable.
+  it('seeds a bound field from initialValues and submits the edited value', () => {
+    const onSubmit = vi.fn()
+    const fields = [{ id: 'ig', type: 'text' as const, label: 'Instagram', prefill: 'social.instagram' }]
+    render(
+      React.createElement(DynamicForm, {
+        fields,
+        onSubmit,
+        initialValues: { ig: 'https://instagram.com/me' },
+      }),
+    )
+    const input = screen.getByLabelText('Instagram') as HTMLInputElement
+    expect(input.value).toBe('https://instagram.com/me')
+    expect(screen.getByText(/from your profile/i)).toBeInTheDocument()
+
+    fireEvent.change(input, { target: { value: 'https://instagram.com/edited' } })
+    fireEvent.submit(screen.getByRole('form'))
+    expect(onSubmit).toHaveBeenCalledWith({ ig: 'https://instagram.com/edited' })
+  })
+
+  it('renders a collection picker for a portfolio_collection field', () => {
+    const fields = [{ id: 'pf', type: 'text' as const, label: 'Portfolio', prefill: 'portfolio_collection' }]
+    render(
+      React.createElement(DynamicForm, {
+        fields,
+        onSubmit: vi.fn(),
+        collections: [
+          { id: 'c1', name: 'Murals 2024', url: 'https://x/artists/a/collections/c1' },
+          { id: 'c2', name: 'Studio work', url: 'https://x/artists/a/collections/c2' },
+        ],
+      }),
+    )
+    expect(screen.getByRole('option', { name: 'Murals 2024' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Studio work' })).toBeInTheDocument()
+  })
 })
