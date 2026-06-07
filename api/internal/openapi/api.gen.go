@@ -424,12 +424,21 @@ type ApplicationStagedDecision string
 // ApplicationArtist defines model for ApplicationArtist.
 type ApplicationArtist struct {
 	AvatarS3Key *string `json:"avatar_s3_key,omitempty"`
+
+	// Bio Artist bio, surfaced live from the profile for review context.
+	Bio         *string `json:"bio,omitempty"`
 	DisplayName *string `json:"display_name,omitempty"`
 
 	// Id Artist profile id — use to link to /artists/{id}
 	Id            *openapi_types.UUID `json:"id,omitempty"`
 	LocationLabel *string             `json:"location_label,omitempty"`
 	MediumTags    *[]string           `json:"medium_tags,omitempty"`
+
+	// SocialLinks Artist's social/web links keyed by platform, surfaced live from the profile so organisers/reviewers see them without the artist re-typing.
+	SocialLinks *map[string]string `json:"social_links,omitempty"`
+
+	// SupportUrl Optional "support this artist" link from the profile.
+	SupportUrl *string `json:"support_url,omitempty"`
 }
 
 // ApplicationForm defines model for ApplicationForm.

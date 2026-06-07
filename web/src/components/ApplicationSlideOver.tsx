@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ApplicationNotes } from './ApplicationNotes'
+import { SocialIcon, SOCIAL_PLATFORMS } from './SocialIcon'
 import { parseEmbed } from '@/lib/embeds'
 import type { components } from '@render/api-client'
 
@@ -84,6 +85,10 @@ export function ApplicationSlideOver({
 
   const artist = application.artist as ApplicationArtist | undefined
   const name = artist?.display_name ?? 'Unknown Artist'
+  // Social links + bio are surfaced live from the artist's profile (E28 M1) so
+  // reviewers see them without the artist re-entering them in the form.
+  const socialLinks = (artist?.social_links ?? {}) as Record<string, string>
+  const presentSocials = SOCIAL_PLATFORMS.filter(p => (socialLinks[p.key] ?? '').trim())
   const answers = (application.answers ?? {}) as Record<string, string>
   const notes = (application.notes ?? []) as ApplicationNote[]
   const id = application.id ?? ''
@@ -131,6 +136,42 @@ export function ApplicationSlideOver({
             >
               👤 View full profile ↗
             </a>
+          )}
+
+          {/* Profile context — socials + support, surfaced live from the artist profile (E28 M1) */}
+          {(presentSocials.length > 0 || artist?.support_url) && (
+            <div className="flex items-center gap-3 flex-wrap" data-testid="artist-socials">
+              {presentSocials.map(p => (
+                <a
+                  key={p.key}
+                  href={socialLinks[p.key]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={p.label}
+                  aria-label={p.label}
+                  className="text-mid hover:text-ink transition-colors"
+                >
+                  <SocialIcon platform={p.key} className="w-5 h-5" />
+                </a>
+              ))}
+              {artist?.support_url && (
+                <a
+                  href={artist.support_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-sans text-xs text-clay hover:opacity-80 transition-opacity"
+                >
+                  ♥ Support ↗
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Artist bio — surfaced live from the profile (E28 M1) */}
+          {artist?.bio && (
+            <p className="font-serif text-base text-ink leading-relaxed whitespace-pre-line">
+              {artist.bio}
+            </p>
           )}
 
           {/* Medium tags */}

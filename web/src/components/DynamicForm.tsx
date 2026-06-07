@@ -9,17 +9,31 @@ export type FormField = {
   label: string
   required?: boolean
   options?: string[]
+  /** Optional binding to a profile attribute — pre-fills this field (E28 M2). */
+  prefill?: string
 }
+
+export type CollectionOption = { id: string; name: string; url: string }
 
 type Props = {
   fields: FormField[]
   onSubmit: (answers: Record<string, string>) => void
   submitting?: boolean
+  /** Pre-filled values keyed by field id/label (E28 M2 — from the artist profile). */
+  initialValues?: Record<string, string>
+  /** Collections for any `portfolio_collection`-bound field's picker. */
+  collections?: CollectionOption[]
 }
 
-export default function DynamicForm({ fields, onSubmit, submitting = false }: Props) {
+export default function DynamicForm({
+  fields,
+  onSubmit,
+  submitting = false,
+  initialValues,
+  collections = [],
+}: Props) {
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((f) => [f.id ?? f.label, ''])),
+    Object.fromEntries(fields.map((f) => [f.id ?? f.label, initialValues?.[f.id ?? f.label] ?? ''])),
   )
 
   function handleChange(key: string, value: string) {
@@ -36,6 +50,7 @@ export default function DynamicForm({ fields, onSubmit, submitting = false }: Pr
       {fields.map((field) => {
         const key = field.id ?? field.label
         const htmlId = `field-${key.replace(/\s+/g, '-').toLowerCase()}`
+        const isPrefilled = !!field.prefill && !!(values[key] ?? '').trim()
         return (
           <div key={key} className="flex flex-col gap-1">
             <label htmlFor={htmlId} className="font-sans text-sm text-ink font-medium">
@@ -43,7 +58,23 @@ export default function DynamicForm({ fields, onSubmit, submitting = false }: Pr
               {field.required && <span className="text-clay ml-1" aria-hidden="true">*</span>}
             </label>
 
-            {field.type === 'textarea' ? (
+            {field.prefill === 'portfolio_collection' && collections.length > 0 ? (
+              <select
+                id={htmlId}
+                name={key}
+                required={field.required}
+                value={values[key] ?? ''}
+                onChange={(e) => handleChange(key, e.target.value)}
+                className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
+              >
+                <option value="">Choose a collection…</option>
+                {collections.map((c) => (
+                  <option key={c.id} value={c.url}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : field.type === 'textarea' ? (
               <textarea
                 id={htmlId}
                 name={key}
@@ -97,6 +128,10 @@ export default function DynamicForm({ fields, onSubmit, submitting = false }: Pr
                 onChange={(e) => handleChange(key, e.target.value)}
                 className="w-full border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber"
               />
+            )}
+
+            {isPrefilled && (
+              <span className="font-sans text-xs text-mid">From your profile — edit if needed.</span>
             )}
           </div>
         )

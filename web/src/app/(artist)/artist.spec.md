@@ -28,5 +28,6 @@
 - Shared field components in `web/src/components/`: `MediumPicker`, `SupportLinkField`, `ImageSlot` — used by BOTH the wizard and `ProfileForm`. Edit the shared component, not one copy.
 
 ## Changelog
+2026-06-07 — E28 M2: apply page (applications/apply/[id]) fetches /profiles/me + collections, pre-fills profile-bound fields via lib/prefill.ts (editable), renders a collection picker for portfolio_collection, and adds a one-click "Apply with my profile" CTA.
 2026-06-06 — Added profile setup wizard (profile/setup/) + shared field components; editor reuses them.
 2026-05-31 — initial spec

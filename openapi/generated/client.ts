@@ -2152,6 +2152,14 @@ export interface components {
             avatar_s3_key?: string | null;
             medium_tags?: string[];
             location_label?: string | null;
+            /** @description Artist's social/web links keyed by platform, surfaced live from the profile so organisers/reviewers see them without the artist re-typing. */
+            social_links?: {
+                [key: string]: string;
+            };
+            /** @description Artist bio, surfaced live from the profile for review context. */
+            bio?: string;
+            /** @description Optional "support this artist" link from the profile. */
+            support_url?: string | null;
         };
         ApplicationNote: {
             /** Format: uuid */

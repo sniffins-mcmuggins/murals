@@ -6,17 +6,20 @@ const WALL_SIZES = ['Small (< 10m²)', 'Medium (10–30m²)', 'Large (> 30m²)']
 const YES_NO = ['Yes', 'No']
 
 export const QUESTION_LIBRARY: LibraryPreset[] = [
+  // Profile-bound presets pre-fill from the artist's profile (E28 M2).
+  { group: 'Profile', type: 'textarea', label: 'Artist bio', required: false, prefill: 'bio' },
+  { group: 'Profile', type: 'text', label: 'Instagram', required: false, prefill: 'social.instagram' },
   { group: 'Logistics', type: 'select', label: 'Preferred wall size', required: false, options: WALL_SIZES },
   { group: 'Logistics', type: 'textarea', label: 'Access or equipment needs', required: false },
   { group: 'Eligibility', type: 'select', label: 'Do you have public liability insurance?', required: true, options: YES_NO },
   { group: 'Eligibility', type: 'text', label: 'Availability (dates you can paint)', required: true },
-  { group: 'Portfolio', type: 'text', label: 'Portfolio link', required: true },
+  { group: 'Portfolio', type: 'text', label: 'Portfolio link', required: true, prefill: 'portfolio_url' },
   { group: 'Portfolio', type: 'embed', label: 'Video walkthrough or 3D model (optional)', required: false },
 ]
 
 export const STARTER_TEMPLATE: Omit<FormField, 'id'>[] = [
   { type: 'textarea', label: 'Artist statement', required: true },
-  { type: 'text', label: 'Portfolio link', required: true },
+  { type: 'text', label: 'Portfolio link', required: true, prefill: 'portfolio_url' },
   { type: 'select', label: 'Preferred wall size', required: false, options: WALL_SIZES },
   { type: 'select', label: 'Do you have public liability insurance?', required: true, options: YES_NO },
   { type: 'text', label: 'Availability (dates you can paint)', required: true },

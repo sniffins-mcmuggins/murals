@@ -39,6 +39,17 @@ type criterionInput struct {
 
 var nonAlphanumRe = regexp.MustCompile(`[^a-z0-9]+`)
 
+// allowedPrefillKeys mirrors the PrefillKey allowlist in web/src/lib/prefill.ts.
+// A form field may optionally bind to one of these profile attributes so the
+// apply form pre-fills it from the artist's profile (E28 M2). Keep in sync.
+var allowedPrefillKeys = map[string]bool{
+	"display_name": true, "bio": true, "location": true, "website": true,
+	"social.instagram": true, "social.twitter": true, "social.facebook": true,
+	"social.youtube": true, "social.tiktok": true, "social.linkedin": true,
+	"social.pinterest": true, "support_url": true,
+	"portfolio_url": true, "portfolio_collection": true,
+}
+
 func slugifyCriterion(label string) string {
 	s := strings.ToLower(strings.TrimSpace(label))
 	s = nonAlphanumRe.ReplaceAllString(s, "-")
@@ -241,6 +252,12 @@ func UpsertFormHandler(pool *pgxpool.Pool) http.HandlerFunc {
 				opts, _ := d["options"].([]any)
 				if len(opts) == 0 {
 					httperr.UnprocessableEntity(w, "select field needs at least one option")
+					return
+				}
+			}
+			if pf, ok := d["prefill"].(string); ok && strings.TrimSpace(pf) != "" {
+				if !allowedPrefillKeys[pf] {
+					httperr.UnprocessableEntity(w, "invalid prefill key: "+pf)
 					return
 				}
 			}

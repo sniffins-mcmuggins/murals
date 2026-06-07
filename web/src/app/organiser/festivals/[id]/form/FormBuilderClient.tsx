@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import type { FormField } from '@/components/DynamicForm'
 import { QUESTION_LIBRARY, STARTER_TEMPLATE } from '@/lib/questionLibrary'
+import { PREFILL_OPTIONS, AUTO_SHOWN_PREFILL_KEYS, type PrefillKey } from '@/lib/prefill'
 
 type BuilderField = FormField & { id: string }
 
@@ -153,6 +154,24 @@ export default function FormBuilderClient({ festivalId }: { festivalId: string }
                 placeholder="Comma-separated options (e.g. Small, Medium, Large)"
                 className="w-full border border-light rounded-lg px-3 py-1.5 font-sans text-sm bg-offwhite"
               />
+            )}
+
+            <div className="flex items-center gap-2">
+              <label className="font-sans text-xs text-mid whitespace-nowrap">Pre-fill from profile</label>
+              <select
+                aria-label="Pre-fill from profile"
+                value={f.prefill ?? ''}
+                onChange={e => update(f.id, { prefill: e.target.value || undefined })}
+                className="border border-light rounded-lg px-2 py-1 font-sans text-xs bg-offwhite"
+              >
+                <option value="">No binding (ask fresh)</option>
+                {PREFILL_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+              </select>
+            </div>
+            {f.prefill && AUTO_SHOWN_PREFILL_KEYS.has(f.prefill as PrefillKey) && (
+              <p className="font-sans text-xs text-mid">
+                Applicants&apos; socials &amp; bio are shown to you automatically — you usually don&apos;t need to ask.
+              </p>
             )}
           </li>
         ))}

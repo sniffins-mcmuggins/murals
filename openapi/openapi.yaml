@@ -694,6 +694,20 @@ components:
         location_label:
           type: string
           nullable: true
+        social_links:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            Artist's social/web links keyed by platform, surfaced live from the
+            profile so organisers/reviewers see them without the artist re-typing.
+        bio:
+          type: string
+          description: Artist bio, surfaced live from the profile for review context.
+        support_url:
+          type: string
+          nullable: true
+          description: Optional "support this artist" link from the profile.
 
     ApplicationNote:
       type: object

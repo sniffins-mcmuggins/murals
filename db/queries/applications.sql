@@ -34,7 +34,10 @@ SELECT
   ap.display_name,
   ap.avatar_s3_key,
   ap.medium_tags,
-  ap.location_label
+  ap.location_label,
+  ap.social_links,
+  ap.bio,
+  ap.support_url
 FROM applications a
 JOIN artist_profiles ap ON ap.id = a.artist_id
 WHERE a.form_id = $1
@@ -51,7 +54,8 @@ UPDATE applications SET rank = $1, updated_at = now() WHERE id = $2;
 
 -- name: ListApplicationsByFormWithArtistExcludingReviewer :many
 -- Reviewer-scoped: hides the application belonging to the reviewer ($2 = user_id).
-SELECT a.*, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label
+SELECT a.*, ap.display_name, ap.avatar_s3_key, ap.medium_tags, ap.location_label,
+  ap.social_links, ap.bio, ap.support_url
 FROM applications a
 JOIN artist_profiles ap ON ap.id = a.artist_id
 WHERE a.form_id = $1
