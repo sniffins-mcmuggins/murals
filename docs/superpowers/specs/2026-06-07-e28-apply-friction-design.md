@@ -1,8 +1,8 @@
 # [E28] Apply Friction — profile as source of truth, never type twice
 
 **Date:** 2026-06-07
-**Status:** Draft design, pending review (open questions at the bottom).
-**Epic:** E28 — see GitHub issue.
+**Status:** Decisions resolved 2026-06-07 (see Decisions section). Ready to plan.
+**Epic:** E28 (#284) — drafts spun out to E29 (#287). Tasks: #285 (M1), #286 (M2).
 **Author:** design pass for Adam.
 
 ---
@@ -31,7 +31,7 @@ The result is tedious, repeated work on **both sides**:
 1. **Re-typing social links every single application** — the headline complaint.
 2. Re-pasting bio / artist statement, portfolio link, medium, location.
 3. No draft/resume — navigate away mid-form and the work is gone
-   (`DynamicForm` holds answers in component `useState` only).
+   (`DynamicForm` holds answers in component `useState` only). → **E29**.
 4. Answering near-identical questions across festivals from scratch each time.
 
 ### Organiser friction (setup & review)
@@ -67,35 +67,34 @@ reviewers see a rich applicant card without leaving the board.
   with zero form-building and zero re-typing (the explicit ask).
 - Any form field that mirrors profile data **pre-fills** from the profile and
   stays editable.
-- Artists never lose half-finished applications.
 - Organiser setup gets shorter (fewer fields to build); reviewer triage gets
   richer (clickable socials + profile inline).
 
 **Non-goals**
 - No change to the scoring/rubric, decision, or spot-assignment flows.
 - No new auth/permission model — reuse festival-owner + reviewer access.
-- Not building an "import my whole profile as the application" auto-apply button
-  (discussed under Open Questions; out of scope for the 3 PRs unless promoted).
+- Application drafts/resume — **moved to E29** (#287), the only migration.
 - No AI/auto-write of answers (that's E19's territory).
 
 ---
 
-## Design overview — three mechanisms, three PRs
+## Design overview — E28 is two PRs (drafts → E29)
 
-| # | Mechanism | Who it helps | Migration? |
-|---|-----------|--------------|-----------|
-| **M1** | **Auto-attached profile context** — applicant socials + key profile info appear live on every application in the organiser/reviewer view | Organiser setup ↓, reviewer triage ↓, artist effort = 0 | **No** |
-| **M2** | **Profile-bound form fields** — fields can bind to a profile attribute and pre-fill the apply form (editable) | Artist re-typing ↓, organiser setup ↓ | **No** |
-| **M3** | **Application drafts** — autosave + resume partial applications | Artist never loses work | **Yes** |
+| # | Mechanism | Epic / PR | Who it helps | Migration? |
+|---|-----------|-----------|--------------|-----------|
+| **M1** | **Auto-attached profile context** — applicant socials + key profile info appear live on every application in the organiser/reviewer view | E28 · PR1 (#285) | Organiser setup ↓, reviewer triage ↓, artist effort = 0 | **No** |
+| **M2** | **Profile-bound form fields** — fields can bind to a profile attribute and pre-fill the apply form (editable), plus a one-click "Apply with my profile" | E28 · PR2 (#286) | Artist re-typing ↓, organiser setup ↓ | **No** |
+| **M3** | **Application drafts** — autosave + resume partial applications | **E29** (#287) | Artist never loses work | Yes |
 
-The three are independent and ship in order. **M1 alone satisfies the headline
-ask** ("socials just appear automatically for organisers"). M2 generalises it to
-all profile-mirroring fields. M3 is the "never do it twice" safety net and is the
-only one needing a schema change — it can be deferred without blocking M1/M2.
+**M1 alone satisfies the headline ask** ("socials just appear automatically for
+organisers"). M2 generalises it to all profile-mirroring fields. Both are
+migration-free, so E28 ships without a schema change. Drafts (M3) became its own
+epic E29 because it is the only migration and the most separable piece; it
+depends on M2's apply-page hydration pattern but doesn't block E28.
 
 ---
 
-## M1 — Auto-attached profile context (PR 1)
+## M1 — Auto-attached profile context (PR 1, #285)
 
 **Idea:** the application review view already enriches each application with an
 `artistSummary` (`display_name, avatar_s3_key, medium_tags, location_label`) via
@@ -106,11 +105,10 @@ render them as clickable chips + a "View full profile" link in the review UI.
 
 No new field types, no new form-building, no artist action.
 
-### Data flow (live, not snapshotted)
+### Data flow — LIVE (decided, Q2)
 Applications already store `artist_id`. The enrichment is a **live join** against
 the current profile — always up to date, no PII duplication, GDPR-clean (delete
-the profile → context disappears). See Open Questions for the snapshot
-alternative; recommendation is **live**.
+the profile → context disappears). No snapshot, no migration.
 
 ### API changes
 - `db/queries/applications.sql`: extend `ListApplicationsByFormWithArtist` and
@@ -163,7 +161,7 @@ extra, and the data is always current. "Socials just appear automatically."
 
 ---
 
-## M2 — Profile-bound form fields (PR 2)
+## M2 — Profile-bound form fields (PR 2, #286)
 
 **Idea:** for the fields organisers *do* want as explicit questions (and that
 mirror profile data), let the field **bind** to a profile attribute so the apply
@@ -196,11 +194,21 @@ social.instagram | social.twitter | social.facebook | social.youtube
 social.tiktok    | social.linkedin | social.pinterest
 support_url
 portfolio_url                → public profile URL (/artists/{id})
+portfolio_collection         → artist picks one collection at apply time (see below)
 ```
 
 - **Answers are unchanged.** The submitted answer is still a plain string in
   `answers[field.id]` — pre-filled or edited. No answer-shape change, no
   migration. `prefill` only affects the *initial value* the artist sees.
+
+### Portfolio binding — BOTH options (decided, Q6)
+The organiser chooses, when building the field, between:
+- **`portfolio_url`** → binds to the whole public profile (`/artists/{id}`).
+  Zero artist interaction; always valid.
+- **`portfolio_collection`** → at apply time the artist picks **one** collection
+  to submit for this festival. Needs a builder toggle and a collection picker on
+  the apply page (fetch the artist's collections, store the chosen collection URL
+  as the answer string). More tailored, more UI.
 
 ### API changes
 - `UpsertFormHandler` (`form.go`) field validation: if `prefill` is present it
@@ -214,6 +222,10 @@ portfolio_url                → public profile URL (/artists/{id})
   "Pull from profile" control — a select offering the allowlisted attributes (or
   "Ask fresh / no binding"). Picking one sets `field.prefill`. Show a hint:
   *"Artists see their profile value pre-filled; they can edit it."*
+- **Soft nudge (decided, Q3):** when a field duplicates data M1 already shows
+  automatically (socials, portfolio), surface a light hint —
+  *"Applicants' socials are shown automatically — you usually don't need to
+  ask."* Keep the presets; do not block or remove them.
 - **Apply page** (`apply/[id]/page.tsx`): fetch the applicant's own profile
   (`GET /profiles/me`, already used by `ProfileForm.tsx`), build a
   `prefillKey → value` resolver, and pass initial values into `DynamicForm`.
@@ -222,29 +234,35 @@ portfolio_url                → public profile URL (/artists/{id})
   affordance on bound fields. Critically, **bound fields remain fully editable**.
 - **Question library** (`questionLibrary.ts`): the profile-mirroring presets
   ("Portfolio link", a new "Instagram" preset, etc.) carry `prefill` so the
-  starter template and library inserts are bound by default — organisers get the
-  benefit without thinking about it.
+  starter template and library inserts are bound by default.
+
+### Stretch — "Apply with my profile" one-click (decided as PR2 stretch, Q5)
+A CTA on the apply page that fills **all** bound fields at once and drops the
+artist into a review-and-submit state — the strongest "never type twice" moment.
+Build it after the per-field pre-fill works; it is purely a convenience layer on
+the same resolver (no new API).
 
 ### Interaction with M1
-M1 and M2 overlap deliberately: M1 surfaces socials to organisers **without** any
-field; M2 lets an organiser who insists on an explicit field still spare the
-artist the typing. With M1 shipped, the library should *nudge* organisers away
-from adding social fields at all (a hint: "Applicants' socials are shown
-automatically — you don't need to ask"). See Open Questions on how hard to push.
+M1 surfaces socials to organisers **without** any field; M2 lets an organiser who
+insists on an explicit field still spare the artist the typing. With M1 shipped,
+the library nudges (soft) organisers away from adding social fields at all.
 
 ### Tests
 - API: form with a valid `prefill` saves; invalid key → 422.
 - Web unit: `DynamicForm` seeds bound fields from `initialValues`; editing a
   bound field changes the submitted answer.
 - Browser: artist with Instagram on profile opens an apply form whose field is
-  bound to `social.instagram` → the field is pre-filled → submit carries it.
+  bound to `social.instagram` → the field is pre-filled → submit carries it;
+  portfolio-collection picker variant; one-click apply fills all bound fields.
 
 ---
 
-## M3 — Application drafts + resume (PR 3)
+## M3 — Application drafts → moved to E29 (#287)
 
-**Idea:** autosave a partial application so the artist never loses work and can
-resume on any device. The only mechanism here needing a migration.
+Autosave + resume partial applications. Spun out of E28 to keep this epic
+migration-free; it is the only schema change and depends on M2's apply-page
+hydration pattern. Full design retained here for continuity; tracked and built
+under **E29 (#287)**.
 
 ### Data model
 New table `application_drafts`, one row per (form, artist):
@@ -261,22 +279,21 @@ CREATE TABLE application_drafts (
 ```
 
 Kept **separate** from `applications` so none of the review/scoring/decision
-queries need a `WHERE status != 'draft'` filter (avoids touching the whole
-review surface). A draft is deleted once the real application is submitted.
+queries need a `WHERE status != 'draft'` filter. A draft is deleted once the real
+application is submitted.
 
 ### API
 - `PUT /festivals/{festivalID}/draft` — upsert the caller's draft answers
-  (auth + artist profile required; mirrors `SubmitApplicationHandler`'s profile
-  check). Debounced autosave target.
+  (auth + artist profile required). Debounced autosave target.
 - `GET /festivals/{festivalID}/draft` — fetch the caller's draft (404 if none).
-- Submitting an application (`SubmitApplicationHandler`) deletes any draft for
-  that (form, artist) in the same path.
-- These are artist-scoped only — drafts are never visible to organisers/reviewers.
+- `SubmitApplicationHandler` deletes any draft for that (form, artist).
+- Artist-scoped only — drafts are never visible to organisers/reviewers.
+- Mind the chi literal-before-`{id}` route ordering trap.
 
 ### Web
 - Apply page autosaves `DynamicForm` answers (debounced ~1s) to the draft
   endpoint; on load, hydrate from `GET .../draft` (merged with M2 prefill —
-  draft wins where present).
+  **draft wins** where present).
 - `/applications` lists in-progress drafts with a **"Resume"** entry point.
 
 ### Tests
@@ -284,24 +301,15 @@ review surface). A draft is deleted once the real application is submitted.
 - Migration round-trip + sqlc scan-count grep verify.
 - Browser: fill half a form → reload → answers restored.
 
-### Deferral note
-PR3 is the only schema change and is independently droppable. If we want E28 to
-be migration-free, ship M1+M2 and split M3 into its own epic. Flagged in Open
-Questions.
-
 ---
 
-## PR breakdown (≤3)
+## PR breakdown (E28 = 2 PRs; E29 = 1)
 
-| PR | Title | Scope | Migration |
-|----|-------|-------|-----------|
-| **PR 1** | Auto-attach applicant profile context to the review view | M1 — extend artist join + `artistSummary` (+OpenAPI), render social chips + "view full profile" in slide-over & board card, canary test | No |
-| **PR 2** | Profile-bound form fields with apply-time pre-fill | M2 — `prefill` key + allowlist, server validation, builder control, `DynamicForm` `initialValues`, apply-page resolver, library presets | No |
-| **PR 3** | Application drafts (autosave + resume) | M3 — `application_drafts` table, draft endpoints, autosave/hydrate UI, resume entry point | Yes |
-
-Each PR is independently shippable and demo-able. PR1 delivers the headline ask
-on its own. Order matters only in that PR2's library nudge references PR1's
-auto-context.
+| PR | Epic | Title | Scope | Migration |
+|----|------|-------|-------|-----------|
+| **PR 1** | E28 #285 | Auto-attach applicant profile context to the review view | M1 — extend artist join + `artistSummary` (+OpenAPI), render social chips + "view full profile" in slide-over & board card, canary test | No |
+| **PR 2** | E28 #286 | Profile-bound form fields + one-click apply | M2 — `prefill` key + allowlist, server validation, builder control + soft nudge, `DynamicForm` `initialValues`, apply-page resolver, portfolio URL + collection-pick variants, library presets, "Apply with my profile" stretch | No |
+| **PR 3** | E29 #287 | Application drafts (autosave + resume) | M3 — `application_drafts` table, draft endpoints, autosave/hydrate UI, resume entry point | Yes |
 
 ---
 
@@ -312,7 +320,7 @@ auto-context.
 - **Pre-fill is a default, never a lock.** Every bound/auto field stays editable
   by the artist; M1 context is read-only display for organisers.
 - **No answer-shape change for M1/M2.** `answers` stays `map[string]string`
-  keyed by `field.id`; `fields` stays opaque jsonb. Only M3 adds a table.
+  keyed by `field.id`; `fields` stays opaque jsonb. Only M3 (E29) adds a table.
 - **Profile context rides existing access gates.** M1 data is only ever returned
   on owner/reviewer-gated endpoints; it is *not* added to
   `myApplicationResponse` or any public response.
@@ -320,67 +328,50 @@ auto-context.
   blind-review toggle returns, M1's profile-context block (name + socials +
   profile link) is exactly the identity that must be withheld until reveal.
   Keep it in one render block so it can be gated in one place.
-- **sqlc scan discipline.** M1 and M3 add columns to SELECTs — both carry the
-  canary test from `e2e-debugging.md` ("new DB columns silently return zero
-  values") to prevent the silent zero-value regression.
+- **sqlc scan discipline.** M1 (and M3) add columns to SELECTs — both carry the
+  canary test from `e2e-debugging.md` to prevent the silent zero-value
+  regression.
 
 ---
 
 ## Files likely touched (orientation for planning)
 
-**PR1:** `db/queries/applications.sql`, `api/internal/sqlcdb/applications.sql.go`
-(generated), `api/internal/festival/application.go`, `.../review.go`,
-`openapi/openapi.yaml` (+ generated client),
+**PR1 (#285):** `db/queries/applications.sql`,
+`api/internal/sqlcdb/applications.sql.go` (generated),
+`api/internal/festival/application.go`, `.../review.go`, `openapi/openapi.yaml`
+(+ generated client),
 `web/src/app/organiser/.../ApplicationSlideOver.tsx`,
 `.../ApplicationCard.tsx`, `web/src/components/SocialIcon.tsx` (reuse), e2e api +
 browser specs, `festival.spec.md` changelog.
 
-**PR2:** `web/src/components/DynamicForm.tsx`,
+**PR2 (#286):** `web/src/components/DynamicForm.tsx`,
 `web/src/app/organiser/festivals/[id]/form/FormBuilderClient.tsx`,
 `web/src/app/(artist)/applications/apply/[id]/page.tsx`,
 `web/src/lib/questionLibrary.ts`, `api/internal/festival/form.go`,
 a shared `prefill` allowlist module, e2e specs, `festival.spec.md` +
 `artist.spec.md` changelogs.
 
-**PR3:** `db/migrations/*` (new table), `db/queries/application_drafts.sql`,
-generated sqlc, new `api/internal/festival/draft.go` + routes in
-`cmd/api/main.go` (mind the chi literal-before-`{id}` ordering trap),
-`web/src/app/(artist)/applications/apply/[id]/page.tsx`,
-`/applications` list page, e2e specs.
+**PR3 (E29 #287):** `db/migrations/*` (new table),
+`db/queries/application_drafts.sql`, generated sqlc, new
+`api/internal/festival/draft.go` + routes in `cmd/api/main.go` (chi ordering),
+`web/src/app/(artist)/applications/apply/[id]/page.tsx`, `/applications` list
+page, e2e specs.
 
 ---
 
-## Open questions (for Adam)
+## Decisions (resolved 2026-06-07)
 
-1. **Priority.** I've drafted this as **P1** (launch/growth UX). The CPF pilot is
-   a direct organiser relationship and M1 noticeably improves *their* review
-   experience — do you want E28 bumped to **P0** (must-ship before CPF Oct 2027),
-   or is P1 right?
-
-2. **Live vs snapshot for M1.** Recommendation is **live** (always current, no
-   PII duplication, GDPR-clean, no migration). The alternative is snapshotting
-   the profile onto the application at submit time — gives a "what they looked
-   like when they applied" record and survives later profile edits/deletion, but
-   adds a column + duplicates PII. Live, or snapshot?
-
-3. **How hard to nudge organisers away from social/portfolio fields.** With M1
-   live, asking for socials as a field is redundant. Options: (a) a soft hint in
-   the builder, (b) drop social presets from the library entirely, (c) actively
-   warn/disable adding a field bound to a social attribute. How opinionated?
-
-4. **Is M3 (drafts) in scope for E28, or its own epic?** It's the only
-   migration and the most separable. Keep it as PR3, or ship E28 as M1+M2
-   (migration-free) and spin drafts out?
-
-5. **"Apply with my profile" one-click.** Out of scope as drafted. Worth a
-   stretch PR — an apply CTA that pre-fills *every* bindable field and lets the
-   artist submit in one review pass? Or leave it to M2's per-field pre-fill?
-
-6. **Portfolio = profile URL, or a chosen collection?** `portfolio_url`
-   currently maps to the public profile (`/artists/{id}`). Should organisers
-   instead be able to bind to a *specific collection*, or is "your whole public
-   profile" the right default?
-
-7. **Public-liability / insurance-style fields.** These are real per-application
-   answers with no profile equivalent. Confirm we're *not* trying to push those
-   onto the profile — they stay as normal fresh questions. (Assumed yes.)
+1. **Priority: P0**, milestone **CPF 2027 Pilot** — M1 directly improves the
+   pilot organiser's review experience.
+2. **M1 = live** profile join (not snapshot): always current, no PII
+   duplication, GDPR-clean, no migration.
+3. **Soft hint** in the builder when a field duplicates auto-shown profile data —
+   presets stay in the library; we do not warn/disable.
+4. **Drafts (M3) spun out to E29 (#287)** so E28 ships migration-free (M1 + M2).
+5. **"Apply with my profile" one-click** added as a PR2 stretch.
+6. **Portfolio binding = both** — organiser can bind to the whole public profile
+   (`portfolio_url`) OR offer a "choose a collection" picker
+   (`portfolio_collection`).
+7. **Per-application fields stay fresh** — insurance, availability and other
+   festival-specific questions are NOT pushed onto the profile; only
+   profile-mirroring fields pre-fill.
