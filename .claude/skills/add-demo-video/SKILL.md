@@ -1,128 +1,134 @@
 ---
 name: add-demo-video
 description: >
-  Add a new demo video to the Painttrace platform demo video suite. Use this skill whenever
+  Add a new demo video clip to the Painttrace demo suite. Use this skill whenever
   the user asks to "add a new demo video", "add a video", "make a video for X", "record a demo
-  of Y flow", "add video V05", "add another video to the catalogue", "make a new Playwright demo",
+  of Y flow", "add a clip", "add another video to the catalogue", "make a new Playwright demo",
   or wants to extend the demo suite with a new scenario. Also use proactively when a major new
-  feature ships and there's no demo video covering it.
+  feature ships and there's no demo clip covering it.
 ---
 
 # Add Demo Video
 
-Adds a new video to the Painttrace demo suite — updates the living catalogue in the spec, writes
-the Playwright script, and commits both.
+The demo suite is a set of **short, single-feature clips** (≤ ~20s each), one Playwright file per
+clip, named `persona-feature` so the right one is easy to grab mid-demo. Only `artist-signup`
+shows registration/login; every other clip silently injects a session and lands directly on its
+page. This skill writes a new clip, updates the living catalogue, and commits.
 
 ## Context files to read first
 
-Before doing anything, read these (they're small):
+- `docs/superpowers/specs/2026-06-01-demo-videos-design.md` — catalogue table, directory layout,
+  silent-auth and off-screen-state design, Playwright config, Taskfile commands
+- `demos/scripts/_setup.ts` — silent auth (`silentLogin`, `silentSignup`), lookups
+  (`cpfFestivalId`, `myProfileId`), and off-screen organiser state (`openRound`, `closeRound`,
+  `stageDecision`, `decideAllAndRelease`, `createSpot`, `assignArtist`)
+- `demos/scripts/helpers.ts` — `addCursorOverlay`, `slowType`, `pause`, `highlight`, `scrollTo`,
+  and `showDialog` (branded narration card — see "Demo dialogs" below)
+- The existing clip closest to the one you're adding — copy its structure exactly
 
-- `docs/superpowers/specs/2026-06-01-demo-videos-design.md` — the spec with the catalogue table,
-  directory structure, Playwright config, and helper patterns
-- `demos/scripts/helpers.ts` — the shared helpers (`slowType`, `pause`, `highlight`, `scrollTo`)
-  that every script uses
-- Any existing script in `demos/scripts/` for the relevant persona — follow the exact same
-  structure (imports, page flow, pacing)
+## Step 1: Determine the clip
 
-## Step 1: Determine the new video
+If the request is clear (persona, feature, the headline moment), proceed. Otherwise ask one
+question at a time:
 
-Read the catalogue table from the spec to find the next ID (V05, V06, etc.).
+1. **Persona** — Artist or Organiser?
+2. **Feature** — the single thing it demonstrates (→ the `persona-feature` name)
+3. **Starting state** — which page does it open on, and as whom? (Lady Gabe for most artist
+   clips; a fresh silent account if it needs an un-set-up profile; Marcus for organiser clips.)
+4. **Off-screen prerequisites** — does the feature need state that must be built first (e.g. an
+   accepted artist, a closed round)? That goes in `_setup.ts`, never on camera.
 
-If the user's request is clear (persona, flow, key moments), proceed. If any of these are missing,
-ask — but keep it to one question at a time:
-
-1. **Persona** — Organiser, Artist, or Public?
-2. **Title** — short, action-oriented ("Viewing the Festival Map", "Managing Collections")
-3. **DB approach** — does this video need a pre-seeded state, or does it start from scratch?
-4. **Key moments** — the 4–8 steps the viewer will see; be specific about which pages and actions
+Keep it to one feature. If the user describes a multi-feature journey, split it into several clips.
 
 ## Step 2: Add the catalogue row
 
-Edit `docs/superpowers/specs/2026-06-01-demo-videos-design.md`. Find the Video Catalogue table
-and append a new row:
+Edit the Video Catalogue table in the spec. Append a row:
 
 ```
-| V0N | Persona | Title | Pre-seeded or From scratch | Key moments summary |
+| `persona-feature` | Persona | Lands as <whom> | One-line description of the headline moment |
 ```
 
-Keep the key moments concise (one cell, pipe-delimited if needed).
+## Step 3: Write the clip
 
-## Step 3: Write the Playwright script
-
-Create `demos/scripts/V0N-<kebab-title>.ts`. Follow the pattern from existing scripts exactly:
+Create `demos/scripts/<persona>-<feature>.ts` (the file stem is the MP4 name). The shape:
 
 ```typescript
-import { test } from '@playwright/test'
-import { slowType, pause, highlight, scrollTo } from './helpers.js'
+import { test, expect } from '@playwright/test'
+import { pause, highlight, addCursorOverlay } from './helpers.js'
+import { silentLogin, cpfFestivalId, ORGANISER_EMAIL } from './_setup.js'
 
-const API = process.env.API_URL ?? 'http://localhost:8080'
-
-test('V0N — <Title>', async ({ page }) => {
-  // Each meaningful section gets a comment header: // ── 1. Description ─────
-
-  // Pre-seeded videos: log in with demo credentials
-  // From-scratch videos: go to /signup and create a fresh account
-
-  // Use slowType() for all user-visible text entry (bio, form answers, names)
-  // Use pause(1200) between major sections for visual breathing room
-  // Use highlight() before clicking an important button to draw the viewer's eye
-  // Use scrollTo() before interacting with off-screen elements
-
-  // End on a meaningful state — a confirmation screen, a published page, a dashboard
+test('<persona>-<feature> — <plain description>', async ({ page }) => {
+  await addCursorOverlay(page)
+  await silentLogin(page /*, ORGANISER_EMAIL */)   // off-screen auth; default = Lady Gabe
+  // …optional off-screen state, e.g. await decideAllAndRelease(page, fid, ['Rosa Vane'])
+  await page.goto('/the/target/page')              // already authenticated
+  // the single headline interaction, paced with pause()/highlight()
+  // end on a clear state (a confirmation, a banner, a published page)
 })
 ```
+
+Rules:
+- **Don't show login** (except `artist-signup`). Use `silentLogin`/`silentSignup` then `goto`.
+- **Never land an artist clip on `/profile`** — Lady Gabe's `setup_completed_at` is null, so it
+  redirects to the wizard. Use `/collections`, `/applications`, `/analytics`, `/endorsements`,
+  `/artists/{id}`, etc.
+- **Off-screen state belongs in `_setup.ts`** (it acts as the logged-in user via `page.request`;
+  the session cookie out-ranks the `Authorization` header). Reuse the existing helpers; add a new
+  one there if the API call is genuinely new. Remember release requires *every* submitted
+  application to have a staged decision (`decideAllAndRelease` handles this).
+- **Keep it ≤ ~20s.** Fewer pauses, only the headline steps. If it can't fit, it's two clips.
 
 ### Pacing guide
+- `pause(600–900)` — between steps on the same page
+- `pause(1500)` — between pages / after an important action
+- `pause(2000–2500)` — at the end, before the recording cuts off
+- `slowType(locator, text)` — all typed content (default 45ms/char)
 
-- `pause(600)` — between steps on the same page
-- `pause(1200)` — between pages / major sections
-- `pause(2000)` — at the end, before the recording cuts off
-- `slowType(locator, text, 80)` — all typed content (80ms per char is the default)
+### Demo dialogs (`showDialog`)
+`await showDialog(page, 'one short sentence explaining this step', { pos: 'top' | 'bottom' })`
+injects a branded narration card that pauses the walkthrough while the viewer reads, then fades.
+Use it to explain *what's happening* — heavily in long/combined clips, once or twice in short
+ones. Pick `pos` so the card doesn't cover the element you're about to act on (e.g. `'bottom'`
+when the action is a top-of-page button like "Open review round"). Keep each line to one sentence.
 
-### Admin grant (if the video needs publish access for a fresh artist)
+### Combined / journey clips
+Most clips cover one feature, but a few combine a natural flow (e.g. `artist-onboarding` =
+signup + wizard; `organiser-review` = triage + review round + placement summary). These run
+longer (>30s) and that's fine — narrate each phase with `showDialog`. To reach a later phase's
+starting state, drive the earlier API steps off-screen via `_setup.ts` rather than on camera.
 
-If V03-style: after the artist saves their profile, the script needs to grant access before
-clicking "Go Public". Do it programmatically (not on-screen):
+## Step 4: Wire it into the suite
 
-```typescript
-// Get artist's user ID
-const profileRes = await page.request.get(`${API}/profiles/me`)
-const { user_id: artistUserId } = await profileRes.json()
+- Add the clip to the `for:` list in `demo:all` (Taskfile.yml, `demo:all` task).
+- No config change needed — `testMatch: ['**/artist-*.ts', '**/organiser-*.ts']` already picks up
+  any new `persona-feature` file. (A new persona prefix needs a new testMatch entry.)
+- If it needs seed data that doesn't exist yet, update `demos/seed/main.go` and note it — don't
+  silently skip it.
 
-// Log in as admin and grant access (not shown in the browser)
-const adminLogin = await page.request.post(`${API}/auth/login`, {
-  data: { email: 'admin@demo.art', password: 'demo-password-2027' },
-})
-const { token: adminToken } = await adminLogin.json()
-await page.request.post(`${API}/admin/users/${artistUserId}/grants`, {
-  headers: { Authorization: `Bearer ${adminToken}` },
-  data: { plan: 'artist_basic', duration_days: 365, note: 'Demo access' },
-})
-// Now continue: click "Go Public" in the browser
-```
-
-## Step 4: Commit
-
-Stage and commit both files together:
+## Step 5: Record and verify
 
 ```bash
-git add docs/superpowers/specs/2026-06-01-demo-videos-design.md demos/scripts/V0N-*.ts
-git commit -m "feat(demos): add V0N — <Title>"
+task up            # stack must be running (api :8080 + web :3000)
+task demo:record V=<persona>-<feature>    # re-seeds, then records (visible browser)
+task demo:convert  # webm → output/<clip>.mp4
 ```
 
-## Step 5: Report back
+Confirm it passed and the MP4 exists. Check duration: `ffprobe -v error -show_entries
+format=duration -of csv=p=0 demos/output/<clip>.mp4`.
 
-Tell the user:
-- The new video ID and what it shows
-- The script path
-- How to record it: `task demo:record V=V0N`
-- Whether the DB needs re-seeding first (`task demo:seed`) — yes if the video uses pre-seeded data
+## Step 6: Commit
+
+```bash
+git add docs/superpowers/specs/2026-06-01-demo-videos-design.md \
+        demos/scripts/<persona>-<feature>.ts Taskfile.yml
+git commit -m "feat(demos): add <persona>-<feature> clip"
+```
+
+(Commit the script + spec + Taskfile. MP4s/webms under `demos/output/` are gitignored.)
 
 ## Notes
 
-- The catalogue table is the living reference. Every video ever commissioned lives here.
-- If the new video needs seed data that doesn't exist yet (new personas, new festival state),
-  note it clearly and suggest updating `demos/seed/main.go` — don't silently skip it.
-- Keep scripts self-contained: don't extract shared setup into helpers.ts unless the same
-  setup appears in 3+ scripts.
-- If the user says "make it like V02 but for X", read V02's script first and adapt it directly.
+- The catalogue table is the living reference. Every clip lives there.
+- `_setup.ts` is **not** a test file (excluded from `testMatch`) — it's the shared module. Put
+  reusable auth/lookup/state logic there, not in `helpers.ts` (which is for recording aids).
+- If the user says "make it like X but for Y", read clip X first and adapt it directly.

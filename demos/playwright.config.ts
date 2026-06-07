@@ -2,12 +2,14 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './scripts',
-  // Only the V## demo scripts are tests; helpers.ts / mailpit.ts are shared
-  // modules imported by them. Playwright forbids a test file importing another
-  // test file, so they must not match testMatch.
-  testMatch: '**/V[0-9]*.ts',
+  // Each clip is a persona-prefixed file (artist-*.ts / organiser-*.ts). Shared
+  // modules (_setup.ts, helpers.ts, mailpit.ts) deliberately don't match — Playwright
+  // forbids a test file importing another test file.
+  testMatch: ['**/artist-*.ts', '**/organiser-*.ts'],
   workers: 1,
-  timeout: 180000,
+  // Bounded so a stuck selector doesn't waste minutes mid-batch, but generous
+  // enough for the long narrated clips (onboarding, organiser-review).
+  timeout: 150000,
   reporter: [['list']],
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:3000',

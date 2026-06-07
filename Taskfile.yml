@@ -76,14 +76,17 @@ tasks:
   demo:seed:
     desc: "Wipe and re-seed the demo database (idempotent)"
     dir: demos/seed
+    # run: always — so re-seeding actually re-runs before every clip in demo:all
+    # (Task otherwise dedups a dep to once per execution). Several organiser clips
+    # mutate festival state off-screen, so each clip must start from a clean seed.
+    run: always
     cmd: go run .
 
   demo:record:
-    desc: "Re-seed then record one demo video. Usage: task demo:record V=V02"
+    desc: "Re-seed then record one clip. Usage: task demo:record V=artist-signup"
     dir: demos
-    # Always re-seed first: V06 advances the festival's review round (open →
-    # close → release decisions), so a second run without a reset finds the
-    # board read-only and dies before the kanban drags. Seeding is the reset.
+    # Always re-seed first: the organiser clips advance the festival's review round
+    # / decisions / spots, so a clip run against dirty state would fail. Seed = reset.
     deps: [demo:seed]
     cmd: npx playwright test scripts/{{.V}}*.ts --config playwright.config.ts --output=output/raw/{{.V}}
 
@@ -93,10 +96,19 @@ tasks:
     cmd: bash run.sh
 
   demo:all:
-    desc: "Record combined videos (V05 artist journey + V06 organiser full). Each re-seeds first."
+    desc: "Record every per-feature clip (artist + organiser), each re-seeding first, then convert to MP4."
     cmds:
-      - task: demo:record
-        vars: { V: V05 }
-      - task: demo:record
-        vars: { V: V06 }
+      - for:
+          - artist-onboarding
+          - artist-public-profile
+          - artist-collections
+          - artist-apply-to-festival
+          - artist-endorsements
+          - artist-analytics
+          - organiser-form-builder
+          - organiser-review
+          - organiser-decisions-release
+          - organiser-map-editor
+        task: demo:record
+        vars: { V: '{{ .ITEM }}' }
       - task: demo:convert
