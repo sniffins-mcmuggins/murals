@@ -29,14 +29,14 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
   ])
 
   if (!collectionRes.data || !profileRes.data) {
-    return { title: 'Collection not found | Render' }
+    return { title: 'Collection not found | Painttrace' }
   }
 
   const collection = collectionRes.data
   const profile = profileRes.data
-  const title = `${collection.name} — ${profile.display_name} | Render`
+  const title = `${collection.name} — ${profile.display_name} | Painttrace`
   const description =
-    collection.description || `${collection.name} by ${profile.display_name} on Render`
+    collection.description || `${collection.name} by ${profile.display_name} on Painttrace`
   const canonical = absoluteUrl(`/artists/${id}/collections/${collectionId}`)
   const image = collection.cover_s3_key || profile.avatar_s3_key || undefined
 
@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
       title,
       description,
       url: canonical,
-      siteName: 'Render',
+      siteName: 'Painttrace',
       images: image ? [{ url: image, alt: collection.name }] : undefined,
     },
     twitter: {

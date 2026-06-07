@@ -114,3 +114,57 @@ export async function scrollTo(page: Page, selector: string): Promise<void> {
   await page.locator(selector).first().scrollIntoViewIfNeeded()
   await pause(600)
 }
+
+/**
+ * Demo-only narration card. Injects a branded (ink + amber) caption that fades
+ * in, holds while the viewer reads, then fades out — deliberately pausing the
+ * walkthrough so each step is clear. Recording aid only; never in the real app.
+ *
+ * pos: 'top' (default) or 'bottom' — pick whichever doesn't cover the action.
+ * The read time scales with text length unless `ms` is given. pointer-events are
+ * off so the card never intercepts clicks.
+ */
+export async function showDialog(
+  page: Page,
+  text: string,
+  opts: { ms?: number; pos?: 'top' | 'bottom' } = {},
+): Promise<void> {
+  const pos = opts.pos ?? 'top'
+  const readMs = opts.ms ?? Math.min(4200, 1000 + text.length * 30)
+  await page.evaluate(({ text, pos, readMs }) => {
+    const ID = '__demo_dialog__'
+    document.getElementById(ID)?.remove()
+    const card = document.createElement('div')
+    card.id = ID
+    const offset = pos === 'top' ? '-10px' : '10px'
+    const label = document.createElement('div')
+    Object.assign(label.style, {
+      font: '700 11px/1 "DM Mono", ui-monospace, monospace',
+      letterSpacing: '0.18em', textTransform: 'uppercase', color: '#E8A838', marginBottom: '6px',
+    })
+    label.textContent = 'Painttrace'
+    const body = document.createElement('div')
+    body.textContent = text
+    Object.assign(body.style, { font: '500 18px/1.5 "DM Sans", system-ui, sans-serif' })
+    card.append(label, body)
+    Object.assign(card.style, {
+      position: 'fixed', left: '50%', [pos]: '32px',
+      transform: `translateX(-50%) translateY(${offset})`,
+      maxWidth: '620px', background: 'rgba(26,26,46,0.96)', color: '#FAF7F2',
+      borderLeft: '4px solid #E8A838', borderRadius: '14px', padding: '16px 22px',
+      boxShadow: '0 10px 34px rgba(0,0,0,0.45)', zIndex: '2147483646',
+      opacity: '0', transition: 'opacity 0.35s ease, transform 0.35s ease', pointerEvents: 'none',
+    } as Partial<CSSStyleDeclaration>)
+    document.body.appendChild(card)
+    requestAnimationFrame(() => {
+      card.style.opacity = '1'
+      card.style.transform = 'translateX(-50%) translateY(0)'
+    })
+    setTimeout(() => {
+      card.style.opacity = '0'
+      card.style.transform = `translateX(-50%) translateY(${offset})`
+      setTimeout(() => card.remove(), 400)
+    }, readMs)
+  }, { text, pos, readMs })
+  await pause(readMs + 300)
+}

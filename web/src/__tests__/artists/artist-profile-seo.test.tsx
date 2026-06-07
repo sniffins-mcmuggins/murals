@@ -120,7 +120,7 @@ describe('ArtistPage OpenGraph metadata', () => {
   it('sets og:title and og:type', async () => {
     mockProfileAndCollections()
     const meta = await generateMetadata({ params: Promise.resolve({ id: 'artist-123' }) })
-    expect(meta.openGraph?.title).toBe('Lady Gabe | Render')
+    expect(meta.openGraph?.title).toBe('Lady Gabe | Painttrace')
     expect(meta.openGraph && (meta.openGraph as { type?: string }).type).toBe('profile')
   })
 
@@ -138,7 +138,7 @@ describe('ArtistPage OpenGraph metadata', () => {
     const meta = await generateMetadata({ params: Promise.resolve({ id: 'artist-123' }) })
     const twitter = meta.twitter as { card?: string; title?: string } | null | undefined
     expect(twitter?.card).toBe('summary_large_image')
-    expect(twitter?.title).toBe('Lady Gabe | Render')
+    expect(twitter?.title).toBe('Lady Gabe | Painttrace')
   })
 
   it('sets a canonical url for the profile', async () => {

@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     params: { path: { festivalID: id } },
   })
   const name = res.data?.name ?? 'Festival'
-  return { title: `${name} — Map | Render` }
+  return { title: `${name} — Map | Painttrace` }
 }
 
 export default async function FestivalMapPage({ params }: Props) {

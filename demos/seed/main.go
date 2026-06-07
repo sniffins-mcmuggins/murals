@@ -168,6 +168,23 @@ func main() {
 	}
 	fmt.Printf("  artist:    %s (profile public, %d images)\n", ladyGabeEmail, len(gabeImages))
 
+	// Analytics events for Lady Gabe spread over the last ~85 days, so the
+	// analytics demo clip shows real numbers (not zeros). Aggregated only — no
+	// per-visitor data (GDPR-clean by design).
+	for _, ev := range []struct {
+		kind  string
+		count int
+	}{{"profile_view", 342}, {"qr_scan", 57}, {"link_click", 124}} {
+		if _, err := conn.Exec(ctx,
+			`INSERT INTO analytics_events (event_type, profile_id, occurred_at)
+			 SELECT $1::analytics_event_type, $2, now() - (random() * interval '85 days')
+			 FROM generate_series(1, $3)`,
+			ev.kind, gabeProfileID, ev.count); err != nil {
+			log.Fatalf("insert analytics %s: %v", ev.kind, err)
+		}
+	}
+	fmt.Println("  analytics: Lady Gabe (342 views · 57 scans · 124 clicks)")
+
 	type seededArtist struct {
 		profileID string
 		a         fictionalArtist
@@ -223,6 +240,29 @@ func main() {
 		log.Fatalf("insert festival: %v", err)
 	}
 	fmt.Printf("  festival:  cpf-2027 (%s)\n", festivalID)
+
+	// Endorsements for Lady Gabe — one organiser (Marcus / CPF), one peer (Amara
+	// Diallo) — so the public-profile and endorsements demo clips have real social
+	// proof to show. moderation_status defaults to 'ok', so both appear publicly.
+	if _, err := conn.Exec(ctx,
+		`INSERT INTO endorsements (endorser_id, endorsee_id, kind, festival_id, body, skills)
+		 VALUES ($1, $2, 'organiser', $3, $4, $5)
+		 ON CONFLICT (endorser_id, endorsee_id) DO NOTHING`,
+		marcusID, gabeProfileID, festivalID,
+		"A consummate professional from first email to final coat — met every deadline, brilliant with the public, and the wall stopped people in their tracks. Any festival would be lucky to have her.",
+		[]string{"reliability", "large-scale", "public engagement"}); err != nil {
+		log.Fatalf("insert organiser endorsement: %v", err)
+	}
+	if _, err := conn.Exec(ctx,
+		`INSERT INTO endorsements (endorser_id, endorsee_id, kind, body, skills)
+		 SELECT user_id, $1, 'peer', $2, $3 FROM artist_profiles WHERE display_name = 'Amara Diallo'
+		 ON CONFLICT (endorser_id, endorsee_id) DO NOTHING`,
+		gabeProfileID,
+		"Gabe's colour work is fearless. I've watched her take a blank gable end and turn it into the best thing on the street. A real one.",
+		[]string{"colour", "composition"}); err != nil {
+		log.Fatalf("insert peer endorsement: %v", err)
+	}
+	fmt.Println("  endorsements: Lady Gabe ← Marcus (organiser) + Amara (peer)")
 
 	fieldsJSON, _ := json.Marshal(cpfFields)
 	var formID string

@@ -82,7 +82,7 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-offwhite">
       <header className="border-b border-light bg-warm">
         <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
-          <span className="font-serif text-xl text-ink">Render</span>
+          <span className="font-serif text-xl text-ink">Painttrace</span>
           {summary.is_beta && (
             <span className="font-mono text-[10px] uppercase tracking-widest text-amber bg-ink px-2 py-0.5 rounded">
               Founding member

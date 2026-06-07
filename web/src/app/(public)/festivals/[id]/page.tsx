@@ -13,10 +13,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     params: { path: { festivalID: id } },
   })
   if (res.error || !res.data) {
-    return { title: 'Festival not found | Render' }
+    return { title: 'Festival not found | Painttrace' }
   }
   return {
-    title: `${res.data.name} | Render`,
+    title: `${res.data.name} | Painttrace`,
     description: res.data.description,
   }
 }
