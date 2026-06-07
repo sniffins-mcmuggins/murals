@@ -26,12 +26,12 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
   })
 
   if (response.status === 404 || !data) {
-    return { title: 'Artist not found | Render' }
+    return { title: 'Artist not found | Painttrace' }
   }
 
-  const title = `${data.display_name} | Render`
+  const title = `${data.display_name} | Painttrace`
   const description =
-    data.bio || `${data.display_name}${data.location_label ? ` — ${data.location_label}` : ''} on Render`
+    data.bio || `${data.display_name}${data.location_label ? ` — ${data.location_label}` : ''} on Painttrace`
   const canonical = absoluteUrl(`/artists/${id}`)
   const image = primaryImage(data)
 
@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
       title,
       description,
       url: canonical,
-      siteName: 'Render',
+      siteName: 'Painttrace',
       images: image ? [{ url: image, alt: data.display_name }] : undefined,
     },
     twitter: {

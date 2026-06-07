@@ -121,7 +121,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md bg-offwhite border border-light rounded-2xl p-8 shadow-sm">
         <h1 className="font-serif text-3xl text-ink mb-2">Create account</h1>
         <p className="font-sans text-mid text-sm mb-8">
-          Join the Render platform for paint festival artists and organisers.
+          Join the Painttrace platform for paint festival artists and organisers.
         </p>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-5">

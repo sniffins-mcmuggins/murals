@@ -25,7 +25,7 @@ const dmMono = DM_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Render',
+  title: 'Painttrace',
   description: 'The platform for paint festival artists and organisers',
 }
 

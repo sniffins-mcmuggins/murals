@@ -130,7 +130,7 @@ export async function showDialog(
   opts: { ms?: number; pos?: 'top' | 'bottom' } = {},
 ): Promise<void> {
   const pos = opts.pos ?? 'top'
-  const readMs = opts.ms ?? Math.min(5500, 1500 + text.length * 36)
+  const readMs = opts.ms ?? Math.min(4200, 1000 + text.length * 30)
   await page.evaluate(({ text, pos, readMs }) => {
     const ID = '__demo_dialog__'
     document.getElementById(ID)?.remove()
@@ -166,5 +166,5 @@ export async function showDialog(
       setTimeout(() => card.remove(), 400)
     }, readMs)
   }, { text, pos, readMs })
-  await pause(readMs + 550)
+  await pause(readMs + 300)
 }

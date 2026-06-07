@@ -194,7 +194,7 @@ function LoginForm() {
     <div className="w-full max-w-md bg-offwhite border border-light rounded-2xl p-8 shadow-sm">
       <h1 className="font-serif text-3xl text-ink mb-2">Sign in</h1>
       <p className="font-sans text-mid text-sm mb-8">
-        Welcome back to Render.
+        Welcome back to Painttrace.
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-5">

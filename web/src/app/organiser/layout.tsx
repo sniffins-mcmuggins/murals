@@ -12,7 +12,7 @@ export default async function OrganiserLayout({ children }: { children: React.Re
     <div className="min-h-screen bg-offwhite flex">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-56 border-r border-light bg-warm shrink-0 pt-8 pb-6 px-4">
-        <span className="font-serif text-xl text-ink mb-8 px-2">Render</span>
+        <span className="font-serif text-xl text-ink mb-8 px-2">Painttrace</span>
         <nav className="flex flex-col gap-1">
           {NAV_LINKS.map(({ href, label }) => (
             <Link

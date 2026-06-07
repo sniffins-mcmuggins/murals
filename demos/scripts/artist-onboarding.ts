@@ -29,7 +29,7 @@ test('artist-onboarding — sign up and build your page', async ({ page }) => {
   await highlight(page, 'button[type=submit]')
   await page.getByRole('button', { name: /create account/i }).click()
   await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible({ timeout: 8000 })
-  await showDialog(page, 'We send a verification link to confirm the email address.', { pos: 'bottom' })
+  await pause(1400) // we verify a real link arrives; shown briefly, no caption needed
 
   // Verify behind the scenes (the link would arrive by email).
   await page.request.post(`${API}/_test/verify-email`, {
@@ -38,7 +38,7 @@ test('artist-onboarding — sign up and build your page', async ({ page }) => {
 
   // ── Sign in ──────────────────────────────────────────────────────────────────
   await page.goto('/login')
-  await pause(600)
+  await pause(350)
   await slowType(page.locator('#email'), email)
   await slowType(page.locator('#password'), password)
   await highlight(page, 'button[type=submit]')
@@ -56,7 +56,7 @@ test('artist-onboarding — sign up and build your page', async ({ page }) => {
 
   // Step 1 — name
   await slowType(page.getByPlaceholder('e.g. Lady Gabe'), 'Lady Gabe')
-  await pause(500)
+  await pause(250)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 2 — photos
@@ -69,21 +69,21 @@ test('artist-onboarding — sign up and build your page', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Upload Photo 1' }).locator('img')).toBeVisible({ timeout: 30000 })
   await page.locator('input[type=file]').nth(2).setInputFiles(PHOTO2)
   await expect(page.getByRole('button', { name: 'Upload Photo 2' }).locator('img')).toBeVisible({ timeout: 30000 })
-  await pause(700)
+  await pause(350)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 3 — bio
   await expect(page.getByText('Step 3 / 9')).toBeVisible({ timeout: 8000 })
   await showDialog(page, 'Write a short bio in your own voice — quick prompts help if you get stuck.')
   await slowType(page.locator('textarea').first(), 'South-West muralist. Bold colour, mythological themes, outdoor work.')
-  await pause(500)
+  await pause(250)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 4 — location
   await expect(page.getByText('Step 4 / 9')).toBeVisible({ timeout: 8000 })
   await showDialog(page, 'Set a city or region — never an exact address.', { pos: 'bottom' })
   await slowType(page.getByPlaceholder('e.g. Cheltenham, UK'), 'Cheltenham, UK')
-  await pause(500)
+  await pause(250)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 5 — mediums
@@ -95,21 +95,21 @@ test('artist-onboarding — sign up and build your page', async ({ page }) => {
   await pause(300)
   await slowType(page.locator('input[aria-label="Add a custom medium"]'), 'spray paint')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await pause(600)
+  await pause(350)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 6 — social links
   await expect(page.getByText('Step 6 / 9')).toBeVisible({ timeout: 8000 })
   await showDialog(page, 'Link the places people already follow your work.', { pos: 'bottom' })
   await slowType(page.locator('input[aria-label="Instagram"]'), 'https://instagram.com/ladygabeart')
-  await pause(500)
+  await pause(250)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 7 — support link
   await expect(page.getByText('Step 7 / 9')).toBeVisible({ timeout: 8000 })
   await showDialog(page, 'Optionally add a tip or support link so fans can back you.')
   await slowType(page.locator('input[aria-label="Support link"]'), 'https://ko-fi.com/ladygabe')
-  await pause(500)
+  await pause(250)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 8 — first collection
@@ -118,7 +118,7 @@ test('artist-onboarding — sign up and build your page', async ({ page }) => {
   await slowType(page.getByPlaceholder('e.g. Cheltenham 2026'), 'Murals 2027')
   await page.locator('input[type=file]').setInputFiles(COVER)
   await expect(page.getByRole('button', { name: 'Upload Cover image' }).locator('img')).toBeVisible({ timeout: 30000 })
-  await pause(600)
+  await pause(350)
   await page.getByRole('button', { name: /continue/i }).click()
 
   // Step 9 — review + publish
