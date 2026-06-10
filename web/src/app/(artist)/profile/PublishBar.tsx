@@ -46,6 +46,22 @@ export default function PublishBar({ initialProfile }: { initialProfile: ArtistP
     setShowUpsell(false)
   }
 
+  async function handlePublishChanges() {
+    setBusy(true)
+    setError(null)
+    const res = await apiClient.POST('/profiles/me/publish-changes', {})
+    setBusy(false)
+    if (res.response.status === 402) {
+      setShowUpsell(true)
+      return
+    }
+    if (!res.data) {
+      setError('Something went wrong. Please try again.')
+      return
+    }
+    setProfile(res.data)
+  }
+
   function handleCopyPreviewLink() {
     const token = profile?.preview_token
     if (!token) return
@@ -72,6 +88,22 @@ export default function PublishBar({ initialProfile }: { initialProfile: ArtistP
           {isDraft ? 'Draft' : 'Public'}
         </span>
 
+        {!isDraft && (
+          <Link
+            href={`/artists/${profile.id}`}
+            className="font-sans text-sm text-ink underline hover:text-amber transition-colors"
+          >
+            View public profile
+          </Link>
+        )}
+
+        <Link
+          href="/profile/preview"
+          className="font-sans text-sm text-ink underline hover:text-amber transition-colors"
+        >
+          Preview draft
+        </Link>
+
         {profile.preview_token && (
           <button
             type="button"
@@ -80,6 +112,26 @@ export default function PublishBar({ initialProfile }: { initialProfile: ArtistP
           >
             {copied ? 'Copied!' : 'Copy preview link'}
           </button>
+        )}
+
+        {!isDraft && profile.has_unpublished_changes && (
+          <>
+            <span
+              data-testid="unpublished-indicator"
+              className="font-mono text-xs uppercase tracking-wider px-2 py-1 rounded border bg-clay/10 text-clay border-clay"
+            >
+              Unpublished changes
+            </span>
+            <button
+              type="button"
+              onClick={handlePublishChanges}
+              disabled={busy}
+              data-testid="publish-changes-btn"
+              className="px-5 py-2 bg-amber text-ink font-sans font-medium text-sm rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {busy ? 'Publishing…' : 'Publish changes'}
+            </button>
+          </>
         )}
 
         {isDraft ? (
