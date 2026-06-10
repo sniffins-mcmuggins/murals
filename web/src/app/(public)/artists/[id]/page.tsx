@@ -142,7 +142,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
       <div className={`max-w-4xl mx-auto px-6 py-12 ${isOwner ? 'pb-28' : ''}`}>
         {/* Headline photos strip */}
         {profile.headline_image_urls.length > 0 && (
-          <div className={`grid gap-2 mb-10 ${profile.headline_image_urls.length === 1 ? 'grid-cols-1' : profile.headline_image_urls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          <div className={`grid auto-rows-[16rem] gap-2 mb-10 ${profile.headline_image_urls.length === 1 ? 'grid-cols-1' : profile.headline_image_urls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
             {profile.headline_image_urls.map((url, i) => (
               <div
                 key={i}
@@ -151,7 +151,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                 <img
                   src={url}
                   alt={`${profile.display_name} — photo ${i + 1}`}
-                  className="w-full h-64 object-cover"
+                  className="block w-full h-full object-cover"
                 />
               </div>
             ))}

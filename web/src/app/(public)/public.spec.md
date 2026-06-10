@@ -26,6 +26,7 @@
 - `artists/`: public artist profile pages
 
 ## Changelog
+2026-06-10 — collection page image grid → CSS-columns masonry (uncropped, no `bg-warm` overflow); headline strip mosaic now `h-full object-cover` + `auto-rows-[16rem]` so spanning cells fill. See `.claude/rules/web-frontend.md` (image-layout trap).
 2026-06-10 — owner-only `OwnerBar` on the live artist page + public collection page; gated by `isProfileOwner()` ownership check. Links owner out to `/profile` and `/collections/{id}`.
 2026-06-10 — E29: public artist profile + collections + images pages now render from published snapshot (API-side); added contract note and boundary clarifying draft invisibility.
 2026-05-31 — initial spec

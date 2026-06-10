@@ -110,13 +110,16 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
         {images.length === 0 ? (
           <p className="font-sans text-mid">No images in this collection yet.</p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="columns-2 sm:columns-3 gap-3">
             {images.map((img) => (
-              <div key={img.id} className="overflow-hidden rounded-lg bg-warm border border-light">
+              <div
+                key={img.id}
+                className="mb-3 break-inside-avoid overflow-hidden rounded-lg border border-light"
+              >
                 <img
                   src={img.cdn_url}
                   alt=""
-                  className="w-full h-auto"
+                  className="block w-full h-auto"
                 />
               </div>
             ))}

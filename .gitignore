@@ -33,3 +33,5 @@ mobile/android/app/.cxx/
 playwright-report/
 
 test-results/
+
+.playwright-mcp/
