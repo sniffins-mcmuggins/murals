@@ -7,6 +7,11 @@ import { OwnerBar } from '@/components/OwnerBar'
 import { SocialLinks } from '@/components/SocialLinks'
 import { absoluteUrl } from '@/lib/site'
 import MuralMapClient from './MuralMapClient'
+import {
+  COLLECTION_STATUS_LABELS,
+  COLLECTION_STATUS_BADGES,
+  COLLECTION_STATUS_BADGE_FALLBACK,
+} from '@/lib/collections'
 
 interface ArtistPageProps {
   params: Promise<{ id: string }>
@@ -87,18 +92,6 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   const collections = collectionsRes.data ?? []
   const appearances = festivalsRes.data ?? []
   const endorsements = endorsementsRes.data?.endorsements ?? []
-
-  const statusLabel: Record<string, string> = {
-    active: 'Active',
-    archived: 'Archived',
-    ongoing: 'Ongoing',
-  }
-
-  const statusColour: Record<string, string> = {
-    active: 'bg-amber text-ink',
-    archived: 'bg-warm text-mid border border-light',
-    ongoing: 'bg-clay text-offwhite',
-  }
 
   // schema.org structured data — a Person (visual artist) whose works are the
   // public collections. Helps search engines surface the artist directly.
@@ -276,9 +269,9 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                     {collection.name}
                   </p>
                   <span
-                    className={`font-mono text-xs uppercase tracking-widest px-2 py-0.5 rounded ${statusColour[collection.status] ?? 'bg-warm text-mid'}`}
+                    className={`font-mono text-xs uppercase tracking-widest px-2 py-0.5 rounded ${COLLECTION_STATUS_BADGES[collection.status] ?? COLLECTION_STATUS_BADGE_FALLBACK}`}
                   >
-                    {statusLabel[collection.status] ?? collection.status}
+                    {COLLECTION_STATUS_LABELS[collection.status] ?? collection.status}
                   </span>
                 </Link>
               ))}

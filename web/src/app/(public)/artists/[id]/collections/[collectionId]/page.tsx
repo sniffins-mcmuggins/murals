@@ -5,21 +5,14 @@ import { apiClient } from '@/lib/api'
 import { absoluteUrl } from '@/lib/site'
 import { isProfileOwner } from '@/lib/auth-server'
 import { OwnerBar } from '@/components/OwnerBar'
+import {
+  COLLECTION_STATUS_LABELS,
+  COLLECTION_STATUS_BADGES,
+  COLLECTION_STATUS_BADGE_FALLBACK,
+} from '@/lib/collections'
 
 interface CollectionPageProps {
   params: Promise<{ id: string; collectionId: string }>
-}
-
-const statusLabel: Record<string, string> = {
-  active: 'Active',
-  archived: 'Archived',
-  ongoing: 'Ongoing',
-}
-
-const statusColour: Record<string, string> = {
-  active: 'bg-amber text-ink',
-  archived: 'bg-warm text-mid border border-light',
-  ongoing: 'bg-clay text-offwhite',
 }
 
 export async function generateMetadata({ params }: CollectionPageProps): Promise<Metadata> {
@@ -97,9 +90,9 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           <div className="flex items-start gap-4 mb-4">
             <h1 className="font-serif text-5xl text-ink flex-1">{collection.name}</h1>
             <span
-              className={`font-mono text-xs uppercase tracking-widest px-2 py-0.5 rounded shrink-0 mt-3 ${statusColour[collection.status] ?? 'bg-warm text-mid'}`}
+              className={`font-mono text-xs uppercase tracking-widest px-2 py-0.5 rounded shrink-0 mt-3 ${COLLECTION_STATUS_BADGES[collection.status] ?? COLLECTION_STATUS_BADGE_FALLBACK}`}
             >
-              {statusLabel[collection.status] ?? collection.status}
+              {COLLECTION_STATUS_LABELS[collection.status] ?? collection.status}
             </span>
           </div>
           {collection.description && (
