@@ -145,6 +145,8 @@ func main() {
 	fmt.Println("Cleared existing demo rows")
 
 	var adminID string
+	fmt.Printf("  password for all:     %s\n", demoPassword)
+
 	if err := conn.QueryRow(ctx,
 		`INSERT INTO users (email, password_hash, is_admin, is_beta, email_verified)
 		 VALUES ($1, $2, true, true, true) RETURNING id`,
