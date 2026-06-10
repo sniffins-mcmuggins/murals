@@ -24,13 +24,20 @@ var cpfFields = []map[string]any{
 	{"id": "f1", "type": "textarea", "label": "Describe your proposed mural concept", "required": true},
 	{"id": "f2", "type": "select", "label": "Preferred wall size", "options": []string{"Small (up to 4m²)", "Medium (4–20m²)", "Large (20m²+)"}, "required": true},
 	{"id": "f3", "type": "select", "label": "Primary medium", "options": []string{"Spray paint", "Brush", "Mixed media", "Roller"}, "required": true},
-	{"id": "f4", "type": "textarea", "label": "Portfolio links (up to 3 URLs)", "required": true, "prefill": "portfolio_url"},
 	{"id": "f5", "type": "select", "label": "Do you have public liability insurance?", "options": []string{"Yes", "No", "In progress"}, "required": true},
 	{"id": "f6", "type": "select", "label": "Full festival availability (10–17 October)?", "options": []string{"Full period", "Partial — specify below"}, "required": true},
 	{"id": "f7", "type": "select", "label": "Previous outdoor mural experience", "options": []string{"Yes", "No"}, "required": false},
 	{"id": "f8", "type": "textarea", "label": "Anything else you'd like to tell us?", "required": false},
-	// Profile-bound (E28 M2): pre-fills from the artist's profile so they never re-type it.
-	{"id": "f9", "type": "text", "label": "Instagram", "required": false, "prefill": "social.instagram"},
+	// Profile-bound link fields (E28 + favicons): one per platform + website, pre-filled,
+	// each with a Share checkbox so the artist picks which to include.
+	{"id": "link_instagram", "type": "text", "label": "Instagram", "required": false, "prefill": "social.instagram"},
+	{"id": "link_twitter", "type": "text", "label": "X / Twitter", "required": false, "prefill": "social.twitter"},
+	{"id": "link_facebook", "type": "text", "label": "Facebook", "required": false, "prefill": "social.facebook"},
+	{"id": "link_youtube", "type": "text", "label": "YouTube", "required": false, "prefill": "social.youtube"},
+	{"id": "link_tiktok", "type": "text", "label": "TikTok", "required": false, "prefill": "social.tiktok"},
+	{"id": "link_linkedin", "type": "text", "label": "LinkedIn", "required": false, "prefill": "social.linkedin"},
+	{"id": "link_pinterest", "type": "text", "label": "Pinterest", "required": false, "prefill": "social.pinterest"},
+	{"id": "link_website", "type": "text", "label": "Website", "required": false, "prefill": "website"},
 }
 
 type fictionalArtist struct {
@@ -135,7 +142,7 @@ func main() {
 		`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility, avatar_s3_key, headline_image_urls)
 		 VALUES ($1, 'Lady Gabe',
 		   'South-West muralist. Bold colour, mythological themes, outdoor work.',
-		   '{"instagram":"https://instagram.com/ladygabeart","website":"https://ladygabe.com"}',
+		   '{"instagram":"https://instagram.com/ladygabeart","website":"https://ladygabe.com","twitter":"https://x.com/ladygabeart","tiktok":"https://tiktok.com/@ladygabeart"}',
 		   'public', $2, $3) RETURNING id`,
 		gabeUserID, gabeAvatarURL, []string{gabeHeadlineURL}).Scan(&gabeProfileID); err != nil {
 		log.Fatalf("insert ladygabe profile: %v", err)

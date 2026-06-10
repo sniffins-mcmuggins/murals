@@ -27,7 +27,6 @@ test('artist-apply-to-festival — submit a festival application', async ({ page
   )
   await page.selectOption('select[name="f2"]', 'Large (20m²+)')
   await page.selectOption('select[name="f3"]', 'Spray paint')
-  await slowType(page.locator('textarea[name="f4"]'), 'https://ladygabe.com/portfolio')
   await page.selectOption('select[name="f5"]', 'Yes')
   await page.selectOption('select[name="f6"]', 'Full period')
 
