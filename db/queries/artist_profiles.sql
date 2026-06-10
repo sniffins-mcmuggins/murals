@@ -100,6 +100,9 @@ SET setup_completed_at = COALESCE(setup_completed_at, now()),
 WHERE user_id = $1
 RETURNING *;
 
+-- name: ListAllPublicProfilesForBackfill :many
+SELECT * FROM artist_profiles WHERE visibility = 'public';
+
 -- name: GetSpotHistoryForProfile :many
 -- Returns festival spot placements for a given artist profile.
 -- Only includes spots from live or closed festivals (not draft/open).

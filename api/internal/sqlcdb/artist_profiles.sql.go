@@ -427,6 +427,51 @@ func (q *Queries) GetSpotHistoryForProfile(ctx context.Context, artistID pgtype.
 	return items, nil
 }
 
+const listAllPublicProfilesForBackfill = `-- name: ListAllPublicProfilesForBackfill :many
+SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by, support_url, setup_completed_at, has_unpublished_changes FROM artist_profiles WHERE visibility = 'public'
+`
+
+func (q *Queries) ListAllPublicProfilesForBackfill(ctx context.Context) ([]ArtistProfile, error) {
+	rows, err := q.db.Query(ctx, listAllPublicProfilesForBackfill)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ArtistProfile
+	for rows.Next() {
+		var i ArtistProfile
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.DisplayName,
+			&i.Bio,
+			&i.LocationLabel,
+			&i.ShowLocation,
+			&i.MediumTags,
+			&i.SocialLinks,
+			&i.AvatarS3Key,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.HeadlineImageUrls,
+			&i.Visibility,
+			&i.PreviewToken,
+			&i.ClaimToken,
+			&i.ClaimedAt,
+			&i.CreatedBy,
+			&i.SupportUrl,
+			&i.SetupCompletedAt,
+			&i.HasUnpublishedChanges,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublicProfiles = `-- name: ListPublicProfiles :many
 SELECT id, user_id, display_name, bio, location_label, show_location, medium_tags, social_links, avatar_s3_key, created_at, updated_at, headline_image_urls, visibility, preview_token, claim_token, claimed_at, created_by, support_url, setup_completed_at, has_unpublished_changes FROM artist_profiles
 WHERE visibility = 'public'

@@ -105,6 +105,12 @@ func publishSnapshotTx(ctx context.Context, pool *pgxpool.Pool, profile sqlcdb.A
 	return tx.Commit(ctx)
 }
 
+// BackfillSnapshot writes/refreshes the published snapshot for an existing
+// public profile. Exposed for the one-off backfill command.
+func BackfillSnapshot(ctx context.Context, pool *pgxpool.Pool, profile sqlcdb.ArtistProfile) error {
+	return publishSnapshotTx(ctx, pool, profile)
+}
+
 // PublishChangesHandler handles POST /profiles/me/publish-changes.
 // Serializes the caller's live draft into profile_snapshots atomically and
 // clears has_unpublished_changes. Gated on billing entitlement, same as publish.

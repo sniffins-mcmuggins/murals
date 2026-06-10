@@ -361,6 +361,9 @@ func DeleteImageHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// S3 object intentionally retained: the published snapshot may still
+		// reference this image until the artist publishes changes. Orphan objects
+		// are cleaned by a future GC pass (E29 follow-up).
 		if err := q.DeleteCollectionImage(r.Context(), img.ID); err != nil {
 			httperr.InternalServerError(w)
 			return
