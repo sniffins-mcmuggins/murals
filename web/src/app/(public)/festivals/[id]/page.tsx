@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { formatDateRange } from '@/lib/dates'
+import { FESTIVAL_STATUS_LABELS, FESTIVAL_STATUS_BADGES } from '@/lib/festivals'
 
 type Props = {
   params: Promise<{ id: string }>
@@ -20,20 +21,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${res.data.name} | Painttrace`,
     description: res.data.description,
   }
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  open: 'Open',
-  live: 'Live',
-  archived: 'Archived',
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-warm text-mid border-light',
-  open: 'bg-amber/20 text-amber border-amber/30',
-  live: 'bg-clay/20 text-clay border-clay/30',
-  archived: 'bg-warm text-mid border-light',
 }
 
 export default async function FestivalPage({ params }: Props) {
@@ -55,8 +42,8 @@ export default async function FestivalPage({ params }: Props) {
   const pins = mapRes.data?.pins ?? []
 
   const status = festival.status ?? 'draft'
-  const statusLabel = STATUS_LABELS[status] ?? status
-  const statusColor = STATUS_COLORS[status] ?? STATUS_COLORS.draft
+  const statusLabel = FESTIVAL_STATUS_LABELS[status] ?? status
+  const statusColor = FESTIVAL_STATUS_BADGES[status] ?? FESTIVAL_STATUS_BADGES.draft
 
   return (
     <main className="min-h-screen bg-offwhite">
