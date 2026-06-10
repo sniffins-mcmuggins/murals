@@ -152,8 +152,11 @@ describe('image reorder', () => {
     expect(reordered[0].id).toBe(idB)
     expect(reordered[1].id).toBe(idA)
 
-    // Order persists on a fresh GET
-    const after = (await fetch(`${API}/collections/${collectionId}/images`).then(r => r.json())) as Array<{ id: string }>
+    // Order persists on a fresh GET (use owner token — E29: draft profiles are
+    // invisible to anonymous callers; owner reads are served from live tables).
+    const after = (await fetch(`${API}/collections/${collectionId}/images`, {
+      headers: auth(token),
+    }).then(r => r.json())) as Array<{ id: string }>
     expect(after[0].id).toBe(idB)
     expect(after[1].id).toBe(idA)
   })

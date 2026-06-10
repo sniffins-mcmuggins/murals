@@ -158,8 +158,12 @@ describe('golden path', () => {
     expect(attachRes.status).toBe(201)
   })
 
-  it('8. public collection GET shows image', async () => {
-    const res = await fetch(`${API}/collections/${collectionId}/images`)
+  it('8. owner collection GET shows image (profile still draft — public needs publish first)', async () => {
+    // E29: collection images on a draft profile return 404 for anonymous callers.
+    // Owner reads are served from live tables so the owner can see unpublished work.
+    const res = await fetch(`${API}/collections/${collectionId}/images`, {
+      headers: { Authorization: `Bearer ${artistToken}` },
+    })
     expect(res.status).toBe(200)
     const images = await res.json()
     expect(Array.isArray(images)).toBe(true)
