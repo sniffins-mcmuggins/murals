@@ -4,8 +4,31 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createApiClient } from '@render/api-client'
 import type { components } from '@render/api-client'
+import { apiBaseUrl } from './api'
 
 type User = components['schemas']['User']
+type ApiClient = ReturnType<typeof createApiClient>
+
+/**
+ * Per-request API client with the session cookie injected. Returns null when
+ * there is no session cookie — callers decide whether that means redirect,
+ * 403, or anonymous fallback. This is THE way to make authed API calls from
+ * Server Components; never reuse the singleton apiClient for authed calls.
+ */
+export async function createAuthedServerClient(): Promise<ApiClient | null> {
+  const cookieStore = await cookies()
+  const sessionValue = cookieStore.get('session')?.value
+  if (!sessionValue) return null
+
+  const client = createApiClient({ baseUrl: apiBaseUrl })
+  client.use({
+    onRequest({ request }) {
+      request.headers.set('Cookie', `session=${sessionValue}`)
+      return request
+    },
+  })
+  return client
+}
 
 /**
  * Read the session cookie and call GET /me to return the authenticated user.
@@ -16,30 +39,8 @@ type User = components['schemas']['User']
  * module-level client is SSR-safe only for unauthenticated requests.
  */
 export async function getSessionUser(): Promise<User | null> {
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('session')
-
-  if (!sessionCookie?.value) {
-    return null
-  }
-
-  const sessionValue = sessionCookie.value
-
-  // Create a fresh client per-request and inject the session cookie via
-  // the getToken mechanism — but we want a Cookie header, not Bearer.
-  // We pass a no-op getToken so the middleware chain is set up, then add
-  // a second middleware that sets the Cookie header directly.
-  const authedClient = createApiClient({
-    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
-  })
-
-  // openapi-fetch clients expose .use(middleware) — add cookie injection.
-  authedClient.use({
-    onRequest({ request }) {
-      request.headers.set('Cookie', `session=${sessionValue}`)
-      return request
-    },
-  })
+  const authedClient = await createAuthedServerClient()
+  if (!authedClient) return null
 
   const { data, response } = await authedClient.GET('/me', {})
 
@@ -74,22 +75,8 @@ export async function requireAuth(): Promise<User> {
  * keyed on the profile id. Does no fetch at all when there is no session cookie.
  */
 export async function isProfileOwner(profileId: string): Promise<boolean> {
-  const cookieStore = await cookies()
-  const sessionValue = cookieStore.get('session')?.value
-
-  if (!sessionValue) {
-    return false
-  }
-
-  const authedClient = createApiClient({
-    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
-  })
-  authedClient.use({
-    onRequest({ request }) {
-      request.headers.set('Cookie', `session=${sessionValue}`)
-      return request
-    },
-  })
+  const authedClient = await createAuthedServerClient()
+  if (!authedClient) return false
 
   const { data, response } = await authedClient.GET('/profiles/me', {})
 

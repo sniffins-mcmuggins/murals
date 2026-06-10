@@ -15,12 +15,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/lib/auth-server', () => ({
   requireAuth: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com', role: 'artist' }),
   getSessionUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com', role: 'artist' }),
-}))
-vi.mock('next/headers', () => ({
-  cookies: vi.fn().mockResolvedValue({ get: vi.fn().mockReturnValue({ value: 'test-session' }) }),
-}))
-vi.mock('@render/api-client', () => ({
-  createApiClient: vi.fn().mockReturnValue({ GET: mockGet, use: vi.fn() }),
+  createAuthedServerClient: vi.fn().mockResolvedValue({ GET: mockGet, use: vi.fn() }),
 }))
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn().mockReturnValue({ invalidateQueries: vi.fn() }),
