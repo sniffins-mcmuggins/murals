@@ -66,10 +66,11 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 export default async function CollectionPage({ params }: CollectionPageProps) {
   const { id, collectionId } = await params
 
-  const [profileRes, collectionRes, imagesRes] = await Promise.all([
+  const [profileRes, collectionRes, imagesRes, isOwner] = await Promise.all([
     apiClient.GET('/profiles/{profileID}', { params: { path: { profileID: id } } }),
     apiClient.GET('/collections/{collectionID}', { params: { path: { collectionID: collectionId } } }),
     apiClient.GET('/collections/{collectionID}/images', { params: { path: { collectionID: collectionId } } }),
+    isProfileOwner(id),
   ])
 
   if (collectionRes.response.status === 404 || !collectionRes.data) {
@@ -79,8 +80,6 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
   const profile = profileRes.data
   const collection = collectionRes.data
   const images = imagesRes.data ?? []
-
-  const isOwner = await isProfileOwner(id)
 
   return (
     <main className="min-h-screen bg-offwhite">

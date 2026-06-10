@@ -61,7 +61,7 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
 export default async function ArtistPage({ params }: ArtistPageProps) {
   const { id } = await params
 
-  const [profileRes, collectionsRes, festivalsRes, endorsementsRes] = await Promise.all([
+  const [profileRes, collectionsRes, festivalsRes, endorsementsRes, isOwner] = await Promise.all([
     apiClient.GET('/profiles/{profileID}', {
       params: { path: { profileID: id } },
     }),
@@ -74,6 +74,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     apiClient.GET('/profiles/{profileID}/endorsements', {
       params: { path: { profileID: id } },
     }),
+    isProfileOwner(id),
   ])
 
   if (profileRes.response.status === 404 || !profileRes.data) {
@@ -81,7 +82,6 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   }
 
   const profile = profileRes.data
-  const isOwner = await isProfileOwner(id)
   const supportUrl =
     profile.support_url && /^https?:\/\//i.test(profile.support_url) ? profile.support_url : null
   const collections = collectionsRes.data ?? []
