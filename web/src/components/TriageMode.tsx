@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import type { components } from '@render/api-client'
 import type { FormField } from '@/components/DynamicForm'
 import { initialTriageIndex, clampIndex } from '@/lib/triage'
+import { linkIconForPrefill } from '@/lib/favicon'
+import { SharedLinks } from '@/components/SharedLinks'
 
 type Application = components['schemas']['Application']
 
@@ -48,6 +50,11 @@ export function TriageMode({ apps, formFields, detailOpen, onShortlist, onOpenDe
   const name = current?.artist?.display_name ?? 'Unknown artist'
   const answers = (current?.answers ?? {}) as Record<string, string>
   const labelFor = (fieldId: string) => formFields.find(f => f.id === fieldId)?.label ?? fieldId
+  // Link fields render as favicons (below); keep their raw URLs out of the text answers.
+  const linkFieldIds = new Set(
+    formFields.filter(f => linkIconForPrefill(f.prefill)).map(f => f.id ?? f.label),
+  )
+  const textEntries = Object.entries(answers).filter(([id]) => !linkFieldIds.has(id)).slice(0, 4)
 
   return (
     <div className="fixed inset-0 z-40 bg-offwhite flex flex-col" data-testid="triage-mode">
@@ -69,8 +76,9 @@ export function TriageMode({ apps, formFields, detailOpen, onShortlist, onOpenDe
                 <span className="font-mono text-xs text-amber uppercase tracking-widest">★ shortlisted</span>
               )}
             </div>
+            <SharedLinks formFields={formFields} answers={answers} className="mb-4" />
             <div className="space-y-3">
-              {Object.entries(answers).slice(0, 4).map(([fieldId, value]) => (
+              {textEntries.map(([fieldId, value]) => (
                 <div key={fieldId}>
                   <p className="font-sans text-xs text-mid mb-0.5">{labelFor(fieldId)}</p>
                   <p className="font-sans text-sm text-ink line-clamp-3">{value}</p>

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { ApplicationNotes } from './ApplicationNotes'
 import { SocialIcon, SOCIAL_PLATFORMS } from './SocialIcon'
+import { SharedLinks } from './SharedLinks'
+import { linkIconForPrefill } from '@/lib/favicon'
 import { parseEmbed } from '@/lib/embeds'
 import type { components } from '@render/api-client'
 
@@ -15,6 +17,7 @@ interface FormField {
   label: string
   type: string
   required: boolean
+  prefill?: string
 }
 
 interface ReviewCriterion {
@@ -314,18 +317,22 @@ export function ApplicationSlideOver({
           {Object.keys(answers).length > 0 && (
             <div>
               <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-3">Application</h3>
+              {/* Links the artist shared on this application render as clickable favicons. */}
+              <SharedLinks formFields={formFields} answers={answers} className="mb-4" />
               <div className="space-y-4">
-                {Object.entries(answers).map(([fieldId, value]) => {
-                  const field = formFields.find(f => f.id === fieldId)
-                  return (
-                    <div key={fieldId}>
-                      <p className="font-sans text-xs text-mid mb-1">{labelFor(fieldId)}</p>
-                      {field?.type === 'embed' && value
-                        ? <EmbedPlayer url={value} />
-                        : <p className="font-sans text-sm text-ink">{value}</p>}
-                    </div>
-                  )
-                })}
+                {Object.entries(answers)
+                  .filter(([fieldId]) => !linkIconForPrefill(formFields.find(f => f.id === fieldId)?.prefill))
+                  .map(([fieldId, value]) => {
+                    const field = formFields.find(f => f.id === fieldId)
+                    return (
+                      <div key={fieldId}>
+                        <p className="font-sans text-xs text-mid mb-1">{labelFor(fieldId)}</p>
+                        {field?.type === 'embed' && value
+                          ? <EmbedPlayer url={value} />
+                          : <p className="font-sans text-sm text-ink">{value}</p>}
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           )}

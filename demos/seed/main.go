@@ -283,15 +283,18 @@ func main() {
 	}
 
 	for _, s := range seeded {
+		handle := s.a.email[:strings.Index(s.a.email, "@")]
 		answers, _ := json.Marshal(map[string]string{
 			"f1": s.a.concept,
 			"f2": s.a.size,
 			"f3": s.a.medium,
-			"f4": "https://portfolio.example/" + s.a.email[:5],
 			"f5": "Yes",
 			"f6": "Full period",
 			"f7": "Yes",
 			"f8": "",
+			// Shared links — surface as clickable favicons in triage + the slide-over.
+			"link_instagram": "https://instagram.com/" + handle,
+			"link_website":   "https://" + handle + ".art",
 		})
 		if _, err := conn.Exec(ctx,
 			`INSERT INTO applications (form_id, artist_id, status, answers)
