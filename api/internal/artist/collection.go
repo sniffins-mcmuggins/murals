@@ -144,6 +144,28 @@ func GetCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			}
 		}
 
+		// Public viewers see the frozen snapshot for this collection; owners read
+		// live so they see unpublished edits. Falls back to the live row if no
+		// snapshot exists (never-published / migration window).
+		if !isOwner(r, profile) {
+			if snapRow, sErr := q.GetProfileSnapshot(r.Context(), profile.ID); sErr == nil {
+				var snap profileSnapshot
+				if json.Unmarshal(snapRow.Snapshot, &snap) == nil {
+					collIDStr := collection.ID.String()
+					for _, sc := range snap.Collections {
+						if sc.ID == collIDStr {
+							w.Header().Set("Content-Type", "application/json")
+							_ = json.NewEncoder(w).Encode(sc)
+							return
+						}
+					}
+					// Collection not in snapshot (added since last publish) → 404 for public.
+					httperr.NotFound(w)
+					return
+				}
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toCollectionResponse(collection))
 	}
@@ -175,6 +197,22 @@ func ListCollectionsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if authErr != nil || principal.UserID != profile.UserID.String() {
 				httperr.NotFound(w)
 				return
+			}
+		}
+
+		// Public viewers see the frozen snapshot; owners read live so they see
+		// unpublished edits. Falls back to the live list if no snapshot exists
+		// (never-published / migration window). The snapshot shape (collectionSnapshot)
+		// is a superset of collectionResponse — it adds an images array — which is
+		// backward-compatible for callers that read fields by name.
+		if !isOwner(r, profile) {
+			if snapRow, sErr := q.GetProfileSnapshot(r.Context(), profile.ID); sErr == nil {
+				var snap profileSnapshot
+				if json.Unmarshal(snapRow.Snapshot, &snap) == nil {
+					w.Header().Set("Content-Type", "application/json")
+					_ = json.NewEncoder(w).Encode(snap.Collections)
+					return
+				}
 			}
 		}
 

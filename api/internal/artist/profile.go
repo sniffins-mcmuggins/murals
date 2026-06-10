@@ -225,6 +225,20 @@ func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 		resp.SpotHistory = spotHistory
 
+		// Public viewers see the frozen snapshot (artist-authored content), with
+		// dynamic cross-entity data (spot history) attached LIVE so it never goes
+		// stale. Owners read live so they see unpublished edits. Falls back to the
+		// live assembly if no snapshot exists yet (never-published / migration window).
+		if !isOwner(r, profile) {
+			if snapRow, sErr := q.GetProfileSnapshot(r.Context(), profile.ID); sErr == nil {
+				var snap profileSnapshot
+				if json.Unmarshal(snapRow.Snapshot, &snap) == nil {
+					snap.Profile.SpotHistory = spotHistory
+					resp = snap.Profile
+				}
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 
@@ -477,6 +491,12 @@ func RotatePreviewTokenHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // ListPublicProfilesHandler handles GET /public/profiles. No auth required.
 // Returns paginated public artist profiles.
+// TODO(E29 follow-up): listing shows live display_name/avatar/medium from the
+// profiles table. Repointing each row to its snapshot would require N+1 reads
+// (one GetProfileSnapshot per row) or a JOIN, which is a separate optimisation.
+// The exposure is low: the listing only surfaces name, avatar, and medium — not
+// the artist's full bio, links, or collections — so a stale display_name for a
+// moment between edit and publish-changes is acceptable at launch.
 func ListPublicProfilesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, perPage := 1, 20

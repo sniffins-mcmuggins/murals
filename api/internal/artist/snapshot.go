@@ -35,6 +35,15 @@ type imageSnapshot struct {
 	DisplayOrder int32  `json:"display_order"`
 }
 
+// isOwner reports whether the request principal owns this profile.
+func isOwner(r *http.Request, profile sqlcdb.ArtistProfile) bool {
+	principal, err := auth.User(r.Context())
+	if err != nil {
+		return false
+	}
+	return profile.UserID.Valid && principal.UserID == profile.UserID.String()
+}
+
 // buildProfileSnapshot assembles the public read-model for a profile from the
 // live tables. public=true so the serializer drops owner-only fields.
 func buildProfileSnapshot(ctx context.Context, q *sqlcdb.Queries, profile sqlcdb.ArtistProfile) (profileSnapshot, error) {
