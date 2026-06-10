@@ -12,7 +12,7 @@ export default async function ProfilePreviewPage() {
   if (!authedClient) redirect('/login')
 
   const me = (await authedClient.GET('/profiles/me', {})).data
-  if (!me) return null
+  if (!me) redirect('/profile/setup')
   const collections =
     (
       await authedClient.GET('/profiles/{profileID}/collections', {
