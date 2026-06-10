@@ -86,6 +86,16 @@ test('artist onboarding: signup → profile → collection → upload → public
     await db.end()
   }
 
+  // ── Owner sees the live page + Edit profile bar ──────────────────────────────
+  await page.goto(`/artists/${profileId}`)
+  await expect(page.getByRole('heading', { name: 'Test Muralist' })).toBeVisible()
+  const ownerBar = page.getByTestId('owner-bar')
+  await expect(ownerBar).toBeVisible()
+  await expect(ownerBar.getByRole('link', { name: 'Edit profile' })).toHaveAttribute(
+    'href',
+    '/profile',
+  )
+
   // ── 7. Verify public artist profile page (unauthenticated) ───────────────────
   // Open public page in a fresh context (no auth)
   const publicPage = await page.context().browser()!.newPage()
@@ -93,6 +103,7 @@ test('artist onboarding: signup → profile → collection → upload → public
     await publicPage.goto(`/artists/${profileId}`)
     await expect(publicPage.getByRole('heading', { name: 'Test Muralist' })).toBeVisible()
     await expect(publicPage.getByText('Urban Walls')).toBeVisible()
+    await expect(publicPage.getByTestId('owner-bar')).toHaveCount(0)
   } finally {
     await publicPage.close()
   }
