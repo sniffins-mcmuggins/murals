@@ -9,6 +9,7 @@ import icon from 'leaflet/dist/images/marker-icon.png'
 import iconShadow from 'leaflet/dist/images/marker-shadow.png'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { muralStatusColour } from '@/lib/murals'
 import type { components } from '@render/api-client'
 
 type FestivalSpot = components['schemas']['FestivalSpot']
@@ -730,7 +731,7 @@ export default function MapEditorClient({ festivalId }: { festivalId: string }) 
                 {(historyEntries)
                   .filter((e: HistoryEntry) => checkedFestivals.has(e.festival_id))
                   .map((e: HistoryEntry) => {
-                    const color = e.mural_status === 'permanent' ? '#E8A838' : e.mural_status === 'temporary' ? '#8A8896' : '#E2DDD6'
+                    const color = muralStatusColour(e.mural_status)
                     const opacity = e.mural_status === 'permanent' ? 0.7 : 0.45
                     return (
                       <CircleMarker key={e.spot_id} center={[e.lat, e.lng]} radius={8} pathOptions={{ color, fillColor: color, fillOpacity: opacity, weight: 1 }}>

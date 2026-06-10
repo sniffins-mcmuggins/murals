@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import { muralStatusColour } from '@/lib/murals'
 
 export interface SpotEntry {
   spot_id: string
@@ -32,8 +33,6 @@ export default function MuralMap({ spots }: { spots: SpotEntry[] }) {
   if (spots.length === 0) return null
 
   const center: [number, number] = [spots[0].lat, spots[0].lng]
-  const statusColor = (s: string) =>
-    s === 'permanent' ? '#E8A838' : s === 'temporary' ? '#8A8896' : '#C0BDB8'
 
   return (
     <MapContainer center={center} zoom={13} style={{ height: 280 }} scrollWheelZoom={false}>
@@ -47,7 +46,7 @@ export default function MuralMap({ spots }: { spots: SpotEntry[] }) {
           key={s.spot_id}
           center={[s.lat, s.lng]}
           radius={9}
-          pathOptions={{ color: statusColor(s.mural_status), fillColor: statusColor(s.mural_status), fillOpacity: 0.75, weight: 1.5 }}
+          pathOptions={{ color: muralStatusColour(s.mural_status), fillColor: muralStatusColour(s.mural_status), fillOpacity: 0.75, weight: 1.5 }}
         >
           <Popup>
             <span className="font-sans text-xs">
