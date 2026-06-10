@@ -40,6 +40,39 @@ var cpfFields = []map[string]any{
 	{"id": "link_website", "type": "text", "label": "Website", "required": false, "prefill": "website"},
 }
 
+// socialURL builds a plausible profile URL for a platform + handle, used to seed
+// each demo applicant's shared application links.
+func socialURL(platform, handle string) string {
+	switch platform {
+	case "instagram":
+		return "https://instagram.com/" + handle
+	case "twitter":
+		return "https://x.com/" + handle
+	case "facebook":
+		return "https://facebook.com/" + handle
+	case "youtube":
+		return "https://youtube.com/@" + handle
+	case "tiktok":
+		return "https://tiktok.com/@" + handle
+	case "linkedin":
+		return "https://linkedin.com/in/" + handle
+	case "pinterest":
+		return "https://pinterest.com/" + handle
+	case "website":
+		return "https://" + handle + ".art"
+	}
+	return ""
+}
+
+// demoLinkSets gives each seeded applicant a distinct mix of shared social links
+// so the favicon row visibly changes as an organiser flips through triage.
+var demoLinkSets = [][]string{
+	{"instagram", "tiktok", "website"},
+	{"twitter", "youtube"},
+	{"facebook", "linkedin", "pinterest"},
+	{"instagram", "twitter", "website"},
+}
+
 type fictionalArtist struct {
 	name    string
 	email   string
@@ -282,9 +315,9 @@ func main() {
 		log.Fatalf("insert form: %v", err)
 	}
 
-	for _, s := range seeded {
+	for i, s := range seeded {
 		handle := s.a.email[:strings.Index(s.a.email, "@")]
-		answers, _ := json.Marshal(map[string]string{
+		ans := map[string]string{
 			"f1": s.a.concept,
 			"f2": s.a.size,
 			"f3": s.a.medium,
@@ -292,10 +325,12 @@ func main() {
 			"f6": "Full period",
 			"f7": "Yes",
 			"f8": "",
-			// Shared links — surface as clickable favicons in triage + the slide-over.
-			"link_instagram": "https://instagram.com/" + handle,
-			"link_website":   "https://" + handle + ".art",
-		})
+		}
+		// Distinct shared links per applicant — clickable favicons in triage + the slide-over.
+		for _, p := range demoLinkSets[i%len(demoLinkSets)] {
+			ans["link_"+p] = socialURL(p, handle)
+		}
+		answers, _ := json.Marshal(ans)
 		if _, err := conn.Exec(ctx,
 			`INSERT INTO applications (form_id, artist_id, status, answers)
 			 VALUES ($1, $2, $3, $4)`,
