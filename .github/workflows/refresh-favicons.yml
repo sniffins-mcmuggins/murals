@@ -1,0 +1,31 @@
+name: Refresh favicons
+
+on:
+  schedule:
+    - cron: '0 4 1 * *'   # 04:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download favicons
+        run: bash web/scripts/fetch-favicons.sh
+
+      - name: Open a PR if anything changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/refresh-favicons
+          title: 'chore: refresh social favicons'
+          commit-message: 'chore: refresh social favicons'
+          body: |
+            Automated favicon refresh (scheduled / manual dispatch).
+            Review the icon changes before merging — a non-empty diff usually means a
+            platform changed its mark (e.g. a rebrand).
+          add-paths: web/public/favicons/*.png

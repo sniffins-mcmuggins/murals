@@ -23,10 +23,11 @@ by on-screen **demo dialogs** (see below). This table is the living reference �
 | `artist-public-profile`           | Artist    | ~12s | Lady Gabe (seeded) | The public artist page: headline strip, bio + medium tags, collection, organiser + peer endorsements. |
 | `artist-collections`              | Artist    | ~26s | Lady Gabe (seeded) | Collections list → open "Murals 2027" → browse images → **how the collection looks publicly**. |
 | `artist-apply-to-festival`        | Artist    | ~18s | Lady Gabe (seeded) | Applications → Apply to CPF 2027 → fill the form → **Application submitted**. |
+| `artist-apply-with-profile`       | Artist    | ~26s | Lady Gabe (seeded) | E28 "never type twice": the CPF form arrives **pre-filled from her profile** as one field per platform — each with its **favicon** — and a per-link **Share** checkbox to choose what to include. She unticks one, adds the festival-specific answers, submits. |
 | `artist-endorsements`             | Artist    | ~10s | Lady Gabe (seeded) | Endorsements manager — hide a peer endorsement (greys out), then show it again. |
 | `artist-analytics`                | Artist    | ~8s  | Lady Gabe (seeded) | Analytics dashboard — profile views / QR scans / link clicks (aggregated, GDPR-clean). |
 | `organiser-form-builder`          | Organiser | ~12s | Marcus (seeded)    | Visual form builder → "Add from library" → media-embed walkthrough/3D field → **Save form**. |
-| `organiser-review`                | Organiser | ~50s | Marcus (seeded)    | The full review story: quick-select **triage** → open round → score → close → (off-screen decide + place) → **spot-assignment summary**. The longest clip. |
+| `organiser-review`                | Organiser | ~48s | Marcus (seeded)    | The full review story: quick-select **triage** → open round → score (the applicant's **socials + bio appear automatically**, E28 M1) → close → (off-screen decide + place) → **spot-assignment summary**. The longest clip. |
 | `organiser-decisions-release`     | Organiser | ~21s | Marcus (seeded)    | Drag the two hero accepts to Accept (the no's are pre-sorted off-screen) → release decisions. |
 | `organiser-map-editor`            | Organiser | ~21s | Marcus (seeded)    | Geocode search → confirm draft pin → spot panel deep-links → drag an accepted artist onto the pin. |
 

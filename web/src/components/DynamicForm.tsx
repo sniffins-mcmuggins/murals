@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { parseEmbed } from '@/lib/embeds'
+import { linkIconForPrefill } from '@/lib/favicon'
+import { Favicon } from './Favicon'
+import { SocialIcon } from './SocialIcon'
 
 export type FormField = {
   id?: string
@@ -35,6 +38,14 @@ export default function DynamicForm({
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.id ?? f.label, initialValues?.[f.id ?? f.label] ?? ''])),
   )
+  // Per-link "Share" state (E28 link fields). Default: shared iff the link is pre-filled.
+  const [shared, setShared] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      fields
+        .filter((f) => linkIconForPrefill(f.prefill) !== null)
+        .map((f) => [f.id ?? f.label, !!(initialValues?.[f.id ?? f.label] ?? '').trim()]),
+    ),
+  )
 
   function handleChange(key: string, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -42,7 +53,12 @@ export default function DynamicForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    onSubmit(values)
+    // An un-shared link contributes an empty answer (excluded from the application).
+    const answers: Record<string, string> = { ...values }
+    for (const key of Object.keys(shared)) {
+      if (!shared[key]) answers[key] = ''
+    }
+    onSubmit(answers)
   }
 
   return (
@@ -50,7 +66,49 @@ export default function DynamicForm({
       {fields.map((field) => {
         const key = field.id ?? field.label
         const htmlId = `field-${key.replace(/\s+/g, '-').toLowerCase()}`
+        const link = linkIconForPrefill(field.prefill)
         const isPrefilled = !!field.prefill && !!(values[key] ?? '').trim()
+
+        if (link) {
+          const isShared = shared[key] ?? false
+          return (
+            <div key={key} className="flex flex-col gap-1">
+              <label htmlFor={htmlId} className="font-sans text-sm text-ink font-medium">
+                {field.label}
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="flex-shrink-0">
+                  {link.kind === 'favicon'
+                    ? <Favicon platform={link.platform} src={link.src} label={field.label} />
+                    : <SocialIcon platform="website" className="w-4 h-4 text-mid" />}
+                </span>
+                <input
+                  id={htmlId}
+                  type="url"
+                  name={key}
+                  value={values[key] ?? ''}
+                  disabled={!isShared}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  className="flex-1 border border-light rounded-lg px-3 py-2 font-sans text-sm text-ink bg-offwhite focus:outline-none focus:border-amber disabled:opacity-50 disabled:bg-warm"
+                />
+                <label className="flex items-center gap-1.5 font-sans text-xs text-mid whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    className="accent-amber"
+                    checked={isShared}
+                    aria-label={`Share ${field.label}`}
+                    onChange={(e) => setShared((prev) => ({ ...prev, [key]: e.target.checked }))}
+                  />
+                  Share
+                </label>
+              </div>
+              {isPrefilled && isShared && (
+                <span className="font-sans text-xs text-mid">From your profile — edit if needed.</span>
+              )}
+            </div>
+          )
+        }
+
         return (
           <div key={key} className="flex flex-col gap-1">
             <label htmlFor={htmlId} className="font-sans text-sm text-ink font-medium">

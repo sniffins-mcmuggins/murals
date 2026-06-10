@@ -22,11 +22,20 @@ test('organiser-review — triage, review round, and placement', async ({ page }
   await highlight(page, '[data-testid="open-triage"]')
   await page.getByTestId('open-triage').click()
   await expect(page.getByTestId('triage-mode')).toBeVisible({ timeout: 5000 })
-  await pause(900)
-  await showDialog(page, '→ to shortlist, ← to pass. Whip through the obvious calls.')
-  await page.keyboard.press('ArrowRight'); await pause(800)
-  await page.keyboard.press('ArrowRight'); await pause(800)
-  await page.keyboard.press('ArrowLeft'); await pause(800)
+  await pause(700)
+
+  // E28: each applicant's shared links show as favicons — hover one to show it's a real link.
+  await showDialog(page, 'Each shared link shows as a favicon — hover to see the address, then click straight through.', { pos: 'bottom' })
+  const triageLink = page.locator('[data-testid="triage-mode"] [data-testid="shared-links"] a').first()
+  await triageLink.scrollIntoViewIfNeeded()
+  await triageLink.hover()
+  await highlight(page, '[data-testid="triage-mode"] [data-testid="shared-links"] a')
+  await pause(1400)
+
+  await showDialog(page, '→ to shortlist, ← to pass — every artist brings a different set of links.')
+  await page.keyboard.press('ArrowRight'); await pause(900)
+  await page.keyboard.press('ArrowRight'); await pause(900)
+  await page.keyboard.press('ArrowLeft'); await pause(900)
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('triage-mode')).not.toBeVisible({ timeout: 5000 })
   await pause(800)
@@ -43,6 +52,13 @@ test('organiser-review — triage, review round, and placement', async ({ page }
   await card.click()
   await expect(page.getByRole('heading', { name: 'Rosa Vane' })).toBeVisible({ timeout: 5000 })
   await pause(600)
+
+  // E28 M1: the applicant's socials + bio + "view full profile" are pulled live
+  // from their profile and shown automatically — the organiser never asked for them.
+  await showDialog(page, "The applicant's links and bio show up automatically — pulled live from their profile, never re-typed.", { pos: 'bottom' })
+  await highlight(page, '[data-testid="artist-socials"]')
+  await pause(900)
+
   await page.getByRole('button', { name: 'Score 5' }).click()
   await pause(500)
   await page.keyboard.press('Escape')

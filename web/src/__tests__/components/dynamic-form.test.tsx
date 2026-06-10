@@ -78,6 +78,32 @@ describe('DynamicForm', () => {
     expect(onSubmit).toHaveBeenCalledWith({ ig: 'https://instagram.com/edited' })
   })
 
+  it('renders a favicon and a Share checkbox for a pre-filled social field', () => {
+    const fields = [{ id: 'ig', type: 'text' as const, label: 'Instagram', prefill: 'social.instagram' }]
+    render(React.createElement(DynamicForm, {
+      fields, onSubmit: vi.fn(), initialValues: { ig: 'https://instagram.com/me' },
+    }))
+    expect(screen.getByRole('img', { name: 'Instagram' })).toHaveAttribute('src', '/favicons/instagram.png')
+    expect(screen.getByRole('checkbox', { name: 'Share Instagram' })).toBeChecked()
+  })
+
+  it('excludes an un-shared link from the submitted answers', () => {
+    const onSubmit = vi.fn()
+    const fields = [{ id: 'ig', type: 'text' as const, label: 'Instagram', prefill: 'social.instagram' }]
+    render(React.createElement(DynamicForm, {
+      fields, onSubmit, initialValues: { ig: 'https://instagram.com/me' },
+    }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Share Instagram' })) // uncheck
+    fireEvent.submit(screen.getByRole('form'))
+    expect(onSubmit).toHaveBeenCalledWith({ ig: '' })
+  })
+
+  it('defaults an empty social field to un-shared', () => {
+    const fields = [{ id: 'tw', type: 'text' as const, label: 'X / Twitter', prefill: 'social.twitter' }]
+    render(React.createElement(DynamicForm, { fields, onSubmit: vi.fn() }))
+    expect(screen.getByRole('checkbox', { name: 'Share X / Twitter' })).not.toBeChecked()
+  })
+
   it('renders a collection picker for a portfolio_collection field', () => {
     const fields = [{ id: 'pf', type: 'text' as const, label: 'Portfolio', prefill: 'portfolio_collection' }]
     render(

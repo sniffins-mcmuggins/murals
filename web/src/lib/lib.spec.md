@@ -24,3 +24,4 @@
 ## Changelog
 2026-05-31 — initial spec
 2026-06-07 — E28 M2: added `prefill.ts` (PrefillKey allowlist + `resolvePrefill`), the source of truth for profile-bound form fields; allowlist mirrored server-side in `api/internal/festival/form.go`.
+2026-06-10 — Added `favicon.ts` (PLATFORM_DOMAINS + linkIconForPrefill) backing per-platform application link fields with self-hosted favicons; refreshed by web/scripts/fetch-favicons.sh + the refresh-favicons workflow.

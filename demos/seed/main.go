@@ -24,11 +24,53 @@ var cpfFields = []map[string]any{
 	{"id": "f1", "type": "textarea", "label": "Describe your proposed mural concept", "required": true},
 	{"id": "f2", "type": "select", "label": "Preferred wall size", "options": []string{"Small (up to 4m²)", "Medium (4–20m²)", "Large (20m²+)"}, "required": true},
 	{"id": "f3", "type": "select", "label": "Primary medium", "options": []string{"Spray paint", "Brush", "Mixed media", "Roller"}, "required": true},
-	{"id": "f4", "type": "textarea", "label": "Portfolio links (up to 3 URLs)", "required": true},
 	{"id": "f5", "type": "select", "label": "Do you have public liability insurance?", "options": []string{"Yes", "No", "In progress"}, "required": true},
 	{"id": "f6", "type": "select", "label": "Full festival availability (10–17 October)?", "options": []string{"Full period", "Partial — specify below"}, "required": true},
 	{"id": "f7", "type": "select", "label": "Previous outdoor mural experience", "options": []string{"Yes", "No"}, "required": false},
 	{"id": "f8", "type": "textarea", "label": "Anything else you'd like to tell us?", "required": false},
+	// Profile-bound link fields (E28 + favicons): one per platform + website, pre-filled,
+	// each with a Share checkbox so the artist picks which to include.
+	{"id": "link_instagram", "type": "text", "label": "Instagram", "required": false, "prefill": "social.instagram"},
+	{"id": "link_twitter", "type": "text", "label": "X / Twitter", "required": false, "prefill": "social.twitter"},
+	{"id": "link_facebook", "type": "text", "label": "Facebook", "required": false, "prefill": "social.facebook"},
+	{"id": "link_youtube", "type": "text", "label": "YouTube", "required": false, "prefill": "social.youtube"},
+	{"id": "link_tiktok", "type": "text", "label": "TikTok", "required": false, "prefill": "social.tiktok"},
+	{"id": "link_linkedin", "type": "text", "label": "LinkedIn", "required": false, "prefill": "social.linkedin"},
+	{"id": "link_pinterest", "type": "text", "label": "Pinterest", "required": false, "prefill": "social.pinterest"},
+	{"id": "link_website", "type": "text", "label": "Website", "required": false, "prefill": "website"},
+}
+
+// socialURL builds a plausible profile URL for a platform + handle, used to seed
+// each demo applicant's shared application links.
+func socialURL(platform, handle string) string {
+	switch platform {
+	case "instagram":
+		return "https://instagram.com/" + handle
+	case "twitter":
+		return "https://x.com/" + handle
+	case "facebook":
+		return "https://facebook.com/" + handle
+	case "youtube":
+		return "https://youtube.com/@" + handle
+	case "tiktok":
+		return "https://tiktok.com/@" + handle
+	case "linkedin":
+		return "https://linkedin.com/in/" + handle
+	case "pinterest":
+		return "https://pinterest.com/" + handle
+	case "website":
+		return "https://" + handle + ".art"
+	}
+	return ""
+}
+
+// demoLinkSets gives each seeded applicant a distinct mix of shared social links
+// so the favicon row visibly changes as an organiser flips through triage.
+var demoLinkSets = [][]string{
+	{"instagram", "tiktok", "website"},
+	{"twitter", "youtube"},
+	{"facebook", "linkedin", "pinterest"},
+	{"instagram", "twitter", "website"},
 }
 
 type fictionalArtist struct {
@@ -133,7 +175,7 @@ func main() {
 		`INSERT INTO artist_profiles (user_id, display_name, bio, social_links, visibility, avatar_s3_key, headline_image_urls)
 		 VALUES ($1, 'Lady Gabe',
 		   'South-West muralist. Bold colour, mythological themes, outdoor work.',
-		   '{"instagram":"https://instagram.com/ladygabeart","website":"https://ladygabe.com"}',
+		   '{"instagram":"https://instagram.com/ladygabeart","website":"https://ladygabe.com","twitter":"https://x.com/ladygabeart","tiktok":"https://tiktok.com/@ladygabeart"}',
 		   'public', $2, $3) RETURNING id`,
 		gabeUserID, gabeAvatarURL, []string{gabeHeadlineURL}).Scan(&gabeProfileID); err != nil {
 		log.Fatalf("insert ladygabe profile: %v", err)
@@ -273,17 +315,22 @@ func main() {
 		log.Fatalf("insert form: %v", err)
 	}
 
-	for _, s := range seeded {
-		answers, _ := json.Marshal(map[string]string{
+	for i, s := range seeded {
+		handle := s.a.email[:strings.Index(s.a.email, "@")]
+		ans := map[string]string{
 			"f1": s.a.concept,
 			"f2": s.a.size,
 			"f3": s.a.medium,
-			"f4": "https://portfolio.example/" + s.a.email[:5],
 			"f5": "Yes",
 			"f6": "Full period",
 			"f7": "Yes",
 			"f8": "",
-		})
+		}
+		// Distinct shared links per applicant — clickable favicons in triage + the slide-over.
+		for _, p := range demoLinkSets[i%len(demoLinkSets)] {
+			ans["link_"+p] = socialURL(p, handle)
+		}
+		answers, _ := json.Marshal(ans)
 		if _, err := conn.Exec(ctx,
 			`INSERT INTO applications (form_id, artist_id, status, answers)
 			 VALUES ($1, $2, $3, $4)`,

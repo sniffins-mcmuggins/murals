@@ -22,3 +22,7 @@ tasks:
   install:
     desc: "Install npm dependencies"
     cmd: npm install
+
+  favicons:
+    desc: "Download social-platform favicons into public/favicons/ (refresh periodically)"
+    cmd: bash scripts/fetch-favicons.sh
