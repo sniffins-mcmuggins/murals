@@ -35,22 +35,23 @@ type spotHistoryEntry struct {
 }
 
 type profileResponse struct {
-	ID                string             `json:"id"`
-	UserID            *string            `json:"user_id"`
-	DisplayName       string             `json:"display_name"`
-	Bio               string             `json:"bio"`
-	Visibility        string             `json:"visibility"`
-	LocationLabel     *string            `json:"location_label,omitempty"`
-	MediumTags        []string           `json:"medium_tags"`
-	SocialLinks       json.RawMessage    `json:"social_links"`
-	AvatarS3Key       *string            `json:"avatar_s3_key,omitempty"`
-	HeadlineImageUrls []string           `json:"headline_image_urls"`
-	CreatedAt         string             `json:"created_at"`
-	UpdatedAt         string             `json:"updated_at"`
-	PreviewToken      *string            `json:"preview_token,omitempty"`
-	SupportURL        *string            `json:"support_url,omitempty"`
-	SetupCompletedAt  *string            `json:"setup_completed_at,omitempty"`
-	SpotHistory       []spotHistoryEntry `json:"spot_history"`
+	ID                    string             `json:"id"`
+	UserID                *string            `json:"user_id"`
+	DisplayName           string             `json:"display_name"`
+	Bio                   string             `json:"bio"`
+	Visibility            string             `json:"visibility"`
+	LocationLabel         *string            `json:"location_label,omitempty"`
+	MediumTags            []string           `json:"medium_tags"`
+	SocialLinks           json.RawMessage    `json:"social_links"`
+	AvatarS3Key           *string            `json:"avatar_s3_key,omitempty"`
+	HeadlineImageUrls     []string           `json:"headline_image_urls"`
+	CreatedAt             string             `json:"created_at"`
+	UpdatedAt             string             `json:"updated_at"`
+	PreviewToken          *string            `json:"preview_token,omitempty"`
+	SupportURL            *string            `json:"support_url,omitempty"`
+	SetupCompletedAt      *string            `json:"setup_completed_at,omitempty"`
+	SpotHistory           []spotHistoryEntry `json:"spot_history"`
+	HasUnpublishedChanges bool               `json:"has_unpublished_changes"`
 }
 
 type profileListResponse struct {
@@ -84,6 +85,7 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 		UpdatedAt:         p.UpdatedAt.Time.Format(time.RFC3339),
 	}
 	resp.SupportURL = p.SupportUrl
+	resp.HasUnpublishedChanges = p.HasUnpublishedChanges
 	if !public && p.SetupCompletedAt.Valid {
 		s := p.SetupCompletedAt.Time.Format(time.RFC3339)
 		resp.SetupCompletedAt = &s

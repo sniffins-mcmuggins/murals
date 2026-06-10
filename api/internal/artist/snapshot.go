@@ -2,7 +2,17 @@ package artist
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net/http"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/sniffins-mcmuggins/render/api/internal/auth"
+	"github.com/sniffins-mcmuggins/render/api/internal/billing"
+	"github.com/sniffins-mcmuggins/render/api/internal/httperr"
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
@@ -51,4 +61,93 @@ func buildProfileSnapshot(ctx context.Context, q *sqlcdb.Queries, profile sqlcdb
 		snap.Collections = append(snap.Collections, cs)
 	}
 	return snap, nil
+}
+
+// publishSnapshotTx builds the snapshot and upserts it + clears the dirty flag
+// in one transaction. Shared by PublishChangesHandler and the first Go-Public.
+func publishSnapshotTx(ctx context.Context, pool *pgxpool.Pool, profile sqlcdb.ArtistProfile) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	qtx := sqlcdb.New(tx)
+
+	snap, err := buildProfileSnapshot(ctx, qtx, profile)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(snap)
+	if err != nil {
+		return err
+	}
+	if err := qtx.UpsertProfileSnapshot(ctx, sqlcdb.UpsertProfileSnapshotParams{
+		ArtistProfileID: profile.ID,
+		Snapshot:        raw,
+	}); err != nil {
+		return err
+	}
+	if err := qtx.ClearProfileChanges(ctx, profile.ID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// PublishChangesHandler handles POST /profiles/me/publish-changes.
+// Serializes the caller's live draft into profile_snapshots atomically and
+// clears has_unpublished_changes. Gated on billing entitlement, same as publish.
+func PublishChangesHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, err := auth.User(r.Context())
+		if err != nil {
+			httperr.Unauthorized(w)
+			return
+		}
+		userUUID, err := pgUUIDFromString(principal.UserID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		q := sqlcdb.New(pool)
+		profile, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		canPub, err := billing.CanPublish(r.Context(), pool, userUUID)
+		if err != nil {
+			slog.Error("publish-changes: check entitlement", "err", err, "user_id", principal.UserID)
+			httperr.InternalServerError(w)
+			return
+		}
+		if !canPub {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusPaymentRequired)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"code":    "payment_required",
+				"message": "An active artist subscription or comp grant is required to publish.",
+			})
+			return
+		}
+
+		if err := publishSnapshotTx(r.Context(), pool, profile); err != nil {
+			slog.Error("publish-changes: write snapshot", "err", err, "profile_id", profile.ID.String())
+			httperr.InternalServerError(w)
+			return
+		}
+
+		updated, err := q.GetArtistProfileByUserID(r.Context(), userUUID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(toProfileResponse(updated, false))
+	}
 }

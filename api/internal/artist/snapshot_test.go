@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// Ensure buildProfileSnapshot is referenced so the unused linter is satisfied
-// while the function awaits its handler in the next task.
-var _ = buildProfileSnapshot
-
 func TestProfileSnapshotJSONRoundTrips(t *testing.T) {
 	snap := profileSnapshot{
 		Profile: profileResponse{ID: "p1", DisplayName: "Lady Gabe", Bio: "v2"},
