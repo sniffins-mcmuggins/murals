@@ -83,7 +83,7 @@ services:
 
   # ── DATABASE ───────────────────────────────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     ports:
       - "5432:5432"
     environment:
@@ -91,7 +91,9 @@ services:
       POSTGRES_PASSWORD: render
       POSTGRES_DB: render
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # postgres:18+ images store data in a major-version subdir; mount the parent
+      # dir (not .../data) per docker-library guidance (docker-library/postgres#1259)
+      - db_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U render -d render"]
       interval: 5s

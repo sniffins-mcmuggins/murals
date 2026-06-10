@@ -203,7 +203,7 @@ analytics_events    -- artist_id, event_type, festival_id, occurred_at (append-o
 services:
   api:        # Go binary, hot-reload via air
   web:        # Next.js (next dev)
-  db:         # postgres:16
+  db:         # postgres:18
   minio:      # minio/minio — S3-compatible, console at :9001
   prometheus: # prom/prometheus
 ```
