@@ -1,9 +1,24 @@
+'use client'
+
 import { useState } from 'react'
 import { apiClient } from '@/lib/api'
 
 type UploadState = 'idle' | 'uploading' | 'error'
 
-export function useUploadImage(collectionId: string) {
+export interface UploadedImage {
+  cdnUrl: string
+  s3Key: string
+}
+
+/**
+ * The full image-upload choreography: presign → PUT to S3/MinIO → confirm.
+ * What happens to the confirmed image is the caller's business — attach it to
+ * a collection, set it as an avatar, etc. — via onUploaded. Errors thrown by
+ * onUploaded are caught and surfaced through the hook's error state.
+ */
+export function useImageUpload(
+  onUploaded: (img: UploadedImage) => void | Promise<void>,
+) {
   const [state, setState] = useState<UploadState>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -18,7 +33,7 @@ export function useUploadImage(collectionId: string) {
       if (presignRes.error || !presignRes.data) throw new Error('Failed to get upload URL')
       const { uploadUrl, s3Key } = presignRes.data
 
-      // 2. PUT to S3/MinIO
+      // 2. PUT to S3/MinIO (presigned URL — not our API, raw fetch is correct here)
       const putRes = await fetch(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': file.type },
@@ -29,14 +44,9 @@ export function useUploadImage(collectionId: string) {
       // 3. Confirm
       const confirmRes = await apiClient.POST('/images/confirm', { body: { s3Key } })
       if (confirmRes.error || !confirmRes.data) throw new Error('Failed to confirm upload')
-      const { cdnUrl } = confirmRes.data
 
-      // 4. Attach to collection
-      const attachRes = await apiClient.POST('/collections/{collectionID}/images', {
-        params: { path: { collectionID: collectionId } },
-        body: { s3Key, cdnUrl },
-      })
-      if (attachRes.error) throw new Error('Failed to attach image')
+      // 4. Caller's post-upload step
+      await onUploaded({ cdnUrl: confirmRes.data.cdnUrl, s3Key })
 
       setState('idle')
     } catch (err) {

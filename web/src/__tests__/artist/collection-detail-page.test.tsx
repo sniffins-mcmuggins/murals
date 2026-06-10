@@ -13,18 +13,18 @@ vi.mock('@tanstack/react-query', () => ({
   useMutation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
   useQueryClient: vi.fn().mockReturnValue({ invalidateQueries: vi.fn() }),
 }))
-vi.mock('@/hooks/useUploadImage', () => ({
-  useUploadImage: vi.fn().mockReturnValue({ upload: vi.fn(), isUploading: false, error: null }),
+vi.mock('@/hooks/useImageUpload', () => ({
+  useImageUpload: vi.fn().mockReturnValue({ upload: vi.fn(), isUploading: false, error: null }),
 }))
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useUploadImage } from '@/hooks/useUploadImage'
+import { useImageUpload } from '@/hooks/useImageUpload'
 import CollectionDetailPage from '@/app/(artist)/collections/[id]/page'
 
 const mockUseQuery = vi.mocked(useQuery)
 const mockUseMutation = vi.mocked(useMutation)
 const mockUseQueryClient = vi.mocked(useQueryClient)
-const mockUseUploadImage = vi.mocked(useUploadImage)
+const mockUseUploadImage = vi.mocked(useImageUpload)
 
 const mockParams = Promise.resolve({ id: 'col-abc123' })
 

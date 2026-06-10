@@ -19,7 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { apiClient } from '@/lib/api'
-import { useUploadImage } from '@/hooks/useUploadImage'
+import { useImageUpload } from '@/hooks/useImageUpload'
 import type { components } from '@render/api-client'
 
 type CollectionImage = components['schemas']['CollectionImage']
@@ -180,7 +180,14 @@ export default function CollectionDetailPage({ params }: Props) {
 }
 
 function CollectionDetail({ collectionId, queryClient }: { collectionId: string; queryClient: ReturnType<typeof useQueryClient> }) {
-  const { upload, isUploading, error: uploadError } = useUploadImage(collectionId)
+  const { upload, isUploading, error: uploadError } = useImageUpload(async ({ cdnUrl, s3Key }) => {
+    const attachRes = await apiClient.POST('/collections/{collectionID}/images', {
+      params: { path: { collectionID: collectionId } },
+      body: { s3Key, cdnUrl },
+    })
+    if (attachRes.error) throw new Error('Failed to attach image')
+    queryClient.invalidateQueries({ queryKey: ['collection-images', collectionId] })
+  })
   const [dragOver, setDragOver] = useState(false)
   const [isEditingFocus, setIsEditingFocus] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor))
@@ -249,7 +256,6 @@ function CollectionDetail({ collectionId, queryClient }: { collectionId: string;
     const file = e.target.files?.[0]
     if (!file) return
     await upload(file)
-    queryClient.invalidateQueries({ queryKey: ['collection-images', collectionId] })
     e.target.value = ''
   }
 
@@ -259,8 +265,7 @@ function CollectionDetail({ collectionId, queryClient }: { collectionId: string;
     const file = e.dataTransfer.files[0]
     if (!file || !file.type.startsWith('image/')) return
     await upload(file)
-    queryClient.invalidateQueries({ queryKey: ['collection-images', collectionId] })
-  }, [upload, queryClient, collectionId])
+  }, [upload])
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event

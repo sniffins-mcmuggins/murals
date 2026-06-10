@@ -9,7 +9,7 @@ import { ImageSlot } from '@/components/ImageSlot'
 import { MediumPicker } from '@/components/MediumPicker'
 import { SupportLinkField } from '@/components/SupportLinkField'
 import { SocialIcon, SOCIAL_PLATFORMS } from '@/components/SocialIcon'
-import { useProfileImageUpload } from '@/hooks/useProfileImageUpload'
+import { useImageUpload } from '@/hooks/useImageUpload'
 
 type ArtistProfile = components['schemas']['ArtistProfile']
 
@@ -119,12 +119,12 @@ export default function ProfileWizard({ initialProfile }: { initialProfile: Arti
   }
 
   // Image upload hooks (avatar + 3 headline slots).
-  const { upload: uploadAvatar, isUploading: avatarUploading } = useProfileImageUpload(url => patch('avatarUrl', url))
+  const { upload: uploadAvatar, isUploading: avatarUploading } = useImageUpload(({ cdnUrl }) => patch('avatarUrl', cdnUrl))
   const setHeadline = (i: number, url: string) =>
     setState(s => { const n = [...s.headlineUrls]; n[i] = url; return { ...s, headlineUrls: n } })
-  const h0 = useProfileImageUpload(url => setHeadline(0, url))
-  const h1 = useProfileImageUpload(url => setHeadline(1, url))
-  const h2 = useProfileImageUpload(url => setHeadline(2, url))
+  const h0 = useImageUpload(({ cdnUrl }) => setHeadline(0, cdnUrl))
+  const h1 = useImageUpload(({ cdnUrl }) => setHeadline(1, cdnUrl))
+  const h2 = useImageUpload(({ cdnUrl }) => setHeadline(2, cdnUrl))
   const headlineHooks = [h0, h1, h2]
 
   const filteredSocials = () =>
@@ -330,7 +330,7 @@ function FirstWorkStep({
   const [localErr, setLocalErr] = useState<string | null>(null)
   const submitting = useRef(false)
 
-  const cover = useProfileImageUpload((url, key) => { setCoverUrl(url); setCoverKey(key) })
+  const cover = useImageUpload(({ cdnUrl, s3Key }) => { setCoverUrl(cdnUrl); setCoverKey(s3Key) })
 
   async function continueStep() {
     if (submitting.current) return

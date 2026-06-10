@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 import { SocialIcon, SOCIAL_PLATFORMS } from '@/components/SocialIcon'
-import { useProfileImageUpload } from '@/hooks/useProfileImageUpload'
+import { useImageUpload } from '@/hooks/useImageUpload'
 import { ImageSlot } from '@/components/ImageSlot'
 import { MediumPicker } from '@/components/MediumPicker'
 import { SupportLinkField } from '@/components/SupportLinkField'
@@ -43,17 +43,17 @@ export default function ProfileForm({ profile, userId }: Props) {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { upload: uploadAvatar, isUploading: avatarUploading } = useProfileImageUpload(
-    url => setAvatarUrl(url)
+  const { upload: uploadAvatar, isUploading: avatarUploading } = useImageUpload(
+    ({ cdnUrl }) => setAvatarUrl(cdnUrl)
   )
-  const { upload: uploadHeadline0, isUploading: headline0Uploading } = useProfileImageUpload(
-    url => setHeadlineUrls(prev => { const n = [...prev]; n[0] = url; return n })
+  const { upload: uploadHeadline0, isUploading: headline0Uploading } = useImageUpload(
+    ({ cdnUrl }) => setHeadlineUrls(prev => { const n = [...prev]; n[0] = cdnUrl; return n })
   )
-  const { upload: uploadHeadline1, isUploading: headline1Uploading } = useProfileImageUpload(
-    url => setHeadlineUrls(prev => { const n = [...prev]; n[1] = url; return n })
+  const { upload: uploadHeadline1, isUploading: headline1Uploading } = useImageUpload(
+    ({ cdnUrl }) => setHeadlineUrls(prev => { const n = [...prev]; n[1] = cdnUrl; return n })
   )
-  const { upload: uploadHeadline2, isUploading: headline2Uploading } = useProfileImageUpload(
-    url => setHeadlineUrls(prev => { const n = [...prev]; n[2] = url; return n })
+  const { upload: uploadHeadline2, isUploading: headline2Uploading } = useImageUpload(
+    ({ cdnUrl }) => setHeadlineUrls(prev => { const n = [...prev]; n[2] = cdnUrl; return n })
   )
   const headlineSlots = [
     { url: headlineUrls[0], upload: uploadHeadline0, isUploading: headline0Uploading, label: 'Photo 1' },
