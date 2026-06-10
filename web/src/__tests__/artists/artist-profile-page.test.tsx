@@ -20,6 +20,12 @@ vi.mock('next/link', () => ({
     ({ type: 'a', props: { href, className, children } }),
 }))
 
+// auth-server is `server-only`; stub it so these tests render the public
+// (non-owner) view without pulling the server-only guard into jsdom.
+vi.mock('@/lib/auth-server', () => ({
+  isProfileOwner: vi.fn().mockResolvedValue(false),
+}))
+
 // Import after mocks are set up
 import ArtistPage from '@/app/(public)/artists/[id]/page'
 import { apiClient } from '@/lib/api'
