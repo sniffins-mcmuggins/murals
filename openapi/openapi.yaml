@@ -274,6 +274,12 @@ components:
               mural_status:
                 type: string
                 enum: [permanent, temporary, unknown]
+        has_unpublished_changes:
+          type: boolean
+          description: >-
+            True when the artist's live profile has changed since the last
+            publish-changes call (or since first publish). Cleared by
+            POST /profiles/me/publish-changes.
 
     CreateProfileRequest:
       type: object
@@ -1517,6 +1523,44 @@ paths:
       responses:
         "200":
           description: Updated profile (visibility is now public).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtistProfile"
+        "402":
+          description: Payment required — no active subscription or comp grant.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, message]
+                properties:
+                  code:
+                    type: string
+                    example: payment_required
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /profiles/me/publish-changes:
+    post:
+      operationId: publishProfileChanges
+      summary: Publish live draft changes to the public snapshot
+      description: >-
+        Serializes the authenticated artist's current live profile (display name,
+        bio, collections, images) into the profile_snapshots table and clears
+        the has_unpublished_changes flag. Gated on the same billing entitlement
+        as /profiles/me/publish — returns 402 if not entitled.
+      tags: [artist]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated profile with has_unpublished_changes cleared.
           content:
             application/json:
               schema:

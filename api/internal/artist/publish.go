@@ -73,6 +73,17 @@ func PublishHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		if err := publishSnapshotTx(r.Context(), pool, updated); err != nil {
+			slog.Error("publish: seed initial snapshot", "err", err, "profile_id", updated.ID.String())
+			httperr.InternalServerError(w)
+			return
+		}
+		updated, err = q.GetArtistProfileByUserID(r.Context(), userUUID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(updated, false))
 	}

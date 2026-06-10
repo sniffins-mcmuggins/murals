@@ -35,22 +35,23 @@ type spotHistoryEntry struct {
 }
 
 type profileResponse struct {
-	ID                string             `json:"id"`
-	UserID            *string            `json:"user_id"`
-	DisplayName       string             `json:"display_name"`
-	Bio               string             `json:"bio"`
-	Visibility        string             `json:"visibility"`
-	LocationLabel     *string            `json:"location_label,omitempty"`
-	MediumTags        []string           `json:"medium_tags"`
-	SocialLinks       json.RawMessage    `json:"social_links"`
-	AvatarS3Key       *string            `json:"avatar_s3_key,omitempty"`
-	HeadlineImageUrls []string           `json:"headline_image_urls"`
-	CreatedAt         string             `json:"created_at"`
-	UpdatedAt         string             `json:"updated_at"`
-	PreviewToken      *string            `json:"preview_token,omitempty"`
-	SupportURL        *string            `json:"support_url,omitempty"`
-	SetupCompletedAt  *string            `json:"setup_completed_at,omitempty"`
-	SpotHistory       []spotHistoryEntry `json:"spot_history"`
+	ID                    string             `json:"id"`
+	UserID                *string            `json:"user_id"`
+	DisplayName           string             `json:"display_name"`
+	Bio                   string             `json:"bio"`
+	Visibility            string             `json:"visibility"`
+	LocationLabel         *string            `json:"location_label,omitempty"`
+	MediumTags            []string           `json:"medium_tags"`
+	SocialLinks           json.RawMessage    `json:"social_links"`
+	AvatarS3Key           *string            `json:"avatar_s3_key,omitempty"`
+	HeadlineImageUrls     []string           `json:"headline_image_urls"`
+	CreatedAt             string             `json:"created_at"`
+	UpdatedAt             string             `json:"updated_at"`
+	PreviewToken          *string            `json:"preview_token,omitempty"`
+	SupportURL            *string            `json:"support_url,omitempty"`
+	SetupCompletedAt      *string            `json:"setup_completed_at,omitempty"`
+	SpotHistory           []spotHistoryEntry `json:"spot_history"`
+	HasUnpublishedChanges bool               `json:"has_unpublished_changes,omitempty"`
 }
 
 type profileListResponse struct {
@@ -84,6 +85,10 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 		UpdatedAt:         p.UpdatedAt.Time.Format(time.RFC3339),
 	}
 	resp.SupportURL = p.SupportUrl
+	// Owner-only: never reveal pending-edit state to the public.
+	if !public {
+		resp.HasUnpublishedChanges = p.HasUnpublishedChanges
+	}
 	if !public && p.SetupCompletedAt.Valid {
 		s := p.SetupCompletedAt.Time.Format(time.RFC3339)
 		resp.SetupCompletedAt = &s
@@ -219,6 +224,20 @@ func GetProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			})
 		}
 		resp.SpotHistory = spotHistory
+
+		// Public viewers see the frozen snapshot (artist-authored content), with
+		// dynamic cross-entity data (spot history) attached LIVE so it never goes
+		// stale. Owners read live so they see unpublished edits. Falls back to the
+		// live assembly if no snapshot exists yet (never-published / migration window).
+		if !isOwner(r, profile) {
+			if snapRow, sErr := q.GetProfileSnapshot(r.Context(), profile.ID); sErr == nil {
+				var snap profileSnapshot
+				if json.Unmarshal(snapRow.Snapshot, &snap) == nil {
+					snap.Profile.SpotHistory = spotHistory
+					resp = snap.Profile
+				}
+			}
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -404,6 +423,22 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Seed a snapshot when this PATCH transitions the profile draft → public.
+		// Without this, public reads would fall back to the live tables until the
+		// artist explicitly calls publish-changes — a leak vector.
+		if req.Visibility != nil && *req.Visibility == "public" && existing.Visibility == "draft" {
+			if err := publishSnapshotTx(r.Context(), pool, updated); err != nil {
+				slog.Error("update-profile: seed snapshot on publish", "err", err, "profile_id", updated.ID.String())
+				httperr.InternalServerError(w)
+				return
+			}
+			updated, err = q.GetArtistProfileByUserID(r.Context(), userUUID)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(updated, false))
 	}
@@ -472,6 +507,12 @@ func RotatePreviewTokenHandler(pool *pgxpool.Pool) http.HandlerFunc {
 
 // ListPublicProfilesHandler handles GET /public/profiles. No auth required.
 // Returns paginated public artist profiles.
+// TODO(E29 follow-up): listing shows live display_name/avatar/medium from the
+// profiles table. Repointing each row to its snapshot would require N+1 reads
+// (one GetProfileSnapshot per row) or a JOIN, which is a separate optimisation.
+// The exposure is low: the listing only surfaces name, avatar, and medium — not
+// the artist's full bio, links, or collections — so a stale display_name for a
+// moment between edit and publish-changes is acceptable at launch.
 func ListPublicProfilesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		page, perPage := 1, 20

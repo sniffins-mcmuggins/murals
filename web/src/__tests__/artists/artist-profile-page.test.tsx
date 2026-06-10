@@ -40,6 +40,7 @@ const mockProfile: components['schemas']['ArtistProfile'] = {
   headline_image_urls: [],
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
+  has_unpublished_changes: false,
 }
 
 const mockCollection: components['schemas']['Collection'] = {

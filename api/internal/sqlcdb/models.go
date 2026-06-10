@@ -293,25 +293,26 @@ type ApplicationScore struct {
 }
 
 type ArtistProfile struct {
-	ID                pgtype.UUID        `db:"id" json:"id"`
-	UserID            pgtype.UUID        `db:"user_id" json:"user_id"`
-	DisplayName       string             `db:"display_name" json:"display_name"`
-	Bio               string             `db:"bio" json:"bio"`
-	LocationLabel     *string            `db:"location_label" json:"location_label"`
-	ShowLocation      bool               `db:"show_location" json:"show_location"`
-	MediumTags        []string           `db:"medium_tags" json:"medium_tags"`
-	SocialLinks       json.RawMessage    `db:"social_links" json:"social_links"`
-	AvatarS3Key       *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	HeadlineImageUrls []string           `db:"headline_image_urls" json:"headline_image_urls"`
-	Visibility        string             `db:"visibility" json:"visibility"`
-	PreviewToken      string             `db:"preview_token" json:"preview_token"`
-	ClaimToken        *string            `db:"claim_token" json:"claim_token"`
-	ClaimedAt         pgtype.Timestamptz `db:"claimed_at" json:"claimed_at"`
-	CreatedBy         pgtype.UUID        `db:"created_by" json:"created_by"`
-	SupportUrl        *string            `db:"support_url" json:"support_url"`
-	SetupCompletedAt  pgtype.Timestamptz `db:"setup_completed_at" json:"setup_completed_at"`
+	ID                    pgtype.UUID        `db:"id" json:"id"`
+	UserID                pgtype.UUID        `db:"user_id" json:"user_id"`
+	DisplayName           string             `db:"display_name" json:"display_name"`
+	Bio                   string             `db:"bio" json:"bio"`
+	LocationLabel         *string            `db:"location_label" json:"location_label"`
+	ShowLocation          bool               `db:"show_location" json:"show_location"`
+	MediumTags            []string           `db:"medium_tags" json:"medium_tags"`
+	SocialLinks           json.RawMessage    `db:"social_links" json:"social_links"`
+	AvatarS3Key           *string            `db:"avatar_s3_key" json:"avatar_s3_key"`
+	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	HeadlineImageUrls     []string           `db:"headline_image_urls" json:"headline_image_urls"`
+	Visibility            string             `db:"visibility" json:"visibility"`
+	PreviewToken          string             `db:"preview_token" json:"preview_token"`
+	ClaimToken            *string            `db:"claim_token" json:"claim_token"`
+	ClaimedAt             pgtype.Timestamptz `db:"claimed_at" json:"claimed_at"`
+	CreatedBy             pgtype.UUID        `db:"created_by" json:"created_by"`
+	SupportUrl            *string            `db:"support_url" json:"support_url"`
+	SetupCompletedAt      pgtype.Timestamptz `db:"setup_completed_at" json:"setup_completed_at"`
+	HasUnpublishedChanges bool               `db:"has_unpublished_changes" json:"has_unpublished_changes"`
 }
 
 type BetaFeedback struct {
@@ -455,6 +456,12 @@ type PasswordResetToken struct {
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	UsedAt    pgtype.Timestamptz `db:"used_at" json:"used_at"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type ProfileSnapshot struct {
+	ArtistProfileID pgtype.UUID        `db:"artist_profile_id" json:"artist_profile_id"`
+	Snapshot        json.RawMessage    `db:"snapshot" json:"snapshot"`
+	PublishedAt     pgtype.Timestamptz `db:"published_at" json:"published_at"`
 }
 
 type PromoCode struct {

@@ -305,6 +305,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles/me/publish-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish live draft changes to the public snapshot
+         * @description Serializes the authenticated artist's current live profile (display name, bio, collections, images) into the profile_snapshots table and clears the has_unpublished_changes flag. Gated on the same billing entitlement as /profiles/me/publish — returns 402 if not entitled.
+         */
+        post: operations["publishProfileChanges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profiles/me/unpublish": {
         parameters: {
             query?: never;
@@ -1906,6 +1926,8 @@ export interface components {
                 /** @enum {string} */
                 mural_status?: "permanent" | "temporary" | "unknown";
             }[];
+            /** @description True when the artist's live profile has changed since the last publish-changes call (or since first publish). Cleared by POST /profiles/me/publish-changes. */
+            has_unpublished_changes?: boolean;
         };
         CreateProfileRequest: {
             /** @example Alice Muralist */
@@ -2828,6 +2850,41 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Updated profile (visibility is now public). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtistProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Payment required — no active subscription or comp grant. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example payment_required */
+                        code: string;
+                        message: string;
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    publishProfileChanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated profile with has_unpublished_changes cleared. */
             200: {
                 headers: {
                     [name: string]: unknown;

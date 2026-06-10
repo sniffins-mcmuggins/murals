@@ -37,6 +37,8 @@ func toImageResponse(img sqlcdb.CollectionImage) collectionImageResponse {
 
 // ListCollectionImagesHandler handles GET /collections/{collectionID}/images.
 // Public endpoint — no auth required; returns images ordered by display_order.
+// Public callers see the frozen snapshot images so draft additions cannot leak.
+// Owners see the live image list so they see unpublished edits.
 func ListCollectionImagesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collectionUUID, err := pgUUIDFromString(chi.URLParam(r, "collectionID"))
@@ -46,6 +48,67 @@ func ListCollectionImagesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		q := sqlcdb.New(pool)
+
+		// Load the collection to find its parent profile (needed for visibility
+		// gate and snapshot lookup).
+		collection, err := q.GetCollectionByID(r.Context(), collectionUUID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httperr.NotFound(w)
+				return
+			}
+			httperr.InternalServerError(w)
+			return
+		}
+
+		// Visibility gate: draft profiles are invisible to non-owners.
+		profile, err := q.GetArtistProfileByID(r.Context(), collection.ArtistProfileID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		if profile.Visibility != "public" {
+			principal, authErr := auth.User(r.Context())
+			if authErr != nil || principal.UserID != profile.UserID.String() {
+				httperr.NotFound(w)
+				return
+			}
+		}
+
+		// Public viewers see the frozen snapshot images; owners read live so they
+		// see unpublished edits. Falls back to the live list if no snapshot exists
+		// (never-published / migration window).
+		if !isOwner(r, profile) {
+			if snapRow, sErr := q.GetProfileSnapshot(r.Context(), profile.ID); sErr == nil {
+				var snap profileSnapshot
+				if json.Unmarshal(snapRow.Snapshot, &snap) == nil {
+					collIDStr := collection.ID.String()
+					for _, sc := range snap.Collections {
+						if sc.ID == collIDStr {
+							// imageSnapshot is the stored shape; convert to the wire format.
+							resp := make([]collectionImageResponse, len(sc.Images))
+							for i, im := range sc.Images {
+								resp[i] = collectionImageResponse{
+									ID:           im.ID,
+									CollectionID: collIDStr,
+									S3Key:        im.S3Key,
+									CdnURL:       im.CdnURL,
+									DisplayOrder: im.DisplayOrder,
+									CreatedAt:    im.CreatedAt,
+								}
+							}
+							w.Header().Set("Content-Type", "application/json")
+							_ = json.NewEncoder(w).Encode(resp)
+							return
+						}
+					}
+					// Collection not in snapshot → not yet published; 404 for public.
+					httperr.NotFound(w)
+					return
+				}
+			}
+		}
+
 		images, err := q.ListCollectionImages(r.Context(), collectionUUID)
 		if err != nil {
 			httperr.InternalServerError(w)
@@ -298,6 +361,9 @@ func DeleteImageHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// S3 object intentionally retained: the published snapshot may still
+		// reference this image until the artist publishes changes. Orphan objects
+		// are cleaned by a future GC pass (E29 follow-up).
 		if err := q.DeleteCollectionImage(r.Context(), img.ID); err != nil {
 			httperr.InternalServerError(w)
 			return

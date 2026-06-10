@@ -30,6 +30,7 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	r.Post("/profiles", artist.CreateProfileHandler(db))
 	r.Get("/profiles/me", artist.GetMyProfileHandler(db))
 	r.Patch("/profiles/me", artist.UpdateProfileHandler(db))
+	r.Post("/profiles/me/publish-changes", artist.PublishChangesHandler(db))
 	r.Get("/profiles/{profileID}", artist.GetProfileHandler(db))
 	r.Get("/profiles/{profileID}/collections", artist.ListCollectionsHandler(db))
 	r.Post("/collections", artist.CreateCollectionHandler(db))
@@ -152,6 +153,13 @@ func TestArtistDomainRoundTrip(t *testing.T) {
 	colBeta := decodeJSON(resp)
 	colBetaID := colBeta["id"].(string)
 	_ = colBetaID
+
+	// 9a. Publish changes so the snapshot includes the new collections; public
+	// viewers are served the frozen snapshot, so publish-changes must be called
+	// before the anonymous list check below.
+	resp = do("POST", "/profiles/me/publish-changes", "", token)
+	assertStatus(resp, http.StatusOK)
+	_ = resp.Body.Close()
 
 	// 9. List collections for profile
 	resp = do("GET", "/profiles/"+profileID+"/collections", "", "") //nolint:bodyclose // body closed inside decodeJSONArray
