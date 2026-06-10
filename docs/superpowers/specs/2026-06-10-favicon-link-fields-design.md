@@ -81,6 +81,19 @@ generic globe — an inline SVG (no asset needed) or `/favicons/website.svg`.
 - This is driven off the `prefill` key, so any organiser's social-bound field gets the
   treatment automatically — it's a product capability, not demo dressing.
 
+### 4b. Choose which links to share
+Each social/website link field carries a **"Share" checkbox** so the artist picks which links
+to include in *this* application (a curated subset of their profile).
+- Default **checked** when the field has a pre-filled value (a link the profile already has);
+  **unchecked** when empty.
+- When **unchecked**, the URL input is dimmed/disabled and the field's submitted answer is the
+  **empty string** (the link is excluded from the application). When checked, the (editable)
+  URL is submitted as normal.
+- A **checkbox per link** (not a radio) — the artist can share any subset.
+- **Scope: the application record only.** This curates what's stored in the application; it
+  does **not** change E28 M1 — the organiser still sees the artist's *public* profile socials
+  live in the review panel (the profile is public regardless). No M1/merged-code changes.
+
 ### 5. Demo seed — `demos/seed/main.go`
 - Replace `f4` (free-text portfolio) and the lone `f9` with a **"Your links"** set: one field
   per social platform (all seven) bound to its `social.*` prefill key, plus a **Website**
@@ -103,6 +116,9 @@ generic globe — an inline SVG (no asset needed) or `/favicons/website.svg`.
 - **Web unit (DynamicForm):** a `social.instagram`-bound field renders an `<img>` whose `src`
   is the static favicon path; `onError` falls back to the brand glyph; the `website` field
   renders the globe.
+- **Web unit (share toggle):** a pre-filled social field defaults to shared and submits its
+  URL; un-checking it submits an empty answer for that field; an empty field defaults to
+  unshared.
 - Existing apply clips + the `prefill`/DynamicForm tests continue to pass.
 
 ---
@@ -137,3 +153,6 @@ generic globe — an inline SVG (no asset needed) or `/favicons/website.svg`.
 3. **Website field = static globe** (no live fetch of the artist's domain).
 4. **All seven** social platforms in the demo form (+ Website).
 5. Glyph fallback via the existing `SocialIcon` on `<img>` error.
+6. **Per-link "Share" checkbox** (default on for pre-filled links) — curates which links go
+   into the application; scope is the application record only, **M1 is unchanged** (the
+   organiser still sees public profile socials in review).
