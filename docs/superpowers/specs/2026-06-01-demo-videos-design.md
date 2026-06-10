@@ -23,7 +23,7 @@ by on-screen **demo dialogs** (see below). This table is the living reference �
 | `artist-public-profile`           | Artist    | ~12s | Lady Gabe (seeded) | The public artist page: headline strip, bio + medium tags, collection, organiser + peer endorsements. |
 | `artist-collections`              | Artist    | ~26s | Lady Gabe (seeded) | Collections list → open "Murals 2027" → browse images → **how the collection looks publicly**. |
 | `artist-apply-to-festival`        | Artist    | ~18s | Lady Gabe (seeded) | Applications → Apply to CPF 2027 → fill the form → **Application submitted**. |
-| `artist-apply-with-profile`       | Artist    | ~28s | Lady Gabe (seeded) | E28 "never type twice": the CPF form arrives **pre-filled from her profile** (portfolio, Instagram) with an **"Apply with my profile"** one-click CTA — she only adds the festival-specific questions, then submits. |
+| `artist-apply-with-profile`       | Artist    | ~26s | Lady Gabe (seeded) | E28 "never type twice": the CPF form arrives **pre-filled from her profile** as one field per platform — each with its **favicon** — and a per-link **Share** checkbox to choose what to include. She unticks one, adds the festival-specific answers, submits. |
 | `artist-endorsements`             | Artist    | ~10s | Lady Gabe (seeded) | Endorsements manager — hide a peer endorsement (greys out), then show it again. |
 | `artist-analytics`                | Artist    | ~8s  | Lady Gabe (seeded) | Analytics dashboard — profile views / QR scans / link clicks (aggregated, GDPR-clean). |
 | `organiser-form-builder`          | Organiser | ~12s | Marcus (seeded)    | Visual form builder → "Add from library" → media-embed walkthrough/3D field → **Save form**. |

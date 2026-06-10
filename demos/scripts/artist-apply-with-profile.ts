@@ -2,9 +2,10 @@ import { test, expect } from '@playwright/test'
 import { pause, highlight, slowType, scrollTo, showDialog, addCursorOverlay } from './helpers.js'
 import { silentLogin } from './_setup.js'
 
-// E28 "never type twice": the application form arrives pre-filled from the
-// artist's profile (portfolio, Instagram), with a one-click "Apply with my
-// profile" CTA. Lady Gabe only adds the festival-specific questions.
+// E28 "never type twice" + favicon link fields: the application form arrives
+// pre-filled from the artist's profile as one field per platform (each with its
+// favicon), and a per-link Share checkbox. Lady Gabe picks what to share and only
+// adds the festival-specific questions.
 test('artist-apply-with-profile — application pre-filled from the artist profile', async ({ page }) => {
   await addCursorOverlay(page)
   await silentLogin(page) // Lady Gabe
@@ -18,19 +19,20 @@ test('artist-apply-with-profile — application pre-filled from the artist profi
   await expect(page.getByRole('heading', { name: /^Apply to/ })).toBeVisible({ timeout: 8000 })
   await pause(700)
 
-  // ── The headline: the form is already filled from her profile ────────────────
-  await showDialog(page, 'Her socials, bio and portfolio already live on her profile — so the form arrives pre-filled.')
-  await scrollTo(page, 'input[name="f9"]')
-  await highlight(page, 'input[name="f9"]') // Instagram — pre-filled, "from your profile"
+  // ── Headline: link fields, one per platform, pre-filled from her profile with favicons ──
+  await showDialog(page, 'Her links arrive pre-filled from her profile — one field per platform, each with its favicon.')
+  await scrollTo(page, 'input[name="link_instagram"]')
+  await highlight(page, 'input[name="link_instagram"]')
   await pause(900)
 
-  await showDialog(page, 'One click drops in everything her profile already knows — no re-typing.', { pos: 'bottom' })
-  await scrollTo(page, 'button:has-text("Apply with my profile")')
-  await highlight(page, 'button:has-text("Apply with my profile")')
-  await pause(1000)
+  // ── She chooses which links to share ──
+  await showDialog(page, 'She chooses which links to share — untick any she\'d rather leave off.', { pos: 'bottom' })
+  await highlight(page, 'input[aria-label="Share TikTok"]')
+  await page.getByRole('checkbox', { name: 'Share TikTok' }).uncheck()
+  await pause(900)
 
-  // ── She only adds the festival-specific questions ────────────────────────────
-  await showDialog(page, 'She only answers what is specific to this festival.')
+  // ── Only the festival-specific questions are left ──
+  await showDialog(page, 'All that\'s left is what\'s specific to this festival.')
   await scrollTo(page, 'textarea[name="f1"]')
   await slowType(
     page.locator('textarea[name="f1"]'),
