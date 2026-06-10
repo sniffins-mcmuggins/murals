@@ -63,3 +63,39 @@ export async function requireAuth(): Promise<User> {
 
   return user
 }
+
+/**
+ * Return true if the authenticated viewer owns the artist profile identified by
+ * `profileId`. False for anonymous visitors, other artists, and viewers with no
+ * profile. The single source of truth for showing owner-only controls on an
+ * otherwise-public page (e.g. the live /artists/{id} page).
+ *
+ * Keyed on the profile id (not the user id) because public artist routes are
+ * keyed on the profile id. Does no fetch at all when there is no session cookie.
+ */
+export async function isProfileOwner(profileId: string): Promise<boolean> {
+  const cookieStore = await cookies()
+  const sessionValue = cookieStore.get('session')?.value
+
+  if (!sessionValue) {
+    return false
+  }
+
+  const authedClient = createApiClient({
+    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
+  })
+  authedClient.use({
+    onRequest({ request }) {
+      request.headers.set('Cookie', `session=${sessionValue}`)
+      return request
+    },
+  })
+
+  const { data, response } = await authedClient.GET('/profiles/me', {})
+
+  if (response.status === 401 || !data) {
+    return false
+  }
+
+  return data.id === profileId
+}
