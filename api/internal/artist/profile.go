@@ -51,7 +51,7 @@ type profileResponse struct {
 	SupportURL            *string            `json:"support_url,omitempty"`
 	SetupCompletedAt      *string            `json:"setup_completed_at,omitempty"`
 	SpotHistory           []spotHistoryEntry `json:"spot_history"`
-	HasUnpublishedChanges bool               `json:"has_unpublished_changes"`
+	HasUnpublishedChanges bool               `json:"has_unpublished_changes,omitempty"`
 }
 
 type profileListResponse struct {
@@ -85,7 +85,10 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 		UpdatedAt:         p.UpdatedAt.Time.Format(time.RFC3339),
 	}
 	resp.SupportURL = p.SupportUrl
-	resp.HasUnpublishedChanges = p.HasUnpublishedChanges
+	// Owner-only: never reveal pending-edit state to the public.
+	if !public {
+		resp.HasUnpublishedChanges = p.HasUnpublishedChanges
+	}
 	if !public && p.SetupCompletedAt.Valid {
 		s := p.SetupCompletedAt.Time.Format(time.RFC3339)
 		resp.SetupCompletedAt = &s

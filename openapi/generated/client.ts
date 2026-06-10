@@ -1927,7 +1927,7 @@ export interface components {
                 mural_status?: "permanent" | "temporary" | "unknown";
             }[];
             /** @description True when the artist's live profile has changed since the last publish-changes call (or since first publish). Cleared by POST /profiles/me/publish-changes. */
-            has_unpublished_changes: boolean;
+            has_unpublished_changes?: boolean;
         };
         CreateProfileRequest: {
             /** @example Alice Muralist */

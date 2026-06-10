@@ -478,7 +478,7 @@ type ArtistProfile struct {
 	DisplayName string    `json:"display_name"`
 
 	// HasUnpublishedChanges True when the artist's live profile has changed since the last publish-changes call (or since first publish). Cleared by POST /profiles/me/publish-changes.
-	HasUnpublishedChanges bool `json:"has_unpublished_changes"`
+	HasUnpublishedChanges *bool `json:"has_unpublished_changes,omitempty"`
 
 	// HeadlineImageUrls Ordered list of S3 public URLs for the artist's headline photos.
 	HeadlineImageUrls []string           `json:"headline_image_urls"`

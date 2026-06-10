@@ -185,7 +185,7 @@ components:
 
     ArtistProfile:
       type: object
-      required: [id, display_name, bio, visibility, medium_tags, social_links, headline_image_urls, created_at, updated_at, has_unpublished_changes]
+      required: [id, display_name, bio, visibility, medium_tags, social_links, headline_image_urls, created_at, updated_at]
       properties:
         id:
           type: string
