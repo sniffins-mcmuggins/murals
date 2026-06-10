@@ -103,6 +103,7 @@ tasks:
           - artist-public-profile
           - artist-collections
           - artist-apply-to-festival
+          - artist-apply-with-profile
           - artist-endorsements
           - artist-analytics
           - organiser-form-builder

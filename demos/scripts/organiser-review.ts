@@ -43,6 +43,13 @@ test('organiser-review — triage, review round, and placement', async ({ page }
   await card.click()
   await expect(page.getByRole('heading', { name: 'Rosa Vane' })).toBeVisible({ timeout: 5000 })
   await pause(600)
+
+  // E28 M1: the applicant's socials + bio + "view full profile" are pulled live
+  // from their profile and shown automatically — the organiser never asked for them.
+  await showDialog(page, "The applicant's links and bio show up automatically — pulled live from their profile, never re-typed.", { pos: 'bottom' })
+  await highlight(page, '[data-testid="artist-socials"]')
+  await pause(900)
+
   await page.getByRole('button', { name: 'Score 5' }).click()
   await pause(500)
   await page.keyboard.press('Escape')
