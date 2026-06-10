@@ -32,6 +32,7 @@
 - `PublishBar` component reads `has_unpublished_changes` from the owner profile response; only shows the "Publish changes" action when the flag is true. The initial "Go Public" publish is a separate action handled by `PublishHandler`.
 
 ## Changelog
+2026-06-10 — upload hooks merged into hooks/useImageUpload (post-confirm step is a caller callback); endorse/endorsements pages migrated to React Query + singleton apiClient; queryFns now throw on API error (isError UI instead of silent empty states).
 2026-06-10 — E29: /profile/preview draft route; PublishBar "Publish changes" + unpublished indicator + "View public profile" + "Preview draft" links.
 2026-06-07 — E28 M2: apply page (applications/apply/[id]) fetches /profiles/me + collections, pre-fills profile-bound fields via lib/prefill.ts (editable), renders a collection picker for portfolio_collection, and adds a one-click "Apply with my profile" CTA.
 2026-06-06 — Added profile setup wizard (profile/setup/) + shared field components; editor reuses them.
