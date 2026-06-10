@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { apiClient } from '@/lib/api'
+import { formatDateRange } from '@/lib/dates'
+import { FESTIVAL_STATUS_LABELS, FESTIVAL_STATUS_BADGES } from '@/lib/festivals'
 
 type Props = {
   params: Promise<{ id: string }>
@@ -19,56 +21,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${res.data.name} | Painttrace`,
     description: res.data.description,
   }
-}
-
-function formatDates(startDate?: string | null, endDate?: string | null): string {
-  if (!startDate && !endDate) return 'TBC'
-
-  const formatDate = (dateStr: string): string => {
-    const [year, month, day] = dateStr.split('-').map(Number)
-    const date = new Date(year, month - 1, day)
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-  }
-
-  const formatDateShort = (dateStr: string): string => {
-    const [year, month, day] = dateStr.split('-').map(Number)
-    const date = new Date(year, month - 1, day)
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-    })
-  }
-
-  if (startDate && endDate) {
-    const [sy] = startDate.split('-').map(Number)
-    const [ey] = endDate.split('-').map(Number)
-    if (sy === ey) {
-      return `${formatDateShort(startDate)} – ${formatDate(endDate)}`
-    }
-    return `${formatDate(startDate)} – ${formatDate(endDate)}`
-  }
-
-  if (startDate) return formatDate(startDate)
-  if (endDate) return formatDate(endDate)
-  return 'TBC'
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft',
-  open: 'Open',
-  live: 'Live',
-  archived: 'Archived',
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-warm text-mid border-light',
-  open: 'bg-amber/20 text-amber border-amber/30',
-  live: 'bg-clay/20 text-clay border-clay/30',
-  archived: 'bg-warm text-mid border-light',
 }
 
 export default async function FestivalPage({ params }: Props) {
@@ -90,8 +42,8 @@ export default async function FestivalPage({ params }: Props) {
   const pins = mapRes.data?.pins ?? []
 
   const status = festival.status ?? 'draft'
-  const statusLabel = STATUS_LABELS[status] ?? status
-  const statusColor = STATUS_COLORS[status] ?? STATUS_COLORS.draft
+  const statusLabel = FESTIVAL_STATUS_LABELS[status] ?? status
+  const statusColor = FESTIVAL_STATUS_BADGES[status] ?? FESTIVAL_STATUS_BADGES.draft
 
   return (
     <main className="min-h-screen bg-offwhite">
@@ -114,7 +66,7 @@ export default async function FestivalPage({ params }: Props) {
           )}
 
           <p className="mt-2 font-mono text-sm text-mid uppercase tracking-wider">
-            {formatDates(festival.start_date, festival.end_date)}
+            {formatDateRange(festival.start_date, festival.end_date)}
           </p>
         </div>
 

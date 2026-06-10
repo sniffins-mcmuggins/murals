@@ -1,7 +1,5 @@
-import { requireAuth } from '@/lib/auth-server'
-import { cookies } from 'next/headers'
+import { requireAuth, createAuthedServerClient } from '@/lib/auth-server'
 import { redirect } from 'next/navigation'
-import { createApiClient } from '@render/api-client'
 import ProfileForm from './ProfileForm'
 import PublishBar from './PublishBar'
 
@@ -12,15 +10,8 @@ export default async function ProfilePage({
 }) {
   const user = await requireAuth()
 
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('session')
-  const authedClient = createApiClient({
-    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
-  })
-  if (sessionCookie?.value) {
-    const sv = sessionCookie.value
-    authedClient.use({ onRequest({ request }) { request.headers.set('Cookie', `session=${sv}`); return request } })
-  }
+  const authedClient = await createAuthedServerClient()
+  if (!authedClient) redirect('/login')
 
   const profileRes = await authedClient.GET('/profiles/me', {})
   const profile = profileRes.data ?? null

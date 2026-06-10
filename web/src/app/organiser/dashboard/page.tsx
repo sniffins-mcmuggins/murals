@@ -12,12 +12,14 @@ export default function OrganiserDashboardPage() {
     queryKey: ['me-reviewing'],
     queryFn: async () => {
       const res = await apiClient.GET('/me/reviewing')
-      if (res.error) return [] as FestivalSummary[]
+      if (res.error) throw new Error('Failed to load reviewing festivals')
       return (res.data ?? []) as FestivalSummary[]
     },
   })
 
   const reviewing = reviewingQuery.data ?? []
+  // On error, the reviewing section simply doesn't render (data is undefined → [])
+  // React Query retries automatically, so no explicit error UI is needed here.
 
   return (
     <div>

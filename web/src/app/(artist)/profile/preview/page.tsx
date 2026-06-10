@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { cookies } from 'next/headers'
-import { createApiClient } from '@render/api-client'
-import { requireAuth } from '@/lib/auth-server'
+import { requireAuth, createAuthedServerClient } from '@/lib/auth-server'
+import { redirect } from 'next/navigation'
 
 // Preview renders the artist's DRAFT (live tables) — "what your changes will
 // look like after you publish". The owner reads /profiles/me + their own
@@ -9,25 +8,14 @@ import { requireAuth } from '@/lib/auth-server'
 export default async function ProfilePreviewPage() {
   await requireAuth()
 
-  const cookieStore = await cookies()
-  const session = cookieStore.get('session')?.value
-  const client = createApiClient({
-    baseUrl: process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
-  })
-  if (session) {
-    client.use({
-      onRequest({ request }) {
-        request.headers.set('Cookie', `session=${session}`)
-        return request
-      },
-    })
-  }
+  const authedClient = await createAuthedServerClient()
+  if (!authedClient) redirect('/login')
 
-  const me = (await client.GET('/profiles/me', {})).data
-  if (!me) return null
+  const me = (await authedClient.GET('/profiles/me', {})).data
+  if (!me) redirect('/profile/setup')
   const collections =
     (
-      await client.GET('/profiles/{profileID}/collections', {
+      await authedClient.GET('/profiles/{profileID}/collections', {
         params: { path: { profileID: me.id } },
       })
     ).data ?? []

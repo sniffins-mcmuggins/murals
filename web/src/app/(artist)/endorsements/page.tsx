@@ -1,38 +1,54 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createApiClient } from '@render/api-client'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 
 type Endorsement = components['schemas']['EndorsementResponse']
 
-const client = createApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
-})
-
 export default function EndorsementsPage() {
-  const [endorsements, setEndorsements] = useState<Endorsement[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    client.GET('/endorsements/received', {}).then(({ data }) => {
-      setEndorsements(data?.endorsements ?? [])
-      setLoading(false)
-    })
-  }, [])
+  const endorsementsQuery = useQuery({
+    queryKey: ['endorsements-received'],
+    queryFn: async () => {
+      const res = await apiClient.GET('/endorsements/received', {})
+      if (res.error) throw new Error('Failed to load endorsements')
+      return res.data?.endorsements ?? []
+    },
+  })
+  const endorsements = endorsementsQuery.data ?? []
 
-  async function toggleVisibility(id: string, currentHidden: boolean) {
-    const { data } = await client.PATCH('/endorsements/{endorsementID}/visibility', {
-      params: { path: { endorsementID: id } },
-      body: { hidden: !currentHidden },
-    })
-    if (data) {
-      setEndorsements((prev) => prev.map((e) => (e.id === id ? data : e)))
-    }
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, hidden }: { id: string; hidden: boolean }) => {
+      const res = await apiClient.PATCH('/endorsements/{endorsementID}/visibility', {
+        params: { path: { endorsementID: id } },
+        body: { hidden },
+      })
+      if (res.error || !res.data) throw new Error('Failed to update visibility')
+      return res.data
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<Endorsement[]>(['endorsements-received'], (prev) =>
+        (prev ?? []).map((e) => (e.id === updated.id ? updated : e)),
+      )
+    },
+  })
+
+  function toggleVisibility(id: string, currentHidden: boolean) {
+    toggleMutation.mutate({ id, hidden: !currentHidden })
   }
 
-  if (loading) {
+  if (endorsementsQuery.isLoading) {
     return <p className="font-sans text-mid">Loading…</p>
+  }
+
+  if (endorsementsQuery.isError) {
+    return (
+      <p role="alert" className="font-sans text-clay">
+        Couldn&apos;t load endorsements. Refresh to try again.
+      </p>
+    )
   }
 
   return (

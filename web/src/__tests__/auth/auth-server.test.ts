@@ -30,8 +30,16 @@ vi.mock('@render/api-client', () => ({
   }),
 }))
 
+// Mock @/lib/api to avoid the module-level createApiClient() call (which fires
+// the factory above before mockUse/mockGet2 are initialised, causing TDZ errors).
+vi.mock('@/lib/api', () => ({
+  apiBaseUrl: 'http://localhost:8080',
+  publicApiBaseUrl: 'http://localhost:8080',
+  apiClient: { use: vi.fn(), GET: vi.fn() },
+}))
+
 // Import the module under test AFTER all mocks are set up.
-import { getSessionUser, requireAuth } from '../../lib/auth-server'
+import { getSessionUser, requireAuth, createAuthedServerClient } from '../../lib/auth-server'
 
 const fakeUser = {
   id: '1',
@@ -113,6 +121,30 @@ describe('getSessionUser', () => {
 
     const result = await getSessionUser()
     expect(result).toBeNull()
+  })
+})
+
+describe('createAuthedServerClient', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns null when there is no session cookie', async () => {
+    mockGet.mockReturnValue(undefined)
+
+    const client = await createAuthedServerClient()
+    expect(client).toBeNull()
+  })
+
+  it('returns a client with cookie middleware when a session exists', async () => {
+    mockGet.mockReturnValue({ value: 'tok123' })
+
+    const client = await createAuthedServerClient()
+    expect(client).not.toBeNull()
+    // the mocked createApiClient captures .use() calls — assert one was registered
+    expect(mockUse).toHaveBeenCalledWith(
+      expect.objectContaining({ onRequest: expect.any(Function) }),
+    )
   })
 })
 

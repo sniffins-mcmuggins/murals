@@ -1,15 +1,12 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { createApiClient } from '@render/api-client'
+import { useQuery } from '@tanstack/react-query'
+import { apiClient } from '@/lib/api'
 import type { components } from '@render/api-client'
 
 type Festival = components['schemas']['Festival']
-
-const client = createApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
-})
 
 export default function EndorsePage({ params }: { params: Promise<{ profileID: string }> }) {
   const { profileID } = use(params)
@@ -20,15 +17,18 @@ export default function EndorsePage({ params }: { params: Promise<{ profileID: s
   const [body, setBody] = useState('')
   const [skillInput, setSkillInput] = useState('')
   const [skills, setSkills] = useState<string[]>([])
-  const [ownedFestivals, setOwnedFestivals] = useState<Festival[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    client.GET('/festivals', {}).then(({ data }) => {
-      if (data) setOwnedFestivals(data)
-    })
-  }, [])
+  const festivalsQuery = useQuery({
+    queryKey: ['my-festivals'],
+    queryFn: async () => {
+      const res = await apiClient.GET('/festivals', {})
+      if (res.error) throw new Error('Failed to load festivals')
+      return (res.data ?? []) as Festival[]
+    },
+  })
+  const ownedFestivals = festivalsQuery.data ?? []
 
   function addSkill(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' || e.key === ',') {
@@ -48,7 +48,7 @@ export default function EndorsePage({ params }: { params: Promise<{ profileID: s
     setSubmitting(true)
     setError(null)
     try {
-      const { response } = await client.POST('/endorsements', {
+      const { response } = await apiClient.POST('/endorsements', {
         body: {
           endorsee_id: profileID,
           kind,

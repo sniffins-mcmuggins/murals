@@ -4,17 +4,11 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { FESTIVAL_STATUS_TEXT } from '@/lib/festivals'
 import type { components } from '@render/api-client'
 
 type Festival = components['schemas']['Festival']
 type FestivalStatus = components['schemas']['FestivalStatus']
-
-const STATUS_COLORS: Record<FestivalStatus, string> = {
-  draft: 'text-mid',
-  open: 'text-amber',
-  live: 'text-clay',
-  archived: 'text-mid',
-}
 
 export default function FestivalsPage() {
   const queryClient = useQueryClient()
@@ -165,7 +159,7 @@ export default function FestivalsPage() {
               {f.start_date && (
                 <p className="font-sans text-xs text-mid mt-0.5">{f.start_date}{f.end_date ? ` – ${f.end_date}` : ''}</p>
               )}
-              <span className={`font-mono text-xs uppercase tracking-wider mt-1 inline-block ${STATUS_COLORS[f.status as FestivalStatus] ?? 'text-mid'}`}>
+              <span className={`font-mono text-xs uppercase tracking-wider mt-1 inline-block ${FESTIVAL_STATUS_TEXT[f.status as FestivalStatus] ?? 'text-mid'}`}>
                 {f.status}
               </span>
             </div>
