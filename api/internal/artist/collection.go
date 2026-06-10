@@ -155,7 +155,7 @@ func GetCollectionHandler(pool *pgxpool.Pool) http.HandlerFunc {
 					for _, sc := range snap.Collections {
 						if sc.ID == collIDStr {
 							w.Header().Set("Content-Type", "application/json")
-							_ = json.NewEncoder(w).Encode(sc)
+							_ = json.NewEncoder(w).Encode(sc.collectionResponse)
 							return
 						}
 					}
@@ -209,8 +209,12 @@ func ListCollectionsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if snapRow, sErr := q.GetProfileSnapshot(r.Context(), profile.ID); sErr == nil {
 				var snap profileSnapshot
 				if json.Unmarshal(snapRow.Snapshot, &snap) == nil {
+					snapColls := make([]collectionResponse, len(snap.Collections))
+					for i, sc := range snap.Collections {
+						snapColls[i] = sc.collectionResponse
+					}
 					w.Header().Set("Content-Type", "application/json")
-					_ = json.NewEncoder(w).Encode(snap.Collections)
+					_ = json.NewEncoder(w).Encode(snapColls)
 					return
 				}
 			}

@@ -423,6 +423,22 @@ func UpdateProfileHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Seed a snapshot when this PATCH transitions the profile draft → public.
+		// Without this, public reads would fall back to the live tables until the
+		// artist explicitly calls publish-changes — a leak vector.
+		if req.Visibility != nil && *req.Visibility == "public" && existing.Visibility == "draft" {
+			if err := publishSnapshotTx(r.Context(), pool, updated); err != nil {
+				slog.Error("update-profile: seed snapshot on publish", "err", err, "profile_id", updated.ID.String())
+				httperr.InternalServerError(w)
+				return
+			}
+			updated, err = q.GetArtistProfileByUserID(r.Context(), userUUID)
+			if err != nil {
+				httperr.InternalServerError(w)
+				return
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toProfileResponse(updated, false))
 	}

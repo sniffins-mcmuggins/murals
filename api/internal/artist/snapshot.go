@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,6 +34,7 @@ type imageSnapshot struct {
 	S3Key        string `json:"s3_key"`
 	CdnURL       string `json:"cdn_url"`
 	DisplayOrder int32  `json:"display_order"`
+	CreatedAt    string `json:"created_at"`
 }
 
 // isOwner reports whether the request principal owns this profile.
@@ -65,6 +67,7 @@ func buildProfileSnapshot(ctx context.Context, q *sqlcdb.Queries, profile sqlcdb
 				S3Key:        im.S3Key,
 				CdnURL:       im.CdnUrl,
 				DisplayOrder: im.DisplayOrder,
+				CreatedAt:    im.CreatedAt.Time.Format(time.RFC3339),
 			})
 		}
 		snap.Collections = append(snap.Collections, cs)

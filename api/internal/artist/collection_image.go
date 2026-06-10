@@ -94,6 +94,7 @@ func ListCollectionImagesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 									S3Key:        im.S3Key,
 									CdnURL:       im.CdnURL,
 									DisplayOrder: im.DisplayOrder,
+									CreatedAt:    im.CreatedAt,
 								}
 							}
 							w.Header().Set("Content-Type", "application/json")
