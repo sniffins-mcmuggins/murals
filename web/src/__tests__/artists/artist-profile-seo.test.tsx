@@ -9,6 +9,12 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// auth-server is `server-only`; stub it so importing the page module doesn't
+// pull the server-only guard into jsdom.
+vi.mock('@/lib/auth-server', () => ({
+  isProfileOwner: vi.fn().mockResolvedValue(false),
+}))
+
 import { apiClient } from '@/lib/api'
 import ArtistPage, { generateMetadata } from '@/app/(public)/artists/[id]/page'
 

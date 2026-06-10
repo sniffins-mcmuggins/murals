@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { absoluteUrl } from '@/lib/site'
+import { isProfileOwner } from '@/lib/auth-server'
+import { OwnerBar } from '@/components/OwnerBar'
 
 interface CollectionPageProps {
   params: Promise<{ id: string; collectionId: string }>
@@ -64,10 +66,11 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 export default async function CollectionPage({ params }: CollectionPageProps) {
   const { id, collectionId } = await params
 
-  const [profileRes, collectionRes, imagesRes] = await Promise.all([
+  const [profileRes, collectionRes, imagesRes, isOwner] = await Promise.all([
     apiClient.GET('/profiles/{profileID}', { params: { path: { profileID: id } } }),
     apiClient.GET('/collections/{collectionID}', { params: { path: { collectionID: collectionId } } }),
     apiClient.GET('/collections/{collectionID}/images', { params: { path: { collectionID: collectionId } } }),
+    isProfileOwner(id),
   ])
 
   if (collectionRes.response.status === 404 || !collectionRes.data) {
@@ -80,7 +83,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
 
   return (
     <main className="min-h-screen bg-offwhite">
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className={`max-w-4xl mx-auto px-6 py-12 ${isOwner ? 'pb-28' : ''}`}>
         <div className="mb-8">
           <Link
             href={`/artists/${id}`}
@@ -120,6 +123,14 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           </div>
         )}
       </div>
+
+      {isOwner && (
+        <OwnerBar
+          label="You're viewing your live collection"
+          editHref={`/collections/${collectionId}`}
+          editLabel="Edit collection"
+        />
+      )}
     </main>
   )
 }

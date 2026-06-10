@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { isProfileOwner } from '@/lib/auth-server'
+import { OwnerBar } from '@/components/OwnerBar'
 import { SocialLinks } from '@/components/SocialLinks'
 import { absoluteUrl } from '@/lib/site'
 import MuralMapClient from './MuralMapClient'
@@ -59,7 +61,7 @@ export async function generateMetadata({ params }: ArtistPageProps): Promise<Met
 export default async function ArtistPage({ params }: ArtistPageProps) {
   const { id } = await params
 
-  const [profileRes, collectionsRes, festivalsRes, endorsementsRes] = await Promise.all([
+  const [profileRes, collectionsRes, festivalsRes, endorsementsRes, isOwner] = await Promise.all([
     apiClient.GET('/profiles/{profileID}', {
       params: { path: { profileID: id } },
     }),
@@ -72,6 +74,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     apiClient.GET('/profiles/{profileID}/endorsements', {
       params: { path: { profileID: id } },
     }),
+    isProfileOwner(id),
   ])
 
   if (profileRes.response.status === 404 || !profileRes.data) {
@@ -136,7 +139,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className={`max-w-4xl mx-auto px-6 py-12 ${isOwner ? 'pb-28' : ''}`}>
         {/* Headline photos strip */}
         {profile.headline_image_urls.length > 0 && (
           <div className={`grid gap-2 mb-10 ${profile.headline_image_urls.length === 1 ? 'grid-cols-1' : profile.headline_image_urls.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
@@ -389,6 +392,14 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
           </section>
         )}
       </div>
+
+      {isOwner && (
+        <OwnerBar
+          label="You're viewing your live page"
+          editHref="/profile"
+          editLabel="Edit profile"
+        />
+      )}
     </main>
   )
 }

@@ -18,5 +18,8 @@ tasks:
     cmd: go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate -f sqlc.yaml
 
   seed:
-    desc: "Load seed data into the local database"
-    cmd: psql "${DATABASE_URL:-postgres://render:render@localhost:5432/render?sslmode=disable}" -f seeds/seed.sql
+    desc: "Load seed data into the local database (delegates to demo:seed)"
+    # The real seeder is the Go program in demos/seed; the old seeds/seed.sql
+    # never existed. Run from the repo root so the demo:seed namespace resolves.
+    dir: ..
+    cmd: task demo:seed

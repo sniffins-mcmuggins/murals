@@ -117,12 +117,20 @@ export default async function DashboardPage() {
                   </p>
                 )}
               </div>
-              <Link
-                href="/profile"
-                className="font-sans text-sm text-ink underline hover:text-amber whitespace-nowrap"
-              >
-                Manage profile
-              </Link>
+              <div className="flex items-center gap-4 whitespace-nowrap">
+                <Link
+                  href={`/artists/${summary.artist_profile.id}`}
+                  className="font-sans text-sm text-ink underline hover:text-amber"
+                >
+                  View live page
+                </Link>
+                <Link
+                  href="/profile"
+                  className="font-sans text-sm text-ink underline hover:text-amber"
+                >
+                  Manage profile
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="text-center py-6">
