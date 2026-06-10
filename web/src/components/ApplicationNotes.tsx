@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api'
+import { formatDate } from '@/lib/dates'
 import type { components } from '@render/api-client'
 
 type ApplicationNote = components['schemas']['ApplicationNote']
@@ -11,10 +12,6 @@ interface Props {
   festivalId: string
   applicationId: string
   notes: ApplicationNote[]
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 export function ApplicationNotes({ festivalId, applicationId, notes }: Props) {

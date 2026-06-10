@@ -6,6 +6,7 @@ import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '
 import { arrayMove } from '@dnd-kit/sortable'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { formatDate } from '@/lib/dates'
 import { ApplicationCard } from '@/components/ApplicationCard'
 import { ApplicationSlideOver } from '@/components/ApplicationSlideOver'
 import { KanbanColumn } from '@/components/KanbanColumn'
@@ -506,7 +507,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
           <div>
             <span className="font-sans text-sm font-bold text-amber">Decisions released</span>
             <span className="font-mono text-xs text-mid ml-3">
-              {new Date(releasedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {formatDate(releasedAt)}
               {' · '}artists notified by email
             </span>
           </div>

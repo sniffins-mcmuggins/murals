@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
+import { formatDate, formatDateRange } from '@/lib/dates'
 import type { components } from '@render/api-client'
 
 type Application = components['schemas']['Application']
@@ -12,14 +13,6 @@ const STATUS_COLOURS: Record<string, string> = {
   submitted: 'bg-amber/20 text-amber',
   accepted: 'bg-green-100 text-green-800',
   declined: 'bg-clay/20 text-clay',
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
 }
 
 export default function ApplicationsPage() {
@@ -112,7 +105,7 @@ export default function ApplicationsPage() {
                   )}
                   {festival.start_date && festival.end_date && (
                     <p className="font-sans text-xs text-mid">
-                      {formatDate(festival.start_date)} – {formatDate(festival.end_date)}
+                      {formatDateRange(festival.start_date, festival.end_date)}
                     </p>
                   )}
                 </div>
