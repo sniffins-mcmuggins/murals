@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 import { absoluteUrl } from '@/lib/site'
+import { isProfileOwner } from '@/lib/auth-server'
+import { OwnerBar } from '@/components/OwnerBar'
 
 interface CollectionPageProps {
   params: Promise<{ id: string; collectionId: string }>
@@ -78,9 +80,11 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
   const collection = collectionRes.data
   const images = imagesRes.data ?? []
 
+  const isOwner = await isProfileOwner(id)
+
   return (
     <main className="min-h-screen bg-offwhite">
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className={`max-w-4xl mx-auto px-6 py-12 ${isOwner ? 'pb-28' : ''}`}>
         <div className="mb-8">
           <Link
             href={`/artists/${id}`}
@@ -120,6 +124,14 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           </div>
         )}
       </div>
+
+      {isOwner && (
+        <OwnerBar
+          label="You're viewing your live collection"
+          editHref={`/collections/${collectionId}`}
+          editLabel="Edit collection"
+        />
+      )}
     </main>
   )
 }
