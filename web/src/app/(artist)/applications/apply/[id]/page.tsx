@@ -56,7 +56,8 @@ export default function ApplyPage() {
     queryKey: ['my-profile'],
     queryFn: async () => {
       const res = await apiClient.GET('/profiles/me')
-      if (res.error) return null
+      if (res.response.status === 404) return null
+      if (res.error) throw new Error('Failed to load profile')
       return (res.data ?? null) as ArtistProfile | null
     },
   })
@@ -69,7 +70,7 @@ export default function ApplyPage() {
       const res = await apiClient.GET('/profiles/{profileID}/collections', {
         params: { path: { profileID: profile!.id } },
       })
-      if (res.error) return []
+      if (res.error) throw new Error('Failed to load collections')
       return (res.data ?? []) as Collection[]
     },
     enabled: !!profile?.id,
@@ -156,6 +157,14 @@ export default function ApplyPage() {
     }
     setSubmitError(null)
     applyMutation.mutate(initialValues)
+  }
+
+  if (profileQuery.isError || collectionsQuery.isError) {
+    return (
+      <p role="alert" className="font-sans text-clay">
+        Couldn&apos;t load your details. Refresh to try again.
+      </p>
+    )
   }
 
   if (festivalQuery.isLoading || formQuery.isLoading || profileQuery.isLoading) {

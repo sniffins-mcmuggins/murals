@@ -12,7 +12,7 @@ export default function OrganiserDashboardPage() {
     queryKey: ['me-reviewing'],
     queryFn: async () => {
       const res = await apiClient.GET('/me/reviewing')
-      if (res.error) return [] as FestivalSummary[]
+      if (res.error) throw new Error('Failed to load reviewing festivals')
       return (res.data ?? []) as FestivalSummary[]
     },
   })

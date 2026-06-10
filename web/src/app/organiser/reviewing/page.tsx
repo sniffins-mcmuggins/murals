@@ -12,7 +12,7 @@ export default function ReviewingPage() {
     queryKey: ['me-reviewing'],
     queryFn: async () => {
       const res = await apiClient.GET('/me/reviewing')
-      if (res.error) return [] as FestivalSummary[]
+      if (res.error) throw new Error('Failed to load reviewing festivals')
       return (res.data ?? []) as FestivalSummary[]
     },
   })
@@ -37,7 +37,13 @@ export default function ReviewingPage() {
         <p className="font-sans text-mid text-sm">Loading…</p>
       )}
 
-      {!reviewingQuery.isLoading && festivals.length === 0 && (
+      {reviewingQuery.isError && (
+        <p role="alert" className="font-sans text-sm text-clay">
+          Couldn&apos;t load your reviewing list. Refresh to try again.
+        </p>
+      )}
+
+      {!reviewingQuery.isLoading && !reviewingQuery.isError && festivals.length === 0 && (
         <p className="font-sans text-sm text-mid">
           You haven&apos;t been invited to review any festivals yet.
         </p>

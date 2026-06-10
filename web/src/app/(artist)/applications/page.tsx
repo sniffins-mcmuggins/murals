@@ -20,7 +20,7 @@ export default function ApplicationsPage() {
     queryKey: ['my-applications'],
     queryFn: async () => {
       const res = await apiClient.GET('/me/applications', {})
-      if (res.error) return []
+      if (res.error) throw new Error('Failed to load applications')
       return (res.data ?? []) as Application[]
     },
   })
@@ -31,7 +31,7 @@ export default function ApplicationsPage() {
       const res = await apiClient.GET('/public/festivals', {
         params: { query: { status: 'open' } },
       })
-      if (res.error) return []
+      if (res.error) throw new Error('Failed to load festivals')
       return (res.data ?? []) as Festival[]
     },
   })
@@ -39,6 +39,7 @@ export default function ApplicationsPage() {
   const applications = applicationsQuery.data ?? []
   const festivals = festivalsQuery.data ?? []
   const isLoading = applicationsQuery.isLoading || festivalsQuery.isLoading
+  const isError = applicationsQuery.isError || festivalsQuery.isError
 
   return (
     <div>
@@ -50,7 +51,13 @@ export default function ApplicationsPage() {
 
         {isLoading && <p className="font-sans text-mid text-sm">Loading…</p>}
 
-        {!isLoading && applications.length === 0 && (
+        {isError && (
+          <p role="alert" className="font-sans text-sm text-clay">
+            Couldn&apos;t load your applications. Refresh to try again.
+          </p>
+        )}
+
+        {!isLoading && !isError && applications.length === 0 && (
           <p className="font-sans text-mid">No applications yet. Browse open festivals below to apply.</p>
         )}
 
@@ -87,7 +94,7 @@ export default function ApplicationsPage() {
       <section>
         <h2 className="font-serif text-2xl text-ink mb-4">Open festivals</h2>
 
-        {!isLoading && festivals.length === 0 && (
+        {!isLoading && !isError && festivals.length === 0 && (
           <p className="font-sans text-mid">No festivals are currently accepting applications.</p>
         )}
 

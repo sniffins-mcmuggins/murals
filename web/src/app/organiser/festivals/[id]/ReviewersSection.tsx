@@ -56,7 +56,7 @@ export function ReviewersSection({ festivalId }: { festivalId: string }) {
       const res = await apiClient.GET('/festivals/{festivalID}/reviewers', {
         params: { path: { festivalID: festivalId } },
       })
-      if (res.error) return [] as Reviewer[]
+      if (res.error) throw new Error('Failed to load reviewers')
       return (res.data ?? []) as Reviewer[]
     },
   })
@@ -90,7 +90,13 @@ export function ReviewersSection({ festivalId }: { festivalId: string }) {
     <div className="p-5 bg-warm border border-light rounded-lg mb-6">
       <h2 className="font-serif text-xl text-ink mb-4">Reviewers</h2>
 
-      {!reviewersQuery.isLoading && reviewers.length === 0 && (
+      {reviewersQuery.isError && (
+        <p role="alert" className="font-sans text-sm text-clay">
+          Couldn&apos;t load reviewers. Refresh to try again.
+        </p>
+      )}
+
+      {!reviewersQuery.isLoading && !reviewersQuery.isError && reviewers.length === 0 && (
         <p className="font-sans text-sm text-mid mb-4">
           No reviewers yet. Invite someone by email to score applications.
         </p>
