@@ -18,6 +18,8 @@ export default function OrganiserDashboardPage() {
   })
 
   const reviewing = reviewingQuery.data ?? []
+  // On error, the reviewing section simply doesn't render (data is undefined → [])
+  // React Query retries automatically, so no explicit error UI is needed here.
 
   return (
     <div>

@@ -33,7 +33,7 @@ export default function ApplyPage() {
       const res = await apiClient.GET('/festivals/{festivalID}', {
         params: { path: { festivalID: festivalId } },
       })
-      if (res.error) return null
+      if (res.error) throw new Error('Failed to load festival')
       return (res.data ?? null) as Festival | null
     },
     enabled: !!festivalId,
@@ -45,7 +45,7 @@ export default function ApplyPage() {
       const res = await apiClient.GET('/festivals/{festivalID}/form', {
         params: { path: { festivalID: festivalId } },
       })
-      if (res.error) return null
+      if (res.error) throw new Error('Failed to load application form')
       return (res.data ?? null) as ApplicationForm | null
     },
     enabled: !!festivalId,
@@ -159,7 +159,7 @@ export default function ApplyPage() {
     applyMutation.mutate(initialValues)
   }
 
-  if (profileQuery.isError || collectionsQuery.isError) {
+  if (profileQuery.isError || collectionsQuery.isError || festivalQuery.isError || formQuery.isError) {
     return (
       <p role="alert" className="font-sans text-clay">
         Couldn&apos;t load your details. Refresh to try again.
