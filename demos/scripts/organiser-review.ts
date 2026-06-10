@@ -25,12 +25,12 @@ test('organiser-review — triage, review round, and placement', async ({ page }
   await pause(700)
 
   // E28: each applicant's shared links show as favicons — hover one to show it's a real link.
-  await showDialog(page, "Each applicant's shared links show as favicons — and they're clickable.", { pos: 'bottom' })
+  await showDialog(page, 'Each shared link shows as a favicon — hover to see the address, then click straight through.', { pos: 'bottom' })
   const triageLink = page.locator('[data-testid="triage-mode"] [data-testid="shared-links"] a').first()
   await triageLink.scrollIntoViewIfNeeded()
   await triageLink.hover()
   await highlight(page, '[data-testid="triage-mode"] [data-testid="shared-links"] a')
-  await pause(1100)
+  await pause(1400)
 
   await showDialog(page, '→ to shortlist, ← to pass — every artist brings a different set of links.')
   await page.keyboard.press('ArrowRight'); await pause(900)

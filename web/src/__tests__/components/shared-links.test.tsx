@@ -20,7 +20,10 @@ describe('SharedLinks', () => {
     const ig = screen.getByRole('link', { name: 'Instagram' })
     expect(ig).toHaveAttribute('href', 'https://instagram.com/me')
     expect(ig).toHaveAttribute('target', '_blank')
+    expect(ig).toHaveAttribute('rel', 'noreferrer')
     expect(screen.getByRole('img', { name: 'Instagram' })).toHaveAttribute('src', '/favicons/instagram.png')
+    // The full address is shown as a hover tooltip (confidence before clicking through).
+    expect(screen.getByText('https://instagram.com/me')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Website' })).toHaveAttribute('href', 'https://me.art')
   })
 

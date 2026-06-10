@@ -38,13 +38,19 @@ export function SharedLinks({
           href={url}
           target="_blank"
           rel="noreferrer"
-          title={label}
           aria-label={label}
-          className="text-mid hover:text-ink transition-colors flex-shrink-0"
+          className="group relative inline-flex text-mid hover:text-ink transition-colors flex-shrink-0"
         >
           {icon.kind === 'favicon'
             ? <Favicon platform={icon.platform} src={icon.src} label={label} className="w-5 h-5" />
             : <SocialIcon platform="website" className="w-5 h-5" />}
+          {/* Hover tooltip showing the actual address — reassures before clicking through. */}
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute left-0 top-full mt-1 z-50 whitespace-nowrap rounded bg-ink px-2 py-1 font-mono text-[10px] text-offwhite shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          >
+            {url}
+          </span>
         </a>
       ))}
     </div>
