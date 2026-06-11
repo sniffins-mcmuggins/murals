@@ -33,6 +33,13 @@ binding contract — read the relevant one before changing a route group.
   legitimate raw `fetch` to our API left** — the only justified raw fetch is the
   external presigned-PUT inside `hooks/useImageUpload.ts` (uploads to MinIO/S3,
   not our API).
+- **This is enforced by ESLint, not convention.** `.eslintrc.json` bans `fetch(`
+  via `no-restricted-syntax`; `task lint` / the `web-lint` pre-commit hook / CI
+  all fail on a raw fetch. If you have a *genuinely external* fetch (not our
+  API), don't reach for `eslint-disable` inline — add the file to the
+  `overrides` exemption in `.eslintrc.json` with a comment, like
+  `hooks/useImageUpload.ts`. If you're tempted to exempt a call to *our* API,
+  the answer is almost always "add the endpoint to the spec" instead.
 - **Missing endpoint? Fix the spec, don't hand-roll fetch.** If the typed client
   can't call an endpoint, the cause is almost always that it's absent from
   `openapi/openapi.yaml`. Add the path + schemas there, run `task openapi:gen`
