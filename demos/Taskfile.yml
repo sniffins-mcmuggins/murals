@@ -2,7 +2,7 @@ version: "3"
 
 tasks:
   seed:
-    desc: "Wipe and re-seed the demo database (idempotent)"
+    desc: "Reset the database (truncate all app tables) and re-seed demo data (idempotent)"
     dir: seed
     # run: always — so re-seeding actually re-runs before every clip in all
     # (Task otherwise dedups a dep to once per execution). Several organiser clips

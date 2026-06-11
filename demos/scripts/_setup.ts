@@ -16,8 +16,12 @@ export const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000'
 
 // All seeded demo accounts share one password (see demos/seed/main.go).
 export const DEMO_PW = 'demo-password-2027'
-export const ORGANISER_EMAIL = 'marcus@cpf-demo.art'
 export const ARTIST_EMAIL = 'ladygabe@demo.art'
+// Lady Gabe OWNS CPF 2027 (seed: owner: featured), so she IS its organiser — the
+// organiser clips log in as her. marcus@cpf-demo.art still owns Upfest (the apply target).
+export const ORGANISER_EMAIL = ARTIST_EMAIL
+// The marcus account, kept for the Upfest-owner / apply-target festival.
+export const UPFEST_ORGANISER_EMAIL = 'marcus@cpf-demo.art'
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -59,13 +63,22 @@ export async function redeemPromo(page: Page): Promise<void> {
 
 // ── Lookups ──────────────────────────────────────────────────────────────────
 
-/** The id of the (open) Cheltenham Paint Festival 2027 — used by several clips. */
+/** The id of the (live) Cheltenham Paint Festival 2027 — used by the organiser clips. */
 export async function cpfFestivalId(ctx: APIRequestContext): Promise<string> {
-  const res = await ctx.get(`${API}/public/festivals?status=open`)
+  const res = await ctx.get(`${API}/public/festivals?status=live`)
   const festivals: Array<{ id: string; slug: string }> = await res.json()
   const cpf = festivals.find(f => f.slug === 'cpf-2027')
-  if (!cpf) throw new Error('cpfFestivalId: cpf-2027 not found (did you run task demo:seed?)')
+  if (!cpf) throw new Error('cpfFestivalId: cpf-2027 not found (did you run task demos:seed?)')
   return cpf.id
+}
+
+/** The id of the (open) Upfest 2027 — the festival Lady Gabe applies to as an artist. */
+export async function upfestFestivalId(ctx: APIRequestContext): Promise<string> {
+  const res = await ctx.get(`${API}/public/festivals?status=open`)
+  const festivals: Array<{ id: string; slug: string }> = await res.json()
+  const upfest = festivals.find(f => f.slug === 'upfest-2027')
+  if (!upfest) throw new Error('upfestFestivalId: upfest-2027 not found (did you run task demos:seed?)')
+  return upfest.id
 }
 
 /** The signed-in artist's own profile id (artist_profiles.id). */

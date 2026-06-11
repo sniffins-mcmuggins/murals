@@ -64,8 +64,11 @@ type Festival struct {
 	StartDate   string  `yaml:"start_date"`
 	EndDate     string  `yaml:"end_date"`
 	Status      string  `yaml:"status"`
-	CenterLat   float64 `yaml:"center_lat"`
-	CenterLng   float64 `yaml:"center_lng"`
+	// Owner: "" / "organiser" → the shared organiser account; "featured" → the
+	// featured artist (Lady Gabe) owns it, so logging in as her shows the organiser side too.
+	Owner     string  `yaml:"owner"`
+	CenterLat float64 `yaml:"center_lat"`
+	CenterLng float64 `yaml:"center_lng"`
 
 	// Application-based festivals
 	EndorsementsForFeaturedArtist []Endorsement    `yaml:"endorsements_for_featured_artist"`
@@ -102,6 +105,10 @@ type Applicant struct {
 	Status        string   `yaml:"status"`
 	SharedLinks   []string `yaml:"shared_links"`
 	ReviewerScore int32    `yaml:"reviewer_score"`
+	// Map spot for accepted applicants — real coordinates so the public live map
+	// renders a pin (the seed used to insert 0,0). Ignored unless status: accepted.
+	SpotLat float64 `yaml:"spot_lat"`
+	SpotLng float64 `yaml:"spot_lng"`
 }
 
 type Endorsement struct {
@@ -176,26 +183,27 @@ func main() {
 	}
 	pwHash := string(hash)
 
-	// ── cleanup ──────────────────────────────────────────────────────────────
-
-	demoEmails := []string{cfg.Accounts.AdminEmail, cfg.Accounts.OrganiserEmail, cfg.FeaturedArtist.Email}
-	for _, f := range cfg.Festivals {
-		if f.ReviewerEmail != "" {
-			demoEmails = append(demoEmails, f.ReviewerEmail)
-		}
-		for _, a := range f.Applicants {
-			demoEmails = append(demoEmails, a.Email)
-		}
+	// ── reset ──────────────────────────────────────────────────────────────────
+	// Full reset of all application data — not just the demo rows. The demo DB is
+	// shared with the e2e suite, which leaves behind hundreds of throwaway festivals
+	// / users; those would clutter the public "Open festivals" list during a live
+	// demo. Truncate every table except schema_migrations (preserving the schema),
+	// then re-seed from scratch. CASCADE handles FK order; RESTART IDENTITY resets
+	// any serial sequences.
+	if _, err := conn.Exec(ctx, `
+		DO $$
+		DECLARE r RECORD;
+		BEGIN
+			FOR r IN
+				SELECT tablename FROM pg_tables
+				WHERE schemaname = 'public' AND tablename <> 'schema_migrations'
+			LOOP
+				EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
+			END LOOP;
+		END $$;`); err != nil {
+		log.Fatalf("reset database: %v", err)
 	}
-	if _, err := conn.Exec(ctx, `DELETE FROM users WHERE email = ANY($1::text[])`, demoEmails); err != nil {
-		log.Fatalf("delete demo users: %v", err)
-	}
-	// V01 organiser-onboarding creates a timestamped CPF 2027 festival each run — clean those up.
-	if _, err := conn.Exec(ctx,
-		`DELETE FROM festivals WHERE name = 'Cheltenham Paint Festival 2027' AND slug != 'cpf-2027'`); err != nil {
-		log.Fatalf("delete stale demo festivals: %v", err)
-	}
-	fmt.Println("Cleared existing demo rows")
+	fmt.Println("Reset database (all tables truncated except schema_migrations)")
 	fmt.Printf("  password for all: %s\n", cfg.Config.Password)
 
 	// ── admin ─────────────────────────────────────────────────────────────────
@@ -289,6 +297,10 @@ func main() {
 	// ── festivals ─────────────────────────────────────────────────────────────
 
 	for _, f := range cfg.Festivals {
+		ownerID := organiserID
+		if f.Owner == "featured" {
+			ownerID = gabeUserID
+		}
 		var festivalID string
 		if err := conn.QueryRow(ctx,
 			`INSERT INTO festivals
@@ -296,7 +308,7 @@ func main() {
 			    center_lat, center_lng)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			 RETURNING id`,
-			organiserID, f.Name, f.Slug, f.Description, f.Location,
+			ownerID, f.Name, f.Slug, f.Description, f.Location,
 			f.StartDate, f.EndDate, f.Status, f.CenterLat, f.CenterLng,
 		).Scan(&festivalID); err != nil {
 			log.Fatalf("insert festival %s: %v", f.Slug, err)
@@ -314,31 +326,6 @@ func main() {
 		if len(f.Spots) > 0 {
 			fmt.Printf("  %s: %s (%d historical spots)\n", f.Slug, festivalID, len(f.Spots))
 			continue
-		}
-
-		// Endorsements for the featured artist
-		for _, e := range f.EndorsementsForFeaturedArtist {
-			switch e.Kind {
-			case "organiser":
-				if _, err := conn.Exec(ctx,
-					`INSERT INTO endorsements (endorser_id, endorsee_id, kind, festival_id, body, skills)
-					 VALUES ($1, $2, 'organiser', $3, $4, $5)
-					 ON CONFLICT (endorser_id, endorsee_id) DO NOTHING`,
-					organiserID, gabeProfileID, festivalID, e.Body, e.Skills); err != nil {
-					log.Fatalf("insert organiser endorsement: %v", err)
-				}
-			case "peer":
-				if _, err := conn.Exec(ctx,
-					`INSERT INTO endorsements (endorser_id, endorsee_id, kind, body, skills)
-					 SELECT user_id, $1, 'peer', $2, $3 FROM artist_profiles WHERE display_name = $4
-					 ON CONFLICT (endorser_id, endorsee_id) DO NOTHING`,
-					gabeProfileID, e.Body, e.Skills, e.FromArtist); err != nil {
-					log.Fatalf("insert peer endorsement from %s: %v", e.FromArtist, err)
-				}
-			}
-		}
-		if len(f.EndorsementsForFeaturedArtist) > 0 {
-			fmt.Printf("  endorsements: %s (%d)\n", ga.DisplayName, len(f.EndorsementsForFeaturedArtist))
 		}
 
 		// Application form
@@ -422,8 +409,8 @@ func main() {
 			}
 			if _, err := conn.Exec(ctx,
 				`INSERT INTO festival_spots (festival_id, number, lat, lng, artist_id)
-				 VALUES ($1, $2, 0, 0, $3)`,
-				festivalID, spotNumber, s.profileID); err != nil {
+				 VALUES ($1, $2, $3, $4, $5)`,
+				festivalID, spotNumber, s.a.SpotLat, s.a.SpotLng, s.profileID); err != nil {
 				log.Fatalf("insert spot for %s: %v", s.a.Name, err)
 			}
 			spotNumber++
@@ -488,6 +475,32 @@ func main() {
 				scored++
 			}
 			fmt.Printf("  reviewer:  %s (scores seeded for %d applications)\n", f.ReviewerEmail, scored)
+		}
+
+		// Endorsements for the featured artist. Seeded last so peer endorsements can
+		// resolve the endorser by display_name (applicants are now inserted above).
+		for _, e := range f.EndorsementsForFeaturedArtist {
+			switch e.Kind {
+			case "organiser":
+				if _, err := conn.Exec(ctx,
+					`INSERT INTO endorsements (endorser_id, endorsee_id, kind, festival_id, body, skills)
+					 VALUES ($1, $2, 'organiser', $3, $4, $5)
+					 ON CONFLICT (endorser_id, endorsee_id) DO NOTHING`,
+					ownerID, gabeProfileID, festivalID, e.Body, e.Skills); err != nil {
+					log.Fatalf("insert organiser endorsement: %v", err)
+				}
+			case "peer":
+				if _, err := conn.Exec(ctx,
+					`INSERT INTO endorsements (endorser_id, endorsee_id, kind, body, skills)
+					 SELECT user_id, $1, 'peer', $2, $3 FROM artist_profiles WHERE display_name = $4
+					 ON CONFLICT (endorser_id, endorsee_id) DO NOTHING`,
+					gabeProfileID, e.Body, e.Skills, e.FromArtist); err != nil {
+					log.Fatalf("insert peer endorsement from %s: %v", e.FromArtist, err)
+				}
+			}
+		}
+		if len(f.EndorsementsForFeaturedArtist) > 0 {
+			fmt.Printf("  endorsements: %s (%d)\n", ga.DisplayName, len(f.EndorsementsForFeaturedArtist))
 		}
 
 		fmt.Printf("  festival:  %s (%s)\n", f.Slug, festivalID)

@@ -14,7 +14,7 @@ test('artist-apply-with-profile — application pre-filled from the artist profi
   await expect(page.getByRole('heading', { name: 'Applications', exact: true })).toBeVisible({ timeout: 8000 })
 
   const openSection = page.locator('section').filter({ hasText: 'Open festivals' })
-  const item = openSection.locator('li').filter({ hasText: 'Cheltenham Paint Festival 2027' }).first()
+  const item = openSection.locator('li').filter({ hasText: 'Upfest 2027' }).first()
   await item.getByRole('link', { name: 'Apply' }).click()
   await expect(page.getByRole('heading', { name: /^Apply to/ })).toBeVisible({ timeout: 8000 })
   await pause(700)

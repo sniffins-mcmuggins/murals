@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test'
 import { pause, highlight, slowType, scrollTo, showDialog, addCursorOverlay } from './helpers.js'
 import { silentLogin } from './_setup.js'
 
-// Applying to an open festival — find CPF 2027, fill the form, submit.
+// Applying to an open festival — Lady Gabe owns CPF, so she applies to Upfest 2027
+// (a festival she doesn't own): find it, fill the form, submit.
 test('artist-apply-to-festival — submit a festival application', async ({ page }) => {
   await addCursorOverlay(page)
   await silentLogin(page) // Lady Gabe
@@ -13,7 +14,7 @@ test('artist-apply-to-festival — submit a festival application', async ({ page
   await pause(500)
 
   const openSection = page.locator('section').filter({ hasText: 'Open festivals' })
-  const item = openSection.locator('li').filter({ hasText: 'Cheltenham Paint Festival 2027' }).first()
+  const item = openSection.locator('li').filter({ hasText: 'Upfest 2027' }).first()
   await highlight(page, 'a[href*="apply"]')
   await item.getByRole('link', { name: 'Apply' }).click()
 

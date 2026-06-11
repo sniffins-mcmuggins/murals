@@ -3,7 +3,7 @@ import { pause, highlight, showDialog, addCursorOverlay } from './helpers.js'
 import { silentLogin } from './_setup.js'
 
 // The artist controls which endorsements appear on their public page.
-// Lady Gabe has a seeded organiser endorsement (CPF) and a peer one (Amara).
+// Lady Gabe has a seeded organiser endorsement (Upfest) and a peer one (Amara, CPF).
 test('artist-endorsements — manage who vouches for you', async ({ page }) => {
   await addCursorOverlay(page)
   await silentLogin(page) // Lady Gabe

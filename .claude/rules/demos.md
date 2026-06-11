@@ -13,7 +13,7 @@ is a Playwright test, recorded as a `.webm`, then converted to MP4 via `run.sh`.
 All commands run from the repo root:
 
 ```bash
-task demos:seed              # wipe + re-seed demo DB (idempotent, run before recording)
+task demos:seed              # full reset (truncate all app tables) + re-seed (run before recording)
 task demos:record V=<name>   # re-seed then record one clip (e.g. V=artist-analytics)
 task demos:convert           # convert all .webm files to MP4 (requires ffmpeg)
 task demos:all               # record every clip in the catalogue, then convert
@@ -45,9 +45,12 @@ Each festival can be either an **application-based** festival or a **historical*
 # Application-based (has a form, applicants, reviewer)
 - slug: cpf-2027
   name: ...
-  status: open          # open | live | closed
+  status: open          # draft | open | live | closed | archived (public map renders only for `live`)
+  owner: featured       # optional: "" / "organiser" → shared organiser; "featured" → Lady Gabe owns it
+                        #   (so logging in as her shows the organiser dashboard for this festival)
   center_lat / center_lng: ...
   endorsements_for_featured_artist:  # optional — organiser/peer endorsements for Lady Gabe
+                        #   (seeded AFTER applicants, so a peer's from_artist resolves)
   application_form:
     fields: [...]       # form field objects (see below)
   reviewer_email: ...
@@ -76,6 +79,8 @@ Each applicant under `festivals[*].applicants`:
   status: submitted            # submitted | accepted | declined | waitlisted
   shared_links: [instagram, tiktok, website]   # platforms shown in the slide-over
   reviewer_score: 4            # 0 = no score; 1–5 = pre-seeded for Sophie
+  spot_lat: 51.9016            # accepted only — real map coords for the live public-map pin
+  spot_lng: -2.0752            #   (omit / 0 → pin lands at 0,0; set these for accepted artists)
 ```
 
 `shared_links` accepts: `instagram`, `twitter`, `facebook`, `youtube`, `tiktok`,

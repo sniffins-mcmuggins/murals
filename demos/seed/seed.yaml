@@ -35,22 +35,32 @@ promo_codes:
     plan: artist_basic
     duration_days: 730
 
+# Reusable application-form field set (CPF + Upfest share the same shape so the
+# apply demo clips work against either festival). Field ids are answer keys — never rename.
 festivals:
+  # ── CPF 2027 ────────────────────────────────────────────────────────────────
+  # Lady Gabe OWNS this one (owner: featured) so logging in as her shows the full
+  # organiser side: dashboard, application board, review round, map editor.
+  # status: live so the public map renders her accepted artists' pins.
+  #
+  # Applicant mix (matches the "decided + a few open" demo state):
+  #   - Kit / Tomás / Amara / Rosa  → submitted, undecided  (decide live on camera;
+  #                                    also what the recorded organiser clips drive)
+  #   - Priya / Elena / Jonah       → accepted, pinned on the live map
+  #   - Carl                        → declined
+  #   - Mara                        → waitlisted
   - slug: cpf-2027
     name: Cheltenham Paint Festival 2027
     description: "The UK's premier paint festival returns for 2027. Eight days of live mural creation across the town centre."
     location: Cheltenham, UK
     start_date: "2027-10-10"
     end_date: "2027-10-17"
-    status: open
+    status: live
+    owner: featured
     center_lat: 51.8994
     center_lng: -2.0783
 
     endorsements_for_featured_artist:
-      - kind: organiser
-        from: organiser
-        body: "A consummate professional from first email to final coat — met every deadline, brilliant with the public, and the wall stopped people in their tracks. Any festival would be lucky to have her."
-        skills: [reliability, large-scale, public engagement]
       - kind: peer
         from_artist: Amara Diallo
         body: "Gabe's colour work is fearless. I've watched her take a blank gable end and turn it into the best thing on the street. A real one."
@@ -135,6 +145,7 @@ festivals:
     reviewer_email: sophie@cpf-reviewer.art
 
     applicants:
+      # ── Undecided — submitted (decide these live; recorded clips drive these too) ──
       - name: Kit Harrow
         email: kit@demo-artist.art
         bio: Urban wildlife muralist based in Bristol.
@@ -179,6 +190,70 @@ festivals:
         shared_links: [instagram, twitter, website]
         reviewer_score: 5
 
+      # ── Accepted — pinned on the live public map ──
+      - name: Priya Nair
+        email: priya@demo-artist.art
+        bio: Botanical muralist working in saturated, dreamlike palettes.
+        avatar_url: https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&h=120&fit=crop&crop=faces
+        medium: Spray paint
+        concept: A six-metre tangle of native wildflowers wrapping a corner shopfront.
+        size: "Large (20m²+)"
+        status: accepted
+        shared_links: [instagram, website]
+        reviewer_score: 5
+        spot_lat: 51.9016
+        spot_lng: -2.0752
+
+      - name: Elena Marsh
+        email: elena@demo-artist.art
+        bio: Bold typographic murals and hand-painted lettering.
+        avatar_url: https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=120&h=120&fit=crop&crop=faces
+        medium: Brush
+        concept: A hand-lettered tribute to Cheltenham's spa heritage in gold and teal.
+        size: "Medium (4–20m²)"
+        status: accepted
+        shared_links: [instagram, twitter, tiktok]
+        reviewer_score: 4
+        spot_lat: 51.8977
+        spot_lng: -2.0809
+
+      - name: Jonah Reid
+        email: jonah@demo-artist.art
+        bio: Photoreal portraiture at architectural scale.
+        avatar_url: https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=120&h=120&fit=crop&crop=faces
+        medium: Spray paint
+        concept: A towering portrait of a local jazz musician for the festival's music quarter.
+        size: "Large (20m²+)"
+        status: accepted
+        shared_links: [instagram, youtube, website]
+        reviewer_score: 5
+        spot_lat: 51.9003
+        spot_lng: -2.0768
+
+      # ── Declined ──
+      - name: Carl Boon
+        email: carl@demo-artist.art
+        bio: Stencil and paste-up artist.
+        avatar_url: https://images.unsplash.com/photo-1463453091185-61582044d556?w=120&h=120&fit=crop&crop=faces
+        medium: Mixed media
+        concept: A political paste-up series across the underpass.
+        size: "Small (up to 4m²)"
+        status: declined
+        shared_links: [instagram]
+        reviewer_score: 2
+
+      # ── Waitlisted ──
+      - name: Mara Lindqvist
+        email: mara@demo-artist.art
+        bio: Nordic-influenced line work and muted palettes.
+        avatar_url: https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=faces
+        medium: Brush
+        concept: A minimalist folk-tale frieze along a side-street hoarding.
+        size: "Medium (4–20m²)"
+        status: waitlisted
+        shared_links: [instagram, pinterest]
+        reviewer_score: 3
+
     # Used to seed Portfolio collections for any applicant with status: accepted.
     # Rotates through the list, 2 images per accepted artist.
     portfolio_images:
@@ -191,6 +266,125 @@ festivals:
       - https://static.wixstatic.com/media/6d7a7a_7826721c02e3490d9d014f35aa329588~mv2.jpg
       - https://static.wixstatic.com/media/6d7a7a_4bb66caea30b4e418e3b341b6cd813f7~mv2.jpg
 
+  # ── Upfest 2027 ───────────────────────────────────────────────────────────────
+  # Owned by the shared organiser (marcus) — NOT Lady Gabe — so that when she logs in
+  # she has an open festival she can APPLY to as an artist (she can't apply to one she
+  # owns). This is the apply-flow target for the artist-apply-* demo clips.
+  - slug: upfest-2027
+    name: Upfest 2027
+    description: "Europe's largest street art & graffiti festival returns to Bristol for 2027 — three days across Bedminster and Southville."
+    location: Bristol, UK
+    start_date: "2027-05-29"
+    end_date: "2027-05-31"
+    status: open
+    center_lat: 51.4406
+    center_lng: -2.5969
+
+    endorsements_for_featured_artist:
+      - kind: organiser
+        from: organiser
+        body: "A consummate professional from first email to final coat — met every deadline, brilliant with the public, and the wall stopped people in their tracks. Any festival would be lucky to have her."
+        skills: [reliability, large-scale, public engagement]
+
+    application_form:
+      fields:
+        - id: f1
+          type: textarea
+          label: Describe your proposed mural concept
+          required: true
+        - id: f2
+          type: select
+          label: Preferred wall size
+          options: ["Small (up to 4m²)", "Medium (4–20m²)", "Large (20m²+)"]
+          required: true
+        - id: f3
+          type: select
+          label: Primary medium
+          options: [Spray paint, Brush, Mixed media, Roller]
+          required: true
+        - id: f5
+          type: select
+          label: Do you have public liability insurance?
+          options: [Yes, No, In progress]
+          required: true
+        - id: f6
+          type: select
+          label: "Full festival availability (29–31 May)?"
+          options: ["Full period", "Partial — specify below"]
+          required: true
+        - id: f7
+          type: select
+          label: Previous outdoor mural experience
+          options: [Yes, No]
+          required: false
+        - id: f8
+          type: textarea
+          label: "Anything else you'd like to tell us?"
+          required: false
+        - id: link_instagram
+          type: text
+          label: Instagram
+          required: false
+          prefill: social.instagram
+        - id: link_twitter
+          type: text
+          label: X / Twitter
+          required: false
+          prefill: social.twitter
+        - id: link_facebook
+          type: text
+          label: Facebook
+          required: false
+          prefill: social.facebook
+        - id: link_youtube
+          type: text
+          label: YouTube
+          required: false
+          prefill: social.youtube
+        - id: link_tiktok
+          type: text
+          label: TikTok
+          required: false
+          prefill: social.tiktok
+        - id: link_linkedin
+          type: text
+          label: LinkedIn
+          required: false
+          prefill: social.linkedin
+        - id: link_pinterest
+          type: text
+          label: Pinterest
+          required: false
+          prefill: social.pinterest
+        - id: link_website
+          type: text
+          label: Website
+          required: false
+          prefill: website
+
+    applicants:
+      - name: Saskia Vale
+        email: saskia@demo-artist.art
+        bio: Large-format abstract muralist working across the South West.
+        avatar_url: https://images.unsplash.com/photo-1554151228-14d9def656e4?w=120&h=120&fit=crop&crop=faces
+        medium: Spray paint
+        concept: A flowing abstract piece inspired by the tides of the Avon.
+        size: "Large (20m²+)"
+        status: submitted
+        shared_links: [instagram, website]
+
+      - name: Owen Pryce
+        email: owen@demo-artist.art
+        bio: Character-led illustration and comic-style murals.
+        avatar_url: https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=120&h=120&fit=crop&crop=faces
+        medium: Mixed media
+        concept: A playful cast of Bristol characters across a shutter run.
+        size: "Medium (4–20m²)"
+        status: submitted
+        shared_links: [instagram, tiktok]
+
+  # ── CPF 2026 ──────────────────────────────────────────────────────────────────
+  # Historical map overlay only — no applications.
   - slug: cpf-2026
     name: Cheltenham Paint Festival 2026
     description: "The 2026 edition of the UK's premier paint festival."
