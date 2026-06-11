@@ -6,7 +6,7 @@
 
 - `POST /endorsements` — create or upsert a peer or organiser endorsement; 201 on success.
 - `DELETE /endorsements/{id}` — endorser withdraws; 204 on success.
-- `GET /profiles/{id}/endorsements` — public list, filtered to `moderation_status='ok'` and `hidden_by_endorsee=false`, organiser-first.
+- `GET /profiles/{id}/endorsements` — public list, filtered to `moderation_status='ok'` and `hidden_by_endorsee=false`, organiser-first. Each row carries `endorser_profile_id` (the endorser's public artist-profile id) **only when that profile's `visibility='public'`**, so the web page can link a peer endorser to `/artists/{id}` without risking a 404; `null`/absent for organisers and draft peers.
 - `PATCH /endorsements/{id}/visibility` — endorsee hides or shows; 200 with updated endorsement.
 - `GET /endorsements/received` — endorsee management: all received endorsements including hidden and moderated.
 
@@ -37,6 +37,7 @@
 - Organiser kind always has festival_id: DB `CHECK (kind = 'peer' OR festival_id IS NOT NULL)`.
 - `moderation_status` is one of `'ok'`, `'hidden'`, `'removed'`.
 - Public list (`ListPublicEndorsements`) never exposes `hidden_by_endorsee=true` or `moderation_status != 'ok'` rows.
+- `endorser_profile_id` is exposed on the public list **only** when the endorser's profile `visibility='public'` (SQL `CASE WHEN ap.visibility = 'public' THEN ap.id END`). It must stay aligned with the public-profile visibility gate in `artist.GetProfileHandler` — if that gate changes, this CASE changes with it, or the page links to a 404. It is omitted from the received-management response (`toReceivedRowResponse`).
 
 ## AI Context
 
@@ -48,5 +49,6 @@
 
 ## Changelog
 
+2026-06-11 — Added `endorser_profile_id` to the public list response (`ListPublicEndorsements` + `toRowResponse`), visibility-gated on `ap.visibility='public'`, so the web artist page can link peer endorsers to `/artists/{id}` and organiser endorsers to `/festivals/{festival_id}`. Plain-text fallback when absent.
 2026-06-11 — Clarified the self-endorsement invariant: the handler guard (endorsee profile `user_id` vs caller), not the DB CHECK, is what prevents it; the UI now hides the endorse affordance on the owner's own profile and the endorse form guards the self case.
 2026-06-01 — initial spec

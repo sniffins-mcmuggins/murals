@@ -105,6 +105,11 @@ SELECT
   e.updated_at,
   ap.display_name  AS endorser_display_name,
   ap.avatar_s3_key AS endorser_avatar_s3_key,
+  -- Only expose the endorser's profile id when their profile is public, so the
+  -- web page never links to an /artists/{id} that 404s (draft profiles are
+  -- invisible to non-owners). NULL for organisers (no artist profile) and
+  -- peers whose profile is still draft.
+  (CASE WHEN ap.visibility = 'public' THEN ap.id END)::uuid AS endorser_profile_id,
   f.name           AS festival_name
 FROM endorsements e
 LEFT JOIN artist_profiles ap ON ap.user_id = e.endorser_id
@@ -129,6 +134,7 @@ type ListPublicEndorsementsRow struct {
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	EndorserDisplayName *string            `db:"endorser_display_name" json:"endorser_display_name"`
 	EndorserAvatarS3Key *string            `db:"endorser_avatar_s3_key" json:"endorser_avatar_s3_key"`
+	EndorserProfileID   pgtype.UUID        `db:"endorser_profile_id" json:"endorser_profile_id"`
 	FestivalName        *string            `db:"festival_name" json:"festival_name"`
 }
 
@@ -155,6 +161,7 @@ func (q *Queries) ListPublicEndorsements(ctx context.Context, endorseeID pgtype.
 			&i.UpdatedAt,
 			&i.EndorserDisplayName,
 			&i.EndorserAvatarS3Key,
+			&i.EndorserProfileID,
 			&i.FestivalName,
 		); err != nil {
 			return nil, err

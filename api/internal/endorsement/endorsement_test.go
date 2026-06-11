@@ -319,6 +319,79 @@ func TestListPublicEndorsements(t *testing.T) {
 	assert.Equal(t, "peer", body.Endorsements[0]["kind"])
 	assert.Equal(t, "Great work", body.Endorsements[0]["body"])
 	assert.Equal(t, "Endorser", body.Endorsements[0]["endorser_display_name"])
+	// Endorser profile is still draft (createArtistProfile defaults to draft), so
+	// it must not be linkable — omitempty drops the field entirely.
+	_, hasProfileID := body.Endorsements[0]["endorser_profile_id"]
+	assert.False(t, hasProfileID, "draft endorser must not expose endorser_profile_id")
+}
+
+func TestListPublicEndorsements_PublicEndorserLinkable(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	endorserID, _, _ := testutil.CreateUser(t, db)
+	endorseeUserID, _, _ := testutil.CreateUser(t, db)
+	endorserProfileID := createArtistProfile(t, db, endorserID, "Public Endorser")
+	publishProfile(t, db, endorserProfileID)
+	endorseeProfileID := createArtistProfile(t, db, endorseeUserID, "Endorsee")
+	publishProfile(t, db, endorseeProfileID)
+
+	_, err := db.Exec(context.Background(),
+		`INSERT INTO endorsements (endorser_id, endorsee_id, kind, body, skills)
+		 VALUES ($1, $2, 'peer', 'Brilliant', '{mural}')`,
+		endorserID, endorseeProfileID)
+	require.NoError(t, err)
+
+	router := chi.NewRouter()
+	router.Get("/profiles/{profileID}/endorsements", endorsement.ListPublicHandler(db))
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	resp := testutil.DoRequest(t, srv, http.MethodGet, "/profiles/"+endorseeProfileID+"/endorsements", "", "")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body struct {
+		Endorsements []map[string]interface{} `json:"endorsements"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	_ = resp.Body.Close()
+	require.Len(t, body.Endorsements, 1)
+	// A public endorser is linkable: the response carries their profile id so the
+	// web page can link to /artists/{id}.
+	assert.Equal(t, endorserProfileID, body.Endorsements[0]["endorser_profile_id"])
+}
+
+func TestListPublicEndorsements_OrganiserHasNoProfileID(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	organiserID, _, _ := testutil.CreateUser(t, db)
+	endorseeUserID, _, _ := testutil.CreateUser(t, db)
+	endorseeProfileID := createArtistProfile(t, db, endorseeUserID, "Endorsee")
+	publishProfile(t, db, endorseeProfileID)
+	festivalID := createFestival(t, db, organiserID)
+
+	_, err := db.Exec(context.Background(),
+		`INSERT INTO endorsements (endorser_id, endorsee_id, kind, festival_id, body, skills)
+		 VALUES ($1, $2, 'organiser', $3, 'Hosted them', '{}')`,
+		organiserID, endorseeProfileID, festivalID)
+	require.NoError(t, err)
+
+	router := chi.NewRouter()
+	router.Get("/profiles/{profileID}/endorsements", endorsement.ListPublicHandler(db))
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	resp := testutil.DoRequest(t, srv, http.MethodGet, "/profiles/"+endorseeProfileID+"/endorsements", "", "")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body struct {
+		Endorsements []map[string]interface{} `json:"endorsements"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	_ = resp.Body.Close()
+	require.Len(t, body.Endorsements, 1)
+	assert.Equal(t, "organiser", body.Endorsements[0]["kind"])
+	// Organisers have no artist profile — link target is the festival, not /artists.
+	_, hasProfileID := body.Endorsements[0]["endorser_profile_id"]
+	assert.False(t, hasProfileID, "organiser endorser must not expose endorser_profile_id")
+	assert.Equal(t, festivalID, body.Endorsements[0]["festival_id"])
 }
 
 func TestListPublicEndorsements_HiddenExcluded(t *testing.T) {

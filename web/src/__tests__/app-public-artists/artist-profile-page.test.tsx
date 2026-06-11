@@ -180,3 +180,73 @@ describe('ArtistPage', () => {
     expect(notFound).not.toHaveBeenCalled()
   })
 })
+
+describe('ArtistPage — clickable endorsers', () => {
+  function peerEndorsement(
+    over: Partial<components['schemas']['EndorsementResponse']> = {},
+  ): components['schemas']['EndorsementResponse'] {
+    return {
+      id: 'endo-1',
+      kind: 'peer',
+      endorser_id: 'user-endorser-1',
+      endorser_display_name: 'Banksy',
+      skills: [],
+      hidden_by_endorsee: false,
+      created_at: '2024-01-01T00:00:00Z',
+      ...over,
+    }
+  }
+
+  function organiserEndorsement(
+    over: Partial<components['schemas']['EndorsementResponse']> = {},
+  ): components['schemas']['EndorsementResponse'] {
+    return {
+      id: 'endo-org-1',
+      kind: 'organiser',
+      endorser_id: 'user-org-1',
+      endorser_display_name: 'Festival Lead',
+      festival_id: 'fest-uuid-555',
+      festival_name: 'Upfest 2027',
+      skills: [],
+      hidden_by_endorsee: false,
+      created_at: '2024-01-01T00:00:00Z',
+      ...over,
+    }
+  }
+
+  function renderWithEndorsements(endorsements: components['schemas']['EndorsementResponse'][]) {
+    mockGet
+      .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // collections
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements }) as never)
+    return ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
+  }
+
+  it('links a peer endorser with a public profile to their /artists page', async () => {
+    const result = await renderWithEndorsements([
+      peerEndorsement({ endorser_profile_id: 'endorser-profile-999', body: 'Top work' }),
+    ])
+    const html = JSON.stringify(result)
+    expect(html).toContain('Banksy')
+    expect(html).toContain('/artists/endorser-profile-999')
+  })
+
+  it('renders a peer endorser with no public profile as plain text (no link)', async () => {
+    const result = await renderWithEndorsements([
+      peerEndorsement({ endorser_profile_id: undefined, body: 'Top work' }),
+    ])
+    const html = JSON.stringify(result)
+    expect(html).toContain('Banksy')
+    // No link to an endorser /artists page when the profile id is absent. The
+    // only /artists/* path present is the page's own profile id.
+    expect(html).not.toContain('/artists/endorser-profile-999')
+  })
+
+  it('links an organiser endorser to the festival public page', async () => {
+    const result = await renderWithEndorsements([organiserEndorsement()])
+    const html = JSON.stringify(result)
+    expect(html).toContain('Upfest 2027')
+    expect(html).toContain('/festivals/fest-uuid-555')
+  })
+})

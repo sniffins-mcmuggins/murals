@@ -699,17 +699,20 @@ type EndorsementListResponse struct {
 
 // EndorsementResponse defines model for EndorsementResponse.
 type EndorsementResponse struct {
-	Body                *string                 `json:"body,omitempty"`
-	CreatedAt           time.Time               `json:"created_at"`
-	EndorserAvatarS3Key *string                 `json:"endorser_avatar_s3_key,omitempty"`
-	EndorserDisplayName *string                 `json:"endorser_display_name,omitempty"`
-	EndorserId          openapi_types.UUID      `json:"endorser_id"`
-	FestivalId          *openapi_types.UUID     `json:"festival_id,omitempty"`
-	FestivalName        *string                 `json:"festival_name,omitempty"`
-	HiddenByEndorsee    bool                    `json:"hidden_by_endorsee"`
-	Id                  openapi_types.UUID      `json:"id"`
-	Kind                EndorsementResponseKind `json:"kind"`
-	Skills              []string                `json:"skills"`
+	Body                *string            `json:"body,omitempty"`
+	CreatedAt           time.Time          `json:"created_at"`
+	EndorserAvatarS3Key *string            `json:"endorser_avatar_s3_key,omitempty"`
+	EndorserDisplayName *string            `json:"endorser_display_name,omitempty"`
+	EndorserId          openapi_types.UUID `json:"endorser_id"`
+
+	// EndorserProfileId Public artist-profile id of the endorser, set only on the public list and only when the endorser has a published profile. Used to link to /artists/{id}. Null for organisers and unpublished peers.
+	EndorserProfileId *openapi_types.UUID     `json:"endorser_profile_id,omitempty"`
+	FestivalId        *openapi_types.UUID     `json:"festival_id,omitempty"`
+	FestivalName      *string                 `json:"festival_name,omitempty"`
+	HiddenByEndorsee  bool                    `json:"hidden_by_endorsee"`
+	Id                openapi_types.UUID      `json:"id"`
+	Kind              EndorsementResponseKind `json:"kind"`
+	Skills            []string                `json:"skills"`
 }
 
 // EndorsementResponseKind defines model for EndorsementResponse.Kind.

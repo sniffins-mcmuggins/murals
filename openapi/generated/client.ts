@@ -2508,6 +2508,11 @@ export interface components {
             endorser_id: string;
             endorser_display_name?: string | null;
             endorser_avatar_s3_key?: string | null;
+            /**
+             * Format: uuid
+             * @description Public artist-profile id of the endorser, set only on the public list and only when the endorser has a published profile. Used to link to /artists/{id}. Null for organisers and unpublished peers.
+             */
+            endorser_profile_id?: string | null;
             /** Format: uuid */
             festival_id?: string | null;
             festival_name?: string | null;

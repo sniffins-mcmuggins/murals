@@ -215,6 +215,20 @@ at the API boundary**, not by stubbing `@tanstack/react-query`.
   first `await` a loaded-state signal so the captured closure sees real data.
 - Mocking the upload hook: return the **full** shape
   `{ upload, state, isUploading, error }` (`state` is required by the type).
+- **A boundary mock proves rendering, not the server contract.** Mocking
+  `apiClient.GET` means *you* supply the response — so a test asserting behaviour
+  driven by a field (a conditional render, a link's `href`, a redirect) only
+  proves "given this field, the UI does X." It can never prove the server
+  actually sends that field. When a component newly *depends* on a server field
+  for behaviour, the Vitest test is necessary but **not sufficient**: add or
+  extend a real-server test (API e2e in `e2e/api/`, or a Playwright spec) that
+  hits the actual endpoint and asserts the field is populated on the real path —
+  including the negative case (field absent → fallback). This is the front-end
+  twin of the sqlc-scan canary in `e2e-debugging.md`: a new field can be wired
+  through types and mocks yet never leave the database. (Lived example: the
+  `endorser_profile_id` endorser link shipped with a green Vitest `href`
+  assertion but no test that the API emitted the id — the mock had been feeding
+  it by hand.)
 
 ## Test file conventions
 
@@ -228,7 +242,10 @@ at the API boundary**, not by stubbing `@tanstack/react-query`.
 - Coverage is reporting-only: `npm run test:coverage` (config in
   `vitest.config.ts`, `@vitest/coverage-v8`). No failing threshold gate yet —
   output goes to `web/coverage/` (gitignored). Don't add a hard threshold
-  without a deliberate decision.
+  without a deliberate decision. Coverage measures *execution, not assertion
+  quality* — a boundary-mocked branch reads as fully covered even when no test
+  proves the server feeds it. A coverage threshold is **not** a substitute for
+  the real-server contract test described under "Testing client pages/hooks".
 
 ## Before pushing
 
