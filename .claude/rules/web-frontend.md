@@ -55,6 +55,23 @@ binding contract — read the relevant one before changing a route group.
   shapes. This includes response DTOs like `MeSummary`, `BetaInvite`,
   `CheckoutResponse` — a page that hand-declares `type Festival = {...}` is a
   smell that the endpoint is missing from the spec (see above).
+- **Typed availability ≠ permission to render.** The generated client types
+  *every* field the server returns, including ones the UI shouldn't show. Don't
+  surface a field just because autocomplete offers it.
+  - Treat emails, other users' identities, and internal IDs (`user_id`,
+    `*_token`) as need-to-know. The spec is **descriptive, not an access
+    boundary** — hiding a field in the component still ships it over the wire
+    (visible in the network tab / RSC payload). If the API hands you PII the
+    screen doesn't need, the fix is to **trim the server response DTO**, not to
+    fetch-and-ignore it. (See the `/beta/me/invites` invitee-emails and public
+    profile `user_id` audits — both were unused fields the server over-returned.)
+  - **Server Components serialize their props to the browser.** A value you fetch
+    server-side and pass into a `'use client'` child crosses to the client and
+    sits in the page payload. Pass only the fields the child needs — e.g.
+    `dashboard/page.tsx` reads the full `/me/summary` server-side but hands the
+    card just `display_name`/`bio`, never the whole user object.
+  - Notice the API returning a field nothing renders? Don't paper over it in the
+    UI — flag it (or fix the handler) so the response DTO stops sending it.
 - **Server-side env:** server code must use `process.env.API_URL` (`http://api:8080`
   in Docker), never `NEXT_PUBLIC_API_URL` (`localhost:8080` → `ECONNREFUSED` from
   inside the container → every page 500s). Just import from `@/lib/api` /
