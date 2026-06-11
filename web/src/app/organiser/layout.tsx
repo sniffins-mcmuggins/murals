@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/auth-server'
 import Link from 'next/link'
 
 const NAV_LINKS = [
-  { href: '/organiser/dashboard', label: 'Dashboard' },
+  { href: '/dashboard', label: 'Dashboard' },
   { href: '/organiser/festivals', label: 'Festivals' },
 ]
 

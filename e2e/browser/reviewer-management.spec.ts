@@ -114,10 +114,10 @@ test.describe('reviewer management', () => {
 
     const { ctx, page } = await loginAs(browser, reviewer.email, reviewer.password, baseURL)
     try {
-      // Navigate to organiser dashboard where the Reviewing card lives
-      await page.goto('/organiser/dashboard')
-      await expect(page.getByRole('heading', { name: /Reviewing \(\d+\)/ })).toBeVisible({ timeout: 10_000 })
-      await page.getByRole('heading', { name: /Reviewing \(\d+\)/ }).click()
+      // The single dashboard surfaces a Reviewing section for invited reviewers.
+      await page.goto('/dashboard')
+      await expect(page.getByRole('heading', { name: 'Reviewing', exact: true })).toBeVisible({ timeout: 10_000 })
+      await page.getByRole('link', { name: 'Review' }).first().click()
 
       // /organiser/reviewing lists the festival
       await expect(page).toHaveURL('/organiser/reviewing')
@@ -151,11 +151,10 @@ test.describe('reviewer management', () => {
 
     const { ctx, page } = await loginAs(browser, userA.email, userA.password, baseURL)
     try {
-      // Navigate to organiser dashboard where both cards appear
-      await page.goto('/organiser/dashboard')
-      // Both cards visible
-      await expect(page.getByRole('heading', { name: 'Festivals', exact: true })).toBeVisible({ timeout: 10_000 })
-      await expect(page.getByRole('heading', { name: /Reviewing \(\d+\)/ })).toBeVisible({ timeout: 5_000 })
+      // The single dashboard shows both "Your festivals" (as organiser) and "Reviewing".
+      await page.goto('/dashboard')
+      await expect(page.getByRole('heading', { name: 'Your festivals', exact: true })).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByRole('heading', { name: 'Reviewing', exact: true })).toBeVisible({ timeout: 5_000 })
     } finally {
       await ctx.close()
     }

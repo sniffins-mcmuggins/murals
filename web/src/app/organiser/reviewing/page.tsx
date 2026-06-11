@@ -23,7 +23,7 @@ export default function ReviewingPage() {
     <div>
       <div className="mb-6">
         <Link
-          href="/organiser/dashboard"
+          href="/dashboard"
           className="font-mono text-xs text-mid uppercase tracking-widest hover:text-ink transition-colors"
         >
           ← Dashboard

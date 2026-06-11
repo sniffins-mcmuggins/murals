@@ -18,6 +18,11 @@ export default async function DashboardPage() {
     throw new Error('Failed to load dashboard summary')
   }
 
+  // Festivals the caller has been invited to review — folded into this single
+  // dashboard (there is no separate organiser dashboard). Empty for most users.
+  const { data: reviewingData } = await client.GET('/me/reviewing', {})
+  const reviewing = reviewingData ?? []
+
   let betaInvites: BetaInvite[] = []
   let betaRemaining = 0
   if (summary.is_beta) {
@@ -141,6 +146,38 @@ export default async function DashboardPage() {
             </div>
           )}
         </section>
+
+        {reviewing.length > 0 && (
+          <section className="bg-warm border border-light rounded-lg p-6">
+            <h2 className="font-serif text-2xl text-ink mb-1">Reviewing</h2>
+            <p className="font-mono text-xs uppercase tracking-wider text-mid mb-4">
+              As reviewer
+            </p>
+            <ul className="divide-y divide-light">
+              {reviewing.map((f) => (
+                <li
+                  key={f.id}
+                  className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-serif text-lg text-ink truncate">
+                      {f.name}
+                    </p>
+                    <p className="font-mono text-xs uppercase tracking-wider text-mid mt-0.5">
+                      {f.status}
+                    </p>
+                  </div>
+                  <Link
+                    href="/organiser/reviewing"
+                    className="font-sans text-sm text-ink underline hover:text-amber whitespace-nowrap"
+                  >
+                    Review
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {summary.is_beta && (
           <>

@@ -27,6 +27,7 @@
 - See e2e-debugging rule for the spot-panel / Leaflet popup selector trap
 
 ## Changelog
+2026-06-11 — Consolidated to a single dashboard. `/dashboard` is the only dashboard (artist "Your art" + organiser "Your festivals" + a new "Reviewing" section from `/me/reviewing`); there is no separate artist/organiser dashboard. `/organiser/dashboard` is now a permanent redirect to `/dashboard`, and the organiser sidebar + reviewing back-link point at `/dashboard`. A user who is both artist and organiser sees everything on one page.
 2026-05-31 — initial spec
 2026-06-05 — spot panel gained a Mural status select (now two selects → disambiguate tests by aria-label); ssr:false-in-client-wrapper invariant extended to the public mural-history map
 2026-06-11 — PR2: dashboard `page.tsx` now uses `createAuthedServerClient()` + the typed client for `/me/summary` and `/beta/me/invites` (was hand-rolled `fetch` + hand-declared entity types); types come from `components['schemas']` (`MeSummary`, `BetaInvite`). PR3: the organiser map editor split into `mapIcons.ts` / `mapHelpers.tsx` / `SpotPanel.tsx` / `MapEditorClient.tsx`; the applications board's data layer moved to `useApplicationReview(festivalId)`. Behaviour unchanged.
