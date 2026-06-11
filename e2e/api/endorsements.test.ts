@@ -28,6 +28,7 @@ async function json(res: Response) {
 let db: Client
 let endorserToken: string
 let endorser2Token: string  // second peer endorser for the 2-endorsement test
+let endorserProfileID: string
 let endorseeToken: string
 let endorseeProfileID: string
 let organiserToken: string
@@ -38,10 +39,16 @@ beforeAll(async () => {
   db = new Client(DB_URL)
   await db.connect()
 
-  // Endorser: has an artist_profile (peer kind)
+  // Endorser: has a public artist_profile (peer kind). Public visibility is what
+  // makes them linkable — the public list returns endorser_profile_id only then.
   const endorser = await createArtist(`endorser-${SUFFIX}`)
   endorserToken = endorser.token
-  await post('/profiles', { displayName: `Endorser ${SUFFIX}` }, endorserToken)
+  const endorserProfileRes = await post('/profiles', { displayName: `Endorser ${SUFFIX}` }, endorserToken)
+  endorserProfileID = (await json(endorserProfileRes)).id
+  await db.query(
+    `UPDATE artist_profiles SET visibility = 'public' WHERE id = $1`,
+    [endorserProfileID],
+  )
 
   // Endorser2: second artist for the received-list test
   const endorser2 = await createArtist(`endorser2-${SUFFIX}`)
@@ -128,6 +135,9 @@ describe('E18 endorsements', () => {
     expect(data.endorsements).toHaveLength(1)
     expect(data.endorsements[0].kind).toBe('peer')
     expect(data.endorsements[0].endorser_display_name).toContain(`Endorser ${SUFFIX}`)
+    // The endorser's profile is public, so it's linkable: the list carries their
+    // profile id for the /artists/{id} link on the web page.
+    expect(data.endorsements[0].endorser_profile_id).toBe(endorserProfileID)
   })
 
   it('5. endorsee hides → public list is empty', async () => {
