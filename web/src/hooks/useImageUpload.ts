@@ -33,7 +33,9 @@ export function useImageUpload(
       if (presignRes.error || !presignRes.data) throw new Error('Failed to get upload URL')
       const { uploadUrl, s3Key } = presignRes.data
 
-      // 2. PUT to S3/MinIO (presigned URL — not our API, raw fetch is correct here)
+      // 2. PUT to S3/MinIO (presigned URL — not our API, raw fetch is correct
+      // here). This is the ONLY sanctioned raw fetch in the app; .eslintrc.json
+      // exempts this file from the no-fetch rule for exactly this call.
       const putRes = await fetch(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': file.type },

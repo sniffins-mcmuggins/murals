@@ -16,6 +16,9 @@ web/.next/
 web/out/
 web/tsconfig.tsbuildinfo
 
+# Vitest coverage (reporting only — never committed)
+web/coverage/
+
 # React Native
 mobile/ios/Pods/
 mobile/android/build/

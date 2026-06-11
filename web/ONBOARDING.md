@@ -53,7 +53,7 @@ web/
 │   │
 │   ├── components/       ← reusable UI shared across pages (DynamicForm, cards…)
 │   │   └── wizard/       ← profile-setup wizard step components
-│   ├── hooks/            ← reusable stateful logic (image upload, reorder…)
+│   ├── hooks/            ← cross-page stateful logic (currently useImageUpload)
 │   ├── lib/              ← non-UI helpers: API client, server-side auth, utils
 │   └── __tests__/        ← Vitest unit/component tests (mirrors src/ layout)
 │
@@ -204,7 +204,32 @@ OpenAPI spec** in `openapi/`. The benefits:
   typo won't compile.
 - Request bodies and query params are typed.
 - Responses come back as `{ data, error, response }`. Always check `res.error`
-  (or `res.data`) before using the result — see the examples above.
+  (or `res.data`) before using the result — see the examples above. Branch on
+  HTTP status with `res.response.status` / `res.response.ok`.
+
+Every endpoint the platform uses is now in the spec (billing, beta, MFA, email
+verification included), so **there is no legitimate raw `fetch` to our API
+left**. The only justified raw fetch is the external presigned-PUT upload to
+MinIO/S3 inside `hooks/useImageUpload.ts` — that's not our API.
+
+A few call shapes you'll need beyond the basic GET/POST:
+
+```ts
+// query params
+apiClient.GET('/auth/verify-email', { params: { query: { token } } })
+// path params
+apiClient.GET('/collections/{collectionID}', { params: { path: { collectionID } } })
+// override the per-request Authorization header (e.g. an MFA-pending token
+// that ISN'T the session cookie)
+apiClient.POST('/auth/mfa/verify', { headers: { Authorization: `Bearer ${mfaToken}` }, body: { code } })
+// fire-and-forget beacon — openapi-fetch forwards arbitrary fetch init
+apiClient.POST('/profiles/{profileID}/link-click', { params, keepalive: true })
+```
+
+**If the typed client can't call an endpoint, the cause is almost always that
+it's missing from the spec** — add the path + schemas to `openapi/openapi.yaml`,
+run `task openapi:gen` (regenerates the TS client *and* the Go interface), commit
+both, then call it. Don't reach for raw `fetch` as a shortcut.
 
 ### Getting types for entities
 
@@ -227,10 +252,20 @@ yourself. That's exactly what `lib/auth-server.ts` does:
 - `requireAuth()` → same, but `redirect('/login')` if not logged in. Use this at
   the top of every protected Server Component page.
 
-If you need *other* authed data in a server page (not just the user), copy the
-pattern from `profile/page.tsx`: make a per-request client and inject the cookie
-via `.use({ onRequest })`. **Don't reuse the singleton `apiClient` for authed
-server calls** — it has no cookie.
+If you need *other* authed data in a server page (not just the user), call
+`createAuthedServerClient()` from `lib/auth-server.ts` — it returns a per-request
+client with the `session` cookie injected (or `null` when there's no session, so
+you decide whether that means redirect, 403, or anonymous fallback). This is THE
+way to make authed API calls from a Server Component:
+
+```tsx
+const client = await createAuthedServerClient()
+if (!client) redirect('/login')
+const { data, error } = await client.GET('/me/summary', {})
+```
+
+**Don't reuse the singleton `apiClient` for authed server calls** — it has no
+cookie.
 
 ### The OpenAPI drift check (don't get caught by this)
 
@@ -283,17 +318,28 @@ worth knowing:
   don't fork a copy.
 - `wizard/StepShell.tsx` — layout frame for the profile-setup wizard steps.
 
-**Hooks** (`src/hooks/`) wrap stateful logic so pages stay clean:
+**Hooks** (`src/hooks/`) wrap *cross-page* stateful logic so pages stay clean:
 
-- `useUploadImage.ts` — the full image-upload dance (presign → PUT to
-  MinIO/S3 → confirm → attach). A great example to read: it shows the multi-step
-  API choreography and error handling in one place.
-- `useApplicationReorder.ts`, `useProfileImageUpload.ts` — similar wrappers.
+- `useImageUpload.ts` — the full image-upload dance (presign → PUT to
+  MinIO/S3 → confirm → caller callback). A great example to read: it shows the
+  multi-step API choreography and error handling in one place, and it's the one
+  place that does the post-confirm step via a caller-supplied `onUploaded`
+  callback (the profile wizard and collection editor both reuse it).
 
-**lib helpers** (`src/lib/`) are non-UI utilities: `api.ts` (client),
-`auth-server.ts` (server auth), `prefill.ts` (which profile fields can pre-fill
-an application form — mirrored server-side), `embeds.ts` (YouTube/Vimeo/Sketchfab
-URL parsing), `mediums.ts`, `triage.ts`, `site.ts` (SEO/site metadata).
+A page-*specific* data layer doesn't belong in `src/hooks/` — co-locate it next
+to the page instead. When a client page accumulates many queries + mutations,
+lift them into a `useXxx(id)` hook beside it so the page stays layout + handlers.
+The reference is `organiser/festivals/[id]/applications/useApplicationReview.ts`
+(4 queries, 7 mutations, optimistic state).
+
+**lib helpers** (`src/lib/`) are non-UI utilities: `api.ts` (client +
+`apiBaseUrl`/`publicApiBaseUrl` — never hand-roll the env fallback),
+`auth-server.ts` (server auth + `createAuthedServerClient()`), `prefill.ts`
+(which profile fields can pre-fill an application form — mirrored server-side),
+`dates.ts` (`formatDate`/`formatDateRange`), `collections.ts` / `festivals.ts`
+(status label + colour maps), `murals.ts` (`muralStatusColour`), `embeds.ts`
+(YouTube/Vimeo/Sketchfab URL parsing), `mediums.ts`, `triage.ts`, `site.ts`
+(SEO/site metadata).
 
 ---
 
@@ -347,8 +393,13 @@ Two layers of tests protect the web app.
 - Runner: **Vitest** in a **jsdom** environment (`vitest.config.ts`).
 - Library: **React Testing Library** (`render`, `screen`, `fireEvent`,
   `getByRole`, `getByLabelText`).
-- Layout mirrors `src/` — a component at `src/components/DynamicForm.tsx` has its
-  test at `src/__tests__/components/dynamic-form.test.tsx`.
+- Layout mirrors `src/`. **All tests live under `src/__tests__/`** — don't
+  colocate `*.test.ts` next to source. A component at
+  `src/components/DynamicForm.tsx` has its test at
+  `src/__tests__/components/dynamic-form.test.tsx`.
+- Route-group test dirs are named after the group (to avoid an old
+  `artist/` vs `artists/` ambiguity): `__tests__/app-artist/` = the `(artist)`
+  group; `__tests__/app-public-artists/` = the public `/artists/[id]` pages.
 - The `@/` alias works in tests too (`import DynamicForm from '@/components/DynamicForm'`).
 
 These test components in isolation (no real backend). Example — note how it
@@ -362,8 +413,34 @@ it('renders a text field', () => {
 })
 ```
 
+**Testing a whole page or a data hook?** Drive it with a *real* React Query
+provider and mock at the API boundary — **don't** stub `@tanstack/react-query`
+and satisfy each `useQuery` positionally (that's brittle: adding a query shifts
+every mock). Use the helper `src/__tests__/helpers/query.tsx`:
+
+```tsx
+import { renderWithClient, ok, err, byPath } from '../helpers/query'
+
+vi.mock('@/lib/api', () => ({ apiClient: { GET: mockGet, POST: mockPost } }))
+
+mockGet.mockImplementation(byPath({
+  '/festivals/{festivalID}': ok(festival),       // { data, error, response }
+  '/festivals/{festivalID}/form': err(404),
+}))
+renderWithClient(<ApplyPage />)
+expect(await screen.findByRole('heading', { name: /Apply to/ })).toBeInTheDocument()
+```
+
+Assert *behaviour* ("shows 3 applications", "calls the reorder endpoint"), never
+hook call order. Avoid `toHaveClass('grid-cols-2')` style assertions — a visual
+refactor shouldn't break a test. Good examples to copy:
+`__tests__/app-artist/apply-page.test.tsx`,
+`__tests__/organiser/applications-page.test.tsx`.
+
 Run them: `task test` (or `npm test`, or `npx vitest run path/to/file.test.tsx`
-for one file, or `npx vitest` for watch mode).
+for one file, or `npx vitest` for watch mode). Coverage is reporting-only:
+`npm run test:coverage` (output in `web/coverage/`, gitignored) — there's no
+failing threshold gate.
 
 ### End-to-end tests — Playwright (`e2e/browser/`, at the repo root)
 
@@ -428,9 +505,10 @@ from a (hypothetical) `GET /me/awards` endpoint.
 6. **Extract reusable logic** into `src/hooks/` or `src/components/` if another
    page will need it. Don't copy-paste a shared field component — import it.
 
-7. **Write tests.** A Vitest component test in
-   `src/__tests__/artist/awards-page.test.tsx`. If it's a full journey, add/extend
-   a Playwright spec in `e2e/browser/`.
+7. **Write tests.** A Vitest test in `src/__tests__/app-artist/awards-page.test.tsx`
+   (route-group dirs are `app-artist` / `app-public-artists`). For a page, use the
+   real-provider + boundary-mock pattern from Section 8. If it's a full journey,
+   add/extend a Playwright spec in `e2e/browser/`.
 
 8. **Run the gates locally:** `task lint && task test` in `web/`. If you touched
    the API shape, regenerate the client so the drift check stays green.
@@ -454,7 +532,9 @@ from a (hypothetical) `GET /me/awards` endpoint.
 | Get an entity's type | `components['schemas']['Name']` from `@render/api-client` |
 | Know who's logged in (server) | `getSessionUser()` / `requireAuth()` from `@/lib/auth-server` |
 | Style something | Tailwind classes + tokens (`text-ink`, `bg-amber`, `font-serif`) |
-| Reuse logic | Hook in `src/hooks/`; UI in `src/components/` |
+| Reuse logic | Cross-page hook in `src/hooks/`; page-specific data hook co-located next to the page; UI in `src/components/` |
+| Test a page/hook | `renderWithClient` + `byPath` boundary mock (`__tests__/helpers/query.tsx`); never stub react-query |
+| Add a missing endpoint | Edit `openapi/openapi.yaml` → `task openapi:gen` → commit both → call via `apiClient` |
 | Run the app | `task up` (repo root) → http://localhost:3000 |
 | Run unit tests | `task test` (in `web/`) |
 | Run lint + types | `task lint` (in `web/`) |

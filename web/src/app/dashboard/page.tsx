@@ -1,81 +1,29 @@
-import { cookies } from 'next/headers'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import type { components } from '@render/api-client'
 
-import { requireAuth } from '@/lib/auth-server'
+import { requireAuth, createAuthedServerClient } from '@/lib/auth-server'
 import { BetaFeedbackWidget } from '@/components/BetaFeedbackWidget'
 import { BetaInviteCard } from '@/components/BetaInviteCard'
 
-const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-
-type ArtistProfile = {
-  id: string
-  display_name: string
-  bio: string
-  avatar_s3_key?: string
-}
-
-type Festival = {
-  id: string
-  name: string
-  slug: string
-  status: 'draft' | 'open' | 'live' | 'archived'
-  start_date?: string
-  end_date?: string
-}
-
-type Summary = {
-  artist_profile: ArtistProfile | null
-  festivals: Festival[]
-  is_beta: boolean
-}
-
-type BetaInvite = {
-  code: string
-  link: string
-  used_count: number
-  max_uses: number
-}
-
-type MyInvitesResponse = {
-  invites: BetaInvite[]
-  remaining_quota: number
-}
-
-async function fetchSummary(sessionCookie: string): Promise<Summary> {
-  const res = await fetch(`${API_URL}/me/summary`, {
-    headers: { Cookie: `session=${sessionCookie}` },
-    cache: 'no-store',
-  })
-  if (!res.ok) {
-    throw new Error(`/me/summary failed: ${res.status}`)
-  }
-  return res.json() as Promise<Summary>
-}
-
-async function fetchMyInvites(sessionCookie: string): Promise<MyInvitesResponse> {
-  const res = await fetch(`${API_URL}/beta/me/invites`, {
-    headers: { Cookie: `session=${sessionCookie}` },
-    cache: 'no-store',
-  })
-  if (!res.ok) {
-    return { invites: [], remaining_quota: 0 }
-  }
-  return res.json() as Promise<MyInvitesResponse>
-}
+type BetaInvite = components['schemas']['BetaInvite']
 
 export default async function DashboardPage() {
   await requireAuth()
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('session')?.value ?? ''
-  const summary = await fetchSummary(sessionCookie)
+  const client = await createAuthedServerClient()
+  if (!client) redirect('/login')
+
+  const { data: summary, error } = await client.GET('/me/summary', {})
+  if (error || !summary) {
+    throw new Error('Failed to load dashboard summary')
+  }
 
   let betaInvites: BetaInvite[] = []
   let betaRemaining = 0
   if (summary.is_beta) {
-    const betaData = await fetchMyInvites(sessionCookie)
-    betaInvites = betaData.invites
-    betaRemaining = betaData.remaining_quota
+    const { data: betaData } = await client.GET('/beta/me/invites', {})
+    betaInvites = betaData?.invites ?? []
+    betaRemaining = betaData?.remaining_quota ?? 0
   }
 
   return (

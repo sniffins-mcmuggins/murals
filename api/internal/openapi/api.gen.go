@@ -107,6 +107,30 @@ func (e ArtistProfileVisibility) Valid() bool {
 	}
 }
 
+// Defines values for BetaFeedbackRequestKind.
+const (
+	Bug       BetaFeedbackRequestKind = "bug"
+	Direction BetaFeedbackRequestKind = "direction"
+	Idea      BetaFeedbackRequestKind = "idea"
+	Praise    BetaFeedbackRequestKind = "praise"
+)
+
+// Valid indicates whether the value is a known member of the BetaFeedbackRequestKind enum.
+func (e BetaFeedbackRequestKind) Valid() bool {
+	switch e {
+	case Bug:
+		return true
+	case Direction:
+		return true
+	case Idea:
+		return true
+	case Praise:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CollectionStatus.
 const (
 	CollectionStatusActive   CollectionStatus = "active"
@@ -470,6 +494,12 @@ type ApplicationNote struct {
 // ApplicationStatus defines model for ApplicationStatus.
 type ApplicationStatus string
 
+// ArtistCheckoutRequest defines model for ArtistCheckoutRequest.
+type ArtistCheckoutRequest struct {
+	// PriceId One of the configured Stripe price IDs for an artist plan.
+	PriceId string `json:"price_id"`
+}
+
 // ArtistProfile defines model for ArtistProfile.
 type ArtistProfile struct {
 	AvatarS3Key *string   `json:"avatar_s3_key,omitempty"`
@@ -508,7 +538,7 @@ type ArtistProfile struct {
 	SupportUrl *string   `json:"support_url,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
-	// UserId UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
+	// UserId UUID of the owning user. Owner-only — omitted entirely from the public profile endpoints (GET /profiles/{id}, GET /public/profiles, published snapshots) to avoid exposing an internal account identifier. Null for unclaimed prospect profiles.
 	UserId *openapi_types.UUID `json:"user_id,omitempty"`
 
 	// Visibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.
@@ -528,6 +558,41 @@ type AttachImageRequest struct {
 
 	// S3Key The s3Key returned by POST /images/presign and confirmed via POST /images/confirm.
 	S3Key string `json:"s3Key"`
+}
+
+// BetaFeedbackRequest defines model for BetaFeedbackRequest.
+type BetaFeedbackRequest struct {
+	Body string                  `json:"body"`
+	Kind BetaFeedbackRequestKind `json:"kind"`
+}
+
+// BetaFeedbackRequestKind defines model for BetaFeedbackRequest.Kind.
+type BetaFeedbackRequestKind string
+
+// BetaFeedbackResponse defines model for BetaFeedbackResponse.
+type BetaFeedbackResponse struct {
+	AdminNote *string            `json:"admin_note,omitempty"`
+	Body      string             `json:"body"`
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	Kind      string             `json:"kind"`
+}
+
+// BetaInvite A single-use beta invite link minted by a founding member (or admin).
+type BetaInvite struct {
+	Code      string             `json:"code"`
+	Cohort    string             `json:"cohort"`
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	Link      string             `json:"link"`
+	MaxUses   int                `json:"max_uses"`
+	UsedCount int                `json:"used_count"`
+}
+
+// CheckoutResponse defines model for CheckoutResponse.
+type CheckoutResponse struct {
+	// CheckoutUrl Stripe Checkout Session URL. Redirect the browser here.
+	CheckoutUrl string `json:"checkout_url"`
 }
 
 // Collection defines model for Collection.
@@ -764,6 +829,37 @@ type MapPin struct {
 	W3w      *string             `json:"w3w,omitempty"`
 }
 
+// MeSummary Single-call snapshot powering the logged-in dashboard.
+type MeSummary struct {
+	ArtistProfile *MeSummaryProfile   `json:"artist_profile"`
+	Festivals     []MeSummaryFestival `json:"festivals"`
+	IsBeta        bool                `json:"is_beta"`
+}
+
+// MeSummaryFestival defines model for MeSummaryFestival.
+type MeSummaryFestival struct {
+	EndDate   *string            `json:"end_date,omitempty"`
+	Id        openapi_types.UUID `json:"id"`
+	Name      string             `json:"name"`
+	Slug      string             `json:"slug"`
+	StartDate *string            `json:"start_date,omitempty"`
+	Status    FestivalStatus     `json:"status"`
+}
+
+// MeSummaryProfile defines model for MeSummaryProfile.
+type MeSummaryProfile struct {
+	AvatarS3Key *string            `json:"avatar_s3_key,omitempty"`
+	Bio         string             `json:"bio"`
+	DisplayName string             `json:"display_name"`
+	Id          openapi_types.UUID `json:"id"`
+}
+
+// MfaVerifyRequest defines model for MfaVerifyRequest.
+type MfaVerifyRequest struct {
+	// Code 6-digit TOTP code from the authenticator app.
+	Code string `json:"code"`
+}
+
 // MyApplication defines model for MyApplication.
 type MyApplication struct {
 	Answers   map[string]interface{} `json:"answers"`
@@ -773,6 +869,18 @@ type MyApplication struct {
 	Id        openapi_types.UUID     `json:"id"`
 	Status    ApplicationStatus      `json:"status"`
 	UpdatedAt time.Time              `json:"updated_at"`
+}
+
+// MyInvitesResponse A member's own invite codes and remaining quota. Deliberately does NOT include who joined via the codes — that would be other users' PII; the per-invite `used_count` conveys how many joined.
+type MyInvitesResponse struct {
+	Invites        []BetaInvite `json:"invites"`
+	RemainingQuota int          `json:"remaining_quota"`
+}
+
+// PortalResponse defines model for PortalResponse.
+type PortalResponse struct {
+	// PortalUrl Stripe Customer Portal URL. Redirect the browser here.
+	PortalUrl string `json:"portal_url"`
 }
 
 // PresignRequest defines model for PresignRequest.
@@ -831,6 +939,11 @@ type ReorderCollectionsRequest struct {
 type ReorderImagesRequest struct {
 	// ImageIds Ordered list of image IDs. display_order is set by position (0-indexed).
 	ImageIds []openapi_types.UUID `json:"imageIds"`
+}
+
+// ResendVerificationRequest defines model for ResendVerificationRequest.
+type ResendVerificationRequest struct {
+	Email openapi_types.Email `json:"email"`
 }
 
 // ReviewerResponse defines model for ReviewerResponse.
@@ -922,6 +1035,12 @@ type User struct {
 	IsBeta    bool                `json:"is_beta"`
 }
 
+// VerifyEmailResponse defines model for VerifyEmailResponse.
+type VerifyEmailResponse struct {
+	// Token JWT — also set as the session HTTP-only cookie.
+	Token string `json:"token"`
+}
+
 // BadRequest RFC 7807 problem details object returned on all error responses.
 type BadRequest = Problem
 
@@ -955,6 +1074,11 @@ type ForgotPasswordJSONBody struct {
 type ResetPasswordJSONBody struct {
 	NewPassword string `json:"new_password"`
 	Token       string `json:"token"`
+}
+
+// VerifyEmailParams defines parameters for VerifyEmail.
+type VerifyEmailParams struct {
+	Token string `form:"token" json:"token"`
 }
 
 // PostFestivalsJSONBody defines parameters for PostFestivals.
@@ -1102,11 +1226,23 @@ type ForgotPasswordJSONRequestBody ForgotPasswordJSONBody
 // PostAuthLoginJSONRequestBody defines body for PostAuthLogin for application/json ContentType.
 type PostAuthLoginJSONRequestBody = LoginRequest
 
+// VerifyMfaJSONRequestBody defines body for VerifyMfa for application/json ContentType.
+type VerifyMfaJSONRequestBody = MfaVerifyRequest
+
+// ResendVerificationJSONRequestBody defines body for ResendVerification for application/json ContentType.
+type ResendVerificationJSONRequestBody = ResendVerificationRequest
+
 // ResetPasswordJSONRequestBody defines body for ResetPassword for application/json ContentType.
 type ResetPasswordJSONRequestBody ResetPasswordJSONBody
 
 // PostAuthSignupJSONRequestBody defines body for PostAuthSignup for application/json ContentType.
 type PostAuthSignupJSONRequestBody = SignupRequest
+
+// SubmitBetaFeedbackJSONRequestBody defines body for SubmitBetaFeedback for application/json ContentType.
+type SubmitBetaFeedbackJSONRequestBody = BetaFeedbackRequest
+
+// CreateArtistCheckoutJSONRequestBody defines body for CreateArtistCheckout for application/json ContentType.
+type CreateArtistCheckoutJSONRequestBody = ArtistCheckoutRequest
 
 // PostCollectionsJSONRequestBody defines body for PostCollections for application/json ContentType.
 type PostCollectionsJSONRequestBody = CreateCollectionRequest
@@ -1197,12 +1333,39 @@ type ServerInterface interface {
 	// Authenticate and receive a JWT
 	// (POST /auth/login)
 	PostAuthLogin(w http.ResponseWriter, r *http.Request)
+	// Complete login by verifying a TOTP code
+	// (POST /auth/mfa/verify)
+	VerifyMfa(w http.ResponseWriter, r *http.Request)
+	// Resend the email-verification link
+	// (POST /auth/resend-verification)
+	ResendVerification(w http.ResponseWriter, r *http.Request)
 	// Reset password using token from email
 	// (POST /auth/reset-password)
 	ResetPassword(w http.ResponseWriter, r *http.Request)
 	// Create a new user account
 	// (POST /auth/signup)
 	PostAuthSignup(w http.ResponseWriter, r *http.Request)
+	// Verify an email address using the token from the email link
+	// (GET /auth/verify-email)
+	VerifyEmail(w http.ResponseWriter, r *http.Request, params VerifyEmailParams)
+	// Submit founding-member feedback
+	// (POST /beta/feedback)
+	SubmitBetaFeedback(w http.ResponseWriter, r *http.Request)
+	// Mint a single-use beta invite link (founding members)
+	// (POST /beta/invites)
+	MintBetaInvite(w http.ResponseWriter, r *http.Request)
+	// List my minted invite codes and remaining quota
+	// (GET /beta/me/invites)
+	GetMyBetaInvites(w http.ResponseWriter, r *http.Request)
+	// Start a Stripe Checkout session for an artist subscription
+	// (POST /billing/artist/checkout)
+	CreateArtistCheckout(w http.ResponseWriter, r *http.Request)
+	// Start a Stripe Checkout session for the organiser setup fee
+	// (POST /billing/organiser/setup-checkout)
+	CreateOrganiserSetupCheckout(w http.ResponseWriter, r *http.Request)
+	// Open the Stripe Customer Portal for self-service billing
+	// (POST /billing/portal)
+	CreateBillingPortal(w http.ResponseWriter, r *http.Request)
 	// Create a collection
 	// (POST /collections)
 	PostCollections(w http.ResponseWriter, r *http.Request)
@@ -1362,6 +1525,9 @@ type ServerInterface interface {
 	// List festivals the authenticated user is a reviewer for
 	// (GET /me/reviewing)
 	GetMyReviewing(w http.ResponseWriter, r *http.Request)
+	// Dashboard snapshot — artist profile, organised festivals, beta flag
+	// (GET /me/summary)
+	GetMeSummary(w http.ResponseWriter, r *http.Request)
 	// Create artist profile
 	// (POST /profiles)
 	PostProfiles(w http.ResponseWriter, r *http.Request)
@@ -1440,6 +1606,18 @@ func (_ Unimplemented) PostAuthLogin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Complete login by verifying a TOTP code
+// (POST /auth/mfa/verify)
+func (_ Unimplemented) VerifyMfa(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Resend the email-verification link
+// (POST /auth/resend-verification)
+func (_ Unimplemented) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Reset password using token from email
 // (POST /auth/reset-password)
 func (_ Unimplemented) ResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -1449,6 +1627,48 @@ func (_ Unimplemented) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // Create a new user account
 // (POST /auth/signup)
 func (_ Unimplemented) PostAuthSignup(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Verify an email address using the token from the email link
+// (GET /auth/verify-email)
+func (_ Unimplemented) VerifyEmail(w http.ResponseWriter, r *http.Request, params VerifyEmailParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Submit founding-member feedback
+// (POST /beta/feedback)
+func (_ Unimplemented) SubmitBetaFeedback(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Mint a single-use beta invite link (founding members)
+// (POST /beta/invites)
+func (_ Unimplemented) MintBetaInvite(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List my minted invite codes and remaining quota
+// (GET /beta/me/invites)
+func (_ Unimplemented) GetMyBetaInvites(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Start a Stripe Checkout session for an artist subscription
+// (POST /billing/artist/checkout)
+func (_ Unimplemented) CreateArtistCheckout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Start a Stripe Checkout session for the organiser setup fee
+// (POST /billing/organiser/setup-checkout)
+func (_ Unimplemented) CreateOrganiserSetupCheckout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Open the Stripe Customer Portal for self-service billing
+// (POST /billing/portal)
+func (_ Unimplemented) CreateBillingPortal(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1770,6 +1990,12 @@ func (_ Unimplemented) GetMyReviewing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Dashboard snapshot — artist profile, organised festivals, beta flag
+// (GET /me/summary)
+func (_ Unimplemented) GetMeSummary(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Create artist profile
 // (POST /profiles)
 func (_ Unimplemented) PostProfiles(w http.ResponseWriter, r *http.Request) {
@@ -1937,6 +2163,40 @@ func (siw *ServerInterfaceWrapper) PostAuthLogin(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// VerifyMfa operation middleware
+func (siw *ServerInterfaceWrapper) VerifyMfa(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyMfa(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResendVerification operation middleware
+func (siw *ServerInterfaceWrapper) ResendVerification(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResendVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ResetPassword operation middleware
 func (siw *ServerInterfaceWrapper) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
@@ -1956,6 +2216,171 @@ func (siw *ServerInterfaceWrapper) PostAuthSignup(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostAuthSignup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyEmail operation middleware
+func (siw *ServerInterfaceWrapper) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params VerifyEmailParams
+
+	// ------------- Required query parameter "token" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "token", r.URL.Query(), &params.Token, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "token"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyEmail(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitBetaFeedback operation middleware
+func (siw *ServerInterfaceWrapper) SubmitBetaFeedback(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitBetaFeedback(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MintBetaInvite operation middleware
+func (siw *ServerInterfaceWrapper) MintBetaInvite(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MintBetaInvite(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMyBetaInvites operation middleware
+func (siw *ServerInterfaceWrapper) GetMyBetaInvites(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyBetaInvites(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateArtistCheckout operation middleware
+func (siw *ServerInterfaceWrapper) CreateArtistCheckout(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateArtistCheckout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOrganiserSetupCheckout operation middleware
+func (siw *ServerInterfaceWrapper) CreateOrganiserSetupCheckout(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOrganiserSetupCheckout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBillingPortal operation middleware
+func (siw *ServerInterfaceWrapper) CreateBillingPortal(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBillingPortal(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3663,6 +4088,28 @@ func (siw *ServerInterfaceWrapper) GetMyReviewing(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetMeSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetMeSummary(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, CookieAuthScopes, []string{})
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMeSummary(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostProfiles operation middleware
 func (siw *ServerInterfaceWrapper) PostProfiles(w http.ResponseWriter, r *http.Request) {
 
@@ -4221,10 +4668,37 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/auth/login", wrapper.PostAuthLogin)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/mfa/verify", wrapper.VerifyMfa)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/resend-verification", wrapper.ResendVerification)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/reset-password", wrapper.ResetPassword)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/signup", wrapper.PostAuthSignup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/verify-email", wrapper.VerifyEmail)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/beta/feedback", wrapper.SubmitBetaFeedback)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/beta/invites", wrapper.MintBetaInvite)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/beta/me/invites", wrapper.GetMyBetaInvites)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/billing/artist/checkout", wrapper.CreateArtistCheckout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/billing/organiser/setup-checkout", wrapper.CreateOrganiserSetupCheckout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/billing/portal", wrapper.CreateBillingPortal)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/collections", wrapper.PostCollections)
@@ -4384,6 +4858,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me/reviewing", wrapper.GetMyReviewing)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/summary", wrapper.GetMeSummary)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/profiles", wrapper.PostProfiles)
@@ -4579,6 +5056,76 @@ func (response PostAuthLogin401ApplicationProblemPlusJSONResponse) VisitPostAuth
 	return err
 }
 
+type VerifyMfaRequestObject struct {
+	Body *VerifyMfaJSONRequestBody
+}
+
+type VerifyMfaResponseObject interface {
+	VisitVerifyMfaResponse(w http.ResponseWriter) error
+}
+
+type VerifyMfa200JSONResponse LoginResponse
+
+func (response VerifyMfa200JSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response VerifyMfa400ApplicationProblemPlusJSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyMfa401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response VerifyMfa401ApplicationProblemPlusJSONResponse) VisitVerifyMfaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResendVerificationRequestObject struct {
+	Body *ResendVerificationJSONRequestBody
+}
+
+type ResendVerificationResponseObject interface {
+	VisitResendVerificationResponse(w http.ResponseWriter) error
+}
+
+type ResendVerification202Response struct {
+}
+
+func (response ResendVerification202Response) VisitResendVerificationResponse(w http.ResponseWriter) error {
+	w.WriteHeader(202)
+	return nil
+}
+
 type ResetPasswordRequestObject struct {
 	Body *ResetPasswordJSONRequestBody
 }
@@ -4673,6 +5220,364 @@ func (response PostAuthSignup422ApplicationProblemPlusJSONResponse) VisitPostAut
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyEmailRequestObject struct {
+	Params VerifyEmailParams
+}
+
+type VerifyEmailResponseObject interface {
+	VisitVerifyEmailResponse(w http.ResponseWriter) error
+}
+
+type VerifyEmail200JSONResponse VerifyEmailResponse
+
+func (response VerifyEmail200JSONResponse) VisitVerifyEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyEmail400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response VerifyEmail400ApplicationProblemPlusJSONResponse) VisitVerifyEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitBetaFeedbackRequestObject struct {
+	Body *SubmitBetaFeedbackJSONRequestBody
+}
+
+type SubmitBetaFeedbackResponseObject interface {
+	VisitSubmitBetaFeedbackResponse(w http.ResponseWriter) error
+}
+
+type SubmitBetaFeedback201JSONResponse BetaFeedbackResponse
+
+func (response SubmitBetaFeedback201JSONResponse) VisitSubmitBetaFeedbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitBetaFeedback400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitBetaFeedback400ApplicationProblemPlusJSONResponse) VisitSubmitBetaFeedbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitBetaFeedback401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitBetaFeedback401ApplicationProblemPlusJSONResponse) VisitSubmitBetaFeedbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MintBetaInviteRequestObject struct {
+}
+
+type MintBetaInviteResponseObject interface {
+	VisitMintBetaInviteResponse(w http.ResponseWriter) error
+}
+
+type MintBetaInvite201JSONResponse BetaInvite
+
+func (response MintBetaInvite201JSONResponse) VisitMintBetaInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MintBetaInvite401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response MintBetaInvite401ApplicationProblemPlusJSONResponse) VisitMintBetaInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MintBetaInvite403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response MintBetaInvite403ApplicationProblemPlusJSONResponse) VisitMintBetaInviteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyBetaInvitesRequestObject struct {
+}
+
+type GetMyBetaInvitesResponseObject interface {
+	VisitGetMyBetaInvitesResponse(w http.ResponseWriter) error
+}
+
+type GetMyBetaInvites200JSONResponse MyInvitesResponse
+
+func (response GetMyBetaInvites200JSONResponse) VisitGetMyBetaInvitesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyBetaInvites401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyBetaInvites401ApplicationProblemPlusJSONResponse) VisitGetMyBetaInvitesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateArtistCheckoutRequestObject struct {
+	Body *CreateArtistCheckoutJSONRequestBody
+}
+
+type CreateArtistCheckoutResponseObject interface {
+	VisitCreateArtistCheckoutResponse(w http.ResponseWriter) error
+}
+
+type CreateArtistCheckout200JSONResponse CheckoutResponse
+
+func (response CreateArtistCheckout200JSONResponse) VisitCreateArtistCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateArtistCheckout400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateArtistCheckout400ApplicationProblemPlusJSONResponse) VisitCreateArtistCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateArtistCheckout401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateArtistCheckout401ApplicationProblemPlusJSONResponse) VisitCreateArtistCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrganiserSetupCheckoutRequestObject struct {
+}
+
+type CreateOrganiserSetupCheckoutResponseObject interface {
+	VisitCreateOrganiserSetupCheckoutResponse(w http.ResponseWriter) error
+}
+
+type CreateOrganiserSetupCheckout200JSONResponse CheckoutResponse
+
+func (response CreateOrganiserSetupCheckout200JSONResponse) VisitCreateOrganiserSetupCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrganiserSetupCheckout401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrganiserSetupCheckout401ApplicationProblemPlusJSONResponse) VisitCreateOrganiserSetupCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrganiserSetupCheckout403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrganiserSetupCheckout403ApplicationProblemPlusJSONResponse) VisitCreateOrganiserSetupCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOrganiserSetupCheckout409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOrganiserSetupCheckout409ApplicationProblemPlusJSONResponse) VisitCreateOrganiserSetupCheckoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBillingPortalRequestObject struct {
+}
+
+type CreateBillingPortalResponseObject interface {
+	VisitCreateBillingPortalResponse(w http.ResponseWriter) error
+}
+
+type CreateBillingPortal200JSONResponse PortalResponse
+
+func (response CreateBillingPortal200JSONResponse) VisitCreateBillingPortalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBillingPortal401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBillingPortal401ApplicationProblemPlusJSONResponse) VisitCreateBillingPortalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBillingPortal404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateBillingPortal404ApplicationProblemPlusJSONResponse) VisitCreateBillingPortalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -7877,6 +8782,43 @@ func (response GetMyReviewing401ApplicationProblemPlusJSONResponse) VisitGetMyRe
 	return err
 }
 
+type GetMeSummaryRequestObject struct {
+}
+
+type GetMeSummaryResponseObject interface {
+	VisitGetMeSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetMeSummary200JSONResponse MeSummary
+
+func (response GetMeSummary200JSONResponse) VisitGetMeSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeSummary401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMeSummary401ApplicationProblemPlusJSONResponse) VisitGetMeSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PostProfilesRequestObject struct {
 	Body *PostProfilesJSONRequestBody
 }
@@ -8674,12 +9616,39 @@ type StrictServerInterface interface {
 	// Authenticate and receive a JWT
 	// (POST /auth/login)
 	PostAuthLogin(ctx context.Context, request PostAuthLoginRequestObject) (PostAuthLoginResponseObject, error)
+	// Complete login by verifying a TOTP code
+	// (POST /auth/mfa/verify)
+	VerifyMfa(ctx context.Context, request VerifyMfaRequestObject) (VerifyMfaResponseObject, error)
+	// Resend the email-verification link
+	// (POST /auth/resend-verification)
+	ResendVerification(ctx context.Context, request ResendVerificationRequestObject) (ResendVerificationResponseObject, error)
 	// Reset password using token from email
 	// (POST /auth/reset-password)
 	ResetPassword(ctx context.Context, request ResetPasswordRequestObject) (ResetPasswordResponseObject, error)
 	// Create a new user account
 	// (POST /auth/signup)
 	PostAuthSignup(ctx context.Context, request PostAuthSignupRequestObject) (PostAuthSignupResponseObject, error)
+	// Verify an email address using the token from the email link
+	// (GET /auth/verify-email)
+	VerifyEmail(ctx context.Context, request VerifyEmailRequestObject) (VerifyEmailResponseObject, error)
+	// Submit founding-member feedback
+	// (POST /beta/feedback)
+	SubmitBetaFeedback(ctx context.Context, request SubmitBetaFeedbackRequestObject) (SubmitBetaFeedbackResponseObject, error)
+	// Mint a single-use beta invite link (founding members)
+	// (POST /beta/invites)
+	MintBetaInvite(ctx context.Context, request MintBetaInviteRequestObject) (MintBetaInviteResponseObject, error)
+	// List my minted invite codes and remaining quota
+	// (GET /beta/me/invites)
+	GetMyBetaInvites(ctx context.Context, request GetMyBetaInvitesRequestObject) (GetMyBetaInvitesResponseObject, error)
+	// Start a Stripe Checkout session for an artist subscription
+	// (POST /billing/artist/checkout)
+	CreateArtistCheckout(ctx context.Context, request CreateArtistCheckoutRequestObject) (CreateArtistCheckoutResponseObject, error)
+	// Start a Stripe Checkout session for the organiser setup fee
+	// (POST /billing/organiser/setup-checkout)
+	CreateOrganiserSetupCheckout(ctx context.Context, request CreateOrganiserSetupCheckoutRequestObject) (CreateOrganiserSetupCheckoutResponseObject, error)
+	// Open the Stripe Customer Portal for self-service billing
+	// (POST /billing/portal)
+	CreateBillingPortal(ctx context.Context, request CreateBillingPortalRequestObject) (CreateBillingPortalResponseObject, error)
 	// Create a collection
 	// (POST /collections)
 	PostCollections(ctx context.Context, request PostCollectionsRequestObject) (PostCollectionsResponseObject, error)
@@ -8839,6 +9808,9 @@ type StrictServerInterface interface {
 	// List festivals the authenticated user is a reviewer for
 	// (GET /me/reviewing)
 	GetMyReviewing(ctx context.Context, request GetMyReviewingRequestObject) (GetMyReviewingResponseObject, error)
+	// Dashboard snapshot — artist profile, organised festivals, beta flag
+	// (GET /me/summary)
+	GetMeSummary(ctx context.Context, request GetMeSummaryRequestObject) (GetMeSummaryResponseObject, error)
 	// Create artist profile
 	// (POST /profiles)
 	PostProfiles(ctx context.Context, request PostProfilesRequestObject) (PostProfilesResponseObject, error)
@@ -9017,6 +9989,68 @@ func (sh *strictHandler) PostAuthLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// VerifyMfa operation middleware
+func (sh *strictHandler) VerifyMfa(w http.ResponseWriter, r *http.Request) {
+	var request VerifyMfaRequestObject
+
+	var body VerifyMfaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyMfa(ctx, request.(VerifyMfaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyMfa")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyMfaResponseObject); ok {
+		if err := validResponse.VisitVerifyMfaResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResendVerification operation middleware
+func (sh *strictHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var request ResendVerificationRequestObject
+
+	var body ResendVerificationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResendVerification(ctx, request.(ResendVerificationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResendVerification")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResendVerificationResponseObject); ok {
+		if err := validResponse.VisitResendVerificationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ResetPassword operation middleware
 func (sh *strictHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var request ResetPasswordRequestObject
@@ -9072,6 +10106,190 @@ func (sh *strictHandler) PostAuthSignup(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostAuthSignupResponseObject); ok {
 		if err := validResponse.VisitPostAuthSignupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyEmail operation middleware
+func (sh *strictHandler) VerifyEmail(w http.ResponseWriter, r *http.Request, params VerifyEmailParams) {
+	var request VerifyEmailRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyEmail(ctx, request.(VerifyEmailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyEmail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyEmailResponseObject); ok {
+		if err := validResponse.VisitVerifyEmailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitBetaFeedback operation middleware
+func (sh *strictHandler) SubmitBetaFeedback(w http.ResponseWriter, r *http.Request) {
+	var request SubmitBetaFeedbackRequestObject
+
+	var body SubmitBetaFeedbackJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitBetaFeedback(ctx, request.(SubmitBetaFeedbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitBetaFeedback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitBetaFeedbackResponseObject); ok {
+		if err := validResponse.VisitSubmitBetaFeedbackResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MintBetaInvite operation middleware
+func (sh *strictHandler) MintBetaInvite(w http.ResponseWriter, r *http.Request) {
+	var request MintBetaInviteRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MintBetaInvite(ctx, request.(MintBetaInviteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MintBetaInvite")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MintBetaInviteResponseObject); ok {
+		if err := validResponse.VisitMintBetaInviteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyBetaInvites operation middleware
+func (sh *strictHandler) GetMyBetaInvites(w http.ResponseWriter, r *http.Request) {
+	var request GetMyBetaInvitesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyBetaInvites(ctx, request.(GetMyBetaInvitesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyBetaInvites")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyBetaInvitesResponseObject); ok {
+		if err := validResponse.VisitGetMyBetaInvitesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateArtistCheckout operation middleware
+func (sh *strictHandler) CreateArtistCheckout(w http.ResponseWriter, r *http.Request) {
+	var request CreateArtistCheckoutRequestObject
+
+	var body CreateArtistCheckoutJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateArtistCheckout(ctx, request.(CreateArtistCheckoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateArtistCheckout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateArtistCheckoutResponseObject); ok {
+		if err := validResponse.VisitCreateArtistCheckoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateOrganiserSetupCheckout operation middleware
+func (sh *strictHandler) CreateOrganiserSetupCheckout(w http.ResponseWriter, r *http.Request) {
+	var request CreateOrganiserSetupCheckoutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateOrganiserSetupCheckout(ctx, request.(CreateOrganiserSetupCheckoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateOrganiserSetupCheckout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateOrganiserSetupCheckoutResponseObject); ok {
+		if err := validResponse.VisitCreateOrganiserSetupCheckoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateBillingPortal operation middleware
+func (sh *strictHandler) CreateBillingPortal(w http.ResponseWriter, r *http.Request) {
+	var request CreateBillingPortalRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateBillingPortal(ctx, request.(CreateBillingPortalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateBillingPortal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateBillingPortalResponseObject); ok {
+		if err := validResponse.VisitCreateBillingPortalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10600,6 +11818,30 @@ func (sh *strictHandler) GetMyReviewing(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMyReviewingResponseObject); ok {
 		if err := validResponse.VisitGetMyReviewingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMeSummary operation middleware
+func (sh *strictHandler) GetMeSummary(w http.ResponseWriter, r *http.Request) {
+	var request GetMeSummaryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMeSummary(ctx, request.(GetMeSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMeSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeSummaryResponseObject); ok {
+		if err := validResponse.VisitGetMeSummaryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

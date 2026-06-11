@@ -77,11 +77,7 @@ export default function SignupPage() {
   async function handleResend() {
     setResendPending(true)
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'}/auth/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
+      await apiClient.POST('/auth/resend-verification', { body: { email } })
       setResendDone(true)
     } finally {
       setResendPending(false)

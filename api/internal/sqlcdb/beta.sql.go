@@ -212,45 +212,6 @@ func (q *Queries) ListBetaFeedbackByUser(ctx context.Context, userID pgtype.UUID
 	return items, nil
 }
 
-const listBetaInviteesByInviter = `-- name: ListBetaInviteesByInviter :many
-SELECT id, email, beta_cohort, created_at
-FROM users
-WHERE invited_by = $1
-ORDER BY created_at ASC
-`
-
-type ListBetaInviteesByInviterRow struct {
-	ID         pgtype.UUID        `db:"id" json:"id"`
-	Email      string             `db:"email" json:"email"`
-	BetaCohort *string            `db:"beta_cohort" json:"beta_cohort"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-}
-
-func (q *Queries) ListBetaInviteesByInviter(ctx context.Context, invitedBy pgtype.UUID) ([]ListBetaInviteesByInviterRow, error) {
-	rows, err := q.db.Query(ctx, listBetaInviteesByInviter, invitedBy)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListBetaInviteesByInviterRow
-	for rows.Next() {
-		var i ListBetaInviteesByInviterRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Email,
-			&i.BetaCohort,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listBetaInvites = `-- name: ListBetaInvites :many
 SELECT id, code, created_by, max_uses, used_count, cohort, expires_at, created_at FROM beta_invites ORDER BY created_at DESC
 `

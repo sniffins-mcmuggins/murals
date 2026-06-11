@@ -29,6 +29,8 @@ tags:
     description: Festival creation, management, applications, and map data
   - name: beta
     description: Beta access — waitlist and invite-gate status
+  - name: billing
+    description: Stripe checkout and customer-portal sessions
 
 components:
   schemas:
@@ -195,8 +197,10 @@ components:
           format: uuid
           nullable: true
           description: >-
-            UUID of the owning user. Null for unclaimed prospect profiles
-            (only accessible via preview token; never returned by public endpoints).
+            UUID of the owning user. Owner-only — omitted entirely from the
+            public profile endpoints (GET /profiles/{id}, GET /public/profiles,
+            published snapshots) to avoid exposing an internal account
+            identifier. Null for unclaimed prospect profiles.
         display_name:
           type: string
         bio:
@@ -1063,6 +1067,171 @@ components:
       properties:
         hidden:
           type: boolean
+
+    ArtistCheckoutRequest:
+      type: object
+      required: [price_id]
+      properties:
+        price_id:
+          type: string
+          description: One of the configured Stripe price IDs for an artist plan.
+          example: price_pro_annual
+
+    CheckoutResponse:
+      type: object
+      required: [checkout_url]
+      properties:
+        checkout_url:
+          type: string
+          format: uri
+          description: Stripe Checkout Session URL. Redirect the browser here.
+
+    PortalResponse:
+      type: object
+      required: [portal_url]
+      properties:
+        portal_url:
+          type: string
+          format: uri
+          description: Stripe Customer Portal URL. Redirect the browser here.
+
+    MeSummaryProfile:
+      type: object
+      required: [id, display_name, bio]
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        bio:
+          type: string
+        avatar_s3_key:
+          type: string
+
+    MeSummaryFestival:
+      type: object
+      required: [id, name, slug, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          $ref: "#/components/schemas/FestivalStatus"
+        start_date:
+          type: string
+        end_date:
+          type: string
+
+    MeSummary:
+      description: Single-call snapshot powering the logged-in dashboard.
+      type: object
+      required: [artist_profile, festivals, is_beta]
+      properties:
+        artist_profile:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/MeSummaryProfile"
+        festivals:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeSummaryFestival"
+        is_beta:
+          type: boolean
+
+    BetaInvite:
+      description: A single-use beta invite link minted by a founding member (or admin).
+      type: object
+      required: [id, code, link, max_uses, used_count, cohort, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        link:
+          type: string
+          format: uri
+        max_uses:
+          type: integer
+        used_count:
+          type: integer
+        cohort:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    MyInvitesResponse:
+      description: >-
+        A member's own invite codes and remaining quota. Deliberately does NOT
+        include who joined via the codes — that would be other users' PII; the
+        per-invite `used_count` conveys how many joined.
+      type: object
+      required: [invites, remaining_quota]
+      properties:
+        invites:
+          type: array
+          items:
+            $ref: "#/components/schemas/BetaInvite"
+        remaining_quota:
+          type: integer
+
+    BetaFeedbackRequest:
+      type: object
+      required: [kind, body]
+      properties:
+        kind:
+          type: string
+          enum: [idea, bug, direction, praise]
+        body:
+          type: string
+
+    BetaFeedbackResponse:
+      type: object
+      required: [id, kind, body, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        body:
+          type: string
+        admin_note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    MfaVerifyRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: 6-digit TOTP code from the authenticator app.
+          example: "123456"
+
+    ResendVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    VerifyEmailResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: JWT — also set as the session HTTP-only cookie.
 
   securitySchemes:
     cookieAuth:
@@ -3344,3 +3513,223 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+
+  /auth/mfa/verify:
+    post:
+      operationId: verifyMfa
+      summary: Complete login by verifying a TOTP code
+      description: >-
+        Second step of an MFA login. The Authorization bearer token here is the
+        short-lived mfa_pending token returned by POST /auth/login, NOT a
+        session token. On success sets the session cookie and returns the JWT.
+      tags: [auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaVerifyRequest"
+      responses:
+        "200":
+          description: MFA verified; session established.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/verify-email:
+    get:
+      operationId: verifyEmail
+      summary: Verify an email address using the token from the email link
+      description: >-
+        Validates the one-time token, marks the email verified, and establishes
+        a session (sets the cookie and returns the JWT).
+      tags: [auth]
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Email verified; session established.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyEmailResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /auth/resend-verification:
+    post:
+      operationId: resendVerification
+      summary: Resend the email-verification link
+      description: >-
+        Always returns 202 — never leaks whether the email is registered.
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendVerificationRequest"
+      responses:
+        "202":
+          description: If the email is registered and unverified, a new link is sent.
+
+  /me/summary:
+    get:
+      operationId: getMeSummary
+      summary: Dashboard snapshot — artist profile, organised festivals, beta flag
+      tags: [auth]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Summary for the authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /billing/artist/checkout:
+    post:
+      operationId: createArtistCheckout
+      summary: Start a Stripe Checkout session for an artist subscription
+      tags: [billing]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtistCheckoutRequest"
+      responses:
+        "200":
+          description: Checkout session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /billing/organiser/setup-checkout:
+    post:
+      operationId: createOrganiserSetupCheckout
+      summary: Start a Stripe Checkout session for the organiser setup fee
+      tags: [billing]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Checkout session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /billing/portal:
+    post:
+      operationId: createBillingPortal
+      summary: Open the Stripe Customer Portal for self-service billing
+      tags: [billing]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Portal session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /beta/invites:
+    post:
+      operationId: mintBetaInvite
+      summary: Mint a single-use beta invite link (founding members)
+      tags: [beta]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Invite created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetaInvite"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /beta/me/invites:
+    get:
+      operationId: getMyBetaInvites
+      summary: List my minted invite codes and remaining quota
+      tags: [beta]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: My invite codes and remaining quota.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyInvitesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /beta/feedback:
+    post:
+      operationId: submitBetaFeedback
+      summary: Submit founding-member feedback
+      tags: [beta]
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BetaFeedbackRequest"
+      responses:
+        "201":
+          description: Feedback recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BetaFeedbackResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"

@@ -169,12 +169,20 @@ func TestGetMyInvitesHandler(t *testing.T) {
 	getH.ServeHTTP(w, r)
 
 	require.Equal(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+
+	// Security canary: the member invites response must never carry invitee PII.
+	// `used_count` per invite conveys how many joined; returning the joiners'
+	// emails would leak other users' PII to the inviter. If a future change
+	// re-adds an `invitees` array, this assertion fails on purpose.
+	assert.NotContains(t, body, "invitees")
+	assert.NotContains(t, body, "email")
+
 	var resp struct {
 		Invites        []map[string]interface{} `json:"invites"`
-		Invitees       []interface{}            `json:"invitees"`
 		RemainingQuota int                      `json:"remaining_quota"`
 	}
-	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	require.NoError(t, json.Unmarshal([]byte(body), &resp))
 	assert.Len(t, resp.Invites, 2)
 	assert.Equal(t, 1, resp.RemainingQuota) // 3 quota - 2 minted = 1
 }

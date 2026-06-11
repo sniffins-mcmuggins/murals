@@ -1756,6 +1756,185 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/mfa/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete login by verifying a TOTP code
+         * @description Second step of an MFA login. The Authorization bearer token here is the short-lived mfa_pending token returned by POST /auth/login, NOT a session token. On success sets the session cookie and returns the JWT.
+         */
+        post: operations["verifyMfa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify an email address using the token from the email link
+         * @description Validates the one-time token, marks the email verified, and establishes a session (sets the cookie and returns the JWT).
+         */
+        get: operations["verifyEmail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/resend-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend the email-verification link
+         * @description Always returns 202 — never leaks whether the email is registered.
+         */
+        post: operations["resendVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard snapshot — artist profile, organised festivals, beta flag */
+        get: operations["getMeSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/artist/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a Stripe Checkout session for an artist subscription */
+        post: operations["createArtistCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/organiser/setup-checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a Stripe Checkout session for the organiser setup fee */
+        post: operations["createOrganiserSetupCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open the Stripe Customer Portal for self-service billing */
+        post: operations["createBillingPortal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/beta/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint a single-use beta invite link (founding members) */
+        post: operations["mintBetaInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/beta/me/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my minted invite codes and remaining quota */
+        get: operations["getMyBetaInvites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/beta/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit founding-member feedback */
+        post: operations["submitBetaFeedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1871,7 +2050,7 @@ export interface components {
             id: string;
             /**
              * Format: uuid
-             * @description UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
+             * @description UUID of the owning user. Owner-only — omitted entirely from the public profile endpoints (GET /profiles/{id}, GET /public/profiles, published snapshots) to avoid exposing an internal account identifier. Null for unclaimed prospect profiles.
              */
             user_id?: string | null;
             display_name: string;
@@ -2353,6 +2532,96 @@ export interface components {
         };
         SetEndorsementVisibilityRequest: {
             hidden: boolean;
+        };
+        ArtistCheckoutRequest: {
+            /**
+             * @description One of the configured Stripe price IDs for an artist plan.
+             * @example price_pro_annual
+             */
+            price_id: string;
+        };
+        CheckoutResponse: {
+            /**
+             * Format: uri
+             * @description Stripe Checkout Session URL. Redirect the browser here.
+             */
+            checkout_url: string;
+        };
+        PortalResponse: {
+            /**
+             * Format: uri
+             * @description Stripe Customer Portal URL. Redirect the browser here.
+             */
+            portal_url: string;
+        };
+        MeSummaryProfile: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            bio: string;
+            avatar_s3_key?: string;
+        };
+        MeSummaryFestival: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            status: components["schemas"]["FestivalStatus"];
+            start_date?: string;
+            end_date?: string;
+        };
+        /** @description Single-call snapshot powering the logged-in dashboard. */
+        MeSummary: {
+            artist_profile: components["schemas"]["MeSummaryProfile"] | null;
+            festivals: components["schemas"]["MeSummaryFestival"][];
+            is_beta: boolean;
+        };
+        /** @description A single-use beta invite link minted by a founding member (or admin). */
+        BetaInvite: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** Format: uri */
+            link: string;
+            max_uses: number;
+            used_count: number;
+            cohort: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /** @description A member's own invite codes and remaining quota. Deliberately does NOT include who joined via the codes — that would be other users' PII; the per-invite `used_count` conveys how many joined. */
+        MyInvitesResponse: {
+            invites: components["schemas"]["BetaInvite"][];
+            remaining_quota: number;
+        };
+        BetaFeedbackRequest: {
+            /** @enum {string} */
+            kind: "idea" | "bug" | "direction" | "praise";
+            body: string;
+        };
+        BetaFeedbackResponse: {
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            body: string;
+            admin_note?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        MfaVerifyRequest: {
+            /**
+             * @description 6-digit TOTP code from the authenticator app.
+             * @example 123456
+             */
+            code: string;
+        };
+        ResendVerificationRequest: {
+            /** Format: email */
+            email: string;
+        };
+        VerifyEmailResponse: {
+            /** @description JWT — also set as the session HTTP-only cookie. */
+            token: string;
         };
     };
     responses: {
@@ -3931,6 +4200,238 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    verifyMfa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description MFA verified; session established. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    verifyEmail: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Email verified; session established. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyEmailResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    resendVerification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendVerificationRequest"];
+            };
+        };
+        responses: {
+            /** @description If the email is registered and unverified, a new link is sent. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getMeSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Summary for the authenticated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createArtistCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtistCheckoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Checkout session created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createOrganiserSetupCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Checkout session created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    createBillingPortal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Portal session created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    mintBetaInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invite created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BetaInvite"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getMyBetaInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description My invite codes and remaining quota. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyInvitesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    submitBetaFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BetaFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Feedback recorded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BetaFeedbackResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

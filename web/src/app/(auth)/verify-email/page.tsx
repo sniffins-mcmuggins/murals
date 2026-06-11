@@ -3,8 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+import { apiClient } from '@/lib/api'
 
 function VerifyEmailContent() {
   const router = useRouter()
@@ -19,11 +18,10 @@ function VerifyEmailContent() {
       return
     }
 
-    fetch(`${apiUrl}/auth/verify-email?token=${encodeURIComponent(token)}`, {
-      credentials: 'include',
-    })
-      .then(async (res) => {
-        if (!res.ok) {
+    apiClient
+      .GET('/auth/verify-email', { params: { query: { token } } })
+      .then(({ response }) => {
+        if (!response.ok) {
           setError('This link is invalid or has expired. Please request a new verification email.')
           return
         }

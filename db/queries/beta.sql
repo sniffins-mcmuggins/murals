@@ -38,12 +38,6 @@ SELECT * FROM beta_invites WHERE created_by = $1 ORDER BY created_at DESC;
 -- name: CountBetaInvitesByCreator :one
 SELECT COUNT(*)::int FROM beta_invites WHERE created_by = $1;
 
--- name: ListBetaInviteesByInviter :many
-SELECT id, email, beta_cohort, created_at
-FROM users
-WHERE invited_by = $1
-ORDER BY created_at ASC;
-
 -- name: CreateBetaFeedback :one
 INSERT INTO beta_feedback (user_id, kind, body)
 VALUES ($1, $2, $3)
