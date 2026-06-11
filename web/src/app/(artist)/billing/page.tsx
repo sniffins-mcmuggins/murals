@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { PricingCard } from '@/components/PricingCard'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+import { apiClient } from '@/lib/api'
 
 const PLANS = {
   basic: {
@@ -39,22 +38,18 @@ export default function ArtistBillingPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/billing/artist/checkout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ price_id: priceId }),
+      const { data, response } = await apiClient.POST('/billing/artist/checkout', {
+        body: { price_id: priceId },
       })
-      if (!res.ok) {
+      if (!response.ok) {
         setError(
-          res.status === 401
+          response.status === 401
             ? 'Please log in again to subscribe.'
             : 'Could not start checkout. Please try again.',
         )
         return
       }
-      const data = (await res.json()) as { checkout_url?: string }
-      if (!data.checkout_url) {
+      if (!data?.checkout_url) {
         setError('Stripe did not return a checkout URL. Please try again.')
         return
       }
@@ -69,20 +64,16 @@ export default function ArtistBillingPage() {
   async function handleManage() {
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/billing/portal`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!res.ok) {
+      const { data, response } = await apiClient.POST('/billing/portal', {})
+      if (!response.ok) {
         setError(
-          res.status === 404
+          response.status === 404
             ? 'No active subscription to manage. Choose a plan above to get started.'
             : 'Could not open the billing portal. Please try again.',
         )
         return
       }
-      const data = (await res.json()) as { portal_url?: string }
-      if (!data.portal_url) {
+      if (!data?.portal_url) {
         setError('Stripe did not return a portal URL. Please try again.')
         return
       }

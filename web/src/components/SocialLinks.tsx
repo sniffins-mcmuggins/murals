@@ -1,6 +1,7 @@
 'use client'
 
 import { SocialIcon } from '@/components/SocialIcon'
+import { apiClient } from '@/lib/api'
 
 interface SocialLinksProps {
   profileId: string
@@ -8,8 +9,14 @@ interface SocialLinksProps {
 }
 
 function recordLinkClick(profileId: string) {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-  fetch(`${base}/profiles/${profileId}/link-click`, { method: 'POST', keepalive: true }).catch(() => {})
+  // keepalive lets the beacon survive navigation; openapi-fetch forwards
+  // arbitrary fetch init (here keepalive) through to the underlying request.
+  apiClient
+    .POST('/profiles/{profileID}/link-click', {
+      params: { path: { profileID: profileId } },
+      keepalive: true,
+    })
+    .catch(() => {})
 }
 
 export function SocialLinks({ profileId, socialLinks }: SocialLinksProps) {

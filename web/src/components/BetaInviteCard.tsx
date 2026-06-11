@@ -1,13 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import type { components } from '@render/api-client'
+import { apiClient } from '@/lib/api'
 
-type Invite = {
-  code: string
-  link: string
-  used_count: number
-  max_uses: number
-}
+type Invite = components['schemas']['BetaInvite']
 
 type Props = {
   initialInvites: Invite[]
@@ -23,11 +20,9 @@ export function BetaInviteCard({ initialInvites, initialRemaining }: Props) {
   async function mintInvite() {
     setLoading(true)
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-      const res = await fetch(`${base}/beta/invites`, { method: 'POST', credentials: 'include' })
-      if (!res.ok) return
-      const inv: Invite = await res.json()
-      setInvites((prev) => [inv, ...prev])
+      const { data, error } = await apiClient.POST('/beta/invites', {})
+      if (error || !data) return
+      setInvites((prev) => [data, ...prev])
       setRemaining((prev) => Math.max(0, prev - 1))
     } finally {
       setLoading(false)

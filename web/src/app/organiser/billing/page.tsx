@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+import { apiClient } from '@/lib/api'
 
 export default function OrgBillingPage() {
   const [error, setError] = useState<string | null>(null)
@@ -12,22 +11,21 @@ export default function OrgBillingPage() {
     setError(null)
     setLoading('setup')
     try {
-      const res = await fetch(`${API_URL}/billing/organiser/setup-checkout`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        if (res.status === 409) {
+      const { data, response } = await apiClient.POST(
+        '/billing/organiser/setup-checkout',
+        {},
+      )
+      if (!response.ok) {
+        if (response.status === 409) {
           setError('Setup fee has already been paid for this account.')
-        } else if (res.status === 401 || res.status === 403) {
+        } else if (response.status === 401 || response.status === 403) {
           setError('Please log in with your organiser account to pay the setup fee.')
         } else {
           setError('Could not start checkout. Please try again.')
         }
         return
       }
-      const data = (await res.json()) as { checkout_url?: string }
-      if (!data.checkout_url) {
+      if (!data?.checkout_url) {
         setError('Stripe did not return a checkout URL. Please try again.')
         return
       }
@@ -43,20 +41,16 @@ export default function OrgBillingPage() {
     setError(null)
     setLoading('manage')
     try {
-      const res = await fetch(`${API_URL}/billing/portal`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (!res.ok) {
+      const { data, response } = await apiClient.POST('/billing/portal', {})
+      if (!response.ok) {
         setError(
-          res.status === 404
+          response.status === 404
             ? 'No billing account yet. Pay the setup fee above to get started.'
             : 'Could not open the billing portal. Please try again.',
         )
         return
       }
-      const data = (await res.json()) as { portal_url?: string }
-      if (!data.portal_url) {
+      if (!data?.portal_url) {
         setError('Stripe did not return a portal URL. Please try again.')
         return
       }

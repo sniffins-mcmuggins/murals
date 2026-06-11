@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { apiClient } from '@/lib/api'
 
 type FeedbackKind = 'idea' | 'bug' | 'direction' | 'praise'
 
@@ -21,14 +22,10 @@ export function BetaFeedbackWidget() {
     if (!body.trim()) return
     setStatus('sending')
     try {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-      const res = await fetch(`${base}/beta/feedback`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, body: body.trim() }),
+      const { error } = await apiClient.POST('/beta/feedback', {
+        body: { kind, body: body.trim() },
       })
-      if (res.ok) {
+      if (!error) {
         setStatus('sent')
         setBody('')
         setTimeout(() => setStatus('idle'), 3000)

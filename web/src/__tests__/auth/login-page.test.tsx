@@ -17,6 +17,7 @@ vi.mock('@/lib/api', () => ({
   apiClient: {
     POST: mockPost,
   },
+  publicApiBaseUrl: 'http://localhost:8080',
 }))
 
 // Import after mocks are set up.

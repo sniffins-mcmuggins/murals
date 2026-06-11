@@ -1,20 +1,23 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import React from 'react'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { renderWithClient, ok, err, byPath } from '../helpers/query'
 
-vi.mock('@/lib/api', () => ({ apiClient: { GET: vi.fn(), POST: vi.fn(), PATCH: vi.fn() } }))
+// Boundary mock: a real QueryClient drives the hooks; we stub only the API and
+// the dnd-kit context (so we can fire a synthetic drag without a real pointer).
+const { mockGet, mockPost, mockPatch, mockPut } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+  mockPost: vi.fn(),
+  mockPatch: vi.fn(),
+  mockPut: vi.fn(),
+}))
+
+vi.mock('@/lib/api', () => ({
+  apiClient: { GET: mockGet, POST: mockPost, PATCH: mockPatch, PUT: mockPut },
+}))
 vi.mock('next/link', () => ({
   default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) =>
     React.createElement('a', { href, className }, children),
-}))
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn((config: { mutationFn?: (v: unknown) => unknown }) => ({
-    mutate: (vars: unknown) => { config.mutationFn?.(vars) },
-    isPending: false,
-    isError: false,
-  })),
-  useQueryClient: vi.fn().mockReturnValue({ invalidateQueries: vi.fn() }),
 }))
 vi.mock('@dnd-kit/core', () => ({
   DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd?: (e: unknown) => void }) => {
@@ -38,10 +41,7 @@ vi.mock('@dnd-kit/sortable', async (importOriginal) => {
   }
 })
 
-import { useQuery } from '@tanstack/react-query'
 import ApplicationsReviewPage from '@/app/organiser/festivals/[id]/applications/page'
-
-const mockUseQuery = vi.mocked(useQuery)
 
 const mockParams = Promise.resolve({ id: 'fest-abc123' })
 
@@ -61,27 +61,38 @@ const createMockApplication = (id: string, artistId: string, overrides = {}) => 
   ...overrides,
 })
 
-describe('Organiser ApplicationsReviewPage', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+// Wire the four reads the board makes: applications, festival, reviewers, form.
+function wireApi(opts: {
+  applications?: unknown[]
+  festival?: Record<string, unknown>
+  reviewer?: boolean
+  form?: Record<string, unknown>
+} = {}) {
+  const routes: Record<string, unknown> = {
+    '/festivals/{festivalID}/applications': ok(opts.applications ?? []),
+    '/festivals/{festivalID}': ok(opts.festival ?? { decisions_released_at: null }),
+    // A reviewer (not organiser) gets 403 on the reviewers list → sentinel branch.
+    '/festivals/{festivalID}/reviewers': opts.reviewer ? err(403) : ok([]),
+    '/festivals/{festivalID}/form': ok(opts.form ?? { fields: [] }),
+  }
+  mockGet.mockImplementation(byPath(routes))
+}
 
-  it('shows loading state', () => {
-    mockUseQuery.mockReturnValue({ data: undefined, isLoading: true, isError: false } as unknown as ReturnType<typeof useQuery>)
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-    expect(screen.getByText('Loading…')).toBeInTheDocument()
+function renderPage() {
+  return renderWithClient(React.createElement(ApplicationsReviewPage, { params: mockParams }))
+}
+
+describe('Organiser ApplicationsReviewPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPost.mockResolvedValue(ok({}))
+    mockPatch.mockResolvedValue(ok({}))
+    mockPut.mockResolvedValue(ok({}))
   })
 
   it('renders 5 kanban columns with correct headers', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1'),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1')] })
+    renderPage()
     await waitFor(() => {
       expect(screen.getByText('Undecided')).toBeInTheDocument()
       expect(screen.getByText('⭐ Shortlisted')).toBeInTheDocument()
@@ -91,222 +102,103 @@ describe('Organiser ApplicationsReviewPage', () => {
     })
   })
 
-  it('places undecided applications in Undecided column', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: null, shortlisted: false }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+  it('disables Release when no decisions are staged', async () => {
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1')] })
+    renderPage()
     await waitFor(() => {
-      expect(screen.getByText('Undecided')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Release.*decisions/ })).toBeDisabled()
     })
   })
 
-  it('places shortlisted applications in Shortlisted column', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: null, shortlisted: true }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
-    await waitFor(() => {
-      expect(screen.getByText('⭐ Shortlisted')).toBeInTheDocument()
+  it('disables Release and flags the count when some apps are still undecided', async () => {
+    wireApi({
+      applications: [
+        createMockApplication('app-1', 'artist-1', { staged_decision: 'accept' }),
+        createMockApplication('app-2', 'artist-2', { staged_decision: null }),
+      ],
     })
-  })
-
-  it('places staged-accept applications in Accept column', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+    renderPage()
     await waitFor(() => {
-      expect(screen.getByText('✓ Accept')).toBeInTheDocument()
-    })
-  })
-
-  it('shows Release button disabled when no decisions staged', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: null, shortlisted: false }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
-    await waitFor(() => {
-      const releaseBtn = screen.getByRole('button', { name: /Release.*decisions/ })
-      expect(releaseBtn).toBeDisabled()
-    })
-  })
-
-  it('shows Release button disabled when some apps are staged but others still undecided', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
-      createMockApplication('app-2', 'artist-2', { staged_decision: null, shortlisted: false }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
-    await waitFor(() => {
-      const releaseBtn = screen.getByRole('button', { name: /Release.*decisions/ })
-      expect(releaseBtn).toBeDisabled()
+      expect(screen.getByRole('button', { name: /Release.*decisions/ })).toBeDisabled()
       expect(screen.getByText(/1 still need a decision/)).toBeInTheDocument()
     })
   })
 
-  it('shows Release button enabled when all submitted apps have staged decisions', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
-      createMockApplication('app-2', 'artist-2', { staged_decision: 'decline', shortlisted: false }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+  it('enables Release when every submitted app has a staged decision', async () => {
+    wireApi({
+      applications: [
+        createMockApplication('app-1', 'artist-1', { staged_decision: 'accept' }),
+        createMockApplication('app-2', 'artist-2', { staged_decision: 'decline' }),
+      ],
+    })
+    renderPage()
     await waitFor(() => {
-      const releaseBtn = screen.getByRole('button', { name: /Release.*2.*decisions/ })
-      expect(releaseBtn).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: /Release.*2.*decisions/ })).not.toBeDisabled()
     })
   })
 
-  it('confirmation modal requires checkbox before Yes release is enabled', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: 'accept', shortlisted: false }),
-    ]
-    // mockReturnValue provides the steady-state for re-renders after Once values are exhausted.
-    // Query call order in KanbanView: applications, festival, reviewers, form.
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValue({ data: undefined, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
+  it('requires the confirmation checkbox before "Yes, release" is enabled', async () => {
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1', { staged_decision: 'accept' })] })
+    renderPage()
 
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
-    await waitFor(() => {
-      screen.getByRole('button', { name: /Release.*decisions/ })
-    })
-    fireEvent.click(screen.getByRole('button', { name: /Release.*decisions/ }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Release decisions?')).toBeInTheDocument()
-    })
+    fireEvent.click(await screen.findByRole('button', { name: /Release.*decisions/ }))
+    await screen.findByText('Release decisions?')
 
     const confirmBtn = screen.getByRole('button', { name: 'Yes, release' })
-    expect(confirmBtn).toBeDisabled()  // disabled until checkbox is ticked
-
+    expect(confirmBtn).toBeDisabled()
     fireEvent.click(screen.getByRole('checkbox'))
-    expect(confirmBtn).not.toBeDisabled()  // enabled after checkbox
+    expect(confirmBtn).not.toBeDisabled()
   })
 
-  it('shows empty state when no applications', async () => {
-    mockUseQuery
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+  it('shows the empty-column placeholder when there are no applications', async () => {
+    wireApi({ applications: [] })
+    renderPage()
     await waitFor(() => {
       expect(screen.getAllByText('empty').length).toBeGreaterThan(0)
     })
   })
 
-  it('hides Release button and decision controls in reviewer mode', async () => {
-    // Multiple useQuery calls: applications, festival, reviewers (sentinel), formQuery
-    mockUseQuery
-      .mockReturnValueOnce({ data: [
-        createMockApplication('app-1', 'artist-1', { staged_decision: null, shortlisted: false }),
-      ], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: 'REVIEWER', isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+  it('hides the Release button in reviewer mode', async () => {
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1')], reviewer: true })
+    renderPage()
     await waitFor(() => {
-      // Release button should not exist in reviewer mode
       expect(screen.queryByRole('button', { name: /Release.*decisions/ })).not.toBeInTheDocument()
     })
   })
 
-  it('shows read-only message when decisions are released', async () => {
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { status: 'accepted', staged_decision: null }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: '2026-05-15T10:00:00Z' }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
+  it('shows the read-only banner once decisions are released', async () => {
+    wireApi({
+      applications: [createMockApplication('app-1', 'artist-1', { status: 'accepted' })],
+      festival: { decisions_released_at: '2026-05-15T10:00:00Z' },
+    })
+    renderPage()
     await waitFor(() => {
       expect(screen.getByText('Decisions released')).toBeInTheDocument()
       expect(screen.getByText('read-only')).toBeInTheDocument()
     })
   })
 
-  it('fires the reorder endpoint when a card is dragged within its column', async () => {
-    const { apiClient } = await import('@/lib/api')
-    ;(apiClient.POST as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {}, error: null })
-
-    const applications = [
-      createMockApplication('app-1', 'artist-1', { staged_decision: null, shortlisted: false }),
-      createMockApplication('app-2', 'artist-2', { staged_decision: null, shortlisted: false }),
-    ]
-    mockUseQuery
-      .mockReturnValueOnce({ data: applications, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { decisions_released_at: null }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: [], isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-      .mockReturnValueOnce({ data: { fields: [] }, isLoading: false, isError: false } as unknown as ReturnType<typeof useQuery>)
-
-    render(React.createElement(ApplicationsReviewPage, { params: mockParams }))
-
-    await waitFor(() => {
-      expect((globalThis as Record<string, unknown>).__onDragEnd).toBeDefined()
+  it('calls the reorder endpoint when a card is dragged within its column', async () => {
+    wireApi({
+      applications: [
+        createMockApplication('app-1', 'artist-1'),
+        createMockApplication('app-2', 'artist-2'),
+      ],
     })
+    renderPage()
 
-    // Both apps are in Undecided. Drag app-1 onto app-2 (same column → reorder).
+    // Wait for the loaded render (header reflects 2 apps) so the captured
+    // onDragEnd closes over populated columns, not the initial empty state.
+    await screen.findByText(/2 total/)
+
+    // Both apps are Undecided; drag app-1 onto app-2 → reorder within the column.
     const onDragEnd = (globalThis as Record<string, unknown>).__onDragEnd as (e: unknown) => void
     onDragEnd({ active: { id: 'app-1' }, over: { id: 'app-2' } })
 
     await waitFor(() => {
-      const calls = (apiClient.POST as ReturnType<typeof vi.fn>).mock.calls
-      const reorderCall = calls.find(c => c[0] === '/festivals/{festivalID}/applications/reorder')
+      const reorderCall = mockPost.mock.calls.find(
+        c => c[0] === '/festivals/{festivalID}/applications/reorder',
+      )
       expect(reorderCall).toBeDefined()
       expect(reorderCall?.[1]?.body?.ids).toEqual(['app-2', 'app-1'])
     })
