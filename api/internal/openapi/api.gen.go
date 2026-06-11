@@ -538,7 +538,7 @@ type ArtistProfile struct {
 	SupportUrl *string   `json:"support_url,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
-	// UserId UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
+	// UserId UUID of the owning user. Owner-only — omitted entirely from the public profile endpoints (GET /profiles/{id}, GET /public/profiles, published snapshots) to avoid exposing an internal account identifier. Null for unclaimed prospect profiles.
 	UserId *openapi_types.UUID `json:"user_id,omitempty"`
 
 	// Visibility Profile visibility. draft = owner-only; public = discoverable by anyone. Defaults to draft on creation.

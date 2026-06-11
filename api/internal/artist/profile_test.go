@@ -75,6 +75,13 @@ func TestGetProfile_Public(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	assert.Equal(t, "Bob Street", body["display_name"])
+
+	// Security canary: the public profile must NOT leak the internal account
+	// UUID. user_id is owner-only; exposing it on the unauthenticated endpoint
+	// is an unnecessary internal-identifier leak. (Owner path keeps it — see
+	// TestGetMyProfile_Success.)
+	_, hasUserID := body["user_id"]
+	assert.False(t, hasUserID, "public profile response must omit user_id")
 }
 
 func TestGetProfile_NotFound(t *testing.T) {
@@ -148,6 +155,9 @@ func TestGetMyProfile_Success(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
 	assert.Equal(t, "Dana", resp["display_name"])
+	// Owner path keeps user_id (it's the caller's own account id); the public
+	// path omits it — see TestGetProfile_Public.
+	assert.Equal(t, userID, resp["user_id"])
 }
 
 func TestPreviewByToken_ValidToken_Returns200(t *testing.T) {

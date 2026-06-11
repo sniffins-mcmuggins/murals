@@ -197,8 +197,10 @@ components:
           format: uuid
           nullable: true
           description: >-
-            UUID of the owning user. Null for unclaimed prospect profiles
-            (only accessible via preview token; never returned by public endpoints).
+            UUID of the owning user. Owner-only — omitted entirely from the
+            public profile endpoints (GET /profiles/{id}, GET /public/profiles,
+            published snapshots) to avoid exposing an internal account
+            identifier. Null for unclaimed prospect profiles.
         display_name:
           type: string
         bio:

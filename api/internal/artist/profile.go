@@ -36,7 +36,7 @@ type spotHistoryEntry struct {
 
 type profileResponse struct {
 	ID                    string             `json:"id"`
-	UserID                *string            `json:"user_id"`
+	UserID                *string            `json:"user_id,omitempty"`
 	DisplayName           string             `json:"display_name"`
 	Bio                   string             `json:"bio"`
 	Visibility            string             `json:"visibility"`
@@ -73,7 +73,6 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 	}
 	resp := profileResponse{
 		ID:                p.ID.String(),
-		UserID:            userID,
 		DisplayName:       p.DisplayName,
 		Bio:               p.Bio,
 		Visibility:        p.Visibility,
@@ -97,6 +96,10 @@ func toProfileResponse(p sqlcdb.ArtistProfile, public bool) profileResponse {
 		resp.LocationLabel = p.LocationLabel
 	}
 	if !public {
+		// user_id is the internal account UUID — owner-only. Public consumers
+		// only need the profile id; exposing user_id on the unauthenticated
+		// profile endpoints leaks an internal identifier nothing renders.
+		resp.UserID = userID
 		resp.PreviewToken = &p.PreviewToken
 	}
 	resp.SpotHistory = []spotHistoryEntry{}

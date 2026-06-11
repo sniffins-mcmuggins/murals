@@ -43,6 +43,7 @@
 - **Draft = live tables; published = snapshot**: the LIVE `artist_profiles` + `collections` + `collection_images` rows are the editable draft. `profile_snapshots` is the read-model the public sees. There is no separate "draft" table — reading live rows with an owner token IS reading the draft.
 - **Snapshot stored in a dedicated 1:1 table** (`profile_snapshots`), not as a column on `artist_profiles` — keeps the JSONB blob out of the hot artist_profiles index and row cache; PK enforces exactly one published snapshot per profile.
 - **`has_unpublished_changes` is owner-only** — the field carries `omitempty` and is never included in public-facing profile responses.
+- **`user_id` is owner-only** — the internal account UUID carries `omitempty` and is set only when `toProfileResponse(p, public=false)`. The public profile endpoints (`GET /profiles/{id}`, `GET /public/profiles`, snapshots) omit it; the public only needs the profile `id`, and exposing the account identifier on unauthenticated endpoints is an unnecessary internal-ID leak nothing consumes.
 
 ## Invariants
 - Public profile read MUST return 404 (not 403) for non-public profiles — information about private profiles must not leak
@@ -54,10 +55,11 @@
 - **Public reads MUST serve the snapshot** — public callers of `GET /profiles/{id}`, `GET /profiles/{id}/collections`, `GET /collections/{id}`, `GET /collections/{id}/images` receive frozen snapshot data, never live rows
 - **Snapshot = authored content only** — spot history, endorsements, and analytics are NEVER frozen into the snapshot; they are always live side-reads attached after snapshot deserialisation
 - **`has_unpublished_changes` MUST NOT appear in public responses** — it is owner-only (`omitempty`; set only when `isOwner`)
+- **`user_id` MUST NOT appear in public responses** — owner-only (`omitempty`; set only when `public=false`). Guarded by canaries in `profile_test.go` (`TestGetProfile_Public` asserts absent; `TestGetMyProfile_Success` asserts present)
 - **`GET /collections/{id}/images` MUST be visibility-gated** — returns 404 for non-public profiles unless the requester is the owner (closing a pre-existing gap where draft images were publicly retrievable)
 
 ## AI Context
-- `profile.go`: profile CRUD + visibility management + publish gate + `RotatePreviewTokenHandler` + `PreviewByTokenHandler`; `toProfileResponse` returns `UserID *string` (null for unclaimed prospects, set since migration 000018)
+- `profile.go`: profile CRUD + visibility management + publish gate + `RotatePreviewTokenHandler` + `PreviewByTokenHandler`; `toProfileResponse(p, public)` sets `UserID *string` only when `!public` (owner-only; `omitempty`) — null for unclaimed prospects, set since migration 000018
 - `publish.go`: `PublishHandler`, `UnpublishHandler` — thin wrappers around `SetArtistProfileVisibility` query + billing gate; both seed/clear the snapshot
 - `publish_changes.go` (or equivalent): `PublishChangesHandler` — serializes live graph → `profile_snapshots` in a single transaction; reuses `toProfileResponse` + collections assembly so the snapshot shape cannot drift from the API response shape
 - `collection.go`: collection CRUD + reorder
@@ -71,6 +73,7 @@
 - **Backfill command**: `api/cmd/backfill-snapshots` — one-shot tool to snapshot all existing public profiles; run once after deploying E29
 
 ## Changelog
+2026-06-11 — data minimization: `user_id` gated owner-only in `toProfileResponse` (was unconditional → leaked the internal account UUID on the unauthenticated `GET /profiles/{id}`, `GET /public/profiles`, and snapshots; no client consumed it). Schema description updated; canaries added to `profile_test.go`.
 2026-06-10 — E29: profile_snapshots 1:1 read-model; POST /profiles/me/publish-changes; draft=live/public=snapshot branching on isOwner across all profile+collection+images reads; GET /collections/{id}/images visibility gate (security fix); has_unpublished_changes owner-only; snapshot authored-content-only invariant; backfill command; image S3 retention note; listing/map still live (known follow-up).
 2026-06-06 — bio made clearable via PATCH (empty string clears; pointer semantics); displayName stays required.
 2026-06-06 — Profile setup wizard backend: support_url + setup_completed_at columns; complete-setup endpoint; claim stamps setup_completed_at.

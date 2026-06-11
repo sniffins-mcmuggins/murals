@@ -2050,7 +2050,7 @@ export interface components {
             id: string;
             /**
              * Format: uuid
-             * @description UUID of the owning user. Null for unclaimed prospect profiles (only accessible via preview token; never returned by public endpoints).
+             * @description UUID of the owning user. Owner-only — omitted entirely from the public profile endpoints (GET /profiles/{id}, GET /public/profiles, published snapshots) to avoid exposing an internal account identifier. Null for unclaimed prospect profiles.
              */
             user_id?: string | null;
             display_name: string;
