@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 tasks:
   migrate:
@@ -16,10 +16,3 @@ tasks:
   generate:
     desc: "Generate type-safe Go from SQL queries (sqlc)"
     cmd: go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate -f sqlc.yaml
-
-  seed:
-    desc: "Load seed data into the local database (delegates to demo:seed)"
-    # The real seeder is the Go program in demos/seed; the old seeds/seed.sql
-    # never existed. Run from the repo root so the demo:seed namespace resolves.
-    dir: ..
-    cmd: task demo:seed

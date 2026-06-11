@@ -1,0 +1,41 @@
+version: "3"
+
+tasks:
+  seed:
+    desc: "Wipe and re-seed the demo database (idempotent)"
+    dir: seed
+    # run: always — so re-seeding actually re-runs before every clip in all
+    # (Task otherwise dedups a dep to once per execution). Several organiser clips
+    # mutate festival state off-screen, so each clip must start from a clean seed.
+    run: always
+    cmd: go run .
+
+  record:
+    desc: "Re-seed then record one clip. Usage: task demos:record V=artist-signup"
+    # Always re-seed first: the organiser clips advance the festival's review round
+    # / decisions / spots, so a clip run against dirty state would fail. Seed = reset.
+    deps: [seed]
+    cmd: npx playwright test scripts/{{.V}}*.ts --config playwright.config.ts --output=output/raw/{{.V}}
+
+  convert:
+    desc: "Convert all recorded .webm files to MP4 (requires ffmpeg)"
+    cmd: bash run.sh
+
+  all:
+    desc: "Record every per-feature clip (artist + organiser), each re-seeding first, then convert to MP4."
+    cmds:
+      - for:
+          - artist-onboarding
+          - artist-public-profile
+          - artist-collections
+          - artist-apply-to-festival
+          - artist-apply-with-profile
+          - artist-endorsements
+          - artist-analytics
+          - organiser-form-builder
+          - organiser-review
+          - organiser-decisions-release
+          - organiser-map-editor
+        task: record
+        vars: { V: '{{ .ITEM }}' }
+      - task: convert

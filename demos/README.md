@@ -91,18 +91,19 @@ accounts above and avoid live signups.
 
 ## 4. Editing the seed
 
-It's a single Go program: **`demos/seed/main.go`** (plain Go with inline SQL
-`INSERT`s — edit it directly, no migration needed). After editing, re-run
-`task demo:seed`.
+All seed data lives in **`demos/seed/seed.yaml`** — edit it directly, no Go
+changes needed. After editing, re-run `task demos:seed`.
 
 | To change… | Edit… |
 |---|---|
-| The shared password | `demoPassword` const (top of the file) |
-| An applicant (name, bio, medium, concept, status) | the `artistSeed` slice |
-| An applicant's avatar | the `avatarURLs` map (keyed by name) |
-| The application questions | the `cpfFields` slice |
-| The festival (name, dates, status, location) | the `INSERT INTO festivals` block |
-| Lady Gabe's profile / images / analytics | her block (`ladygabe@demo.art`) |
+| The shared password | `config.password` |
+| An applicant (name, bio, medium, concept, status) | the relevant entry under `festivals[*].applicants` |
+| An applicant's avatar | `avatar_url` on the applicant |
+| An applicant's shared social links | `shared_links` list on the applicant |
+| The application questions | `festivals[*].application_form.fields` |
+| The festival (name, dates, status, location) | the relevant festival entry |
+| Lady Gabe's profile / images / analytics | `featured_artist` block |
+| Promo codes | `promo_codes` list |
 
 ### Image gotcha
 
