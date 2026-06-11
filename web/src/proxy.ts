@@ -11,7 +11,10 @@ const PROTECTED_PATHS = ['/dashboard', '/profile', '/collections', '/application
  */
 const BETA_ALLOWLIST = ['/', '/login', '/signup', '/waitlist', '/preview', '/claim']
 
-export function middleware(request: NextRequest) {
+// Renamed from `middleware` → `proxy` per the Next.js 16 file convention.
+// Runtime is nodejs (the only option for proxy); this handler uses no
+// edge-specific APIs, so the switch is transparent.
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const sessionCookie = request.cookies.get('session')
 

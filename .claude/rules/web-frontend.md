@@ -5,7 +5,7 @@ paths:
 
 # Web frontend standards & gotchas
 
-The Next.js 15 App Router platform (React 19, TypeScript, Tailwind v4). This is
+The Next.js 16 App Router platform (React 19, TypeScript, Tailwind v4). This is
 the in-context working knowledge for `web/`. Route-group `*.spec.md` files are the
 binding contract — read the relevant one before changing a route group.
 
@@ -33,11 +33,12 @@ binding contract — read the relevant one before changing a route group.
   legitimate raw `fetch` to our API left** — the only justified raw fetch is the
   external presigned-PUT inside `hooks/useImageUpload.ts` (uploads to MinIO/S3,
   not our API).
-- **This is enforced by ESLint, not convention.** `.eslintrc.json` bans `fetch(`
-  via `no-restricted-syntax`; `task lint` / the `web-lint` pre-commit hook / CI
-  all fail on a raw fetch. If you have a *genuinely external* fetch (not our
-  API), don't reach for `eslint-disable` inline — add the file to the
-  `overrides` exemption in `.eslintrc.json` with a comment, like
+- **This is enforced by ESLint, not convention.** `eslint.config.mjs` (flat
+  config — Next 16 removed `next lint`, so linting runs via `eslint .`) bans
+  `fetch(` via `no-restricted-syntax`; `task lint` / the `web-lint` pre-commit
+  hook / CI all fail on a raw fetch. If you have a *genuinely external* fetch
+  (not our API), don't reach for `eslint-disable` inline — add the file to the
+  files-scoped exemption block in `eslint.config.mjs` with a comment, like
   `hooks/useImageUpload.ts`. If you're tempted to exempt a call to *our* API,
   the answer is almost always "add the endpoint to the spec" instead.
 - **Missing endpoint? Fix the spec, don't hand-roll fetch.** If the typed client
@@ -170,13 +171,20 @@ client page passes ~300 lines:
   Keep them as named constants in one module (`mapIcons.ts`) and keep them in
   sync with the tokens by comment; the status→colour mapping for circle markers
   is `lib/murals.ts` (`muralStatusColour`).
+- **Leaflet default marker icon — import `@/lib/leaflet`, don't re-roll it.** A
+  `.png` `import` resolves to `{ src }` under webpack but to a bare URL **string**
+  under Turbopack (Next 16's bundler). The old `L.icon({ iconUrl: (icon as {src}).src })`
+  pattern left `iconUrl` undefined → Leaflet threw `iconUrl not set in Icon
+  options` on the first `<Marker>`, taking the whole map down via the error
+  boundary (caught only by e2e). `lib/leaflet.ts` resolves either shape and
+  installs the default icon as a side effect — import it; never reconstruct it.
 
 ## Shared components — edit, don't fork
 
 `MediumPicker.tsx`, `SupportLinkField.tsx`, `ImageSlot.tsx` are used by **both**
 the profile wizard and the profile editor. Changing one changes both — that's
 intentional. The image-upload choreography (presign → PUT MinIO/S3 → confirm →
-attach) lives in `hooks/useUploadImage.ts`; reuse it, don't reimplement.
+attach) lives in `hooks/useImageUpload.ts`; reuse it, don't reimplement.
 
 ## Testing client pages/hooks — the preferred pattern
 

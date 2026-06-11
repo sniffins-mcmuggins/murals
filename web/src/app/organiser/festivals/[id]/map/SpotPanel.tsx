@@ -39,7 +39,6 @@ export function SpotPanel({ spot, unassignedArtists, festivalId, onClose, onMuta
     setNotes(spot.notes ?? '')
     setArtistId(spot.artist_id ?? '')
     setMuralStatus((spot.mural_status as 'permanent' | 'temporary' | 'unknown') ?? 'unknown')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spot])
 
   const artistOptions: UnassignedArtist[] = spot.artist_id

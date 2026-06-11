@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, FormEvent, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 
 type Role = 'artist' | 'organiser'
 
-export default function SignupPage() {
+function SignupForm() {
   const searchParams = useSearchParams()
 
   const [email, setEmail] = useState('')
@@ -218,5 +218,21 @@ export default function SignupPage() {
         </p>
       </div>
     </main>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-warm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-offwhite border border-light rounded-2xl p-8 shadow-sm">
+            <p className="font-sans text-sm text-mid">Loading…</p>
+          </div>
+        </main>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   )
 }

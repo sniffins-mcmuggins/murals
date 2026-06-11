@@ -1,23 +1,13 @@
 import L from 'leaflet'
-import icon from 'leaflet/dist/images/marker-icon.png'
-import iconShadow from 'leaflet/dist/images/marker-shadow.png'
+// Installs Leaflet's default marker icon (bundler-agnostic) as a side effect —
+// the single source of truth for the marker-icon import fix.
+import '@/lib/leaflet'
 
 // Marker colours are inlined into the divIcon HTML strings below because CSS
 // classes can't reach into a Leaflet `L.divIcon` string. They mirror the design
 // tokens in globals.css — keep them in sync (amber = --color-amber, terracotta
 // = --color-clay). See lib/murals.ts for the status→colour mapping used by the
 // history overlay circle markers.
-
-// Fix the default Leaflet icon broken by webpack's asset handling. This is a
-// module-level side effect: importing this file installs the default icon.
-const DefaultIcon = L.icon({
-  iconUrl: (icon as { src: string }).src,
-  shadowUrl: (iconShadow as { src: string }).src,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-})
-L.Marker.prototype.options.icon = DefaultIcon
 
 export const AmberIcon = L.divIcon({
   className: '',

@@ -13,7 +13,7 @@ Read this top-to-bottom once. After that, the **"Add a feature"** and
 
 This folder is the **browser platform** — the site artists and organisers log
 into. (The public mobile app lives in `mobile/`; the Go backend lives in
-`api/`.) It is a **Next.js 15 App Router** app written in **TypeScript** and
+`api/`.) It is a **Next.js 16 App Router** app written in **TypeScript** and
 **React 19**, styled with **Tailwind CSS v4**.
 
 Three things make our setup different from a vanilla "create-react-app" you may
@@ -55,15 +55,20 @@ web/
 │   │   └── wizard/       ← profile-setup wizard step components
 │   ├── hooks/            ← cross-page stateful logic (currently useImageUpload)
 │   ├── lib/              ← non-UI helpers: API client, server-side auth, utils
+│   ├── proxy.ts          ← runs before each request (auth/beta redirects)
 │   └── __tests__/        ← Vitest unit/component tests (mirrors src/ layout)
 │
 ├── package.json         ← scripts + dependencies
 ├── Taskfile.yml         ← `task dev`, `task test`, `task lint` shortcuts
 ├── next.config.ts       ← Next config (standalone output, transpile api-client)
+├── eslint.config.mjs    ← ESLint flat config (Next 16 removed `next lint`)
 ├── vitest.config.ts     ← test runner config (jsdom, @ alias)
 ├── tsconfig.json        ← TypeScript config (note the `@/*` → `src/*` alias)
 └── Dockerfile           ← how the container image is built
 ```
+
+> **`proxy.ts`** is what older Next.js called `middleware.ts` (renamed in 16). It
+> runs before a request reaches a route — we use it for auth/beta redirects.
 
 ### Route groups — what the parentheses mean
 
@@ -163,7 +168,7 @@ export default function ApplicationsPage() {
 - When unsure, start with a Server Component and push `'use client'` down to the
   smallest leaf that actually needs it. Less JS shipped = faster.
 
-### ⚠️ Three traps that will cost you an afternoon
+### ⚠️ Four traps that will cost you an afternoon
 
 These are real, documented landmines (in the specs and the e2e-debugging rule):
 
@@ -181,6 +186,14 @@ These are real, documented landmines (in the specs and the e2e-debugging rule):
 
 3. **Server Components can't use hooks or `onClick`.** If you add `useState` to a
    page and get a confusing error, you forgot `'use client'`.
+
+4. **Request-time APIs are async — `await` them.** As of Next 16, `cookies()`,
+   `headers()`, and a route's `params` / `searchParams` are Promises; reading
+   them synchronously is a *build error*, not a warning. Server pages do
+   `const { id } = await params` (or `await cookies()`); client pages read the
+   URL via the `useSearchParams()` / `useParams()` hooks instead. (A client page
+   using `useSearchParams()` must also sit inside a `<Suspense>` boundary, or the
+   production build fails to prerender — copy `(auth)/login/page.tsx`.)
 
 ---
 
@@ -374,10 +387,14 @@ source directly. From `web/`:
 ```bash
 task dev      # next dev on :3000  (needs the API for data, though)
 task test     # vitest — unit + component tests
-task lint     # eslint  +  tsc --noEmit  (typecheck)
+task lint     # eslint .  +  tsc --noEmit  (typecheck)
 task build    # production build
 task install  # npm install
 ```
+
+Both `next dev` and `next build` use **Turbopack** by default (Next 16) — no
+flag needed, and we have no custom webpack config. `lint` runs the ESLint CLI
+against the flat config in `eslint.config.mjs` (`next lint` was removed in 16).
 
 (Each is a thin wrapper over the `package.json` scripts: `npm test`,
 `npm run lint`, `npm run typecheck`, etc.)

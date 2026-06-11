@@ -2,21 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
-import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import icon from 'leaflet/dist/images/marker-icon.png'
-import iconShadow from 'leaflet/dist/images/marker-shadow.png'
 import Link from 'next/link'
-
-// Fix default marker icon broken by webpack
-const DefaultIcon = L.icon({
-  iconUrl: (icon as { src: string }).src,
-  shadowUrl: (iconShadow as { src: string }).src,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-})
-L.Marker.prototype.options.icon = DefaultIcon
+// Installs Leaflet's default marker icon (bundler-agnostic) as a side effect.
+import '@/lib/leaflet'
 
 export type MapPin = {
   artist_id: string
