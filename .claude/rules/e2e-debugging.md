@@ -196,6 +196,20 @@ docker compose -f infra/docker-compose.yml up -d --build web
 ```
 The volume is populated from the image on first start because the `web/Dockerfile` dev stage runs `npm ci --workspaces`.
 
+### Web container runs the OLD dependency version after a bump (`package.json` says X, container logs say Y)
+
+Symptom: you bump a dependency (e.g. `next` 15→16 in `web/package.json`), `docker compose up -d --build web` succeeds, but the container logs still show the old version (`▲ Next.js 15.5.18`). The bind-mounted source has the new `package.json`, yet `node_modules` resolves the old package.
+
+Root cause: `node_modules` lives in **named volumes** (`web_root_node_modules` for hoisted workspace deps at `/workspace/node_modules`, `web_node_modules` for `/workspace/web/node_modules`). `--build` rebuilds the *image* (which runs `npm ci` with the new versions), but a **persisted named volume is only initialised from the image when it's empty** — an existing volume shadows the rebuilt image with the old `node_modules`. `--build` is therefore insufficient for a version change (it's enough for a fresh/wiped volume, the lightningcss case above).
+
+Fix: remove the node_modules volumes (and the `.next` cache) so they repopulate from the rebuilt image, then recreate web:
+```bash
+docker compose -f infra/docker-compose.yml rm -sf web
+docker volume rm infra_web_root_node_modules infra_web_node_modules infra_web_next
+docker compose -f infra/docker-compose.yml up -d --build web
+```
+Verify: `docker compose logs web | grep -oE 'Next\.js [0-9.]+'` should show the new version. This does NOT touch the DB/MinIO volumes (unlike `down -v`), so no data reset.
+
 ### Next.js: all pages return 500 — dynamic import in Server Component
 
 If `/`, `/login`, etc. all 500, look for `next/dynamic({ ssr: false })` used directly in a Server Component (a `page.tsx` without `'use client'`). The Next.js error is verbose in the web container logs: `docker compose logs web --tail=30`. Fix: extract the dynamic import into a `'use client'` wrapper component (see `web/src/app/(public)/festivals/[id]/map/FestivalMapClient.tsx` for the pattern).
