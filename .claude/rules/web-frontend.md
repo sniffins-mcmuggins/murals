@@ -171,6 +171,13 @@ client page passes ~300 lines:
   Keep them as named constants in one module (`mapIcons.ts`) and keep them in
   sync with the tokens by comment; the status→colour mapping for circle markers
   is `lib/murals.ts` (`muralStatusColour`).
+- **Leaflet default marker icon — import `@/lib/leaflet`, don't re-roll it.** A
+  `.png` `import` resolves to `{ src }` under webpack but to a bare URL **string**
+  under Turbopack (Next 16's bundler). The old `L.icon({ iconUrl: (icon as {src}).src })`
+  pattern left `iconUrl` undefined → Leaflet threw `iconUrl not set in Icon
+  options` on the first `<Marker>`, taking the whole map down via the error
+  boundary (caught only by e2e). `lib/leaflet.ts` resolves either shape and
+  installs the default icon as a side effect — import it; never reconstruct it.
 
 ## Shared components — edit, don't fork
 
