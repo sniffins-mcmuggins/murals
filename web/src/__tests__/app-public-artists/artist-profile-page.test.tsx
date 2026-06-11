@@ -30,8 +30,10 @@ vi.mock('@/lib/auth-server', () => ({
 import ArtistPage from '@/app/(public)/artists/[id]/page'
 import { apiClient } from '@/lib/api'
 import { notFound } from 'next/navigation'
+import { isProfileOwner } from '@/lib/auth-server'
 
 const mockGet = vi.mocked(apiClient.GET)
+const mockIsOwner = vi.mocked(isProfileOwner)
 
 const mockProfile: components['schemas']['ArtistProfile'] = {
   id: 'profile-uuid-123',
@@ -135,6 +137,35 @@ describe('ArtistPage', () => {
 
     const html = JSON.stringify(result)
     expect(html).not.toContain('Collections')
+  })
+
+  it('shows the "Endorse this artist" link to a non-owner viewer', async () => {
+    mockIsOwner.mockResolvedValueOnce(false)
+    mockGet
+      .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
+
+    const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
+
+    const html = JSON.stringify(result)
+    expect(html).toContain('Endorse this artist')
+    expect(html).toContain('/endorse/profile-uuid-123')
+  })
+
+  it('hides the "Endorse this artist" link on the viewer\'s own profile', async () => {
+    mockIsOwner.mockResolvedValueOnce(true)
+    mockGet
+      .mockResolvedValueOnce(makeOkResponse(mockProfile) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never)
+      .mockResolvedValueOnce(makeOkResponse([]) as never) // festivals
+      .mockResolvedValueOnce(makeOkResponse({ endorsements: [] }) as never)
+
+    const result = await ArtistPage({ params: Promise.resolve({ id: 'profile-uuid-123' }) })
+
+    const html = JSON.stringify(result)
+    expect(html).not.toContain('Endorse this artist')
   })
 
   it('does not call notFound() when the profile is found', async () => {

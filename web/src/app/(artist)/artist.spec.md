@@ -32,6 +32,7 @@
 - `PublishBar` component reads `has_unpublished_changes` from the owner profile response; only shows the "Publish changes" action when the flag is true. The initial "Go Public" publish is a separate action handled by `PublishHandler`.
 
 ## Changelog
+2026-06-11 — `endorse/[profileID]` now guards the self case: if `/profiles/me` resolves to the same profile, it shows a "You can't endorse yourself" message instead of the form (the API already rejects it with 400; this is the UI half).
 2026-06-11 — PR2: the artist `billing/page.tsx` migrated off raw `fetch` to the typed client (`/billing/artist/checkout`, `/billing/portal`) now the endpoints are in the spec. No raw `fetch` to our API remains in this group.
 2026-06-10 — upload hooks merged into hooks/useImageUpload (post-confirm step is a caller callback); endorse/endorsements pages migrated to React Query + singleton apiClient; queryFns now throw on API error (isError UI instead of silent empty states).
 2026-06-10 — E29: /profile/preview draft route; PublishBar "Publish changes" + unpublished indicator + "View public profile" + "Preview draft" links.

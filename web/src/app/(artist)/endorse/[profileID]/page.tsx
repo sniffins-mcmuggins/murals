@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, use } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api'
@@ -29,6 +30,19 @@ export default function EndorsePage({ params }: { params: Promise<{ profileID: s
     },
   })
   const ownedFestivals = festivalsQuery.data ?? []
+
+  // You can't endorse your own profile. The API rejects it (400), but guard the
+  // form too so the viewer never gets that far. `/profiles/me` 404s for users
+  // without an artist profile — they're never the endorsee, so treat as not-self.
+  const myProfileQuery = useQuery({
+    queryKey: ['my-profile'],
+    queryFn: async () => {
+      const res = await apiClient.GET('/profiles/me', {})
+      if (res.error) return null
+      return res.data ?? null
+    },
+  })
+  const isSelf = myProfileQuery.data?.id === profileID
 
   function addSkill(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' || e.key === ',') {
@@ -73,6 +87,29 @@ export default function EndorsePage({ params }: { params: Promise<{ profileID: s
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Don't flash the form before we know whose profile this is.
+  if (myProfileQuery.isLoading) {
+    return <p className="font-sans text-mid">Loading…</p>
+  }
+
+  if (isSelf) {
+    return (
+      <div>
+        <h1 className="font-serif text-4xl text-ink mb-2">You can&apos;t endorse yourself</h1>
+        <p className="font-sans text-mid mb-8">
+          Endorsements come from other artists and organisers. Share your
+          profile so others can vouch for you.
+        </p>
+        <Link
+          href={`/artists/${profileID}`}
+          className="inline-block font-mono text-xs uppercase tracking-widest bg-ink text-offwhite px-6 py-2 rounded hover:bg-amber hover:text-ink transition-colors"
+        >
+          View your profile
+        </Link>
+      </div>
+    )
   }
 
   return (

@@ -201,12 +201,15 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             </a>
           )}
 
-          <Link
-            href={`/endorse/${id}`}
-            className="inline-block mt-4 font-mono text-xs uppercase tracking-widest border border-light text-mid hover:text-ink hover:border-ink px-4 py-2 rounded transition-colors"
-          >
-            Endorse this artist
-          </Link>
+          {/* You can't endorse yourself — only offer the affordance to other viewers. */}
+          {!isOwner && (
+            <Link
+              href={`/endorse/${id}`}
+              className="inline-block mt-4 font-mono text-xs uppercase tracking-widest border border-light text-mid hover:text-ink hover:border-ink px-4 py-2 rounded transition-colors"
+            >
+              Endorse this artist
+            </Link>
+          )}
         </header>
 
         {/* Festival appearances */}

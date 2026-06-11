@@ -27,7 +27,13 @@
 
 ## Invariants
 
-- No self-endorsement: DB `CHECK (endorser_id <> endorsee_id)` + handler guard at 400.
+- No self-endorsement: the **handler** is the real guard — it loads the endorsee's
+  `artist_profiles` row and rejects with 400 when `endorsee.user_id == caller.user_id`.
+  The DB `CHECK (endorser_id <> endorsee_id)` does NOT prevent this: `endorser_id` is a
+  `users.id` and `endorsee_id` is an `artist_profiles.id`, so the two are never equal even
+  for a true self-endorsement — the CHECK only blocks the degenerate equal-UUID case. The
+  UI also hides the "Endorse" affordance on the viewer's own profile, and the
+  `/endorse/[profileID]` form short-circuits when it's the caller's own profile.
 - Organiser kind always has festival_id: DB `CHECK (kind = 'peer' OR festival_id IS NOT NULL)`.
 - `moderation_status` is one of `'ok'`, `'hidden'`, `'removed'`.
 - Public list (`ListPublicEndorsements`) never exposes `hidden_by_endorsee=true` or `moderation_status != 'ok'` rows.
@@ -42,4 +48,5 @@
 
 ## Changelog
 
+2026-06-11 — Clarified the self-endorsement invariant: the handler guard (endorsee profile `user_id` vs caller), not the DB CHECK, is what prevents it; the UI now hides the endorse affordance on the owner's own profile and the endorse form guards the self case.
 2026-06-01 — initial spec
