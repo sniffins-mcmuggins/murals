@@ -13,12 +13,13 @@
   - `AdminUpdateFeedbackHandler(pool)` — `PATCH /admin/beta/feedback/{feedbackID}` — set admin_note
 - **Member beta routes** (`/beta/*`, beta-gated):
   - `MintInviteHandler(pool, webBase)` — `POST /beta/invites` — member mints personal single-use invite (default quota: 3/member)
-  - `GetMyInvitesHandler(pool)` — `GET /beta/me/invites` — own codes + remaining quota + invitees
+  - `GetMyInvitesHandler(pool)` — `GET /beta/me/invites` — own codes + remaining quota (no invitee PII — see Key Decisions)
   - `SubmitFeedbackHandler(pool)` — `POST /beta/feedback` — submit feedback (kind ∈ idea|bug|direction|praise)
   - `GetMyFeedbackHandler(pool)` — `GET /beta/feedback` — caller's own feedback rows only
 
 ## Boundaries
 - Does NOT own beta invite emails — those are handled by the admin workflow externally
+- `GET /beta/me/invites` does NOT return who joined via the member's codes — that would expose other users' email addresses (PII) to the inviter; `used_count` per invite conveys the join count instead
 - Does NOT gate the `GET /public/*` routes or the Stripe webhook — those are intentionally outside the beta gate in `main.go`
 - Member `GET /beta/feedback` returns ONLY the caller's own rows — no cross-user access
 
@@ -34,6 +35,7 @@
 - `Gate` MUST pass anonymous requests through (no principal = pass through, not 401/403) — auth is downstream
 - `is_beta` MUST be read from the DB user row, not from the JWT — the JWT has no `is_beta` claim
 - `GetMyFeedbackHandler` MUST filter by `user_id = caller's UUID` — never return other users' rows
+- `GetMyInvitesHandler` MUST NOT include invitee identities/emails in its response — guarded by a canary in `invites_test.go` (`assert.NotContains(body, "invitees"/"email")`)
 
 ## AI Context
 - `gate.go`: the `Gate` middleware — the `!cfg.BetaMode` short-circuit is the launch exit path
@@ -48,3 +50,4 @@
 ## Changelog
 2026-05-31 — initial spec
 2026-06-01 — added E16.2 invite issuance + quota; E16.3 feedback inbox + founding-member UX
+2026-06-11 — data minimization: removed the `invitees` array (joiner emails/PII) from `GET /beta/me/invites` — no client rendered it and `used_count` conveys the join count. Dropped the `ListBetaInviteesByInviter` query, the `BetaInvitee` schema, and `MyInvitesResponse.invitees`. Added a PII canary to `invites_test.go`.

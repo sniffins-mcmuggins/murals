@@ -589,14 +589,6 @@ type BetaInvite struct {
 	UsedCount int                `json:"used_count"`
 }
 
-// BetaInvitee defines model for BetaInvitee.
-type BetaInvitee struct {
-	BetaCohort *string             `json:"beta_cohort,omitempty"`
-	Email      openapi_types.Email `json:"email"`
-	JoinedAt   time.Time           `json:"joined_at"`
-	UserId     openapi_types.UUID  `json:"user_id"`
-}
-
 // CheckoutResponse defines model for CheckoutResponse.
 type CheckoutResponse struct {
 	// CheckoutUrl Stripe Checkout Session URL. Redirect the browser here.
@@ -879,11 +871,10 @@ type MyApplication struct {
 	UpdatedAt time.Time              `json:"updated_at"`
 }
 
-// MyInvitesResponse defines model for MyInvitesResponse.
+// MyInvitesResponse A member's own invite codes and remaining quota. Deliberately does NOT include who joined via the codes — that would be other users' PII; the per-invite `used_count` conveys how many joined.
 type MyInvitesResponse struct {
-	Invitees       []BetaInvitee `json:"invitees"`
-	Invites        []BetaInvite  `json:"invites"`
-	RemainingQuota int           `json:"remaining_quota"`
+	Invites        []BetaInvite `json:"invites"`
+	RemainingQuota int          `json:"remaining_quota"`
 }
 
 // PortalResponse defines model for PortalResponse.
@@ -1363,7 +1354,7 @@ type ServerInterface interface {
 	// Mint a single-use beta invite link (founding members)
 	// (POST /beta/invites)
 	MintBetaInvite(w http.ResponseWriter, r *http.Request)
-	// List the invites I have minted and who has joined through them
+	// List my minted invite codes and remaining quota
 	// (GET /beta/me/invites)
 	GetMyBetaInvites(w http.ResponseWriter, r *http.Request)
 	// Start a Stripe Checkout session for an artist subscription
@@ -1657,7 +1648,7 @@ func (_ Unimplemented) MintBetaInvite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// List the invites I have minted and who has joined through them
+// List my minted invite codes and remaining quota
 // (GET /beta/me/invites)
 func (_ Unimplemented) GetMyBetaInvites(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -9646,7 +9637,7 @@ type StrictServerInterface interface {
 	// Mint a single-use beta invite link (founding members)
 	// (POST /beta/invites)
 	MintBetaInvite(ctx context.Context, request MintBetaInviteRequestObject) (MintBetaInviteResponseObject, error)
-	// List the invites I have minted and who has joined through them
+	// List my minted invite codes and remaining quota
 	// (GET /beta/me/invites)
 	GetMyBetaInvites(ctx context.Context, request GetMyBetaInvitesRequestObject) (GetMyBetaInvitesResponseObject, error)
 	// Start a Stripe Checkout session for an artist subscription

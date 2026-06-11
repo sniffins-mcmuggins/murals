@@ -1908,7 +1908,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the invites I have minted and who has joined through them */
+        /** List my minted invite codes and remaining quota */
         get: operations["getMyBetaInvites"];
         put?: never;
         post?: never;
@@ -2589,18 +2589,9 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
-        BetaInvitee: {
-            /** Format: uuid */
-            user_id: string;
-            /** Format: email */
-            email: string;
-            beta_cohort?: string;
-            /** Format: date-time */
-            joined_at: string;
-        };
+        /** @description A member's own invite codes and remaining quota. Deliberately does NOT include who joined via the codes — that would be other users' PII; the per-invite `used_count` conveys how many joined. */
         MyInvitesResponse: {
             invites: components["schemas"]["BetaInvite"][];
-            invitees: components["schemas"]["BetaInvitee"][];
             remaining_quota: number;
         };
         BetaFeedbackRequest: {
@@ -4405,7 +4396,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description My invites and invitees. */
+            /** @description My invite codes and remaining quota. */
             200: {
                 headers: {
                     [name: string]: unknown;

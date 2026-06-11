@@ -205,18 +205,16 @@ func MintInviteHandler(pool *pgxpool.Pool, webBase string) http.HandlerFunc {
 
 type myInvitesResponse struct {
 	Invites        []inviteResponse `json:"invites"`
-	Invitees       []inviteeItem    `json:"invitees"`
 	RemainingQuota int              `json:"remaining_quota"`
 }
 
-type inviteeItem struct {
-	UserID     string  `json:"user_id"`
-	Email      string  `json:"email"`
-	BetaCohort *string `json:"beta_cohort,omitempty"`
-	JoinedAt   string  `json:"joined_at"`
-}
-
 // GetMyInvitesHandler handles GET /beta/me/invites.
+//
+// Returns the member's own invite codes + remaining quota only. It deliberately
+// does NOT return the list of people who joined via those codes: that would be
+// other users' email addresses (PII) the inviter has no need to hold, and
+// `used_count` per invite already conveys how many joined. Keeping this response
+// PII-free aligns with the platform's aggregated-only / GDPR-clean stance.
 func GetMyInvitesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -239,12 +237,6 @@ func GetMyInvitesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		invitees, err := q.ListBetaInviteesByInviter(r.Context(), creatorUUID)
-		if err != nil {
-			httperr.InternalServerError(w)
-			return
-		}
-
 		inviteItems := make([]inviteResponse, 0, len(invites))
 		for _, inv := range invites {
 			inviteItems = append(inviteItems, inviteResponse{
@@ -257,16 +249,6 @@ func GetMyInvitesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			})
 		}
 
-		inviteeItems := make([]inviteeItem, 0, len(invitees))
-		for _, u := range invitees {
-			inviteeItems = append(inviteeItems, inviteeItem{
-				UserID:     u.ID.String(),
-				Email:      u.Email,
-				BetaCohort: u.BetaCohort,
-				JoinedAt:   u.CreatedAt.Time.UTC().Format("2006-01-02T15:04:05Z"),
-			})
-		}
-
 		remaining := memberInviteQuota - len(inviteItems)
 		if remaining < 0 {
 			remaining = 0
@@ -275,7 +257,6 @@ func GetMyInvitesHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(myInvitesResponse{
 			Invites:        inviteItems,
-			Invitees:       inviteeItems,
 			RemainingQuota: remaining,
 		})
 	}

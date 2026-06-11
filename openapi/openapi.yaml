@@ -1164,34 +1164,18 @@ components:
           type: string
           format: date-time
 
-    BetaInvitee:
-      type: object
-      required: [user_id, email, joined_at]
-      properties:
-        user_id:
-          type: string
-          format: uuid
-        email:
-          type: string
-          format: email
-        beta_cohort:
-          type: string
-        joined_at:
-          type: string
-          format: date-time
-
     MyInvitesResponse:
+      description: >-
+        A member's own invite codes and remaining quota. Deliberately does NOT
+        include who joined via the codes — that would be other users' PII; the
+        per-invite `used_count` conveys how many joined.
       type: object
-      required: [invites, invitees, remaining_quota]
+      required: [invites, remaining_quota]
       properties:
         invites:
           type: array
           items:
             $ref: "#/components/schemas/BetaInvite"
-        invitees:
-          type: array
-          items:
-            $ref: "#/components/schemas/BetaInvitee"
         remaining_quota:
           type: integer
 
@@ -3707,14 +3691,14 @@ paths:
   /beta/me/invites:
     get:
       operationId: getMyBetaInvites
-      summary: List the invites I have minted and who has joined through them
+      summary: List my minted invite codes and remaining quota
       tags: [beta]
       security:
         - cookieAuth: []
         - bearerAuth: []
       responses:
         "200":
-          description: My invites and invitees.
+          description: My invite codes and remaining quota.
           content:
             application/json:
               schema:
