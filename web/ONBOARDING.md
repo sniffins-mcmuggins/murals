@@ -13,7 +13,7 @@ Read this top-to-bottom once. After that, the **"Add a feature"** and
 
 This folder is the **browser platform** — the site artists and organisers log
 into. (The public mobile app lives in `mobile/`; the Go backend lives in
-`api/`.) It is a **Next.js 15 App Router** app written in **TypeScript** and
+`api/`.) It is a **Next.js 16 App Router** app written in **TypeScript** and
 **React 19**, styled with **Tailwind CSS v4**.
 
 Three things make our setup different from a vanilla "create-react-app" you may

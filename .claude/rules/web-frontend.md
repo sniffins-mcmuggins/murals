@@ -5,7 +5,7 @@ paths:
 
 # Web frontend standards & gotchas
 
-The Next.js 15 App Router platform (React 19, TypeScript, Tailwind v4). This is
+The Next.js 16 App Router platform (React 19, TypeScript, Tailwind v4). This is
 the in-context working knowledge for `web/`. Route-group `*.spec.md` files are the
 binding contract — read the relevant one before changing a route group.
 
@@ -33,11 +33,12 @@ binding contract — read the relevant one before changing a route group.
   legitimate raw `fetch` to our API left** — the only justified raw fetch is the
   external presigned-PUT inside `hooks/useImageUpload.ts` (uploads to MinIO/S3,
   not our API).
-- **This is enforced by ESLint, not convention.** `.eslintrc.json` bans `fetch(`
-  via `no-restricted-syntax`; `task lint` / the `web-lint` pre-commit hook / CI
-  all fail on a raw fetch. If you have a *genuinely external* fetch (not our
-  API), don't reach for `eslint-disable` inline — add the file to the
-  `overrides` exemption in `.eslintrc.json` with a comment, like
+- **This is enforced by ESLint, not convention.** `eslint.config.mjs` (flat
+  config — Next 16 removed `next lint`, so linting runs via `eslint .`) bans
+  `fetch(` via `no-restricted-syntax`; `task lint` / the `web-lint` pre-commit
+  hook / CI all fail on a raw fetch. If you have a *genuinely external* fetch
+  (not our API), don't reach for `eslint-disable` inline — add the file to the
+  files-scoped exemption block in `eslint.config.mjs` with a comment, like
   `hooks/useImageUpload.ts`. If you're tempted to exempt a call to *our* API,
   the answer is almost always "add the endpoint to the spec" instead.
 - **Missing endpoint? Fix the spec, don't hand-roll fetch.** If the typed client
