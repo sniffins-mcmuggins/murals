@@ -177,7 +177,7 @@ client page passes ~300 lines:
 `MediumPicker.tsx`, `SupportLinkField.tsx`, `ImageSlot.tsx` are used by **both**
 the profile wizard and the profile editor. Changing one changes both — that's
 intentional. The image-upload choreography (presign → PUT MinIO/S3 → confirm →
-attach) lives in `hooks/useUploadImage.ts`; reuse it, don't reimplement.
+attach) lives in `hooks/useImageUpload.ts`; reuse it, don't reimplement.
 
 ## Testing client pages/hooks — the preferred pattern
 
