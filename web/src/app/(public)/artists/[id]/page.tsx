@@ -314,7 +314,11 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             <h2 className="font-serif text-3xl text-ink mb-6">Endorsements</h2>
 
             {/* Organiser endorsements first */}
-            {endorsements.filter((e) => e.kind === 'organiser').map((e) => (
+            {endorsements.filter((e) => e.kind === 'organiser').map((e) => {
+              // Organiser endorsements always carry a festival_id (DB CHECK), so the
+              // festival badge links to the festival's public page.
+              const festivalHref = e.festival_id ? `/festivals/${e.festival_id}` : null
+              return (
               <div key={e.id} className="mb-6 p-5 border border-light rounded-lg bg-warm">
                 <div className="flex items-start gap-3">
                   {e.endorser_avatar_s3_key && (
@@ -327,9 +331,18 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       {e.festival_name && (
-                        <span className="font-mono text-xs uppercase tracking-widest bg-amber text-ink px-2 py-0.5 rounded">
-                          {e.festival_name}
-                        </span>
+                        festivalHref ? (
+                          <Link
+                            href={festivalHref}
+                            className="font-mono text-xs uppercase tracking-widest bg-amber text-ink px-2 py-0.5 rounded hover:bg-clay hover:text-offwhite transition-colors"
+                          >
+                            {e.festival_name}
+                          </Link>
+                        ) : (
+                          <span className="font-mono text-xs uppercase tracking-widest bg-amber text-ink px-2 py-0.5 rounded">
+                            {e.festival_name}
+                          </span>
+                        )
                       )}
                       {e.endorser_display_name && (
                         <span className="font-sans text-sm text-mid">via {e.endorser_display_name}</span>
@@ -350,14 +363,18 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
 
             {/* Peer endorsements */}
             {endorsements.filter((e) => e.kind === 'peer').length > 0 && (
               <div className="grid gap-4 sm:grid-cols-2">
-                {endorsements.filter((e) => e.kind === 'peer').map((e) => (
-                  <div key={e.id} className="p-4 border border-light rounded-lg bg-offwhite">
-                    <div className="flex items-center gap-3 mb-2">
+                {endorsements.filter((e) => e.kind === 'peer').map((e) => {
+                  // Link to the endorser's public page only when they have a
+                  // published profile (endorser_profile_id is server-gated on it).
+                  const profileHref = e.endorser_profile_id ? `/artists/${e.endorser_profile_id}` : null
+                  const author = (
+                    <>
                       {e.endorser_avatar_s3_key && (
                         <img
                           src={e.endorser_avatar_s3_key}
@@ -365,10 +382,23 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                           className="w-8 h-8 rounded-full object-cover"
                         />
                       )}
-                      <span className="font-sans text-sm font-medium text-ink">
+                      <span className="font-sans text-sm font-medium text-ink group-hover:text-clay transition-colors">
                         {e.endorser_display_name ?? 'Anonymous artist'}
                       </span>
-                    </div>
+                    </>
+                  )
+                  return (
+                  <div key={e.id} className="p-4 border border-light rounded-lg bg-offwhite">
+                    {profileHref ? (
+                      <Link
+                        href={profileHref}
+                        className="flex items-center gap-3 mb-2 group hover:text-clay"
+                      >
+                        {author}
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-3 mb-2">{author}</div>
+                    )}
                     {e.body && (
                       <p className="font-serif text-base text-ink leading-relaxed">{e.body}</p>
                     )}
@@ -382,7 +412,8 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </section>

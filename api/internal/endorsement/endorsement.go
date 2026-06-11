@@ -26,17 +26,22 @@ func pgUUIDFromString(s string) (pgtype.UUID, error) {
 }
 
 type endorsementResponse struct {
-	ID                  string   `json:"id"`
-	Kind                string   `json:"kind"`
-	EndorserID          string   `json:"endorser_id"`
-	EndorserDisplayName *string  `json:"endorser_display_name,omitempty"`
-	EndorserAvatarS3Key *string  `json:"endorser_avatar_s3_key,omitempty"`
-	FestivalID          *string  `json:"festival_id,omitempty"`
-	FestivalName        *string  `json:"festival_name,omitempty"`
-	Body                *string  `json:"body,omitempty"`
-	Skills              []string `json:"skills"`
-	HiddenByEndorsee    bool     `json:"hidden_by_endorsee"`
-	CreatedAt           string   `json:"created_at"`
+	ID                  string  `json:"id"`
+	Kind                string  `json:"kind"`
+	EndorserID          string  `json:"endorser_id"`
+	EndorserDisplayName *string `json:"endorser_display_name,omitempty"`
+	EndorserAvatarS3Key *string `json:"endorser_avatar_s3_key,omitempty"`
+	// EndorserProfileID is the endorser's public artist-profile id, set only on
+	// the public list and only when the endorser's profile visibility is
+	// 'public'. The web page uses it to link to /artists/{id}; nil for
+	// organisers and draft peers, which render as plain text.
+	EndorserProfileID *string  `json:"endorser_profile_id,omitempty"`
+	FestivalID        *string  `json:"festival_id,omitempty"`
+	FestivalName      *string  `json:"festival_name,omitempty"`
+	Body              *string  `json:"body,omitempty"`
+	Skills            []string `json:"skills"`
+	HiddenByEndorsee  bool     `json:"hidden_by_endorsee"`
+	CreatedAt         string   `json:"created_at"`
 }
 
 func uuidPtrFromPgtype(u pgtype.UUID) *string {
@@ -75,6 +80,7 @@ func toRowResponse(e sqlcdb.ListPublicEndorsementsRow) endorsementResponse {
 		EndorserID:          e.EndorserID.String(),
 		EndorserDisplayName: e.EndorserDisplayName,
 		EndorserAvatarS3Key: e.EndorserAvatarS3Key,
+		EndorserProfileID:   uuidPtrFromPgtype(e.EndorserProfileID),
 		FestivalID:          uuidPtrFromPgtype(e.FestivalID),
 		FestivalName:        e.FestivalName,
 		Body:                e.Body,

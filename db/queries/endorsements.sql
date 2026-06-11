@@ -30,6 +30,11 @@ SELECT
   e.updated_at,
   ap.display_name  AS endorser_display_name,
   ap.avatar_s3_key AS endorser_avatar_s3_key,
+  -- Only expose the endorser's profile id when their profile is public, so the
+  -- web page never links to an /artists/{id} that 404s (draft profiles are
+  -- invisible to non-owners). NULL for organisers (no artist profile) and
+  -- peers whose profile is still draft.
+  (CASE WHEN ap.visibility = 'public' THEN ap.id END)::uuid AS endorser_profile_id,
   f.name           AS festival_name
 FROM endorsements e
 LEFT JOIN artist_profiles ap ON ap.user_id = e.endorser_id

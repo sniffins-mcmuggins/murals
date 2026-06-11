@@ -32,9 +32,12 @@ Make the author of each endorsement clickable:
   is the only real gap.
 - `ListPublicEndorsements` already `LEFT JOIN artist_profiles ap ON ap.user_id =
   e.endorser_id`, so `ap.id` (the endorser's profile id) is one column away.
-- Public artist pages render from `profile_snapshots`. A peer endorser is only
-  safely linkable if a snapshot row exists for their profile; otherwise
-  `/artists/{id}` calls `notFound()`.
+- Public artist pages (`GET /profiles/{id}`) are gated on
+  `artist_profiles.visibility = 'public'` — draft profiles `notFound()` for
+  non-owners. A peer endorser is therefore only safely linkable when their
+  profile visibility is `public`. (Snapshots freeze the *content* of a public
+  profile but are not the visibility gate; a public profile renders via
+  live-assembly even before its first snapshot.)
 - Organiser endorsements always carry `festival_id` (DB `CHECK (kind = 'peer' OR
   festival_id IS NOT NULL)`), so the organiser link target always exists.
 - The DTO already exposes `festival_id` and `festival_name`.
@@ -43,18 +46,17 @@ Make the author of each endorsement clickable:
 
 ### 1. DB query — `db/queries/endorsements.sql` (`ListPublicEndorsements`)
 
-Add a publish-gated endorser profile id. Join the snapshot table and emit the
-profile id only when a snapshot exists:
+Add a visibility-gated endorser profile id. The `artist_profiles` join already
+exists; emit `ap.id` only when the endorser's profile is public:
 
 ```sql
-LEFT JOIN profile_snapshots ps ON ps.artist_profile_id = ap.id
-...
-CASE WHEN ps.artist_profile_id IS NOT NULL THEN ap.id END AS endorser_profile_id
+(CASE WHEN ap.visibility = 'public' THEN ap.id END)::uuid AS endorser_profile_id
 ```
 
-`endorser_profile_id` is therefore `NULL` for organisers (no artist profile) and
-for unpublished peers. "Unpublished → plain text" becomes a server guarantee, not
-a client guess.
+The `::uuid` cast is required so sqlc infers `pgtype.UUID` rather than
+`interface{}`. `endorser_profile_id` is therefore `NULL` for organisers (no
+artist profile) and for draft peers. "Not public → plain text" becomes a server
+guarantee, not a client guess.
 
 Only `ListPublicEndorsements` changes. `ListReceivedEndorsements` (endorsee
 management view) is untouched — it does not render public links.
@@ -93,10 +95,10 @@ from the repo root; commit both generated files (CI's "OpenAPI — no drift" job
 
 ## Testing
 
-- **API (Go) test** in `endorsement_test.go`: a published peer endorser yields
-  `endorser_profile_id` equal to their profile id; an unpublished peer endorser
-  (profile exists, no snapshot) yields `endorser_profile_id` absent/nil; an
-  organiser endorser yields it absent.
+- **API (Go) test** in `endorsement_test.go`: a public peer endorser yields
+  `endorser_profile_id` equal to their profile id; a draft peer endorser
+  (profile exists, visibility != public) yields `endorser_profile_id`
+  absent/nil; an organiser endorser yields it absent.
 - **Web (Vitest)** render test under `__tests__/app-public-artists/`: a peer
   endorsement with `endorser_profile_id` renders a link to `/artists/{id}`; one
   without renders no link; an organiser endorsement renders a link to

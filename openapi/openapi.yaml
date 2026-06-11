@@ -1010,6 +1010,14 @@ components:
         endorser_avatar_s3_key:
           type: string
           nullable: true
+        endorser_profile_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            Public artist-profile id of the endorser, set only on the public
+            list and only when the endorser has a published profile. Used to
+            link to /artists/{id}. Null for organisers and unpublished peers.
         festival_id:
           type: string
           format: uuid
