@@ -124,4 +124,29 @@ test.describe('public visitor flow', () => {
     // The image uploaded in beforeAll should appear in the grid
     await expect(page.locator('img').first()).toBeVisible()
   })
+
+  test('"Apply to exhibit" CTA links to the real apply route, not a 404', async ({ page }) => {
+    // The apply CTA only renders while a festival is `open` (a `live` one shows the
+    // map link instead), so spin up a dedicated open festival for this assertion.
+    const suffix = uniqueSuffix()
+    const organiser = await createOrganiser(suffix)
+    const { festivalId: openFid } = await createFestival(organiser.token, {
+      name: `Apply Fest ${suffix}`,
+      slug: `apply-${suffix}`,
+    })
+    await upsertForm(organiser.token, openFid)
+    await setFestivalStatus(organiser.token, openFid, 'open')
+
+    await page.goto(`/festivals/${openFid}`)
+    const applyLink = page.getByRole('link', { name: /apply to exhibit/i })
+    await expect(applyLink).toBeVisible()
+    // Pin the exact target: a dangling `/festivals/{id}/apply` shipped once and 404'd
+    // for every visitor (caught by the UI health sweep; now guarded by typedRoutes too).
+    await expect(applyLink).toHaveAttribute('href', `/applications/apply/${openFid}`)
+
+    // Follow it: an anonymous visitor hits the auth-gated apply page and is redirected
+    // to /login — crucially NOT Next's 404 page, which is what the broken link produced.
+    await applyLink.click()
+    await expect(page).toHaveURL(/\/login/)
+  })
 })
