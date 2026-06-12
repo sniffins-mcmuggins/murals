@@ -12,28 +12,28 @@ import (
 )
 
 const addFestivalArtist = `-- name: AddFestivalArtist :one
-INSERT INTO festival_artists (festival_id, artist_id, status)
+INSERT INTO festival_artists (festival_id, artist_id, source)
 VALUES ($1, $2, $3)
 ON CONFLICT (festival_id, artist_id) DO UPDATE
-    SET status = EXCLUDED.status, updated_at = now()
-RETURNING festival_id, artist_id, status, created_at, updated_at
+    SET source = EXCLUDED.source, updated_at = now()
+RETURNING festival_id, artist_id, created_at, updated_at, source
 `
 
 type AddFestivalArtistParams struct {
 	FestivalID pgtype.UUID          `db:"festival_id" json:"festival_id"`
 	ArtistID   pgtype.UUID          `db:"artist_id" json:"artist_id"`
-	Status     FestivalArtistStatus `db:"status" json:"status"`
+	Source     FestivalArtistSource `db:"source" json:"source"`
 }
 
 func (q *Queries) AddFestivalArtist(ctx context.Context, arg AddFestivalArtistParams) (FestivalArtist, error) {
-	row := q.db.QueryRow(ctx, addFestivalArtist, arg.FestivalID, arg.ArtistID, arg.Status)
+	row := q.db.QueryRow(ctx, addFestivalArtist, arg.FestivalID, arg.ArtistID, arg.Source)
 	var i FestivalArtist
 	err := row.Scan(
 		&i.FestivalID,
 		&i.ArtistID,
-		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Source,
 	)
 	return i, err
 }
@@ -46,7 +46,6 @@ FROM festival_artists fa
 JOIN artist_profiles ap ON ap.id = fa.artist_id
 WHERE fa.festival_id = $1
   AND fa.artist_id = $2
-  AND fa.status = 'accepted'
 `
 
 type GetAcceptedArtistForFestivalParams struct {
@@ -72,13 +71,12 @@ SELECT $1::uuid AS artist_id
 WHERE EXISTS (
     SELECT 1 FROM festival_artists fa
     WHERE fa.festival_id = $2 AND fa.artist_id = $1
-      AND fa.status = 'accepted'
 )
 OR EXISTS (
     SELECT 1 FROM applications a
     JOIN application_forms af ON af.id = a.form_id
     WHERE af.festival_id = $2 AND a.artist_id = $1
-      AND a.staged_decision = 'accept'
+      AND a.decision = 'accept' AND a.released_at IS NULL
 )
 `
 
@@ -88,7 +86,7 @@ type GetSpotEligibleArtistParams struct {
 }
 
 // Returns the artist_id iff the artist is spot-eligible for this festival:
-// a released accept OR a provisional accept (staged_decision = 'accept').
+// a lineup member (festival_artists row) OR a provisional accept (decision = 'accept', not yet released).
 // Used as the assignment guard in SetSpotArtistHandler. ErrNoRows => not eligible.
 func (q *Queries) GetSpotEligibleArtist(ctx context.Context, arg GetSpotEligibleArtistParams) (pgtype.UUID, error) {
 	row := q.db.QueryRow(ctx, getSpotEligibleArtist, arg.ArtistID, arg.FestivalID)
@@ -112,7 +110,6 @@ WHERE f.deleted_at IS NULL
       SELECT 1 FROM festival_artists fa
       WHERE fa.festival_id = f.id
         AND fa.artist_id = $1
-        AND fa.status = 'accepted'
     )
     OR (f.status = 'live' AND EXISTS (
       SELECT 1 FROM festival_spots fs
@@ -132,7 +129,7 @@ type ListPublicFestivalsForArtistRow struct {
 	Status    FestivalStatus `db:"status" json:"status"`
 }
 
-// Festivals where the given artist is accepted and/or has an assigned spot,
+// Festivals where the given artist is a lineup member and/or has an assigned spot,
 // restricted to festivals the public can see (open or live, not soft-deleted).
 // Used by the public "Appearances" section on an artist profile.
 func (q *Queries) ListPublicFestivalsForArtist(ctx context.Context, artistID pgtype.UUID) ([]ListPublicFestivalsForArtistRow, error) {

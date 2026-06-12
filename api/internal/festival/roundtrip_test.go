@@ -48,8 +48,9 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 
 	// Review
 	r.Get("/festivals/{festivalID}/applications", festival.ListApplicationsHandler(db))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db, auth.NoopMailer{}))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db, auth.NoopMailer{}))
+	// literal before parameterised
+	r.Post("/festivals/{festivalID}/applications/release-decisions", festival.ReleaseDecisionsHandler(db, auth.NoopMailer{}))
+	r.Patch("/festivals/{festivalID}/applications/{applicationID}", festival.PatchApplicationHandler(db))
 
 	// Map
 	r.Get("/festivals/slug/{slug}/map", festival.GetMapDataHandler(db))
@@ -191,7 +192,7 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	app := decodeJSON(resp)
 	_ = resp.Body.Close()
 	applicationID := app["id"].(string)
-	assert.Equal(t, "submitted", app["status"])
+	assert.Equal(t, "undecided", app["decision"])
 
 	// 12. List applications (organiser)
 	resp = do("GET", "/festivals/"+festID+"/applications", "", orgToken)
@@ -200,12 +201,18 @@ func TestFestivalDomainRoundTrip(t *testing.T) {
 	_ = resp.Body.Close()
 	assert.Len(t, apps, 1)
 
-	// 13. Accept application
-	resp = do("POST", "/festivals/"+festID+"/applications/"+applicationID+"/accept", "", orgToken)
+	// 13. Set decision to accept via PATCH
+	resp = do("PATCH", "/festivals/"+festID+"/applications/"+applicationID,
+		`{"shortlisted":false,"review_flag":false,"decision":"accept"}`, orgToken)
 	assertStatus(resp, http.StatusOK)
-	accepted := decodeJSON(resp)
+	patched := decodeJSON(resp)
 	_ = resp.Body.Close()
-	assert.Equal(t, "accepted", accepted["status"])
+	assert.Equal(t, "accept", patched["decision"])
+
+	// 13b. Release decisions (makes the accept public and creates festival_artist row)
+	resp = do("POST", "/festivals/"+festID+"/applications/release-decisions", "", orgToken)
+	assertStatus(resp, http.StatusOK)
+	_ = resp.Body.Close()
 
 	// 14. Set festival to live
 	resp = do("PATCH", "/festivals/"+festID, `{"status":"live"}`, orgToken)
@@ -299,8 +306,7 @@ func TestFestivalDomainRoundTrip_MapOnlyShowsPinnedArtists(t *testing.T) {
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, festID),
 		ArtistID:   pgUUID(t, artistProfileID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
-		// PinLat/PinLng left as zero — pin_lat/pin_lng will be NULL in DB
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err, "add festival artist")
 

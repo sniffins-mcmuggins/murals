@@ -56,7 +56,7 @@ func TestListArtistFestivals_AcceptedAppears(t *testing.T) {
 	_, err = q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: fest.ID,
 		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err)
 
@@ -128,30 +128,18 @@ func TestListArtistFestivals_AssignedSpotAppears(t *testing.T) {
 	assert.Equal(t, festID, out[0].ID)
 }
 
-func TestListArtistFestivals_ExcludesDeclinedAndPending(t *testing.T) {
+func TestListArtistFestivals_ExcludesNonLineupArtist(t *testing.T) {
+	// An artist who applied but was never added to festival_artists (e.g. declined or pending)
+	// must not appear in the public appearances list.
 	t.Parallel()
 	db := testutil.NewDB(t)
-	q := sqlcdb.New(db)
 
 	orgID, _, _ := createTestUser(t, db)
 	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Rejected Artist")
 
-	declinedFest, _ := createTestFestival(t, db, orgID, "live")
-	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
-		FestivalID: pgUUID(t, declinedFest),
-		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusDeclined,
-	})
-	require.NoError(t, err)
-
-	invitedFest, _ := createTestFestival(t, db, orgID, "live")
-	_, err = q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
-		FestivalID: pgUUID(t, invitedFest),
-		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusInvited,
-	})
-	require.NoError(t, err)
+	// A live festival where the artist applied but was not added to the lineup.
+	_, _ = createTestFestival(t, db, orgID, "live")
 
 	r := chi.NewRouter()
 	r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(db))
@@ -175,13 +163,13 @@ func TestListArtistFestivals_ExcludesNonPublicFestivals(t *testing.T) {
 	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Draft Artist")
 
-	// Accepted at a draft festival and an archived one — neither is public.
+	// Added to lineup at a draft festival and an archived one — neither is public.
 	for _, status := range []string{"draft", "archived"} {
 		festID, _ := createTestFestival(t, db, orgID, status)
 		_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 			FestivalID: pgUUID(t, festID),
 			ArtistID:   pgUUID(t, artistID),
-			Status:     sqlcdb.FestivalArtistStatusAccepted,
+			Source:     sqlcdb.FestivalArtistSourceApplication,
 		})
 		require.NoError(t, err)
 	}
@@ -212,7 +200,7 @@ func TestListArtistFestivals_OpenFestivalHasNoMapSlug(t *testing.T) {
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, openFest),
 		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err)
 
@@ -281,9 +269,8 @@ func TestAppearances_PreReleaseSpotDoesNotLeak(t *testing.T) {
 	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
 	q := sqlcdb.New(db)
-	dec := "accept"
 	_, err := q.UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
-		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, Decision: sqlcdb.ApplicationDecisionAccept,
 	})
 	require.NoError(t, err)
 

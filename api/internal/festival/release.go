@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -14,9 +15,23 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
+// decisionToStatus converts a decision value to the notification status string.
+func decisionToStatus(d string) string {
+	switch d {
+	case "accept":
+		return "accepted"
+	case "waitlist":
+		return "waitlisted"
+	case "decline":
+		return "declined"
+	default:
+		return d
+	}
+}
+
 // ReleaseDecisionsHandler handles POST /festivals/{festivalID}/applications/release-decisions.
-// Bulk-updates all staged decisions to final statuses, sends notification emails, and
-// sets decisions_released_at. Returns 409 if already released.
+// Stamps released_at on every decided-but-unreleased application, creates festival_artists rows
+// for accepts, and clears spots for non-accepts. Returns 409 if nothing to release.
 func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -50,46 +65,51 @@ func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.H
 			return
 		}
 
-		// Guard: all submitted applications must have a staged decision before release.
+		// Guard: all applications must have a decision before release.
 		undecided, err := q.CountSubmittedUndecidedByFestival(r.Context(), festUUID)
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
 		}
 		if undecided > 0 {
-			httperr.UnprocessableEntity(w, "all submitted applications must have a staged decision before releasing")
+			httperr.UnprocessableEntity(w, "all submitted applications must have a decision before releasing")
 			return
 		}
 
-		// Mark festival as released first (returns no rows if already released → 409)
-		_, err = q.SetFestivalDecisionsReleasedAt(r.Context(), festUUID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				w.WriteHeader(http.StatusConflict)
-				return
-			}
-			httperr.InternalServerError(w)
-			return
-		}
-
-		// Bulk-update staged decisions → final statuses
-		released, err := q.ReleaseDecisionsForFestival(r.Context(), festUUID)
+		// Release is a multi-table write: stamp released_at, create festival_artists rows
+		// for accepts, clear spots for non-accepts. Wrap in one transaction.
+		tx, err := pool.Begin(r.Context())
 		if err != nil {
 			httperr.InternalServerError(w)
 			return
 		}
+		defer tx.Rollback(r.Context()) //nolint:errcheck // no-op after a successful Commit
+		qtx := q.WithTx(tx)
 
-		// Per-application side effects. Accepted artists become festival_artists so
-		// they're assignable on the map and visible on the public roster — this
-		// mirrors AcceptApplicationHandler, which the staged-decision flow replaces.
-		// AddFestivalArtist is an upsert, so re-release is harmless. Decline/waitlist
-		// touch no festival_artists row, matching the direct handlers.
+		released, err := qtx.ReleaseDecisionsForFestival(r.Context(), festUUID)
+		if err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+		if len(released) == 0 {
+			// Nothing new to release — everything was already released.
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+
+		// Per-application side effects. Emails are collected and sent only after the
+		// transaction commits — never email an artist about a decision that then rolls back.
+		type pendingNotification struct {
+			artistID pgtype.UUID
+			status   string
+		}
+		notifications := make([]pendingNotification, 0, len(released))
 		for _, app := range released {
-			if app.Status == sqlcdb.ApplicationStatusAccepted {
-				if _, err := q.AddFestivalArtist(r.Context(), sqlcdb.AddFestivalArtistParams{
+			if app.Decision == sqlcdb.ApplicationDecisionAccept {
+				if _, err := qtx.AddFestivalArtist(r.Context(), sqlcdb.AddFestivalArtistParams{
 					FestivalID: festUUID,
 					ArtistID:   app.ArtistID,
-					Status:     sqlcdb.FestivalArtistStatusAccepted,
+					Source:     sqlcdb.FestivalArtistSourceApplication,
 				}); err != nil {
 					httperr.InternalServerError(w)
 					return
@@ -97,14 +117,24 @@ func ReleaseDecisionsHandler(pool *pgxpool.Pool, mailer auth.EmailSender) http.H
 			} else {
 				// Safety net: an artist provisionally assigned a spot, then downgraded,
 				// must not keep the spot into the live festival.
-				if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
+				if err := qtx.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
 					FestivalID: festUUID, ArtistID: app.ArtistID,
 				}); err != nil {
 					httperr.InternalServerError(w)
 					return
 				}
 			}
-			sendApplicationNotification(pool, mailer, app.ArtistID, fest.Name, string(app.Status))
+			notifications = append(notifications, pendingNotification{app.ArtistID, decisionToStatus(string(app.Decision))})
+		}
+
+		if err := tx.Commit(r.Context()); err != nil {
+			httperr.InternalServerError(w)
+			return
+		}
+
+		// Durable now — fire the notifications (each is a detached goroutine).
+		for _, n := range notifications {
+			sendApplicationNotification(pool, mailer, n.artistID, fest.Name, n.status)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

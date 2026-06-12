@@ -17,23 +17,22 @@ import (
 )
 
 type festivalResponse struct {
-	ID                  string   `json:"id"`
-	OrganiserID         string   `json:"organiser_id"`
-	Name                string   `json:"name"`
-	Slug                string   `json:"slug"`
-	Description         string   `json:"description"`
-	LocationLabel       string   `json:"location_label"`
-	StartDate           *string  `json:"start_date,omitempty"`
-	EndDate             *string  `json:"end_date,omitempty"`
-	Status              string   `json:"status"`
-	CreatedAt           string   `json:"created_at"`
-	UpdatedAt           string   `json:"updated_at"`
-	DecisionsReleasedAt *string  `json:"decisions_released_at,omitempty"`
-	ReviewOpenedAt      *string  `json:"review_opened_at,omitempty"`
-	ReviewClosedAt      *string  `json:"review_closed_at,omitempty"`
-	ReviewStatus        string   `json:"review_status"`
-	CenterLat           *float64 `json:"center_lat,omitempty"`
-	CenterLng           *float64 `json:"center_lng,omitempty"`
+	ID             string   `json:"id"`
+	OrganiserID    string   `json:"organiser_id"`
+	Name           string   `json:"name"`
+	Slug           string   `json:"slug"`
+	Description    string   `json:"description"`
+	LocationLabel  string   `json:"location_label"`
+	StartDate      *string  `json:"start_date,omitempty"`
+	EndDate        *string  `json:"end_date,omitempty"`
+	Status         string   `json:"status"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
+	ReviewOpenedAt *string  `json:"review_opened_at,omitempty"`
+	ReviewClosedAt *string  `json:"review_closed_at,omitempty"`
+	ReviewStatus   string   `json:"review_status"`
+	CenterLat      *float64 `json:"center_lat,omitempty"`
+	CenterLng      *float64 `json:"center_lng,omitempty"`
 }
 
 func toFestivalResponse(f sqlcdb.Festival) festivalResponse {
@@ -55,10 +54,6 @@ func toFestivalResponse(f sqlcdb.Festival) festivalResponse {
 	if f.EndDate.Valid {
 		s := f.EndDate.Time.Format("2006-01-02")
 		resp.EndDate = &s
-	}
-	if f.DecisionsReleasedAt.Valid {
-		s := f.DecisionsReleasedAt.Time.Format(time.RFC3339)
-		resp.DecisionsReleasedAt = &s
 	}
 	resp.ReviewStatus = "not_started"
 	if f.ReviewOpenedAt.Valid {

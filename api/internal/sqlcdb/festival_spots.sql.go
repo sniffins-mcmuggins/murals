@@ -397,7 +397,6 @@ SELECT fa.artist_id, ap.display_name AS name
 FROM festival_artists fa
 JOIN artist_profiles ap ON ap.id = fa.artist_id
 WHERE fa.festival_id = $1
-  AND fa.status = 'accepted'
   AND NOT EXISTS (
     SELECT 1 FROM festival_spots fs
     WHERE fs.festival_id = $1 AND fs.artist_id = fa.artist_id
@@ -436,13 +435,13 @@ FROM (
     SELECT fa.artist_id, ap.display_name AS name
     FROM festival_artists fa
     JOIN artist_profiles ap ON ap.id = fa.artist_id
-    WHERE fa.festival_id = $1 AND fa.status = 'accepted'
+    WHERE fa.festival_id = $1
     UNION
     SELECT a.artist_id, ap.display_name AS name
     FROM applications a
     JOIN application_forms af ON af.id = a.form_id
     JOIN artist_profiles ap ON ap.id = a.artist_id
-    WHERE af.festival_id = $1 AND a.staged_decision = 'accept'
+    WHERE af.festival_id = $1 AND a.decision = 'accept' AND a.released_at IS NULL
 ) elig
 WHERE NOT EXISTS (
     SELECT 1 FROM festival_spots fs
@@ -456,8 +455,8 @@ type GetUnassignedSpotEligibleArtistsRow struct {
 	Name     string      `db:"name" json:"name"`
 }
 
-// Artists eligible to be placed on a spot: released accepts (festival_artists) OR
-// provisional accepts (applications.staged_decision = 'accept'), minus those already
+// Artists eligible to be placed on a spot: lineup members (festival_artists) OR
+// provisional accepts (decision = 'accept', not yet released), minus those already
 // assigned a spot. Feeds the map editor pool and the dashboard summary.
 func (q *Queries) GetUnassignedSpotEligibleArtists(ctx context.Context, festivalID pgtype.UUID) ([]GetUnassignedSpotEligibleArtistsRow, error) {
 	rows, err := q.db.Query(ctx, getUnassignedSpotEligibleArtists, festivalID)
