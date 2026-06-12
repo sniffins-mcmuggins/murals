@@ -1,3 +1,4 @@
+import type { Route } from 'next'
 import Link from 'next/link'
 
 /**
@@ -14,7 +15,7 @@ export function OwnerBar({
   editLabel,
 }: {
   label: string
-  editHref: string
+  editHref: Route
   editLabel: string
 }) {
   return (

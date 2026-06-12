@@ -1,5 +1,6 @@
 'use client'
 
+import type { Route } from 'next'
 import { useState, FormEvent, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -30,7 +31,9 @@ function LoginForm() {
     if (claimRedirect) {
       router.push('/profile?claimed=1')
     } else {
-      router.push(nextPath)
+      // nextPath is an arbitrary ?next= query value, so it can't be a statically
+      // known Route — cast through the typedRoutes boundary deliberately.
+      router.push(nextPath as Route)
     }
   }
 
