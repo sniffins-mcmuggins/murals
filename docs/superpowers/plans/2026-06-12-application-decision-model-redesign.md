@@ -10,7 +10,16 @@
 
 **Design doc:** `docs/superpowers/specs/2026-06-12-application-decision-model-redesign-design.md`
 
-**Branch:** continue on `fix/seed-staged-decisions` (the interim seed fix lives here and is superseded in Task 5).
+**Branch:** `feat/decision-model` (renamed from `fix/seed-staged-decisions`; the interim seed fix lives here and is superseded in Task 5).
+
+---
+
+## Progress (2026-06-12)
+
+- ✅ **Task 1 — Migration** (`b5bfb92`). Applied; up/down/up round-trip clean.
+- ✅ **Task 2 — API layer** (`a87b3f4` + review fixes `7e4b0a0`). `task api:test` green. Spec compliance + code-quality reviews done. Review fixes folded in: released-application immutability (PATCH → 409), `CountSubmittedUndecidedByFestival` also requires `released_at IS NULL`, real declined-applicant exclusion test, and `festival.spec.md` updated to the new model (so Task 7's festival.spec.md item is already done — only `db.spec.md` + `.claude/rules/e2e-debugging.md` remain there).
+  - **Carry-over for Task 4:** `useApplicationReview.ts` reorder still sends `body: { status: 'submitted', ids }` — the reorder handler now validates against decision values, so the web must send a valid `decision` (or the field be reworked). Web is known-stale (still reads `decisions_released_at`/`staged_decision`) until Task 4.
+- ⏳ **Tasks 3–6** not started (OpenAPI, web, seed, e2e). Task 7 partially done (festival.spec.md).
 
 ---
 
