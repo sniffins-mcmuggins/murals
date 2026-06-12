@@ -1,0 +1,23 @@
+{
+  // Project-local Zed settings.
+  //
+  // This is an npm-workspaces monorepo: `typescript` (and `@render/api-client`)
+  // are hoisted to the repo-root `node_modules`, so `web/node_modules/typescript`
+  // does not exist. Without an explicit tsdk, Zed's vtsls fails to locate the
+  // TypeScript SDK from inside `web/`, drops those files into an inferred project
+  // with no `paths` mapping, and reports `Cannot find module '@/...'` (ts2307)
+  // even though `tsc -p web/tsconfig.json` passes cleanly.
+  //
+  // Pointing vtsls at the hoisted SDK makes it use the project's TypeScript 5.x
+  // and bind `web/` files to `web/tsconfig.json`, so the `@/* -> ./src/*` alias
+  // resolves in the editor.
+  "lsp": {
+    "vtsls": {
+      "initialization_options": {
+        "typescript": {
+          "tsdk": "node_modules/typescript/lib"
+        }
+      }
+    }
+  }
+}

@@ -84,7 +84,7 @@ export default async function FestivalPage({ params }: Props) {
               Applications are open for this festival.
             </p>
             <Link
-              href={`/festivals/${id}/apply`}
+              href={`/applications/apply/${id}`}
               className="inline-block bg-amber text-ink font-sans font-semibold px-6 py-3 rounded hover:bg-amber/90 transition-colors"
             >
               Apply to exhibit

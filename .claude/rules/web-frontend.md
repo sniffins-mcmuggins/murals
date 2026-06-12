@@ -91,6 +91,53 @@ binding contract — read the relevant one before changing a route group.
 - **Change the API shape → regenerate the client** (`task openapi:gen` from repo
   root) and commit it, or CI's "OpenAPI — no drift" job goes red.
 
+## Routing & links — `typedRoutes` is ON
+
+`next.config.ts` sets `typedRoutes: true`, so **every `<Link href>` and `router.push()`
+is type-checked against the real route tree**. A link to a route that doesn't exist is
+a compile error, not a silent runtime 404. (This was added after a dangling
+`/festivals/{id}/apply` link shipped to the public festival page — see `docs/ui-health`.)
+
+- **Static hrefs are checked airtight.** `href="/dashboard"` compiles; `href="/dashbord"`
+  or `href={`/festivals/${id}/apply`}` (no such route) is a `tsc` error.
+- **Dynamic interpolations need an explicit `as Route`.** A bare `string` can contain
+  slashes, so `` `/festivals/${festivalId}` `` is *not* assignable to `Route` even though
+  the route exists. Cast it: `` (`/festivals/${festivalId}` as Route) ``. Import the type
+  with `import type { Route } from 'next'`. This is the one legitimate escape hatch — a
+  reviewer can see every cast. Live examples: `(public)/artists/[id]/page.tsx`,
+  `components/OwnerBar.tsx` (its `editHref` prop is typed `Route`).
+- **Arrays of links: type the field**, e.g. `const NAV_LINKS: { href: Route; label: string }[]`
+  (see the two `layout.tsx` nav menus). The literals are then checked as real routes.
+- **Genuinely-external targets** (a `?next=` query value, an arbitrary redirect) can't be
+  statically known — cast `as Route` with a comment, as `(auth)/login/page.tsx` does.
+- **Enforcement depends on generated route types.** `typedRoutes` writes `.next/types/**`
+  only via `next dev` / `next build` / `next typegen`. So `npm run typecheck` is
+  `next typegen && tsc --noEmit` (not bare `tsc`) — CI calls that script. If you add a
+  raw `tsc` invocation anywhere, prefix it with `next typegen` or the route checking is
+  silently off.
+
+## Security headers & `next.config.ts` policy
+
+`next.config.ts` sets a baseline of security response headers via `headers()`, applied to
+every route: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `X-DNS-Prefetch-Control: off`. Also
+`poweredByHeader: false` (no `X-Powered-By` version leak).
+
+- **Kill-switch:** all four headers are gated behind `SECURITY_HEADERS` — set
+  `SECURITY_HEADERS=off` to disable them in any environment without a code change. Default
+  is ON (unset = on), so local dev, the e2e stack, and CI all get them. The four baseline
+  headers are safe for Playwright/HMR — the full browser suite passes with them on — so
+  you shouldn't need the switch for these; it exists for the fragile additions below.
+- **HSTS is deliberately NOT set here.** `Strict-Transport-Security` is HTTPS-only and
+  belongs at the TLS terminator (ALB/CDN, E11 infra), not on `http://localhost`.
+- **CSP is deliberately NOT set yet.** A `Content-Security-Policy` must allowlist Leaflet's
+  inline styles, OSM tile hosts, and the presigned image host(s) — add it to
+  `securityHeaders` gated by the same `SECURITY_HEADERS` flag, and soak it report-only
+  before enforcing. Don't bolt on a naive CSP; it will silently break the maps.
+- **`logging: { fetches: { fullUrl: true } }`** logs the full URL of every server-side
+  fetch in dev — your first signal for the `API_URL` vs `NEXT_PUBLIC_API_URL` footgun (a
+  Server Component hitting `localhost:8080` → `ECONNREFUSED`). Dev-only; no prod effect.
+
 ## Styling
 
 - **Design tokens only** (defined in `src/app/globals.css`): `text-ink`,

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Route } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
@@ -123,7 +123,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
       {isOwner && (
         <OwnerBar
           label="You're viewing your live collection"
-          editHref={`/collections/${collectionId}`}
+          editHref={`/collections/${collectionId}` as Route}
           editLabel="Edit collection"
         />
       )}

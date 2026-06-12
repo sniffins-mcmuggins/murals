@@ -268,6 +268,11 @@ func main() {
 		// returns 200 if and only if the middleware lets the request through. Path
 		// is namespaced under /_test/ and exposes no real functionality; keep it as
 		// the smallest possible probe until a real Pro-only endpoint replaces it.
+		// Test-only: mint a short-lived access grant for the calling user so e2e
+		// tests and the UI health sweep can satisfy the publish gate (CanPublish)
+		// without Stripe or an admin session. Namespaced under /_test/.
+		r.Post("/_test/grant", billing.GrantTestHandler(pool))
+
 		r.With(billing.RequirePlan(pool, "artist_pro")).Get("/_test/billing/pro-only", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})

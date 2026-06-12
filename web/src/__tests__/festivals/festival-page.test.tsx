@@ -58,7 +58,7 @@ describe('FestivalPage', () => {
     const jsx = await FestivalPage({ params: makeParams('abc-123') })
     const rendered = JSON.stringify(jsx)
 
-    expect(rendered).toContain('/festivals/abc-123/apply')
+    expect(rendered).toContain('/applications/apply/abc-123')
     expect(rendered).toContain('Apply to exhibit')
   })
 

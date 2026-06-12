@@ -1,0 +1,48 @@
+{
+  "_comment": "Route manifest for the UI health sweep. Each entry is visited by scripts/ui-health/sweep.ts. `auth` selects which session loads it (public = no login). `{placeholders}` are substituted from fixtures the sweep creates at runtime (see sweep.ts → buildFixtures), so this file never hardcodes DB UUIDs. When you add a new page.tsx under web/src/app, add it here too — the ui-health-sweep skill checks for drift on every run.",
+  "fixtures": {
+    "_comment": "Documents which placeholders the sweep resolves. Update buildFixtures() in sweep.ts if you add a new one.",
+    "artistProfileId": "A published artist profile owned by the primary artist fixture",
+    "otherProfileId": "A second artist's published profile (for endorse flow — you cannot endorse yourself)",
+    "collectionId": "A collection under the primary artist profile",
+    "festivalId": "An organiser festival with a form, status=open",
+    "festivalSlug": "Slug of the open festival",
+    "applyFestivalId": "A festival the primary artist can apply to (status=open, has form)"
+  },
+  "routes": [
+    { "path": "/", "auth": "public", "waitFor": "body" },
+    { "path": "/login", "auth": "public" },
+    { "path": "/signup", "auth": "public" },
+    { "path": "/forgot-password", "auth": "public" },
+    { "path": "/artists/{artistProfileId}", "auth": "public" },
+    { "path": "/artists/{artistProfileId}/collections/{collectionId}", "auth": "public" },
+    { "path": "/festivals/{festivalId}", "auth": "public" },
+    { "path": "/festivals/{festivalId}/map", "auth": "public" },
+
+    { "path": "/dashboard", "auth": "artist" },
+    { "path": "/profile", "auth": "artist" },
+    { "path": "/profile/setup", "auth": "artist" },
+    { "path": "/profile/preview", "auth": "artist" },
+    { "path": "/collections", "auth": "artist" },
+    { "path": "/collections/{collectionId}", "auth": "artist" },
+    { "path": "/applications", "auth": "artist" },
+    { "path": "/applications/apply/{applyFestivalId}", "auth": "artist" },
+    { "path": "/endorsements", "auth": "artist" },
+    { "path": "/endorse/{otherProfileId}", "auth": "artist" },
+    { "path": "/analytics", "auth": "artist" },
+    { "path": "/billing", "auth": "artist" },
+
+    { "path": "/organiser/dashboard", "auth": "organiser" },
+    { "path": "/organiser/festivals", "auth": "organiser" },
+    { "path": "/organiser/festivals/{festivalId}", "auth": "organiser" },
+    { "path": "/organiser/festivals/{festivalId}/form", "auth": "organiser" },
+    { "path": "/organiser/festivals/{festivalId}/map", "auth": "organiser" },
+    { "path": "/organiser/festivals/{festivalId}/applications", "auth": "organiser" },
+    { "path": "/organiser/reviewing", "auth": "organiser" },
+    { "path": "/organiser/billing", "auth": "organiser" }
+  ],
+  "skipped": [
+    { "path": "/verify-email", "reason": "needs a one-time email token in the URL — not a steady-state page" },
+    { "path": "/reset-password", "reason": "needs a one-time reset token in the URL — not a steady-state page" }
+  ]
+}

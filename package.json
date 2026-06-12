@@ -1,5 +1,6 @@
 {
   "private": true,
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "openapi/client",
     "web"
@@ -9,6 +10,7 @@
     "@types/pg": "^8.20.0",
     "otplib": "^13.4.0",
     "pg": "^8.21.0",
+    "tsx": "^4.19.0",
     "vitest": "^3.0.0"
   }
 }

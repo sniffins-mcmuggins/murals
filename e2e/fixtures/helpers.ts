@@ -111,7 +111,18 @@ export async function createProfile(
   return { profileId: data.id }
 }
 
+// Publishing draft → public is gated behind an active artist subscription or comp
+// grant (api/internal/artist/profile.go → billing.CanPublish). For tests/tooling we
+// satisfy that gate via the /_test/grant backdoor (mints a 24h artist_basic grant for
+// the calling user) before flipping visibility, so a bare publish no longer 402s.
 export async function publishProfile(token: string): Promise<void> {
+  const grantRes = await fetch(`${API}/_test/grant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ plan: 'artist_basic' }),
+  })
+  if (!grantRes.ok) throw new Error(`Grant publish entitlement failed: ${grantRes.status}`)
+
   const res = await fetch(`${API}/profiles/me`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

@@ -68,6 +68,14 @@ tasks:
       - bash -c 'n=0; until curl -sf http://localhost:3000 >/dev/null 2>&1; do sleep 2; n=$((n+1)); [ $n -ge 60 ] && echo "Web did not become ready" && exit 1; done; echo "Web ready"'
       - task: e2e
 
+  ui-health:
+    desc: "Sweep every route for console errors, failed requests & broken links (requires stack to be up)"
+    cmd: npx tsx scripts/ui-health/sweep.ts
+
+  ui-health:baseline:
+    desc: "Accept the current UI state as the new baseline (docs/ui-health/baseline.json)"
+    cmd: npx tsx scripts/ui-health/sweep.ts --update-baseline
+
   hooks:install:
     desc: "Install git hooks via lefthook (run once after cloning)"
     cmd: go tool lefthook install

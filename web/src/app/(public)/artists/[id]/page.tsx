@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Route } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
@@ -317,7 +317,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
             {endorsements.filter((e) => e.kind === 'organiser').map((e) => {
               // Organiser endorsements always carry a festival_id (DB CHECK), so the
               // festival badge links to the festival's public page.
-              const festivalHref = e.festival_id ? `/festivals/${e.festival_id}` : null
+              const festivalHref: Route | null = e.festival_id ? (`/festivals/${e.festival_id}` as Route) : null
               return (
               <div key={e.id} className="mb-6 p-5 border border-light rounded-lg bg-warm">
                 <div className="flex items-start gap-3">
@@ -372,7 +372,7 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
                 {endorsements.filter((e) => e.kind === 'peer').map((e) => {
                   // Link to the endorser's public page only when they have a
                   // published profile (endorser_profile_id is server-gated on it).
-                  const profileHref = e.endorser_profile_id ? `/artists/${e.endorser_profile_id}` : null
+                  const profileHref: Route | null = e.endorser_profile_id ? (`/artists/${e.endorser_profile_id}` as Route) : null
                   const author = (
                     <>
                       {e.endorser_avatar_s3_key && (

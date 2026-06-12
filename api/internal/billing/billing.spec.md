@@ -1,6 +1,6 @@
 # billing Spec
 **Path:** `api/internal/billing/`
-**Last updated:** 2026-05-31
+**Last updated:** 2026-06-12
 
 ## Contract
 - Creates Stripe Checkout Sessions for artist subscriptions (basic/pro, monthly/annual) via `ArtistCheckoutHandler`
@@ -37,8 +37,10 @@
 - `webhook.go`: all Stripe webhook handling — idempotency logic and subscription state transitions live here
 - `middleware.go`: `RequirePlan(plan)` — route-level billing gate
 - `entitlement.go`: `CanPublish` — the handler-level entitlement check used when you need a bool not a middleware
+- `testsupport.go`: `GrantTestHandler` — **test-only** endpoint (wired at `POST /_test/grant` in `main.go`) that mints a 24h `artist_basic`/`artist_pro` grant for the calling principal, so e2e tests and the UI health sweep satisfy `CanPublish` without Stripe or an admin session. Like all `/_test/` routes, prod safety relies on the deployment not exposing the path, not a code guard.
 - `festival.go`: festival billing helpers
 - `Prices` is constructed in `api/cmd/api/main.go` from env vars — if a price ID is blank, `PlanFromPriceID` returns `"unknown"` and the checkout will fail with a Stripe 400
 
 ## Changelog
 2026-05-31 — initial spec
+2026-06-12 — added `GrantTestHandler` (`testsupport.go`, `POST /_test/grant`): test-only entitlement backdoor so e2e/tooling can satisfy the publish gate without Stripe/admin

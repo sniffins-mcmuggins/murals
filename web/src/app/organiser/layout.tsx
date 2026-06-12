@@ -1,7 +1,8 @@
+import type { Route } from 'next'
 import { requireAuth } from '@/lib/auth-server'
 import Link from 'next/link'
 
-const NAV_LINKS = [
+const NAV_LINKS: { href: Route; label: string }[] = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/organiser/festivals', label: 'Festivals' },
 ]
