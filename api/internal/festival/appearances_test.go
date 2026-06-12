@@ -128,18 +128,26 @@ func TestListArtistFestivals_AssignedSpotAppears(t *testing.T) {
 	assert.Equal(t, festID, out[0].ID)
 }
 
-func TestListArtistFestivals_ExcludesNonLineupArtist(t *testing.T) {
-	// An artist who applied but was never added to festival_artists (e.g. declined or pending)
-	// must not appear in the public appearances list.
+func TestListArtistFestivals_ExcludesDeclinedApplicant(t *testing.T) {
+	// An artist who applied to a live festival but was declined (released, so no
+	// festival_artists lineup row and no spot) must not appear in public appearances.
+	// This exercises the negative branch of ListPublicFestivalsForArtist: the artist
+	// IS linked to the festival via an application, yet is correctly excluded.
 	t.Parallel()
 	db := testutil.NewDB(t)
 
 	orgID, _, _ := createTestUser(t, db)
 	artistUserID, _, _ := createTestUser(t, db)
-	artistID := createTestArtistProfile(t, db, artistUserID, "Rejected Artist")
+	artistID := createTestArtistProfile(t, db, artistUserID, "Declined Artist")
+	festID, _ := createTestFestival(t, db, orgID, "live")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
-	// A live festival where the artist applied but was not added to the lineup.
-	_, _ = createTestFestival(t, db, orgID, "live")
+	// Decline the application and release it: no lineup row, no spot.
+	_, err := db.Exec(context.Background(),
+		`UPDATE applications SET decision = 'decline', released_at = now() WHERE id = $1`,
+		pgUUID(t, appID))
+	require.NoError(t, err)
 
 	r := chi.NewRouter()
 	r.Get("/profiles/{profileID}/festivals", festival.ListArtistFestivalsHandler(db))
@@ -151,7 +159,7 @@ func TestListArtistFestivals_ExcludesNonLineupArtist(t *testing.T) {
 	var out []appearanceResp
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	_ = resp.Body.Close()
-	assert.Empty(t, out)
+	assert.Empty(t, out, "declined applicant must not appear in public appearances")
 }
 
 func TestListArtistFestivals_ExcludesNonPublicFestivals(t *testing.T) {

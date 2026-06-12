@@ -15,7 +15,9 @@ import (
 	"github.com/sniffins-mcmuggins/render/api/internal/sqlcdb"
 )
 
-// decisionToStatus converts a decision value to the notification status string.
+// decisionToStatus converts a present-tense decision enum value (accept/waitlist/
+// decline) to the past-tense status string sendApplicationNotification switches on
+// (accepted/waitlisted/declined). Keep this the single conversion site.
 func decisionToStatus(d string) string {
 	switch d {
 	case "accept":

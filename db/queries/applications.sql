@@ -62,12 +62,14 @@ WHERE a.form_id = $1
 ORDER BY a.rank ASC, a.created_at ASC;
 
 -- name: CountSubmittedUndecidedByFestival :one
--- Applications still needing a decision (block release while > 0).
+-- Applications still needing a decision (block release while > 0). Mirrors the
+-- filter in ReleaseDecisionsForFestival: only unreleased rows can still be undecided.
 SELECT COUNT(*)::int AS count
 FROM applications a
 JOIN application_forms f ON a.form_id = f.id
 WHERE f.festival_id = $1
-  AND a.decision = 'undecided';
+  AND a.decision = 'undecided'
+  AND a.released_at IS NULL;
 
 -- name: ListStagedApplicationsByFestival :many
 SELECT a.*

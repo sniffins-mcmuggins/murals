@@ -187,6 +187,27 @@ func TestReleaseDecisions_NothingToRelease_409(t *testing.T) {
 	_ = second.Body.Close()
 }
 
+// A released application is final: PATCHing its decision afterwards is rejected,
+// so a published 'accept' can't be flipped (which would desync the artist's view
+// and orphan the lineup row).
+func TestPatchApplication_RejectedAfterRelease(t *testing.T) {
+	t.Parallel()
+	db := testutil.NewDB(t)
+	sc := setupReviewScenario(t, db)
+	srv := buildReleaseTestServer(t, db)
+
+	_ = doRequest(t, srv, "PATCH", "/festivals/"+sc.festID+"/applications/"+sc.applicationID,
+		`{"shortlisted":false,"review_flag":false,"decision":"accept"}`, sc.orgToken).Body.Close()
+	rel := doRequest(t, srv, "POST", "/festivals/"+sc.festID+"/applications/release-decisions", "", sc.orgToken)
+	require.Equal(t, http.StatusOK, rel.StatusCode)
+	_ = rel.Body.Close()
+
+	patch := doRequest(t, srv, "PATCH", "/festivals/"+sc.festID+"/applications/"+sc.applicationID,
+		`{"shortlisted":false,"review_flag":false,"decision":"decline"}`, sc.orgToken)
+	require.Equal(t, http.StatusConflict, patch.StatusCode)
+	_ = patch.Body.Close()
+}
+
 func buildReleaseTestServer(t *testing.T, db *pgxpool.Pool) *httptest.Server {
 	t.Helper()
 	r := chi.NewRouter()

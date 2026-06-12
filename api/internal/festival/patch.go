@@ -60,6 +60,16 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Released decisions are final: once an application has been published to
+		// the artist the board is read-only. Without this, a PATCH could flip a
+		// released 'accept' back to 'undecided' — leaving released_at set, so the
+		// artist's /me/applications would show the changed decision and the
+		// festival_artists lineup row would be orphaned.
+		if app.ReleasedAt.Valid {
+			httperr.Conflict(w, "application already released")
+			return
+		}
+
 		var req struct {
 			Shortlisted bool    `json:"shortlisted"`
 			ReviewFlag  bool    `json:"review_flag"`
