@@ -83,6 +83,31 @@ expect(statuses).toEqual([200, 409])
 
 Two rapid sequential requests often surface TOCTOU bugs without full concurrent infrastructure.
 
+## Adding a gate to an *existing* endpoint breaks its callers silently
+
+When you bolt a new auth/entitlement/validation gate onto an endpoint that already
+ships (e.g. `billing.CanPublish` was added to `PATCH /profiles/me`, so publishing now
+402s without a subscription/grant), the endpoint's behaviour changes for everything that
+already calls it — including **shared e2e helpers and tooling**. Unit tests for the gate
+itself pass, the suite stays green because each test that needs the endpoint patches
+*itself* inline, and the **shared helper silently rots**: its contract ("publish this
+profile") quietly becomes "attempt to publish; fail unless you separately satisfied the
+gate." The next consumer inherits the broken helper. (Lived example: `publishProfile()`
+in `e2e/fixtures/helpers.ts` 402'd for the UI health sweep weeks after the gate landed.)
+
+When you gate an existing endpoint:
+
+- **Grep for every caller** of the endpoint and its e2e helper(s) — `grep -rn '/profiles/me'`
+  / `grep -rn publishProfile e2e/ scripts/`. A green suite does **not** mean the helper
+  still works; it means no *current* test exercised the now-broken path.
+- **Fix the shared helper, not each call site.** Fold the gate-satisfying step into the
+  helper (e.g. `publishProfile()` now hits the `/_test/grant` backdoor first) so every
+  caller — tests *and* tooling — gets a working path through one fetch. Don't copy-paste
+  an inline grant into each test.
+- If satisfying the gate in tests needs setup an ordinary fetch can't do, add a namespaced
+  `/_test/...` backdoor (see `billing.GrantTestHandler`, modelled on `/_test/verify-email`)
+  rather than standing up Stripe/admin sessions in every test.
+
 ## Pre-merge checklist for new handlers
 
 - [ ] Route registered in `main.go` with the correct middleware group.
@@ -90,4 +115,5 @@ Two rapid sequential requests often surface TOCTOU bugs without full concurrent 
 - [ ] If the route is in a new protected group: there is an unauthenticated e2e probe that confirms 401.
 - [ ] If the route does its own auth check (not middleware): there is an e2e test for the no-token → 401 path.
 - [ ] If the handler can race on a unique constraint: the DB query uses `ON CONFLICT` and there is a concurrent `Promise.all` e2e test.
+- [ ] If you added a gate to an **existing** endpoint: you grepped for its callers + e2e helpers and updated the shared helper (not each call site), and added a `/_test/` backdoor if the gate can't be satisfied by a plain fetch.
 - [ ] `task api:test` passes.

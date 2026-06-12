@@ -92,7 +92,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ github.workspace }}
-        run: npm install
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -124,7 +124,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Lint
         run: '[ "$(npm pkg get devDependencies)" = "{}" ] && echo "No devDependencies – skipping" || npm run lint --if-present'
@@ -217,6 +217,22 @@ jobs:
 
       - name: Run browser e2e
         run: npx playwright test
+
+      # Behavioural backstop: sweeps every route for console errors, failed
+      # requests and broken links, diffing against docs/ui-health/baseline.json.
+      # Non-blocking for now (continue-on-error) while we build trust in the
+      # baseline — flip to blocking once it's proven stable across runs.
+      - name: UI health sweep (non-blocking)
+        continue-on-error: true
+        run: go -C api tool task -d "$PWD" ui-health
+
+      - name: Upload UI health report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-health-report
+          path: docs/ui-health/report.md
+          retention-days: 7
 
       - name: Print compose logs on failure
         if: failure()

@@ -115,6 +115,15 @@ a compile error, not a silent runtime 404. (This was added after a dangling
   `next typegen && tsc --noEmit` (not bare `tsc`) — CI calls that script. If you add a
   raw `tsc` invocation anywhere, prefix it with `next typegen` or the route checking is
   silently off.
+- **A unit-test `href` assertion does NOT prove the route exists — it can ratify a broken
+  one.** `expect(rendered).toContain('/festivals/abc/apply')` passes whether or not
+  `/festivals/[id]/apply` is a real route; it only checks the string the component emits.
+  The broken apply link shipped with exactly such a green assertion (`festival-page.test.tsx`).
+  Route *correctness* is `typedRoutes`' job (compile time); route *navigation* is an e2e's
+  job (follow the link, assert it doesn't 404 — see `public-visitor.spec.ts`). Treat an
+  href string-match as a weak smoke check, never as proof the link works. (This is the
+  routing-specific case of "A boundary mock proves rendering, not the server contract"
+  below.)
 
 ## Security headers & `next.config.ts` policy
 
