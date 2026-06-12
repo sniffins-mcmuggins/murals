@@ -19,6 +19,20 @@ pre-commit:
     openapi-drift:
       glob: "openapi/openapi.yaml"
       run: cd openapi && task gen && cd .. && git diff --exit-code openapi/generated/ api/internal/openapi/
+    # Catch a package.json change committed without regenerating its lockfile
+    # (the `npm ci` EUSAGE failure that bit us on an image rebuild). `npm ci
+    # --dry-run` validates manifest↔lock sync read-only — no writes, no registry
+    # re-resolution, so it can't false-positive across npm versions. One stanza
+    # per lock domain; each only runs when that domain's package files are staged.
+    lockfile-sync:
+      glob: "{package.json,package-lock.json,web/package.json,openapi/client/package.json}"
+      run: npm ci --dry-run --no-audit --no-fund
+    mobile-lockfile-sync:
+      glob: "mobile/{package.json,package-lock.json}"
+      run: cd mobile && npm ci --dry-run --no-audit --no-fund
+    demos-lockfile-sync:
+      glob: "demos/{package.json,package-lock.json}"
+      run: cd demos && npm ci --dry-run --no-audit --no-fund
 
 pre-push:
   parallel: true
