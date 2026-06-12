@@ -1,5 +1,6 @@
 {
   "private": true,
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "openapi/client",
     "web"
