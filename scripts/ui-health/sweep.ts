@@ -82,8 +82,12 @@ async function buildFixtures(): Promise<Record<string, string>> {
     displayName: `UIH Artist ${sfx}`,
     bio: 'Health-sweep fixture artist.',
   })
-  await publishProfile(artist.token)
+  // Create the collection BEFORE publishing: publishing seeds the public snapshot,
+  // and a collection added afterwards isn't in it → public GET 404s (see
+  // api/internal/artist/collection.go "Collection not in snapshot"). Mirror the real
+  // flow — set up content, then publish.
   const { collectionId } = await createCollection(artist.token, { name: `UIH Collection ${sfx}` })
+  await publishProfile(artist.token)
 
   // Second artist: a different published profile so /endorse/{id} has a valid target.
   const other = await createArtist(`uih-other-${sfx}`)

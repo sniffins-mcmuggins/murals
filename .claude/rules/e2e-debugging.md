@@ -386,12 +386,21 @@ Diagnose: `H=$(date -u +%s); C=$(docker compose -f infra/docker-compose.yml exec
 
 Fix: this is environmental, not a product or server bug — do NOT change the server skew. Make the test absorb transient drift with a bounded retry that regenerates a fresh code and spaces attempts out (so the clocks re-converge), rather than a single-shot retry. See the `confirmMFA` loop in `mfa-login.spec.ts`. If a 401 persists across several spaced retries, that's a real >30s clock offset worth fixing in the environment.
 
+### Public collection/profile 404s right after publishing — snapshot froze without the content
+
+Symptom: a test (or fixture) creates a collection, publishes the profile, then a public GET of that collection's page 404s even though the owner can see it. Often surfaces as an intermittent fixture/setup failure rather than a product test.
+
+Root cause: publishing **freezes a snapshot** of the profile + collections at that instant (`api/internal/artist/snapshot.go`, seeded on the draft→public transition; public reads go through the snapshot, owner reads go live). Content added *after* publish is a draft addition — invisible to the public until the artist re-snapshots via `POST /profiles/me/publish-changes`. So "create collection → publish → public 404" is the model working as designed, not a bug.
+
+Fix in test setup: create everything the public path needs **before** the publish (see `scripts/ui-health/sweep.ts buildFixtures` — the collection is created before `publishProfile`), or call `publish-changes` after adding content. Never assert a public view of content added post-publish without re-publishing.
+
 ## Test data conventions
 
 - **Unique suffixes.** Every spec generates `const suffix = Date.now()` and uses it in emails (`artist-${suffix}@e2e.test`), slugs, names. Don't ever hardcode — the DB persists across runs, so reruns must not collide.
 - **`createArtist` / `createOrganiser`** in `helpers.ts` sign up + log in and return `{ token, userId, email, password }`. The browser specs use `loginAs(browser, email, password, baseURL)` to start a fresh authenticated browser context.
 - **`uploadImage(token, collectionId)`** does the full 5-step S3 dance: presign → PUT MinIO → confirm → attach → set as collection cover. If image-related tests fail, check whether step 1 (presign 500), step 2 (PUT 403), or step 6 (cover not visible on public page) is the actual failure.
 - **MinIO bucket is `anonymous set download`** (see `infra/docker-compose.yml` `minio-init`). The browser can `GET` images without auth.
+- **Publishing a profile is gated — `publishProfile(token)` self-grants.** Draft→public is gated behind an active subscription or comp grant (`api/internal/artist/profile.go` → `billing.CanPublish`); a bare visibility PATCH 402s. The `publishProfile()` helper now first calls the test-only `POST /_test/grant` backdoor (mints a 24h `artist_basic` grant for the calling Bearer principal, `billing.GrantTestHandler`) then flips visibility — so any caller gets a working publish via one fetch. Browser specs that don't use the helper bypass the gate another way: `forcePublish(db, userId)` in `fixtures/db-helpers.ts` writes the grant straight to the DB. Don't hand-roll the admin `/admin/users/{id}/grants` dance in a new test just to publish.
 
 ## Editing this file
 

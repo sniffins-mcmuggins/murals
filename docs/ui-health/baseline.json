@@ -1,0 +1,284 @@
+{
+  "/": {
+    "path": "/",
+    "auth": "public",
+    "loadMs": 681,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/login": {
+    "path": "/login",
+    "auth": "public",
+    "loadMs": 596,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/signup": {
+    "path": "/signup",
+    "auth": "public",
+    "loadMs": 626,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/forgot-password": {
+    "path": "/forgot-password",
+    "auth": "public",
+    "loadMs": 596,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/artists/{artistProfileId}": {
+    "path": "/artists/{artistProfileId}",
+    "auth": "public",
+    "loadMs": 656,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/artists/{artistProfileId}/collections/{collectionId}": {
+    "path": "/artists/{artistProfileId}/collections/{collectionId}",
+    "auth": "public",
+    "loadMs": 620,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/festivals/{festivalId}": {
+    "path": "/festivals/{festivalId}",
+    "auth": "public",
+    "loadMs": 626,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/festivals/{festivalId}/map": {
+    "path": "/festivals/{festivalId}/map",
+    "auth": "public",
+    "loadMs": 938,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/dashboard": {
+    "path": "/dashboard",
+    "auth": "artist",
+    "loadMs": 618,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/profile": {
+    "path": "/profile",
+    "auth": "artist",
+    "loadMs": 647,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/profile/setup": {
+    "path": "/profile/setup",
+    "auth": "artist",
+    "loadMs": 610,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/profile/preview": {
+    "path": "/profile/preview",
+    "auth": "artist",
+    "loadMs": 612,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/collections": {
+    "path": "/collections",
+    "auth": "artist",
+    "loadMs": 639,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/collections/{collectionId}": {
+    "path": "/collections/{collectionId}",
+    "auth": "artist",
+    "loadMs": 646,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/applications": {
+    "path": "/applications",
+    "auth": "artist",
+    "loadMs": 631,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/applications/apply/{applyFestivalId}": {
+    "path": "/applications/apply/{applyFestivalId}",
+    "auth": "artist",
+    "loadMs": 655,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/endorsements": {
+    "path": "/endorsements",
+    "auth": "artist",
+    "loadMs": 630,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/endorse/{otherProfileId}": {
+    "path": "/endorse/{otherProfileId}",
+    "auth": "artist",
+    "loadMs": 645,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/analytics": {
+    "path": "/analytics",
+    "auth": "artist",
+    "loadMs": 605,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/billing": {
+    "path": "/billing",
+    "auth": "artist",
+    "loadMs": 608,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/dashboard": {
+    "path": "/organiser/dashboard",
+    "auth": "organiser",
+    "loadMs": 632,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/festivals": {
+    "path": "/organiser/festivals",
+    "auth": "organiser",
+    "loadMs": 630,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/festivals/{festivalId}": {
+    "path": "/organiser/festivals/{festivalId}",
+    "auth": "organiser",
+    "loadMs": 651,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/festivals/{festivalId}/form": {
+    "path": "/organiser/festivals/{festivalId}/form",
+    "auth": "organiser",
+    "loadMs": 640,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/festivals/{festivalId}/map": {
+    "path": "/organiser/festivals/{festivalId}/map",
+    "auth": "organiser",
+    "loadMs": 909,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/festivals/{festivalId}/applications": {
+    "path": "/organiser/festivals/{festivalId}/applications",
+    "auth": "organiser",
+    "loadMs": 700,
+    "consoleErrors": [
+      "Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update the component. Move this work to useEffect instead."
+    ],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/reviewing": {
+    "path": "/organiser/reviewing",
+    "auth": "organiser",
+    "loadMs": 634,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  },
+  "/organiser/billing": {
+    "path": "/organiser/billing",
+    "auth": "organiser",
+    "loadMs": 602,
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "failedRequests": [],
+    "slowRequests": [],
+    "brokenLinks": []
+  }
+}
