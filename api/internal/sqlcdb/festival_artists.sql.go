@@ -16,7 +16,7 @@ INSERT INTO festival_artists (festival_id, artist_id, source)
 VALUES ($1, $2, $3)
 ON CONFLICT (festival_id, artist_id) DO UPDATE
     SET source = EXCLUDED.source, updated_at = now()
-RETURNING festival_id, artist_id, created_at, updated_at, source
+RETURNING festival_id, artist_id, source, created_at, updated_at
 `
 
 type AddFestivalArtistParams struct {
@@ -31,9 +31,9 @@ func (q *Queries) AddFestivalArtist(ctx context.Context, arg AddFestivalArtistPa
 	err := row.Scan(
 		&i.FestivalID,
 		&i.ArtistID,
+		&i.Source,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Source,
 	)
 	return i, err
 }

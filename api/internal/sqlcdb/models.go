@@ -402,9 +402,9 @@ type Festival struct {
 type FestivalArtist struct {
 	FestivalID pgtype.UUID          `db:"festival_id" json:"festival_id"`
 	ArtistID   pgtype.UUID          `db:"artist_id" json:"artist_id"`
+	Source     FestivalArtistSource `db:"source" json:"source"`
 	CreatedAt  pgtype.Timestamptz   `db:"created_at" json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz   `db:"updated_at" json:"updated_at"`
-	Source     FestivalArtistSource `db:"source" json:"source"`
 }
 
 type FestivalReviewer struct {

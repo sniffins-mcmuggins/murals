@@ -3,7 +3,7 @@
 **Last updated:** 2026-05-31
 
 ## Contract
-- `db/migrations/`: golang-migrate up/down SQL files, domain-grouped (`000001_users` … `000007_application_decision_model`); current highest is `000007`
+- `db/migrations/`: golang-migrate up/down SQL files, domain-grouped (`000001_users` … `000006_profile_snapshots`); current highest is `000006`
 - `db/queries/`: sqlc input — SQL queries that `task db:generate` compiles to `api/internal/sqlcdb/*.sql.go`
 - `db/seed/`: seed data for local development
 - `api/internal/db/db.go`: `db.Open(ctx, url)` — creates and validates a pgx connection pool
@@ -30,7 +30,7 @@
 - **`has_unpublished_changes` is trigger-maintained, including on DELETE** — three DB triggers cover this: AFTER INSERT/UPDATE/DELETE on `collections` and `collection_images` set the owning profile's flag to `true`; BEFORE UPDATE on `artist_profiles` sets it to `true` only when an authored content column changes (the publish path writes the flag and snapshot in the same UPDATE, which must NOT re-trigger the dirty flag). DELETE on child rows is the primary reason triggers are used — `updated_at` on the parent row cannot detect child deletions.
 
 ## AI Context
-- `db/migrations/`: numbered SQL files — current highest is `000007`
+- `db/migrations/`: numbered SQL files — current highest is `000006`
 - `db/queries/`: one file per table or concern — edit here, then `task db:generate`
 - `api/internal/sqlcdb/`: generated output — `models.go` has the struct definitions; `*.sql.go` has the query implementations
 - `task db:migrate`: applies pending migrations against the running Docker DB
@@ -38,7 +38,7 @@
 - The dual concern (sqlc-generated code + migration SQL) is fully documented in `.claude/rules/sqlc-and-schema.md` — read that rule when touching anything here
 
 ## Changelog
-2026-06-12 — 000007 decision-model: applications gains `decision` (application_decision enum) + `released_at`, drops `status`/`staged_decision`; festival_artists gains `source` (festival_artist_source enum), drops `status`; festivals drops `decisions_released_at`. Release state is now per-application (released_at), not a festival-level flag.
+2026-06-13 — pre-deploy migration consolidation: folded the decision-model shape directly into `000003_festivals` (no separate `000007`, no add-then-drop churn, no backfill). `applications` ships with `decision` (application_decision enum) + `released_at` and never had `status`/`staged_decision`; `festival_artists` ships with `source` (festival_artist_source enum) and never had `status`; `festivals` has no `decisions_released_at`. Release state is per-application (`released_at`), not a festival-level flag. Safe to rewrite because nothing is deployed.
 2026-06-10 — E29: profile_snapshots table (1:1, PK, jsonb), has_unpublished_changes column, three triggers (collections/collection_images INSERT/UPDATE/DELETE + artist_profiles BEFORE UPDATE content guard). Documented snapshot boundary (authored content only) and dirty-flag trigger invariants.
 2026-06-06 — Corrected stale migration count (filesystem highest is 000005, not 000016); added profile setup fields migration.
 2026-05-31 — initial spec
