@@ -14,12 +14,19 @@
 
 ---
 
-## Progress (2026-06-12)
+## Progress (2026-06-13) — COMPLETE
 
 - ✅ **Task 1 — Migration** (`b5bfb92`). Applied; up/down/up round-trip clean.
-- ✅ **Task 2 — API layer** (`a87b3f4` + review fixes `7e4b0a0`). `task api:test` green. Spec compliance + code-quality reviews done. Review fixes folded in: released-application immutability (PATCH → 409), `CountSubmittedUndecidedByFestival` also requires `released_at IS NULL`, real declined-applicant exclusion test, and `festival.spec.md` updated to the new model (so Task 7's festival.spec.md item is already done — only `db.spec.md` + `.claude/rules/e2e-debugging.md` remain there).
-  - **Carry-over for Task 4:** `useApplicationReview.ts` reorder still sends `body: { status: 'submitted', ids }` — the reorder handler now validates against decision values, so the web must send a valid `decision` (or the field be reworked). Web is known-stale (still reads `decisions_released_at`/`staged_decision`) until Task 4.
-- ⏳ **Tasks 3–6** not started (OpenAPI, web, seed, e2e). Task 7 partially done (festival.spec.md).
+- ✅ **Task 2 — API layer** (`a87b3f4` + review fixes `7e4b0a0`). `task api:test` green.
+- ✅ **Task 3 — OpenAPI** (`6c457b2`). Spec + both generated clients regenerated; drift check green.
+- ✅ **Task 4 — Web** (`a067296`). Board reads `decision` unconditionally; `released_at` drives release state; reorder sends a valid decision. `task lint` + `task test` (209) green.
+- ✅ **Task 5 — Demo seed** (`1e5a889`). `decision` column, end-of-seed invariant. Re-seeded: CPF shows Accept=3 Waitlist=1 Decline=1 Undecided=4, all provisional (released=0).
+- ✅ **Task 6 — e2e** (`17508f9`). `task e2e:api` 280 passing; Playwright browser suite 37 passing.
+- ✅ **Task 7 — Docs** (`fcd2847` + festival.spec.md in `7e4b0a0`). `db.spec.md` migration count + changelog; `.claude/rules/e2e-debugging.md` had no stale decision refs.
+
+**Final verification (2026-06-13):** api:test ✓ · web lint+test ✓ · e2e:api 280 ✓ · browser e2e 37 ✓ · seed invariant + board counts ✓.
+
+**Note on the worktree/Docker split:** the Compose stack bind-mounts the **main repo**, so verification required syncing the branch into the main working tree (`git -C <main> checkout feat/decision-model -- api web db demos openapi e2e`) and deleting `api/internal/festival/waitlist*.go` (a `checkout -- path` does not remove files the branch deleted). The OpenAPI clients were also generated into the main repo so the workspace-resolved `@render/api-client` types matched.
 
 ---
 
