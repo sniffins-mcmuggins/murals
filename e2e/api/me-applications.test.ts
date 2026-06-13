@@ -65,7 +65,8 @@ describe('/me/applications', () => {
     )
     expect(ours).toHaveLength(2)
     for (const a of ours) {
-      expect(a.status).toBe('submitted')
+      // Freshly submitted, decisions not released → no verdict visible yet.
+      expect(a.decision ?? null).toBeNull()
     }
   })
 

@@ -37,7 +37,9 @@ describe('no artist awareness before release', () => {
     })
     const mineBody = await mine.text()
     expect(mine.status).toBe(200)
-    expect(mineBody).toContain('"status":"submitted"')
+    // Decision is null until released — the staged 'accept' must not leak.
+    expect(mineBody).toContain('"decision":null')
+    expect(mineBody).not.toContain('"decision":"accept"')
     expect(mineBody).not.toContain('staged_decision')
     expect(mineBody).not.toContain('shortlisted')
 

@@ -8,17 +8,11 @@ import {
   upsertForm,
   submitApplication,
   acceptArtist,
+  stageDecision,
+  releaseDecisions,
 } from '../fixtures/helpers'
 
 const API = process.env.API_URL ?? 'http://localhost:8080'
-
-async function declineArtist(token: string, festivalId: string, applicationId: string): Promise<void> {
-  const res = await fetch(
-    `${API}/festivals/${festivalId}/applications/${applicationId}/decline`,
-    { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
-  )
-  if (!res.ok) throw new Error(`Decline artist failed: ${res.status}`)
-}
 
 describe('GET /profiles/{profileID}/festivals — public festival appearances', () => {
   it('invalid profileID → 400', async () => {
@@ -56,9 +50,11 @@ describe('GET /profiles/{profileID}/festivals — public festival appearances', 
     const declinedProfile = await createProfile(declined.token, { displayName: `Declined Artist ${suffix}` })
     const declinedApp = await submitApplication(declined.token, festivalId)
 
-    // Organiser resolves both applications, then publishes the festival.
-    await acceptArtist(organiser.token, festivalId, acceptedApp.applicationId)
-    await declineArtist(organiser.token, festivalId, declinedApp.applicationId)
+    // Organiser decides both applications, releases them in one wave (release
+    // is blocked while any app is still undecided), then publishes the festival.
+    await stageDecision(organiser.token, festivalId, acceptedApp.applicationId, 'accept')
+    await stageDecision(organiser.token, festivalId, declinedApp.applicationId, 'decline')
+    await releaseDecisions(organiser.token, festivalId)
     await setFestivalStatus(organiser.token, festivalId, 'live')
 
     // Accepted artist's profile lists the festival, with a working map link.

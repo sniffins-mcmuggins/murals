@@ -75,7 +75,7 @@ describe('application validation', () => {
     expect(JSON.stringify(body)).toContain('artist-statement')
   })
 
-  it('organiser can decline a submitted application (200, status=declined)', async () => {
+  it('organiser can decline a submitted application (decision=decline)', async () => {
     const { festivalId } = await createFestival(organiser.token, {
       name: 'Decline Fest',
       slug: `decline-${SUFFIX}`,
@@ -85,11 +85,15 @@ describe('application validation', () => {
     const { applicationId } = await submitApplication(artist.token, festivalId)
 
     const res = await fetch(
-      `${API}/festivals/${festivalId}/applications/${applicationId}/decline`,
-      { method: 'POST', headers: auth(organiser.token) },
+      `${API}/festivals/${festivalId}/applications/${applicationId}`,
+      {
+        method: 'PATCH',
+        headers: { ...auth(organiser.token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'decline' }),
+      },
     )
     expect(res.status).toBe(200)
     const data = await res.json()
-    expect(data.status).toBe('declined')
+    expect(data.decision).toBe('decline')
   })
 })

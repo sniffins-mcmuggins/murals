@@ -124,10 +124,14 @@ describe('authorization isolation', () => {
     await setFestivalStatus(orgB.token, festivalId, 'open')
     const { applicationId } = await submitApplication(artistA.token, festivalId)
 
-    // Organiser A tries to accept on B's festival — 403.
+    // Organiser A tries to set a decision on B's festival — 403.
     const acceptRes = await fetch(
-      `${API}/festivals/${festivalId}/applications/${applicationId}/accept`,
-      { method: 'POST', headers: auth(orgA.token) },
+      `${API}/festivals/${festivalId}/applications/${applicationId}`,
+      {
+        method: 'PATCH',
+        headers: { ...auth(orgA.token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
+      },
     )
     expect(acceptRes.status).toBe(403)
   })
@@ -146,17 +150,17 @@ describe('authorization isolation', () => {
 
   // ── IDOR: new review endpoints (issue #141) ─────────────────────────────────
 
-  it("organiser A cannot waitlist an application on organiser B's festival (403)", async () => {
+  it("organiser A cannot release decisions on organiser B's festival (403)", async () => {
     const { festivalId } = await createFestival(orgB.token, {
       name: 'B Waitlist Fest',
       slug: `b-wl-${SUFFIX}`,
     })
     await upsertForm(orgB.token, festivalId)
     await setFestivalStatus(orgB.token, festivalId, 'open')
-    const { applicationId } = await submitApplication(artistA.token, festivalId)
+    await submitApplication(artistA.token, festivalId)
 
     const res = await fetch(
-      `${API}/festivals/${festivalId}/applications/${applicationId}/waitlist`,
+      `${API}/festivals/${festivalId}/applications/release-decisions`,
       { method: 'POST', headers: auth(orgA.token) },
     )
     expect(res.status).toBe(403)
@@ -216,7 +220,7 @@ describe('authorization isolation', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth(orgA.token) },
-        body: JSON.stringify({ status: 'submitted', ids: [applicationId] }),
+        body: JSON.stringify({ status: 'undecided', ids: [applicationId] }),
       },
     )
     expect(res.status).toBe(403)

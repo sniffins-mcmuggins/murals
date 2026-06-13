@@ -265,19 +265,17 @@ export async function submitApplication(
   return { applicationId: data.id }
 }
 
+// The direct accept/decline/waitlist endpoints are gone — a "full" accept is now
+// a staged decision followed by a release (which stamps released_at and creates
+// the lineup row). Releases the whole festival's decided wave, so use on
+// single-applicant festivals (as the fixtures do).
 export async function acceptArtist(
   token: string,
   festivalId: string,
   applicationId: string,
 ): Promise<void> {
-  const res = await fetch(
-    `${API}/festivals/${festivalId}/applications/${applicationId}/accept`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  )
-  if (!res.ok) throw new Error(`Accept artist failed: ${res.status}`)
+  await stageDecision(token, festivalId, applicationId, 'accept')
+  await releaseDecisions(token, festivalId)
 }
 
 export async function setPin(
@@ -334,7 +332,7 @@ export async function stageDecision(
   const res = await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: decision }),
+    body: JSON.stringify({ shortlisted: false, review_flag: false, decision: decision ?? 'undecided' }),
   })
   if (!res.ok) throw new Error(`stageDecision failed: ${res.status} ${await res.text()}`)
 }
