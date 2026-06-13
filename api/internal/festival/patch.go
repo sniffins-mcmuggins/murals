@@ -187,6 +187,12 @@ func ReorderApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if !ok {
 				return
 			}
+			// Released applications are immutable (mirrors PatchApplicationHandler) —
+			// once published the board is read-only, so rank can't be reshuffled either.
+			if app.ReleasedAt.Valid {
+				httperr.Conflict(w, "application already released")
+				return
+			}
 			if string(app.Decision) != req.Status {
 				httperr.BadRequest(w, "application status mismatch: "+idStr)
 				return

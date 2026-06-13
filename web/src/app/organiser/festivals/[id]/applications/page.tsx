@@ -135,7 +135,10 @@ function KanbanView({ festivalId }: { festivalId: string }) {
 
   const decidedCount = allApps.filter(a => a.decision !== 'undecided').length
   const submittedUndecided = allApps.filter(a => a.decision === 'undecided').length
-  const submittedApps = allApps.filter(a => a.released_at == null)
+  // Unreleased applications (decision still mutable) — feeds the spot-assignment
+  // pool and the release-count gate. Includes provisional accepts/waitlists/declines,
+  // not just decision==='undecided'.
+  const unreleasedApps = allApps.filter(a => a.released_at == null)
 
   function handleTriageShortlist(id: string, shortlisted: boolean) {
     const app = allApps.find(a => a.id === id)
@@ -257,7 +260,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setTriageOpen(true)}
-                disabled={submittedApps.length === 0}
+                disabled={unreleasedApps.length === 0}
                 className="font-sans text-sm border border-light rounded-lg px-4 py-2 hover:border-amber disabled:opacity-40"
                 data-testid="open-triage"
               >
@@ -417,7 +420,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
 
       {triageOpen && (
         <TriageMode
-          apps={submittedApps}
+          apps={unreleasedApps}
           formFields={formFields}
           detailOpen={!!selectedApp}
           onShortlist={handleTriageShortlist}
