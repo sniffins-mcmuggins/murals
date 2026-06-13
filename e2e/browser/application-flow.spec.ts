@@ -66,9 +66,9 @@ test('apply → accept → pin → map data contains pin', async ({ browser }) =
     // Confirm submission
     await expect(artistPage.getByRole('heading', { name: 'Application submitted' })).toBeVisible()
 
-    // Artist applications list shows submitted status
+    // Artist applications list shows the pending outcome (no verdict until release)
     await artistPage.goto('/applications')
-    await expect(artistPage.getByText('submitted', { exact: true })).toBeVisible()
+    await expect(artistPage.getByText('Under review', { exact: true })).toBeVisible()
   } finally {
     // Don't close yet — we need to check again later
   }

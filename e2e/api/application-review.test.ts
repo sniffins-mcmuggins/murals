@@ -236,23 +236,33 @@ describe('application review workflow', () => {
       applicationId = app.applicationId
     })
 
-    it('POST /waitlist → 200 with status: waitlisted', async () => {
-      const res = await fetch(
-        `${API}/festivals/${festivalId}/applications/${applicationId}/waitlist`,
+    it('PATCH decision=waitlist then release → application is waitlisted', async () => {
+      const patch = await fetch(
+        `${API}/festivals/${festivalId}/applications/${applicationId}`,
+        {
+          method: 'PATCH',
+          headers: json(org.token),
+          body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'waitlist' }),
+        },
+      )
+      expect(patch.status).toBe(200)
+      expect((await patch.json()).decision).toBe('waitlist')
+
+      const release = await fetch(
+        `${API}/festivals/${festivalId}/applications/release-decisions`,
         { method: 'POST', headers: auth(org.token) },
       )
-      expect(res.status).toBe(200)
-      expect((await res.json()).status).toBe('waitlisted')
+      expect(release.status).toBe(200)
     })
 
-    it("waitlisted status visible in artist's GET /me/applications", async () => {
+    it("waitlist decision visible in artist's GET /me/applications after release", async () => {
       const res = await fetch(`${API}/me/applications`, {
         headers: auth(artist.token),
       })
       expect(res.status).toBe(200)
       const apps = await res.json()
       const mine = apps.find((a: { id: string }) => a.id === applicationId)
-      expect(mine?.status).toBe('waitlisted')
+      expect(mine?.decision).toBe('waitlist')
     })
   })
 
@@ -285,7 +295,7 @@ describe('application review workflow', () => {
       const res = await fetch(`${API}/festivals/${festivalId}/applications/reorder`, {
         method: 'POST',
         headers: json(org.token),
-        body: JSON.stringify({ status: 'submitted', ids: [] }),
+        body: JSON.stringify({ status: 'undecided', ids: [] }),
       })
       expect(res.status).toBe(204)
     })
@@ -295,7 +305,7 @@ describe('application review workflow', () => {
       const reorderRes = await fetch(`${API}/festivals/${festivalId}/applications/reorder`, {
         method: 'POST',
         headers: json(org.token),
-        body: JSON.stringify({ status: 'submitted', ids: [appB, appA] }),
+        body: JSON.stringify({ status: 'undecided', ids: [appB, appA] }),
       })
       expect(reorderRes.status).toBe(204)
 
@@ -322,7 +332,7 @@ describe('application review workflow', () => {
       const res = await fetch(`${API}/festivals/${festivalId}/applications/reorder`, {
         method: 'POST',
         headers: json(org.token),
-        body: JSON.stringify({ status: 'submitted', ids: ['not-a-uuid'] }),
+        body: JSON.stringify({ status: 'undecided', ids: ['not-a-uuid'] }),
       })
       expect(res.status).toBe(400)
     })
@@ -353,42 +363,49 @@ describe('staged decisions', () => {
     applicationId = app.applicationId
   })
 
-  it('stages a decision via PATCH and returns it in the list', async () => {
+  it('PATCH sets decision and keeps it provisional (no released_at, hidden from artist)', async () => {
     const patchRes = await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
       method: 'PATCH',
       headers: json(org.token),
-      body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+      body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
     })
     expect(patchRes.status).toBe(200)
     const patched = await patchRes.json()
-    expect(patched.staged_decision).toBe('accept')
-    expect(patched.status).toBe('submitted') // status unchanged until release
+    expect(patched.decision).toBe('accept')
+    expect(patched.released_at).toBeNull() // provisional until release
 
     const listRes = await fetch(`${API}/festivals/${festivalId}/applications`, {
       headers: auth(org.token),
     })
     const apps = await listRes.json()
     const found = apps.find((a: { id: string }) => a.id === applicationId)
-    expect(found.staged_decision).toBe('accept')
+    expect(found.decision).toBe('accept')
+    expect(found.released_at).toBeNull()
+
+    // Artist cannot see the verdict yet (decision is null until released).
+    const mineRes = await fetch(`${API}/me/applications`, { headers: auth(artist.token) })
+    const mine = (await mineRes.json()).find((a: { id: string }) => a.id === applicationId)
+    expect(mine?.decision ?? null).toBeNull()
   })
 
-  it('clears a staged decision by patching null', async () => {
+  it('clears a decision back to undecided', async () => {
     const res = await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
       method: 'PATCH',
       headers: json(org.token),
-      body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: null }),
+      body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'undecided' }),
     })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.staged_decision).toBeNull()
+    expect(body.decision).toBe('undecided')
+    expect(body.released_at).toBeNull()
   })
 
-  it('releases decisions: bulk updates status, clears staged_decision', async () => {
+  it('release stamps released_at, keeps the decision, makes the accept spot-eligible', async () => {
     // Stage again before releasing
     await fetch(`${API}/festivals/${festivalId}/applications/${applicationId}`, {
       method: 'PATCH',
       headers: json(org.token),
-      body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+      body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
     })
 
     const releaseRes = await fetch(
@@ -402,17 +419,25 @@ describe('staged decisions', () => {
     const body = await releaseRes.json()
     expect(body.released).toBe(1)
 
-    // Verify application status updated and staged_decision cleared
+    // Verdict unchanged, now released.
     const listRes = await fetch(`${API}/festivals/${festivalId}/applications`, {
       headers: auth(org.token),
     })
     const apps = await listRes.json()
     const app = apps.find((a: { id: string }) => a.id === applicationId)
-    expect(app.status).toBe('accepted')
-    expect(app.staged_decision).toBeNull()
+    expect(app.decision).toBe('accept')
+    expect(app.released_at).not.toBeNull()
+
+    // Released accept becomes a lineup member → shows in the unassigned-eligible pool.
+    const spots = await (await fetch(`${API}/festivals/${festivalId}/spots`, {
+      headers: auth(org.token),
+    })).json()
+    expect(
+      spots.unassigned_artists.some((u: { artist_id: string }) => u.artist_id === app.artist_id),
+    ).toBe(true)
   })
 
-  it('returns 409 on second release attempt', async () => {
+  it('returns 409 on second release attempt (nothing new to release)', async () => {
     const res = await fetch(
       `${API}/festivals/${festivalId}/applications/release-decisions`,
       {
@@ -421,15 +446,6 @@ describe('staged decisions', () => {
       },
     )
     expect(res.status).toBe(409)
-  })
-
-  it('decisions_released_at is set on the festival after release', async () => {
-    const res = await fetch(`${API}/festivals/${festivalId}`, {
-      headers: auth(org.token),
-    })
-    const fest = await res.json()
-    expect(fest.decisions_released_at).not.toBeNull()
-    expect(typeof fest.decisions_released_at).toBe('string')
   })
 
   it('returns 422 when releasing with undecided submitted applications', async () => {
@@ -453,7 +469,7 @@ describe('staged decisions', () => {
     expect(res.status).toBe(422)
   })
 
-  it('rejects invalid staged_decision value with 400', async () => {
+  it('rejects invalid decision value with 400', async () => {
     const freshSuffix = `staged-bad-${Date.now()}`
     const org2 = await createOrganiser(`${freshSuffix}-org`)
     const artist2 = await createArtist(`${freshSuffix}-art`)
@@ -471,7 +487,7 @@ describe('staged decisions', () => {
       {
         method: 'PATCH',
         headers: json(org2.token),
-        body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'invalid' }),
+        body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'invalid' }),
       },
     )
     expect(res.status).toBe(400)

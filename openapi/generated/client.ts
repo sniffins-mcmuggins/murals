@@ -1158,135 +1158,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/festivals/{festivalID}/applications/{applicationID}/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                festivalID: string;
-                applicationID: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Accept an application */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    festivalID: string;
-                    applicationID: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Updated application */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Application"];
-                    };
-                };
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/festivals/{festivalID}/applications/{applicationID}/decline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                festivalID: string;
-                applicationID: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Decline an application */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    festivalID: string;
-                    applicationID: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Updated application */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Application"];
-                    };
-                };
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/festivals/{festivalID}/applications/{applicationID}/waitlist": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Waitlist an application */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    festivalID: string;
-                    applicationID: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Application waitlisted */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Application"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/festivals/{festivalID}/applications/{applicationID}": {
         parameters: {
             query?: never;
@@ -1316,8 +1187,11 @@ export interface paths {
                     "application/json": {
                         shortlisted: boolean;
                         review_flag: boolean;
-                        /** @enum {string|null} */
-                        staged_decision?: "accept" | "waitlist" | "decline" | null;
+                        /**
+                         * @description Organiser's verdict; defaults to undecided when omitted
+                         * @enum {string}
+                         */
+                        decision?: "undecided" | "accept" | "waitlist" | "decline";
                     };
                 };
             };
@@ -2223,11 +2097,6 @@ export interface components {
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
-            /**
-             * Format: date-time
-             * @description Set once when Release Decisions is triggered; null until then
-             */
-            decisions_released_at?: string | null;
             /** Format: date-time */
             review_opened_at?: string | null;
             /** Format: date-time */
@@ -2296,8 +2165,6 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @enum {string} */
-        ApplicationStatus: "submitted" | "accepted" | "declined" | "waitlisted";
         Application: {
             /** Format: uuid */
             id?: string;
@@ -2305,15 +2172,19 @@ export interface components {
             form_id?: string;
             /** Format: uuid */
             artist_id?: string;
-            status?: components["schemas"]["ApplicationStatus"];
+            /**
+             * @description Organiser's verdict — defaults to undecided
+             * @enum {string}
+             */
+            decision?: "undecided" | "accept" | "waitlist" | "decline";
+            /**
+             * Format: date-time
+             * @description When the decision was published to the artist; null while provisional
+             */
+            released_at?: string | null;
             rank?: number;
             shortlisted?: boolean;
             review_flag?: boolean;
-            /**
-             * @description Organiser's staged decision — null until dragged to a column
-             * @enum {string|null}
-             */
-            staged_decision?: "accept" | "waitlist" | "decline" | null;
             answers?: Record<string, never>;
             /** Format: date-time */
             created_at?: string;
@@ -2334,7 +2205,11 @@ export interface components {
             form_id: string;
             /** Format: uuid */
             artist_id: string;
-            status: components["schemas"]["ApplicationStatus"];
+            /**
+             * @description Outcome shown to the artist; null until decisions are released
+             * @enum {string|null}
+             */
+            decision?: "accept" | "waitlist" | "decline" | null;
             answers: {
                 [key: string]: unknown;
             };

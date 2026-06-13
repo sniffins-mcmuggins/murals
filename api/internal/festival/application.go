@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/sniffins-mcmuggins/render/api/internal/auth"
@@ -54,11 +55,11 @@ type applicationResponse struct {
 	ID              string           `json:"id"`
 	FormID          string           `json:"form_id"`
 	ArtistID        string           `json:"artist_id"`
-	Status          string           `json:"status"`
+	Decision        string           `json:"decision"`
+	ReleasedAt      *string          `json:"released_at"`
 	Rank            int32            `json:"rank"`
 	Shortlisted     bool             `json:"shortlisted"`
 	ReviewFlag      bool             `json:"review_flag"`
-	StagedDecision  *string          `json:"staged_decision"`
 	Answers         json.RawMessage  `json:"answers"`
 	CreatedAt       string           `json:"created_at"`
 	UpdatedAt       string           `json:"updated_at"`
@@ -70,16 +71,24 @@ type applicationResponse struct {
 	CriterionScores []criterionScore `json:"criterion_scores"`
 }
 
+func rfc3339Ptr(ts pgtype.Timestamptz) *string {
+	if !ts.Valid {
+		return nil
+	}
+	s := ts.Time.Format(time.RFC3339)
+	return &s
+}
+
 func toApplicationResponse(a sqlcdb.Application) applicationResponse {
 	return applicationResponse{
 		ID:              a.ID.String(),
 		FormID:          a.FormID.String(),
 		ArtistID:        a.ArtistID.String(),
-		Status:          string(a.Status),
+		Decision:        string(a.Decision),
+		ReleasedAt:      rfc3339Ptr(a.ReleasedAt),
 		Rank:            a.Rank,
 		Shortlisted:     a.Shortlisted,
 		ReviewFlag:      a.ReviewFlag,
-		StagedDecision:  a.StagedDecision,
 		Answers:         a.Answers,
 		CreatedAt:       a.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt:       a.UpdatedAt.Time.Format(time.RFC3339),
@@ -95,18 +104,23 @@ type myApplicationResponse struct {
 	ID        string          `json:"id"`
 	FormID    string          `json:"form_id"`
 	ArtistID  string          `json:"artist_id"`
-	Status    string          `json:"status"`
+	Decision  *string         `json:"decision"`
 	Answers   json.RawMessage `json:"answers"`
 	CreatedAt string          `json:"created_at"`
 	UpdatedAt string          `json:"updated_at"`
 }
 
 func toMyApplicationResponse(a sqlcdb.Application) myApplicationResponse {
+	var decision *string
+	if a.ReleasedAt.Valid {
+		d := string(a.Decision)
+		decision = &d
+	}
 	return myApplicationResponse{
 		ID:        a.ID.String(),
 		FormID:    a.FormID.String(),
 		ArtistID:  a.ArtistID.String(),
-		Status:    string(a.Status),
+		Decision:  decision,
 		Answers:   a.Answers,
 		CreatedAt: a.CreatedAt.Time.Format(time.RFC3339),
 		UpdatedAt: a.UpdatedAt.Time.Format(time.RFC3339),
@@ -114,8 +128,8 @@ func toMyApplicationResponse(a sqlcdb.Application) myApplicationResponse {
 }
 
 // reviewerApplicationResponse is the panellist-facing view. It deliberately
-// omits all organiser decision signals (staged_decision, shortlisted,
-// review_flag, rank, status), notes, and updated_at (edit timestamps are
+// omits all organiser decision signals (decision, released_at, shortlisted,
+// review_flag, rank), notes, and updated_at (edit timestamps are
 // organiser-internal) — reviewers score blind to decisions.
 type reviewerApplicationResponse struct {
 	ID              string           `json:"id"`
@@ -155,17 +169,17 @@ func toEnrichedResponse(
 		mediumTags = []string{}
 	}
 	return applicationResponse{
-		ID:             row.ID.String(),
-		FormID:         row.FormID.String(),
-		ArtistID:       row.ArtistID.String(),
-		Status:         string(row.Status),
-		Rank:           row.Rank,
-		Shortlisted:    row.Shortlisted,
-		ReviewFlag:     row.ReviewFlag,
-		StagedDecision: row.StagedDecision,
-		Answers:        row.Answers,
-		CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:      row.UpdatedAt.Time.Format(time.RFC3339),
+		ID:          row.ID.String(),
+		FormID:      row.FormID.String(),
+		ArtistID:    row.ArtistID.String(),
+		Decision:    string(row.Decision),
+		ReleasedAt:  rfc3339Ptr(row.ReleasedAt),
+		Rank:        row.Rank,
+		Shortlisted: row.Shortlisted,
+		ReviewFlag:  row.ReviewFlag,
+		Answers:     row.Answers,
+		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
 		Artist: &artistSummary{
 			ID:            row.ArtistID.String(),
 			DisplayName:   row.DisplayName,
@@ -187,17 +201,17 @@ func toEnrichedReviewerRow(row sqlcdb.ListApplicationsByFormWithArtistExcludingR
 		mediumTags = []string{}
 	}
 	return applicationResponse{
-		ID:             row.ID.String(),
-		FormID:         row.FormID.String(),
-		ArtistID:       row.ArtistID.String(),
-		Status:         string(row.Status),
-		Rank:           row.Rank,
-		Shortlisted:    row.Shortlisted,
-		ReviewFlag:     row.ReviewFlag,
-		StagedDecision: row.StagedDecision,
-		Answers:        row.Answers,
-		CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
-		UpdatedAt:      row.UpdatedAt.Time.Format(time.RFC3339),
+		ID:          row.ID.String(),
+		FormID:      row.FormID.String(),
+		ArtistID:    row.ArtistID.String(),
+		Decision:    string(row.Decision),
+		ReleasedAt:  rfc3339Ptr(row.ReleasedAt),
+		Rank:        row.Rank,
+		Shortlisted: row.Shortlisted,
+		ReviewFlag:  row.ReviewFlag,
+		Answers:     row.Answers,
+		CreatedAt:   row.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   row.UpdatedAt.Time.Format(time.RFC3339),
 		Artist: &artistSummary{
 			ID:            row.ArtistID.String(),
 			DisplayName:   row.DisplayName,

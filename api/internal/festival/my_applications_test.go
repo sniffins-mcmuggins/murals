@@ -54,7 +54,7 @@ func TestGetMyApplications_ReturnsOwnApplications(t *testing.T) {
 	var apps []map[string]any
 	require.NoError(t, json.Unmarshal(body, &apps))
 	require.Len(t, apps, 1)
-	assert.Equal(t, "submitted", apps[0]["status"])
+	assert.Nil(t, apps[0]["decision"]) // decision is nil until released
 }
 
 func TestGetMyApplications_RequiresAuth(t *testing.T) {
@@ -151,10 +151,9 @@ func TestMyApplications_HidesReviewSignals(t *testing.T) {
 	createTestArtistProfile(t, db, artistUserID, "Privacy Artist")
 	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
-	// Organiser stages 'accept' and shortlists — internal review signals.
-	dec := "accept"
+	// Organiser sets decision 'accept' and shortlists — internal review signals.
 	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
-		ID: pgUUID(t, appID), Shortlisted: true, ReviewFlag: true, StagedDecision: &dec,
+		ID: pgUUID(t, appID), Shortlisted: true, ReviewFlag: true, Decision: sqlcdb.ApplicationDecisionAccept,
 	})
 	require.NoError(t, err)
 
@@ -166,9 +165,8 @@ func TestMyApplications_HidesReviewSignals(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	body := w.Body.String()
-	// Artist must see status (still 'submitted') but NONE of the review signals.
-	require.Contains(t, body, `"status":"submitted"`)
-	require.NotContains(t, body, "staged_decision")
+	// Artist must not see the decision until it's released (released_at is nil).
+	require.Contains(t, body, `"decision":null`)
 	require.NotContains(t, body, "shortlisted")
 	require.NotContains(t, body, "review_flag")
 	require.NotContains(t, body, `"rank"`)

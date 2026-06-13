@@ -61,7 +61,7 @@ func TestPatchApplicationFlags_ForbiddenForNonOwner(t *testing.T) {
 	_ = resp.Body.Close()
 }
 
-func TestPatchApplicationStagedDecision(t *testing.T) {
+func TestPatchApplicationDecision(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)
 	sc := setupReviewScenario(t, db)
@@ -73,8 +73,8 @@ func TestPatchApplicationStagedDecision(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	// Stage as accept
-	body := `{"shortlisted":false,"review_flag":false,"staged_decision":"accept"}`
+	// Set decision to accept
+	body := `{"shortlisted":false,"review_flag":false,"decision":"accept"}`
 	resp := doRequest(t, srv, "PATCH",
 		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
 		body, sc.orgToken)
@@ -82,10 +82,10 @@ func TestPatchApplicationStagedDecision(t *testing.T) {
 	var app map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app))
 	_ = resp.Body.Close()
-	assert.Equal(t, "accept", app["staged_decision"])
+	assert.Equal(t, "accept", app["decision"])
 
-	// Clear staged decision
-	body = `{"shortlisted":false,"review_flag":false,"staged_decision":null}`
+	// Set decision back to undecided
+	body = `{"shortlisted":false,"review_flag":false,"decision":"undecided"}`
 	resp = doRequest(t, srv, "PATCH",
 		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
 		body, sc.orgToken)
@@ -93,17 +93,17 @@ func TestPatchApplicationStagedDecision(t *testing.T) {
 	var app2 map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app2))
 	_ = resp.Body.Close()
-	assert.Nil(t, app2["staged_decision"])
+	assert.Equal(t, "undecided", app2["decision"])
 
-	// Invalid staged_decision value should reject
-	body = `{"shortlisted":false,"review_flag":false,"staged_decision":"invalid"}`
+	// Invalid decision value should reject
+	body = `{"shortlisted":false,"review_flag":false,"decision":"invalid"}`
 	resp = doRequest(t, srv, "PATCH",
 		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
 		body, sc.orgToken)
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	_ = resp.Body.Close()
 
-	// Omitting staged_decision should preserve prior value
+	// Omitting decision should default to undecided
 	body = `{"shortlisted":true,"review_flag":false}`
 	resp = doRequest(t, srv, "PATCH",
 		"/festivals/"+sc.festID+"/applications/"+sc.applicationID,
@@ -112,7 +112,7 @@ func TestPatchApplicationStagedDecision(t *testing.T) {
 	var app3 map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app3))
 	_ = resp.Body.Close()
-	assert.Nil(t, app3["staged_decision"]) // should still be null from the previous request
+	assert.Equal(t, "undecided", app3["decision"])
 }
 
 func TestReorderApplications(t *testing.T) {
@@ -133,7 +133,7 @@ func TestReorderApplications(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	body := `{"status":"submitted","ids":["` + appID2 + `","` + sc.applicationID + `"]}`
+	body := `{"status":"undecided","ids":["` + sc.applicationID + `","` + appID2 + `"]}`
 	resp := doRequest(t, srv, "POST",
 		"/festivals/"+sc.festID+"/applications/reorder",
 		body, sc.orgToken)

@@ -113,12 +113,12 @@ describe('reviewer scoring & panellist', () => {
       const app = apps.find((a: { id: string }) => a.id === appId)
       expect(app).toBeDefined()
       // Decision fields must be absent from the reviewer shape.
-      expect(app.staged_decision).toBeUndefined()
+      expect(app.decision).toBeUndefined()
+      expect(app.released_at).toBeUndefined()
       expect(app.shortlisted).toBeUndefined()
       expect(app.review_flag).toBeUndefined()
       expect(app.rank).toBeUndefined()
       expect(app.notes).toBeUndefined()
-      expect(app.status).toBeUndefined()
       expect(app.updated_at).toBeUndefined()
       // Scoring-relevant fields remain.
       expect(app.artist?.display_name).toBeDefined()
@@ -151,13 +151,15 @@ describe('reviewer scoring & panellist', () => {
     })
 
     // The advisory-boundary canary — the most important test in this suite.
-    it('reviewer CANNOT accept / decline / reorder / patch → 403', async () => {
-      const accept = await fetch(`${API}/festivals/${festivalId}/applications/${appId}/accept`, { method: 'POST', headers: auth(reviewerToken) })
-      expect(accept.status).toBe(403)
-      const decline = await fetch(`${API}/festivals/${festivalId}/applications/${appId}/decline`, { method: 'POST', headers: auth(reviewerToken) })
-      expect(decline.status).toBe(403)
+    it('reviewer CANNOT decide / release / reorder / patch → 403', async () => {
+      const decide = await fetch(`${API}/festivals/${festivalId}/applications/${appId}`, {
+        method: 'PATCH', headers: json(reviewerToken), body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
+      })
+      expect(decide.status).toBe(403)
+      const release = await fetch(`${API}/festivals/${festivalId}/applications/release-decisions`, { method: 'POST', headers: auth(reviewerToken) })
+      expect(release.status).toBe(403)
       const reorder = await fetch(`${API}/festivals/${festivalId}/applications/reorder`, {
-        method: 'POST', headers: json(reviewerToken), body: JSON.stringify({ status: 'submitted', ids: [appId] }),
+        method: 'POST', headers: json(reviewerToken), body: JSON.stringify({ status: 'undecided', ids: [appId] }),
       })
       expect(reorder.status).toBe(403)
       const patch = await fetch(`${API}/festivals/${festivalId}/applications/${appId}`, {
@@ -258,7 +260,7 @@ describe('reviewer scoring & panellist', () => {
         })
         expect(score.status).toBe(200)
         const stage = await fetch(`${API}/festivals/${rFest}/applications/${rApp}`, {
-          method: 'PATCH', headers: json(org.token), body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+          method: 'PATCH', headers: json(org.token), body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
         })
         expect(stage.status).toBe(409)
       })
@@ -268,7 +270,7 @@ describe('reviewer scoring & panellist', () => {
         expect(close.status).toBe(200)
         // Decisions now allowed.
         const stage = await fetch(`${API}/festivals/${rFest}/applications/${rApp}`, {
-          method: 'PATCH', headers: json(org.token), body: JSON.stringify({ shortlisted: false, review_flag: false, staged_decision: 'accept' }),
+          method: 'PATCH', headers: json(org.token), body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
         })
         expect(stage.status).toBe(200)
         // Reviewer can no longer score.

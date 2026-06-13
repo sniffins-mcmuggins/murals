@@ -31,14 +31,6 @@ UPDATE festivals SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL;
 -- name: ListPublicFestivals :many
 SELECT * FROM festivals WHERE deleted_at IS NULL AND status = $1 ORDER BY start_date ASC NULLS LAST, created_at DESC;
 
--- name: SetFestivalDecisionsReleasedAt :one
-UPDATE festivals
-SET decisions_released_at = now(), updated_at = now()
-WHERE id = $1
-  AND decisions_released_at IS NULL
-  AND deleted_at IS NULL
-RETURNING *;
-
 -- name: OpenReviewRound :one
 UPDATE festivals
 SET review_opened_at = now(), review_closed_at = NULL, updated_at = now()

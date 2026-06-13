@@ -49,13 +49,13 @@ const createMockApplication = (id: string, artistId: string, overrides = {}) => 
   id,
   form_id: 'form-1',
   artist_id: artistId,
-  status: 'submitted' as const,
+  decision: 'undecided' as const,
+  released_at: null as string | null,
   shortlisted: false,
   review_flag: false,
   rank: 0,
   answers: {},
   notes: [],
-  staged_decision: null as null,
   created_at: '2026-03-15T10:00:00Z',
   updated_at: '2026-03-15T10:00:00Z',
   ...overrides,
@@ -70,7 +70,7 @@ function wireApi(opts: {
 } = {}) {
   const routes: Record<string, unknown> = {
     '/festivals/{festivalID}/applications': ok(opts.applications ?? []),
-    '/festivals/{festivalID}': ok(opts.festival ?? { decisions_released_at: null }),
+    '/festivals/{festivalID}': ok(opts.festival ?? {}),
     // A reviewer (not organiser) gets 403 on the reviewers list → sentinel branch.
     '/festivals/{festivalID}/reviewers': opts.reviewer ? err(403) : ok([]),
     '/festivals/{festivalID}/form': ok(opts.form ?? { fields: [] }),
@@ -113,8 +113,8 @@ describe('Organiser ApplicationsReviewPage', () => {
   it('disables Release and flags the count when some apps are still undecided', async () => {
     wireApi({
       applications: [
-        createMockApplication('app-1', 'artist-1', { staged_decision: 'accept' }),
-        createMockApplication('app-2', 'artist-2', { staged_decision: null }),
+        createMockApplication('app-1', 'artist-1', { decision: 'accept' }),
+        createMockApplication('app-2', 'artist-2', { decision: 'undecided' }),
       ],
     })
     renderPage()
@@ -127,8 +127,8 @@ describe('Organiser ApplicationsReviewPage', () => {
   it('enables Release when every submitted app has a staged decision', async () => {
     wireApi({
       applications: [
-        createMockApplication('app-1', 'artist-1', { staged_decision: 'accept' }),
-        createMockApplication('app-2', 'artist-2', { staged_decision: 'decline' }),
+        createMockApplication('app-1', 'artist-1', { decision: 'accept' }),
+        createMockApplication('app-2', 'artist-2', { decision: 'decline' }),
       ],
     })
     renderPage()
@@ -138,7 +138,7 @@ describe('Organiser ApplicationsReviewPage', () => {
   })
 
   it('requires the confirmation checkbox before "Yes, release" is enabled', async () => {
-    wireApi({ applications: [createMockApplication('app-1', 'artist-1', { staged_decision: 'accept' })] })
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1', { decision: 'accept' })] })
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: /Release.*decisions/ }))
@@ -168,13 +168,36 @@ describe('Organiser ApplicationsReviewPage', () => {
 
   it('shows the read-only banner once decisions are released', async () => {
     wireApi({
-      applications: [createMockApplication('app-1', 'artist-1', { status: 'accepted' })],
-      festival: { decisions_released_at: '2026-05-15T10:00:00Z' },
+      applications: [createMockApplication('app-1', 'artist-1', {
+        decision: 'accept', released_at: '2026-05-15T10:00:00Z',
+      })],
     })
     renderPage()
     await waitFor(() => {
       expect(screen.getByText('Decisions released')).toBeInTheDocument()
       expect(screen.getByText('read-only')).toBeInTheDocument()
+    })
+  })
+
+  it('files a provisional accept (released_at null) in the Accept column', async () => {
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1', { decision: 'accept' })] })
+    renderPage()
+    // Pre-release header shows the decided count under the Accept column.
+    await screen.findByText('✓ Accept')
+    await waitFor(() => expect(screen.getByText(/1 decided/)).toBeInTheDocument())
+  })
+
+  it('files a released accept (released_at set) in the Accept column too', async () => {
+    wireApi({ applications: [createMockApplication('app-1', 'artist-1', {
+      decision: 'accept', released_at: '2026-05-15T10:00:00Z',
+    })] })
+    renderPage()
+    // Released → read-only banner, but the card still lands under Accept (count 1).
+    await waitFor(() => {
+      expect(screen.getByText('Decisions released')).toBeInTheDocument()
+      // header for the Accept column reads "✓ Accept (1)"
+      const acceptHeader = screen.getByText('✓ Accept').closest('div')
+      expect(acceptHeader?.textContent).toContain('(1)')
     })
   })
 

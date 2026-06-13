@@ -56,7 +56,7 @@ func TestListArtistFestivals_AcceptedAppears(t *testing.T) {
 	_, err = q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: fest.ID,
 		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err)
 
@@ -128,29 +128,25 @@ func TestListArtistFestivals_AssignedSpotAppears(t *testing.T) {
 	assert.Equal(t, festID, out[0].ID)
 }
 
-func TestListArtistFestivals_ExcludesDeclinedAndPending(t *testing.T) {
+func TestListArtistFestivals_ExcludesDeclinedApplicant(t *testing.T) {
+	// An artist who applied to a live festival but was declined (released, so no
+	// festival_artists lineup row and no spot) must not appear in public appearances.
+	// This exercises the negative branch of ListPublicFestivalsForArtist: the artist
+	// IS linked to the festival via an application, yet is correctly excluded.
 	t.Parallel()
 	db := testutil.NewDB(t)
-	q := sqlcdb.New(db)
 
 	orgID, _, _ := createTestUser(t, db)
 	artistUserID, _, _ := createTestUser(t, db)
-	artistID := createTestArtistProfile(t, db, artistUserID, "Rejected Artist")
+	artistID := createTestArtistProfile(t, db, artistUserID, "Declined Artist")
+	festID, _ := createTestFestival(t, db, orgID, "live")
+	createTestApplicationForm(t, db, festID)
+	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
-	declinedFest, _ := createTestFestival(t, db, orgID, "live")
-	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
-		FestivalID: pgUUID(t, declinedFest),
-		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusDeclined,
-	})
-	require.NoError(t, err)
-
-	invitedFest, _ := createTestFestival(t, db, orgID, "live")
-	_, err = q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
-		FestivalID: pgUUID(t, invitedFest),
-		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusInvited,
-	})
+	// Decline the application and release it: no lineup row, no spot.
+	_, err := db.Exec(context.Background(),
+		`UPDATE applications SET decision = 'decline', released_at = now() WHERE id = $1`,
+		pgUUID(t, appID))
 	require.NoError(t, err)
 
 	r := chi.NewRouter()
@@ -163,7 +159,7 @@ func TestListArtistFestivals_ExcludesDeclinedAndPending(t *testing.T) {
 	var out []appearanceResp
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	_ = resp.Body.Close()
-	assert.Empty(t, out)
+	assert.Empty(t, out, "declined applicant must not appear in public appearances")
 }
 
 func TestListArtistFestivals_ExcludesNonPublicFestivals(t *testing.T) {
@@ -175,13 +171,13 @@ func TestListArtistFestivals_ExcludesNonPublicFestivals(t *testing.T) {
 	artistUserID, _, _ := createTestUser(t, db)
 	artistID := createTestArtistProfile(t, db, artistUserID, "Draft Artist")
 
-	// Accepted at a draft festival and an archived one — neither is public.
+	// Added to lineup at a draft festival and an archived one — neither is public.
 	for _, status := range []string{"draft", "archived"} {
 		festID, _ := createTestFestival(t, db, orgID, status)
 		_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 			FestivalID: pgUUID(t, festID),
 			ArtistID:   pgUUID(t, artistID),
-			Status:     sqlcdb.FestivalArtistStatusAccepted,
+			Source:     sqlcdb.FestivalArtistSourceApplication,
 		})
 		require.NoError(t, err)
 	}
@@ -212,7 +208,7 @@ func TestListArtistFestivals_OpenFestivalHasNoMapSlug(t *testing.T) {
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, openFest),
 		ArtistID:   pgUUID(t, artistID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err)
 
@@ -281,9 +277,8 @@ func TestAppearances_PreReleaseSpotDoesNotLeak(t *testing.T) {
 	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
 	q := sqlcdb.New(db)
-	dec := "accept"
 	_, err := q.UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
-		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, Decision: sqlcdb.ApplicationDecisionAccept,
 	})
 	require.NoError(t, err)
 

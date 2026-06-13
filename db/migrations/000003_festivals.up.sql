@@ -5,13 +5,13 @@
 --   active rows. 'closed' status added for festivals that have concluded but
 --   remain publicly visible (distinct from 'archived' which is organiser-
 --   hidden). center_lat/center_lng support the nearby-history overlay (E26).
--- festival_artists: M:N link (invited/accepted/declined). Pin coordinates
---   were removed in favour of dedicated festival_spots.
+-- festival_artists: the festival lineup (single source of truth for who's in).
+--   source records how the artist entered (application | invite).
 -- application_forms: one per festival; review_criteria is a jsonb array of
 --   per-criterion scoring rubrics.
 -- applications: artists' submissions. rank/shortlisted/review_flag support
---   the review round; staged_decision stages accept/waitlist/decline before
---   release.
+--   the review round; decision is the organiser's verdict and released_at marks
+--   when it became visible to the artist.
 -- application_scores: PK (application_id, reviewer_id, criterion_id) — one
 --   score per reviewer per criterion per application.
 -- festival_spots: organiser-placed map pins. mural_status records whether
@@ -36,7 +36,6 @@ CREATE TABLE festivals (
     deleted_at     timestamptz,
     created_at     timestamptz     NOT NULL DEFAULT now(),
     updated_at     timestamptz     NOT NULL DEFAULT now(),
-    decisions_released_at timestamptz,
     review_opened_at      timestamptz,
     review_closed_at      timestamptz,
     center_lat     numeric(9,6),
@@ -45,13 +44,14 @@ CREATE TABLE festivals (
 
 CREATE UNIQUE INDEX festivals_slug_idx ON festivals (slug) WHERE deleted_at IS NULL;
 
-CREATE TYPE festival_artist_status AS ENUM ('invited', 'accepted', 'declined');
+CREATE TYPE festival_artist_source AS ENUM ('application', 'invite');
 
--- pin_lat/pin_lng/w3w were removed; spots are now in festival_spots.
+-- festival_artists is the festival lineup (who's in). Membership = a row exists;
+-- source records how the artist got there. Spots live in festival_spots.
 CREATE TABLE festival_artists (
     festival_id uuid                   NOT NULL REFERENCES festivals(id) ON DELETE CASCADE,
     artist_id   uuid                   NOT NULL REFERENCES artist_profiles(id) ON DELETE CASCADE,
-    status      festival_artist_status NOT NULL DEFAULT 'invited',
+    source      festival_artist_source NOT NULL DEFAULT 'application',
     created_at  timestamptz            NOT NULL DEFAULT now(),
     updated_at  timestamptz            NOT NULL DEFAULT now(),
     PRIMARY KEY (festival_id, artist_id)
@@ -71,23 +71,22 @@ CREATE TABLE application_forms (
     review_criteria  jsonb       NOT NULL DEFAULT '[]'
 );
 
--- application_status: 'waitlisted' added for the review round.
-CREATE TYPE application_status AS ENUM ('submitted', 'accepted', 'declined', 'waitlisted');
+-- decision: the organiser's verdict — the single source of truth.
+-- released_at: when that verdict became visible to the artist (NULL = provisional).
+CREATE TYPE application_decision AS ENUM ('undecided', 'accept', 'waitlist', 'decline');
 
--- Column order: core fields, created/updated, then review fields (rank,
--- shortlisted, review_flag, staged_decision) in addition order.
 CREATE TABLE applications (
-    id              uuid               PRIMARY KEY DEFAULT gen_random_uuid(),
-    form_id         uuid               NOT NULL REFERENCES application_forms(id) ON DELETE CASCADE,
-    artist_id       uuid               NOT NULL REFERENCES artist_profiles(id) ON DELETE CASCADE,
-    status          application_status NOT NULL DEFAULT 'submitted',
-    answers         jsonb              NOT NULL DEFAULT '{}',
-    created_at      timestamptz        NOT NULL DEFAULT now(),
-    updated_at      timestamptz        NOT NULL DEFAULT now(),
-    rank            int                NOT NULL DEFAULT 0,
-    shortlisted     bool               NOT NULL DEFAULT false,
-    review_flag     bool               NOT NULL DEFAULT false,
-    staged_decision text               CHECK (staged_decision IN ('accept', 'waitlist', 'decline')),
+    id              uuid                 PRIMARY KEY DEFAULT gen_random_uuid(),
+    form_id         uuid                 NOT NULL REFERENCES application_forms(id) ON DELETE CASCADE,
+    artist_id       uuid                 NOT NULL REFERENCES artist_profiles(id) ON DELETE CASCADE,
+    answers         jsonb                NOT NULL DEFAULT '{}',
+    created_at      timestamptz          NOT NULL DEFAULT now(),
+    updated_at      timestamptz          NOT NULL DEFAULT now(),
+    rank            int                  NOT NULL DEFAULT 0,
+    shortlisted     bool                 NOT NULL DEFAULT false,
+    review_flag     bool                 NOT NULL DEFAULT false,
+    decision        application_decision NOT NULL DEFAULT 'undecided',
+    released_at     timestamptz,
     UNIQUE (form_id, artist_id)
 );
 

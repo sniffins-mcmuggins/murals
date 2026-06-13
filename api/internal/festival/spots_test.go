@@ -35,7 +35,7 @@ func setupSpotsScenario(t *testing.T, db *pgxpool.Pool) spotsScenario {
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, festID),
 		ArtistID:   pgUUID(t, artistProfileID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err)
 	return spotsScenario{orgToken: orgToken, orgID: orgID, festID: festID, artistProfileID: artistProfileID}
@@ -350,10 +350,9 @@ func TestSpots_ProvisionalAcceptIsSpotEligible(t *testing.T) {
 	profileID := createTestArtistProfile(t, db, artistUserID, "Prov Artist")
 	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
-	// Stage 'accept' WITHOUT releasing — no festival_artists row exists.
-	dec := "accept"
+	// Set decision to 'accept' WITHOUT releasing — no festival_artists row exists.
 	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
-		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, Decision: sqlcdb.ApplicationDecisionAccept,
 	})
 	require.NoError(t, err)
 
@@ -440,9 +439,8 @@ func TestSpots_RestagingAwayFromAcceptClearsSpot(t *testing.T) {
 	profileID := createTestArtistProfile(t, db, artistUserID, "Flip Artist")
 	appID := createTestApplicationInFestival(t, db, festID, artistUserID)
 
-	dec := "accept"
 	_, err := sqlcdb.New(db).UpdateApplicationFlags(t.Context(), sqlcdb.UpdateApplicationFlagsParams{
-		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, StagedDecision: &dec,
+		ID: pgUUID(t, appID), Shortlisted: false, ReviewFlag: false, Decision: sqlcdb.ApplicationDecisionAccept,
 	})
 	require.NoError(t, err)
 
@@ -468,9 +466,9 @@ func TestSpots_RestagingAwayFromAcceptClearsSpot(t *testing.T) {
 	require.Equal(t, http.StatusOK, ar.StatusCode)
 	_ = ar.Body.Close()
 
-	// Re-stage to decline — the spot assignment must be cleared.
+	// Set decision to decline — the spot assignment must be cleared.
 	pr := testutil.DoRequest(t, srv, "PATCH", "/festivals/"+festID+"/applications/"+appID,
-		`{"shortlisted":false,"review_flag":false,"staged_decision":"decline"}`, orgToken)
+		`{"shortlisted":false,"review_flag":false,"decision":"decline"}`, orgToken)
 	require.Equal(t, http.StatusOK, pr.StatusCode)
 	_ = pr.Body.Close()
 

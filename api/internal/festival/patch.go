@@ -15,8 +15,8 @@ import (
 )
 
 // PatchApplicationHandler handles PATCH /festivals/{festivalID}/applications/{applicationID}.
-// Accepts { "shortlisted": bool, "review_flag": bool, "staged_decision": string|null }.
-// staged_decision if provided must be "accept", "waitlist", "decline" or null (to clear).
+// Accepts { "shortlisted": bool, "review_flag": bool, "decision": string }.
+// decision must be one of "undecided", "accept", "waitlist", "decline" (default: "undecided").
 func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, err := auth.User(r.Context())
@@ -60,29 +60,41 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		// Released decisions are final: once an application has been published to
+		// the artist the board is read-only. Without this, a PATCH could flip a
+		// released 'accept' back to 'undecided' — leaving released_at set, so the
+		// artist's /me/applications would show the changed decision and the
+		// festival_artists lineup row would be orphaned.
+		if app.ReleasedAt.Valid {
+			httperr.Conflict(w, "application already released")
+			return
+		}
+
 		var req struct {
-			Shortlisted    bool    `json:"shortlisted"`
-			ReviewFlag     bool    `json:"review_flag"`
-			StagedDecision *string `json:"staged_decision"`
+			Shortlisted bool    `json:"shortlisted"`
+			ReviewFlag  bool    `json:"review_flag"`
+			Decision    *string `json:"decision"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			httperr.BadRequest(w, "invalid request body")
 			return
 		}
 
-		if req.StagedDecision != nil {
-			valid := map[string]bool{"accept": true, "waitlist": true, "decline": true}
-			if !valid[*req.StagedDecision] {
-				httperr.BadRequest(w, "staged_decision must be accept, waitlist, or decline")
+		decision := "undecided"
+		if req.Decision != nil {
+			valid := map[string]bool{"undecided": true, "accept": true, "waitlist": true, "decline": true}
+			if !valid[*req.Decision] {
+				httperr.BadRequest(w, "decision must be undecided, accept, waitlist, or decline")
 				return
 			}
+			decision = *req.Decision
 		}
 
 		updated, err := q.UpdateApplicationFlags(r.Context(), sqlcdb.UpdateApplicationFlagsParams{
-			ID:             appUUID,
-			Shortlisted:    req.Shortlisted,
-			ReviewFlag:     req.ReviewFlag,
-			StagedDecision: req.StagedDecision,
+			ID:          appUUID,
+			Shortlisted: req.Shortlisted,
+			ReviewFlag:  req.ReviewFlag,
+			Decision:    sqlcdb.ApplicationDecision(decision),
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -94,8 +106,8 @@ func PatchApplicationHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Invariant: a spot may only belong to a spot-eligible accept.
-		// If this application is no longer staged 'accept', clear any spot it holds.
-		if req.StagedDecision == nil || *req.StagedDecision != "accept" {
+		// If this application is no longer 'accept', clear any spot it holds.
+		if decision != "accept" {
 			if err := q.ClearSpotAssignmentForArtist(r.Context(), sqlcdb.ClearSpotAssignmentForArtistParams{
 				FestivalID: festUUID, ArtistID: app.ArtistID,
 			}); err != nil {
@@ -158,7 +170,7 @@ func ReorderApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		validStatuses := map[string]bool{"submitted": true, "accepted": true, "waitlisted": true, "declined": true}
+		validStatuses := map[string]bool{"undecided": true, "accept": true, "waitlist": true, "decline": true}
 		if !validStatuses[req.Status] {
 			httperr.BadRequest(w, "invalid status")
 			return
@@ -175,7 +187,13 @@ func ReorderApplicationsHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			if !ok {
 				return
 			}
-			if string(app.Status) != req.Status {
+			// Released applications are immutable (mirrors PatchApplicationHandler) —
+			// once published the board is read-only, so rank can't be reshuffled either.
+			if app.ReleasedAt.Valid {
+				httperr.Conflict(w, "application already released")
+				return
+			}
+			if string(app.Decision) != req.Status {
 				httperr.BadRequest(w, "application status mismatch: "+idStr)
 				return
 			}

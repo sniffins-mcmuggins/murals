@@ -250,17 +250,27 @@ describe('golden path', () => {
     const apps = await res.json()
     expect(Array.isArray(apps)).toBe(true)
     expect(apps.length).toBe(1)
-    expect(apps[0].status).toBe('submitted')
+    expect(apps[0].decision).toBe('undecided')
+    expect(apps[0].released_at).toBeNull()
   })
 
-  it('15. organiser accepts application', async () => {
-    const res = await fetch(
-      `${API}/festivals/${festivalId}/applications/${applicationId}/accept`,
+  it('15. organiser accepts application (decision + release)', async () => {
+    const patch = await fetch(
+      `${API}/festivals/${festivalId}/applications/${applicationId}`,
+      {
+        method: 'PATCH',
+        headers: { ...auth(organiserToken), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shortlisted: false, review_flag: false, decision: 'accept' }),
+      },
+    )
+    expect(patch.status).toBe(200)
+    expect((await json(patch)).decision).toBe('accept')
+
+    const release = await fetch(
+      `${API}/festivals/${festivalId}/applications/release-decisions`,
       { method: 'POST', headers: auth(organiserToken) },
     )
-    expect(res.status).toBe(200)
-    const data = await json(res)
-    expect(data.status).toBe('accepted')
+    expect(release.status).toBe(200)
   })
 
   it('16. accepted artist appears in festival roster (via spots endpoint)', async () => {

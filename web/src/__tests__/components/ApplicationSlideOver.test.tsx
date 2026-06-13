@@ -16,7 +16,8 @@ const baseApp = {
   id: 'app-1',
   form_id: 'form-1',
   artist_id: 'artist-1',
-  status: 'submitted' as const,
+  decision: 'undecided' as const,
+  released_at: null,
   shortlisted: false,
   review_flag: false,
   rank: 0,
@@ -59,30 +60,30 @@ describe('ApplicationSlideOver — owner mode (isReviewer=false)', () => {
   })
 
   it('shows Unstage button when a decision is staged', () => {
-    const appWithStaged = { ...baseApp, staged_decision: 'accept' as const }
+    const appWithStaged = { ...baseApp, decision: 'accept' as const }
     render(<ApplicationSlideOver {...baseProps} application={appWithStaged} isReviewer={false} isReleased={false} />)
     expect(screen.getByText('Unstage')).toBeInTheDocument()
   })
 
-  it('calls onStage with null when clicking Unstage', () => {
+  it('calls onStage with undecided when clicking Unstage', () => {
     const onStage = vi.fn()
-    const appWithStaged = { ...baseApp, staged_decision: 'accept' as const }
+    const appWithStaged = { ...baseApp, decision: 'accept' as const }
     render(<ApplicationSlideOver {...baseProps} application={appWithStaged} isReviewer={false} isReleased={false} onStage={onStage} />)
     fireEvent.click(screen.getByText('Unstage'))
-    expect(onStage).toHaveBeenCalledWith('app-1', null)
+    expect(onStage).toHaveBeenCalledWith('app-1', 'undecided')
   })
 
   it('clicking active decision pill unstages it', () => {
     const onStage = vi.fn()
-    const app = { ...baseApp, staged_decision: 'accept' as const }
+    const app = { ...baseApp, decision: 'accept' as const }
     render(<ApplicationSlideOver {...baseProps} application={app} isReviewer={false} isReleased={false} onStage={onStage} />)
     fireEvent.click(screen.getByText('✓ Accept'))
-    expect(onStage).toHaveBeenCalledWith('app-1', null)
+    expect(onStage).toHaveBeenCalledWith('app-1', 'undecided')
   })
 
-  it('shows status badge when post-release', () => {
-    const appWithStatus = { ...baseApp, status: 'accepted' as const }
-    render(<ApplicationSlideOver {...baseProps} application={appWithStatus} isReviewer={false} isReleased={true} />)
+  it('shows decision badge when post-release', () => {
+    const appReleased = { ...baseApp, decision: 'accept' as const, released_at: '2026-05-15T10:00:00Z' }
+    render(<ApplicationSlideOver {...baseProps} application={appReleased} isReviewer={false} isReleased={true} />)
     expect(screen.getByText('accepted')).toBeInTheDocument()
     expect(screen.queryByText('✓ Accept')).not.toBeInTheDocument()
   })

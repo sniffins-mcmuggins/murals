@@ -142,46 +142,6 @@ func TestListApplications_EnrichesWithSocialLinksAndBio(t *testing.T) {
 	assert.Equal(t, "https://ko-fi.com/canary", artist["support_url"])
 }
 
-func TestAcceptApplication(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-	sc := setupReviewScenario(t, db)
-
-	r := chi.NewRouter()
-	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/accept", festival.AcceptApplicationHandler(db, auth.NoopMailer{}))
-
-	srv := httptest.NewServer(r)
-	t.Cleanup(srv.Close)
-
-	resp := doRequest(t, srv, "POST", "/festivals/"+sc.festID+"/applications/"+sc.applicationID+"/accept", "", sc.orgToken)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var app map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app))
-	_ = resp.Body.Close()
-	assert.Equal(t, "accepted", app["status"])
-}
-
-func TestDeclineApplication(t *testing.T) {
-	t.Parallel()
-	db := testutil.NewDB(t)
-	sc := setupReviewScenario(t, db)
-
-	r := chi.NewRouter()
-	r.Use(auth.Middleware(db, testSecret))
-	r.Post("/festivals/{festivalID}/applications/{applicationID}/decline", festival.DeclineApplicationHandler(db, auth.NoopMailer{}))
-
-	srv := httptest.NewServer(r)
-	t.Cleanup(srv.Close)
-
-	resp := doRequest(t, srv, "POST", "/festivals/"+sc.festID+"/applications/"+sc.applicationID+"/decline", "", sc.orgToken)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var app map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&app))
-	_ = resp.Body.Close()
-	assert.Equal(t, "declined", app["status"])
-}
-
 func TestReview_ForbiddenForNonOwner(t *testing.T) {
 	t.Parallel()
 	db := testutil.NewDB(t)

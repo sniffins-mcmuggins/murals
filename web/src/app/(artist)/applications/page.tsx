@@ -6,14 +6,16 @@ import { apiClient } from '@/lib/api'
 import { formatDate, formatDateRange } from '@/lib/dates'
 import type { components } from '@render/api-client'
 
-type Application = components['schemas']['Application']
+type MyApplication = components['schemas']['MyApplication']
 type Festival = components['schemas']['Festival']
 
-const STATUS_COLOURS: Record<string, string> = {
-  submitted: 'bg-amber/20 text-amber',
-  accepted: 'bg-green-100 text-green-800',
-  declined: 'bg-clay/20 text-clay',
+// Artist-facing outcome: decision is null until the organiser releases decisions.
+const DECISION_DISPLAY: Record<string, { label: string; colour: string }> = {
+  accept: { label: 'Accepted', colour: 'bg-green-100 text-green-800' },
+  waitlist: { label: 'Waitlisted', colour: 'bg-amber/20 text-amber' },
+  decline: { label: 'Declined', colour: 'bg-clay/20 text-clay' },
 }
+const PENDING_DISPLAY = { label: 'Under review', colour: 'bg-light text-mid' }
 
 export default function ApplicationsPage() {
   const applicationsQuery = useQuery({
@@ -21,7 +23,7 @@ export default function ApplicationsPage() {
     queryFn: async () => {
       const res = await apiClient.GET('/me/applications', {})
       if (res.error) throw new Error('Failed to load applications')
-      return (res.data ?? []) as Application[]
+      return (res.data ?? []) as MyApplication[]
     },
   })
 
@@ -64,7 +66,7 @@ export default function ApplicationsPage() {
         {!isLoading && applications.length > 0 && (
           <ul className="space-y-3">
             {applications.map((app, i) => {
-              const colour = STATUS_COLOURS[app.status ?? ''] ?? 'bg-light text-mid'
+              const display = app.decision ? (DECISION_DISPLAY[app.decision] ?? PENDING_DISPLAY) : PENDING_DISPLAY
               return (
                 <li
                   key={app.id}
@@ -79,9 +81,9 @@ export default function ApplicationsPage() {
                     )}
                   </div>
                   <span
-                    className={`font-mono text-xs uppercase tracking-wider px-2 py-0.5 rounded ${colour}`}
+                    className={`font-mono text-xs uppercase tracking-wider px-2 py-0.5 rounded ${display.colour}`}
                   >
-                    {app.status}
+                    {display.label}
                   </span>
                 </li>
               )

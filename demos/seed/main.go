@@ -153,6 +153,22 @@ func emailHandle(email string) string {
 	return email[:strings.Index(email, "@")]
 }
 
+// decisionFor maps a seed.yaml applicant status to the organiser's provisional
+// `decision`. "submitted" (no verdict yet) maps to 'undecided'. The application
+// stays unreleased (released_at NULL) — CPF is seeded mid-review, pre-release.
+func decisionFor(status string) string {
+	switch status {
+	case "accepted":
+		return "accept"
+	case "declined":
+		return "decline"
+	case "waitlisted":
+		return "waitlist"
+	default:
+		return "undecided"
+	}
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
@@ -383,19 +399,20 @@ func main() {
 				ans["link_"+p] = socialURL(p, handle)
 			}
 			answers, _ := json.Marshal(ans)
+			// A festival mid-review holds the organiser's verdict in `decision`
+			// with `released_at` still NULL; lineup (`festival_artists`) rows are
+			// only written when the organiser hits Release (ReleaseDecisionsHandler),
+			// which stamps released_at. Seeding `decision` with no release mirrors
+			// the reachable mid-review state — accepted artists remain spot-eligible
+			// via decision='accept' + released_at IS NULL (GetSpotEligibleArtist), so
+			// the map pins and public appearances still render. Leaving CPF
+			// un-released is what the organiser release/map demo clips need — they
+			// call Release themselves.
 			if _, err := conn.Exec(ctx,
-				`INSERT INTO applications (form_id, artist_id, status, answers)
+				`INSERT INTO applications (form_id, artist_id, decision, answers)
 				 VALUES ($1, $2, $3, $4)`,
-				formID, s.profileID, s.a.Status, string(answers)); err != nil {
+				formID, s.profileID, decisionFor(s.a.Status), string(answers)); err != nil {
 				log.Fatalf("insert application %s: %v", s.a.Name, err)
-			}
-			if s.a.Status == "accepted" {
-				if _, err := conn.Exec(ctx,
-					`INSERT INTO festival_artists (festival_id, artist_id, status)
-					 VALUES ($1, $2, 'accepted')`,
-					festivalID, s.profileID); err != nil {
-					log.Fatalf("insert festival_artist %s: %v", s.a.Name, err)
-				}
 			}
 		}
 		fmt.Printf("  applications: %d\n", len(seeded))
@@ -504,6 +521,17 @@ func main() {
 		}
 
 		fmt.Printf("  festival:  %s (%s)\n", f.Slug, festivalID)
+	}
+
+	// Invariant: an undecided application can never be released.
+	var bad int
+	if err := conn.QueryRow(ctx, `
+		SELECT count(*) FROM applications
+		WHERE decision = 'undecided' AND released_at IS NOT NULL`).Scan(&bad); err != nil {
+		log.Fatalf("invariant check failed: %v", err)
+	}
+	if bad > 0 {
+		log.Fatalf("seed invariant violated: %d undecided applications have released_at set", bad)
 	}
 
 	fmt.Println("Demo seed complete ✓")

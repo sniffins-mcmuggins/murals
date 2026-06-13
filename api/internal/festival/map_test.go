@@ -34,7 +34,7 @@ func TestGetMapData_LiveFestivalReturnsPins(t *testing.T) {
 	_, err := q.AddFestivalArtist(context.Background(), sqlcdb.AddFestivalArtistParams{
 		FestivalID: pgUUID(t, festID),
 		ArtistID:   pgUUID(t, artistProfileID),
-		Status:     sqlcdb.FestivalArtistStatusAccepted,
+		Source:     sqlcdb.FestivalArtistSourceApplication,
 	})
 	require.NoError(t, err, "add festival artist")
 
