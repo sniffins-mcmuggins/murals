@@ -78,9 +78,9 @@ export function useApplicationReview(festivalId: string) {
     queryClient.invalidateQueries({ queryKey: ['festival-applications', festivalId] })
 
   const stageMutation = useMutation({
-    mutationFn: async ({ appId, stagedDecision, shortlisted, reviewFlag }: {
+    mutationFn: async ({ appId, decision, shortlisted, reviewFlag }: {
       appId: string
-      stagedDecision: string | null
+      decision: string
       shortlisted: boolean
       reviewFlag: boolean
     }) => {
@@ -89,15 +89,15 @@ export function useApplicationReview(festivalId: string) {
         body: {
           shortlisted,
           review_flag: reviewFlag,
-          staged_decision: stagedDecision as 'accept' | 'waitlist' | 'decline' | null | undefined,
+          decision: decision as 'undecided' | 'accept' | 'waitlist' | 'decline',
         },
       })
       if (res.error) throw new Error('Stage failed')
     },
-    onMutate: ({ appId, stagedDecision, shortlisted }) => {
+    onMutate: ({ appId, decision, shortlisted }) => {
       const snapshot = localApps
       setLocalApps(prev => prev?.map(a =>
-        a.id === appId ? { ...a, staged_decision: stagedDecision as Application['staged_decision'], shortlisted } : a
+        a.id === appId ? { ...a, decision: decision as Application['decision'], shortlisted } : a
       ) ?? null)
       return { snapshot }
     },
@@ -129,7 +129,7 @@ export function useApplicationReview(festivalId: string) {
         body: {
           shortlisted,
           review_flag: reviewFlag,
-          staged_decision: (app?.staged_decision ?? null) as 'accept' | 'waitlist' | 'decline' | null | undefined,
+          decision: (app?.decision ?? 'undecided') as 'undecided' | 'accept' | 'waitlist' | 'decline',
         },
       })
       if (res.error) throw new Error('Patch failed')
@@ -181,10 +181,10 @@ export function useApplicationReview(festivalId: string) {
   })
 
   const reorderMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
+    mutationFn: async ({ status, ids }: { status: string; ids: string[] }) => {
       const res = await apiClient.POST('/festivals/{festivalID}/applications/reorder', {
         params: { path: { festivalID: festivalId } },
-        body: { status: 'submitted', ids },
+        body: { status, ids },
       })
       if (res.error) throw new Error('Reorder failed')
     },
@@ -219,9 +219,11 @@ export function useApplicationReview(festivalId: string) {
   )
 
   const festivalData = festivalQuery.data as
-    { decisions_released_at?: string | null; review_status?: string; name?: string } | undefined
-  const isReleased = !!(festivalData?.decisions_released_at)
-  const releasedAt = festivalData?.decisions_released_at
+    { review_status?: string; name?: string } | undefined
+  // Release state now lives per-application: a festival is "released" once any
+  // application has a released_at stamp.
+  const isReleased = allApps.some(a => a.released_at != null)
+  const releasedAt = allApps.find(a => a.released_at != null)?.released_at ?? null
   const reviewStatus = festivalData?.review_status ?? 'not_started'
   const roundOpen = reviewStatus === 'open'
 

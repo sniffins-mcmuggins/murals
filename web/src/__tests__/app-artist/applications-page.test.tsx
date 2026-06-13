@@ -37,13 +37,13 @@ describe('ApplicationsPage', () => {
     expect(screen.getByText(/No applications yet/)).toBeInTheDocument()
   })
 
-  it('shows applications list with status and date', () => {
+  it('shows applications list with outcome and date', () => {
     const applications = [
       {
         id: 'app-1',
         form_id: 'form-1',
         artist_id: 'artist-1',
-        status: 'submitted',
+        decision: null, // not yet released → under review
         answers: {},
         created_at: '2026-03-15T10:00:00Z',
         updated_at: '2026-03-15T10:00:00Z',
@@ -52,7 +52,7 @@ describe('ApplicationsPage', () => {
         id: 'app-2',
         form_id: 'form-2',
         artist_id: 'artist-1',
-        status: 'accepted',
+        decision: 'accept', // released accept
         answers: {},
         created_at: '2026-02-01T10:00:00Z',
         updated_at: '2026-02-02T10:00:00Z',
@@ -62,7 +62,7 @@ describe('ApplicationsPage', () => {
       .mockReturnValueOnce({ data: applications, isLoading: false } as unknown as ReturnType<typeof useQuery>)
       .mockReturnValueOnce({ data: [], isLoading: false } as unknown as ReturnType<typeof useQuery>)
     render(React.createElement(ApplicationsPage))
-    expect(screen.getByText('submitted')).toBeInTheDocument()
-    expect(screen.getByText('accepted')).toBeInTheDocument()
+    expect(screen.getByText('Under review')).toBeInTheDocument()
+    expect(screen.getByText('Accepted')).toBeInTheDocument()
   })
 })

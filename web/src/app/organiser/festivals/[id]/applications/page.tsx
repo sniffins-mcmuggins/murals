@@ -22,18 +22,20 @@ const COLUMN_META: Record<ColumnKey, { label: string; headerClass: string; borde
   decline:     { label: '✗ Decline',    headerClass: 'text-clay',        borderColor: 'border-clay' },
 }
 
-function getColumn(app: Application, isReleased: boolean): ColumnKey {
-  if (isReleased) {
-    if (app.status === 'accepted') return 'accept'
-    if (app.status === 'waitlisted') return 'waitlist'
-    if (app.status === 'declined') return 'decline'
-    return app.shortlisted ? 'shortlisted' : 'undecided'
-  }
-  if (app.staged_decision === 'accept') return 'accept'
-  if (app.staged_decision === 'waitlist') return 'waitlist'
-  if (app.staged_decision === 'decline') return 'decline'
-  if (app.shortlisted) return 'shortlisted'
-  return 'undecided'
+// Decision is the single source of truth — the column resolves the same way
+// before and after release. `released_at` only controls read-only-ness, not placement.
+function getColumn(app: Application): ColumnKey {
+  if (app.decision === 'accept') return 'accept'
+  if (app.decision === 'waitlist') return 'waitlist'
+  if (app.decision === 'decline') return 'decline'
+  return app.shortlisted ? 'shortlisted' : 'undecided'
+}
+
+// Each column maps to the decision value its cards carry (shortlisted is just a
+// flag on otherwise-undecided apps). Used when reordering within a column.
+const COLUMN_DECISION: Record<ColumnKey, string> = {
+  undecided: 'undecided', shortlisted: 'undecided',
+  accept: 'accept', waitlist: 'waitlist', decline: 'decline',
 }
 
 type Props = { params: Promise<{ id: string }> }
@@ -126,14 +128,14 @@ function KanbanView({ festivalId }: { festivalId: string }) {
       undecided: [], shortlisted: [], accept: [], waitlist: [], decline: [],
     }
     for (const app of allApps) {
-      result[getColumn(app, isReleased)].push(app)
+      result[getColumn(app)].push(app)
     }
     return result
-  }, [allApps, isReleased])
+  }, [allApps])
 
-  const stagedCount = allApps.filter(a => a.staged_decision != null).length
-  const submittedUndecided = allApps.filter(a => a.status === 'submitted' && !a.staged_decision).length
-  const submittedApps = allApps.filter(a => a.status === 'submitted')
+  const decidedCount = allApps.filter(a => a.decision !== 'undecided').length
+  const submittedUndecided = allApps.filter(a => a.decision === 'undecided').length
+  const submittedApps = allApps.filter(a => a.released_at == null)
 
   function handleTriageShortlist(id: string, shortlisted: boolean) {
     const app = allApps.find(a => a.id === id)
@@ -151,7 +153,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     const app = allApps.find(a => a.id === appId)
     if (!app) return
 
-    const activeColumn = getColumn(app, isReleased)
+    const activeColumn = getColumn(app)
 
     // Resolve the target column: over.id is either a column key or a card id.
     const overId = over.id as string
@@ -161,7 +163,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
     } else {
       const overApp = allApps.find(a => a.id === overId)
       if (!overApp) return
-      targetColumn = getColumn(overApp, isReleased)
+      targetColumn = getColumn(overApp)
     }
 
     // Same column AND dropped on a card → reorder within the column.
@@ -178,21 +180,17 @@ function KanbanView({ festivalId }: { festivalId: string }) {
         const others = base.filter(a => !reorderedIds.has(a.id))
         return [...others, ...reordered]
       })
-      reorderMutation.mutate(reordered.map(a => a.id ?? ''))
+      reorderMutation.mutate({ status: COLUMN_DECISION[activeColumn], ids: reordered.map(a => a.id ?? '') })
       return
     }
 
     // Same column but dropped on empty background → no-op.
     if (activeColumn === targetColumn) return
 
-    // Different column → stage a decision (or clear it).
-    const decisionMap: Partial<Record<ColumnKey, string | null>> = {
-      accept: 'accept', waitlist: 'waitlist', decline: 'decline',
-      undecided: null, shortlisted: null,
-    }
+    // Different column → set the decision (undecided/shortlisted clear the verdict).
     stageMutation.mutate({
       appId,
-      stagedDecision: decisionMap[targetColumn] ?? null,
+      decision: COLUMN_DECISION[targetColumn],
       shortlisted: targetColumn === 'shortlisted',
       reviewFlag: app.review_flag ?? false,
     })
@@ -250,7 +248,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
           <h1 className="font-serif text-4xl text-ink">Applications</h1>
           {!isReleased && (
             <p className="font-mono text-xs text-mid mt-1 uppercase tracking-widest">
-              {allApps.length} total · {stagedCount} staged
+              {allApps.length} total · {decidedCount} decided
             </p>
           )}
         </div>
@@ -267,10 +265,10 @@ function KanbanView({ festivalId }: { festivalId: string }) {
               </button>
               <button
                 onClick={() => setShowReleaseModal(true)}
-                disabled={submittedUndecided > 0 || stagedCount === 0}
+                disabled={submittedUndecided > 0 || decidedCount === 0}
                 className="font-sans text-sm font-bold bg-amber text-ink px-5 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                Release {stagedCount > 0 ? `${stagedCount} ` : ''}decisions →
+                Release {decidedCount > 0 ? `${decidedCount} ` : ''}decisions →
               </button>
             </div>
             {submittedUndecided > 0 && (
@@ -382,7 +380,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
           <div className="bg-offwhite rounded-xl p-8 max-w-sm w-full mx-4 shadow-xl">
             <h2 className="font-serif text-2xl text-ink mb-2">Release decisions?</h2>
             <p className="font-sans text-sm text-mid mb-5">
-              Decisions will be sent to {stagedCount} {stagedCount === 1 ? 'artist' : 'artists'} simultaneously. This cannot be undone.
+              Decisions will be sent to {decidedCount} {decidedCount === 1 ? 'artist' : 'artists'} simultaneously. This cannot be undone.
             </p>
             <label className="flex items-start gap-3 cursor-pointer mb-6">
               <input
@@ -392,7 +390,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
                 className="mt-0.5 accent-amber h-4 w-4 flex-shrink-0"
               />
               <span className="font-sans text-sm text-ink">
-                I understand all {stagedCount} {stagedCount === 1 ? 'artist' : 'artists'} will be notified at the same time and this cannot be undone
+                I understand all {decidedCount} {decidedCount === 1 ? 'artist' : 'artists'} will be notified at the same time and this cannot be undone
               </span>
             </label>
             <div className="flex gap-3 justify-end">
@@ -438,7 +436,7 @@ function KanbanView({ festivalId }: { festivalId: string }) {
           if (!app) return
           stageMutation.mutate({
             appId: id,
-            stagedDecision: decision,
+            decision,
             shortlisted: app.shortlisted ?? false,
             reviewFlag: app.review_flag ?? false,
           })

@@ -32,7 +32,7 @@ interface Props {
   formFields: FormField[]
   festivalId: string
   onClose: () => void
-  onStage: (id: string, decision: string | null) => void
+  onStage: (id: string, decision: string) => void
   onScore: (id: string, score: number, criterionId?: string) => void
   isReviewer: boolean
   isPending: boolean
@@ -194,7 +194,7 @@ export function ApplicationSlideOver({
               <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
               <div className="flex gap-2 flex-wrap">
                 {(['accept', 'waitlist', 'decline'] as const).map(decision => {
-                  const isActive = application.staged_decision === decision
+                  const isActive = application.decision === decision
                   const styles: Record<string, string> = {
                     accept: isActive ? 'bg-green-100 border-green-400 text-green-800' : 'border-light text-mid hover:border-green-300',
                     waitlist: isActive ? 'bg-amber/20 border-amber text-ink' : 'border-light text-mid hover:border-amber',
@@ -203,7 +203,7 @@ export function ApplicationSlideOver({
                   return (
                     <button
                       key={decision}
-                      onClick={() => onStage(id, isActive ? null : decision)}
+                      onClick={() => onStage(id, isActive ? 'undecided' : decision)}
                       disabled={isPending}
                       className={`font-sans text-xs border px-3 py-1.5 rounded-lg capitalize transition-colors disabled:opacity-50 ${styles[decision]}`}
                     >
@@ -212,9 +212,9 @@ export function ApplicationSlideOver({
                   )
                 })}
               </div>
-              {application.staged_decision && (
+              {application.decision !== 'undecided' && (
                 <button
-                  onClick={() => onStage(id, null)}
+                  onClick={() => onStage(id, 'undecided')}
                   disabled={isPending}
                   className="font-mono text-xs text-mid hover:text-ink mt-1 disabled:opacity-50"
                 >
@@ -229,12 +229,14 @@ export function ApplicationSlideOver({
             <div>
               <h3 className="font-mono text-xs text-mid uppercase tracking-widest mb-2">Decision</h3>
               <span className={`font-mono text-xs uppercase tracking-widest px-2 py-1 rounded ${
-                application.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                application.status === 'waitlisted' ? 'bg-amber/20 text-ink' :
-                application.status === 'declined' ? 'bg-red-100 text-clay' :
+                application.decision === 'accept' ? 'bg-green-100 text-green-800' :
+                application.decision === 'waitlist' ? 'bg-amber/20 text-ink' :
+                application.decision === 'decline' ? 'bg-red-100 text-clay' :
                 'bg-warm text-mid'
               }`}>
-                {application.status}
+                {application.decision === 'accept' ? 'accepted' :
+                 application.decision === 'waitlist' ? 'waitlisted' :
+                 application.decision === 'decline' ? 'declined' : application.decision}
               </span>
             </div>
           )}
