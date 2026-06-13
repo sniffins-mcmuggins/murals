@@ -153,11 +153,10 @@ func emailHandle(email string) string {
 	return email[:strings.Index(email, "@")]
 }
 
-// stagedDecisionFor maps a seed.yaml applicant status to the provisional
-// staged_decision an organiser would have set mid-review. "submitted" (no
-// decision yet) maps to a NULL staged_decision. Returning `any` lets nil pass
-// through pgx as SQL NULL.
-func stagedDecisionFor(status string) any {
+// decisionFor maps a seed.yaml applicant status to the organiser's provisional
+// `decision`. "submitted" (no verdict yet) maps to 'undecided'. The application
+// stays unreleased (released_at NULL) — CPF is seeded mid-review, pre-release.
+func decisionFor(status string) string {
 	switch status {
 	case "accepted":
 		return "accept"
@@ -166,7 +165,7 @@ func stagedDecisionFor(status string) any {
 	case "waitlisted":
 		return "waitlist"
 	default:
-		return nil
+		return "undecided"
 	}
 }
 
@@ -400,22 +399,19 @@ func main() {
 				ans["link_"+p] = socialURL(p, handle)
 			}
 			answers, _ := json.Marshal(ans)
-			// A festival mid-review holds decisions as `staged_decision` on a
-			// still-`submitted` application; the final `status` column and the
-			// `festival_artists` rows are only written when the organiser hits
-			// Release (festival.ReleaseDecisionsHandler), which also sets
-			// decisions_released_at. The applications board keys off staged_decision
-			// until that flag is set, so seeding the final `status` directly with no
-			// release stranded accepted artists in "Undecided". Mirror the reachable
-			// mid-review state instead: status stays 'submitted', the decision lives
-			// in staged_decision. Accepted artists remain spot-eligible via
-			// staged_decision='accept' (GetSpotEligibleArtist), so the map pins and
-			// public appearances still render. Leaving CPF un-released is also what
-			// the organiser release/map demo clips need — they call Release themselves.
+			// A festival mid-review holds the organiser's verdict in `decision`
+			// with `released_at` still NULL; lineup (`festival_artists`) rows are
+			// only written when the organiser hits Release (ReleaseDecisionsHandler),
+			// which stamps released_at. Seeding `decision` with no release mirrors
+			// the reachable mid-review state — accepted artists remain spot-eligible
+			// via decision='accept' + released_at IS NULL (GetSpotEligibleArtist), so
+			// the map pins and public appearances still render. Leaving CPF
+			// un-released is what the organiser release/map demo clips need — they
+			// call Release themselves.
 			if _, err := conn.Exec(ctx,
-				`INSERT INTO applications (form_id, artist_id, status, staged_decision, answers)
-				 VALUES ($1, $2, 'submitted', $3, $4)`,
-				formID, s.profileID, stagedDecisionFor(s.a.Status), string(answers)); err != nil {
+				`INSERT INTO applications (form_id, artist_id, decision, answers)
+				 VALUES ($1, $2, $3, $4)`,
+				formID, s.profileID, decisionFor(s.a.Status), string(answers)); err != nil {
 				log.Fatalf("insert application %s: %v", s.a.Name, err)
 			}
 		}
@@ -525,6 +521,17 @@ func main() {
 		}
 
 		fmt.Printf("  festival:  %s (%s)\n", f.Slug, festivalID)
+	}
+
+	// Invariant: an undecided application can never be released.
+	var bad int
+	if err := conn.QueryRow(ctx, `
+		SELECT count(*) FROM applications
+		WHERE decision = 'undecided' AND released_at IS NOT NULL`).Scan(&bad); err != nil {
+		log.Fatalf("invariant check failed: %v", err)
+	}
+	if bad > 0 {
+		log.Fatalf("seed invariant violated: %d undecided applications have released_at set", bad)
 	}
 
 	fmt.Println("Demo seed complete ✓")
