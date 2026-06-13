@@ -485,11 +485,6 @@ components:
         updated_at:
           type: string
           format: date-time
-        decisions_released_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Set once when Release Decisions is triggered; null until then
         review_opened_at:
           type: string
           format: date-time
@@ -603,10 +598,6 @@ components:
           type: string
           format: date-time
 
-    ApplicationStatus:
-      type: string
-      enum: [submitted, accepted, declined, waitlisted]
-
     Application:
       type: object
       properties:
@@ -619,19 +610,21 @@ components:
         artist_id:
           type: string
           format: uuid
-        status:
-          $ref: "#/components/schemas/ApplicationStatus"
+        decision:
+          type: string
+          enum: [undecided, accept, waitlist, decline]
+          description: Organiser's verdict — defaults to undecided
+        released_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the decision was published to the artist; null while provisional
         rank:
           type: integer
         shortlisted:
           type: boolean
         review_flag:
           type: boolean
-        staged_decision:
-          type: string
-          nullable: true
-          enum: [accept, waitlist, decline]
-          description: Organiser's staged decision — null until dragged to a column
         answers:
           type: object
         created_at:
@@ -662,7 +655,7 @@ components:
 
     MyApplication:
       type: object
-      required: [id, form_id, artist_id, status, answers, created_at, updated_at]
+      required: [id, form_id, artist_id, answers, created_at, updated_at]
       properties:
         id:
           type: string
@@ -673,8 +666,11 @@ components:
         artist_id:
           type: string
           format: uuid
-        status:
-          $ref: "#/components/schemas/ApplicationStatus"
+        decision:
+          type: string
+          nullable: true
+          enum: [accept, waitlist, decline]
+          description: Outcome shown to the artist; null until decisions are released
         answers:
           type: object
           additionalProperties: true
@@ -2748,99 +2744,6 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /festivals/{festivalID}/applications/{applicationID}/accept:
-    parameters:
-      - name: festivalID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: applicationID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    post:
-      tags: [festival]
-      summary: Accept an application
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Updated application
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Application"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /festivals/{festivalID}/applications/{applicationID}/decline:
-    parameters:
-      - name: festivalID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: applicationID
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-    post:
-      tags: [festival]
-      summary: Decline an application
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Updated application
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Application"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /festivals/{festivalID}/applications/{applicationID}/waitlist:
-    post:
-      tags: [festivals]
-      summary: Waitlist an application
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: festivalID
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: applicationID
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: Application waitlisted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Application"
-
   /festivals/{festivalID}/applications/{applicationID}:
     patch:
       tags: [festivals]
@@ -2872,10 +2775,10 @@ paths:
                   type: boolean
                 review_flag:
                   type: boolean
-                staged_decision:
+                decision:
                   type: string
-                  nullable: true
-                  enum: [accept, waitlist, decline]
+                  enum: [undecided, accept, waitlist, decline]
+                  description: Organiser's verdict; defaults to undecided when omitted
       responses:
         "200":
           description: Flags updated
